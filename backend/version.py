@@ -1,4 +1,4 @@
-"""The released version (major.minor), shown in Settings and on /health.
+"""The released version (major.minor[.patch]), shown in Settings and on /health.
 
 Its own module, free of imports, so Dockerfile.backend can stamp it into the
 image at build time (/opt/jobnavigator/image-version) without loading the app;

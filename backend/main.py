@@ -130,7 +130,7 @@ OPENAPI_TAGS = [
     {"name": "system", "description": "Health check and system info"},
 ]
 
-from backend.version import APP_VERSION  # noqa: E402 — released version (major.minor); Settings and /health
+from backend.version import APP_VERSION  # noqa: E402 — released version (major.minor[.patch]); Settings and /health
 
 app = FastAPI(
     title="JobNavigator API",
