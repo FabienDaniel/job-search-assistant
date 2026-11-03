@@ -4,15 +4,15 @@ All notable changes to JobNavigator are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-Releases are named major.minor ("3.2"), with a patch number when needed ("3.2.1"), and tagged with a `v` prefix (`v3.2`). Tags before 3.0 carry a `.0` patch (`v2.2.0`). The `3.1.1` tag has no `v` because it marks a point in history and publishes no images.
+Releases are named major.minor ("3.2"), with a patch number when needed ("3.2.1"), and tagged with a `v` prefix (`v3.2`). Tags before 3.0 carry a `.0` patch (`v2.2.0`).
 
 ## [Unreleased]
 
-### 2026-11-03
+## [3.1.1] — 2026-11-03
 
 Tag created to highlight the starting point of divergence with the original repository from **vesaias**.
 
-#### Added
+### Added
 - **Levels.fyi apply:** a Levels.fyi job whose own data names no employer link is applied to on Levels.fyi itself, so it counts like LinkedIn Easy Apply (Direct in the Link filter, Open goes to its Levels.fyi page) instead of a Board link.
 - **Default cover-letter template** (by @volkotyk): Settings › Cover letters › **Default template** picks the template a new letter starts with. **Same as résumé** (the default) gives the letter its résumé's template; **Last selected** gives it the template you last picked in the cover-letter editor, remembered per account and never shared with another; a template from the list goes on every new letter. When none applies (a blank letter, a letter from Persona, a Modern Professional résumé, nothing picked yet) the letter gets Garamond Modern. `PATCH /api/settings` rejects any other value with 422.
 - **Default résumé template:** Settings › Résumé & tailoring › **Default résumé template** picks the template a new résumé starts with (blank, imported, or tailored from Persona): **Last selected** (the default: the template you last picked in the résumé editor, remembered per account) or a template from the list. A copy tailored from a résumé keeps that résumé's template. Before any pick, the first template on the list, as before.
@@ -23,7 +23,7 @@ Tag created to highlight the starting point of divergence with the original repo
 - **Creative boards, Himalayas and Eluta follow-ups:** a job whose job-page read failed and left it with no text (Behance gives its text only there) is not saved but read again on the next run, so scoring never falls back to the board's script-drawn page; the editor blocks Run and Test of these modes until a search term is set; telemetry reports each Creative board on its own (`creative:behance`), as JobSpy boards are.
 - **Apify Behance and Hollylist boards** (by @volkotyk): paid fallbacks for the creative mode, `piotrv1001/behance-jobs-scraper` (about $1 per 1,000 jobs; full-time and contract jobs, no freelance briefs) and `datawatcher/hollylist-scraper` (about $1.90 per 1,000 jobs with text; members-only offers skipped). Neither applies Hours old. Neither actor applies Remote: on 2026-10-24 a Remote run returned only on-site rows (Behance's `isWorldwide` switch is not a remote filter, and Hollylist's `workType` let an on-site row through). So `isWorldwide` is not sent, and a Remote-only search drops the rows that Behance or the posting calls hybrid or on-site, as for Apify LinkedIn. Apify still bills those rows.
 
-#### Fixed
+### Fixed
 - **Levels.fyi jobs without text could never be scored:** when the scrape's visit to a job's Levels.fyi page failed, the job had no description, and scoring fell back to the page's visible text: only Levels.fyi's cookie banner and its "Levels.fyi Jobs" blurb, because the posting is drawn by script. The model then answered in prose and every try failed with "not valid JSON". Scoring now reads the description from the page's own data (and saves it on the job), never the banner; a job with no data left on Levels.fyi says there is no text to score. A reply that is not JSON is logged with its first 200 characters.
 - **Cover letters from a Modern Professional résumé** (by @volkotyk): a generated letter took the résumé's template, and `modern` has no cover-letter version, so the letter failed to render ("Unknown template: 'modern'"). Such a letter now gets Garamond Modern, and a letter already stored with a template this install does not have renders with Garamond Modern, as a résumé does. A blank letter now starts with Garamond Modern instead of whichever template folder sorted first.
 
