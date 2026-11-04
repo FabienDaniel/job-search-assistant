@@ -13,11 +13,11 @@ const timeAgo = (s) => {
   if (!s) return ''
   const diff = Date.now() - new Date(s).getTime()
   const h = Math.floor(diff / 3600000)
-  if (h < 1) return 'just now'
-  if (h < 24) return `${h}h ago`
+  if (h < 1) return t`just now`
+  if (h < 24) return t`${h}h ago`
   const days = Math.floor(h / 24)
-  if (days < 21) return `${days}d ago`
-  return `${Math.floor(days / 7)}w ago`
+  if (days < 21) return t`${days}d ago`
+  return t`${Math.floor(days / 7)}w ago`
 }
 const scoreColor = (s) => (s >= 70 ? 'var(--good)' : s >= 50 ? 'var(--warn)' : 'var(--bad)')
 
@@ -43,8 +43,8 @@ const chipTitle = (c, baseName, avgFit) => {
   return [
     baseName,
     copyLabel(c),
-    c.score != null ? `fit ${c.score}${d != null ? ` (${d >= 0 ? '+' : ''}${d} vs ${baseName} avg)` : ''}` : null,
-    c.fresh ? 'changes unreviewed' : null,
+    c.score != null ? t`fit ${c.score}${d != null ? t` (${d >= 0 ? '+' : ''}${d} vs ${baseName} avg)` : ''}` : null,
+    c.fresh ? t`changes unreviewed` : null,
   ].filter(Boolean).join(' · ')
 }
 // layout half of the chip-row label; the type is `Label`'s (ui.jsx)
@@ -292,7 +292,7 @@ export default function V2Resumes() {
                 )
               })}
               {archived.length > 0 && (
-                <ArchiveBand onClick={() => setShowArchived(true)} action="browse ›">
+                <ArchiveBand onClick={() => setShowArchived(true)} action={t`browse ›`}>
                   {plural(archived.length, { one: 'Archived · # copy from rejected or stale applications', other: 'Archived · # copies from rejected or stale applications' })}
                 </ArchiveBand>
               )}

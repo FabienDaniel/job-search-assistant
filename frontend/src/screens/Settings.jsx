@@ -68,12 +68,12 @@ const KEYLESS = ['claude_code', 'codex_cli', 'antigravity_cli', 'ollama', 'lmstu
 // provider shows and saves the same key, so switching a slot's provider back keeps its key.
 const PROVIDER_KEY = { claude_api: 'anthropic_api_key', openai: 'openai_api_key', openrouter: 'openrouter_api_key', opencode_go: 'opencode_api_key' }
 const keyHelp = (prov, member) => t`Saved for ${PROVIDER_LABEL[prov] || prov}: every model slot on it uses this key.`
-  + (member || !PROVIDER_KEY[prov] ? '' : ` Empty uses ${PROVIDER_KEY[prov].toUpperCase()} from .env.`)
+  + (member || !PROVIDER_KEY[prov] ? '' : t` Empty uses ${PROVIDER_KEY[prov].toUpperCase()} from .env.`)
 // Provider settings whose value 'claude_code' makes the Claude Code token row relevant.
 const CLAUDE_CODE_SLOTS = ['llm_provider', 'scoring_llm_provider', 'llm_fallback_provider', 'cv_tailor_llm_provider',
   'cover_letter_llm_provider', 'autofill_llm_provider', 'email_llm_provider']
-const SLOT_NAMES = { llm_provider: 'Primary', scoring_llm_provider: 'Scoring', llm_fallback_provider: t`Scoring fallback`, cv_tailor_llm_provider: 'Tailoring',
-  cover_letter_llm_provider: t`Cover letters`, autofill_llm_provider: 'Autofill', email_llm_provider: t`Email classification` }
+const SLOT_NAMES = { llm_provider: t`Primary`, scoring_llm_provider: t`Scoring`, llm_fallback_provider: t`Scoring fallback`, cv_tailor_llm_provider: t`Tailoring`,
+  cover_letter_llm_provider: t`Cover letters`, autofill_llm_provider: t`Autofill`, email_llm_provider: t`Email classification` }
 
 // The value rows' fields are `Input` now (adornment slot and all), so the box
 // lives in ui.jsx with every other field. What is left here is the type these
@@ -81,10 +81,10 @@ const SLOT_NAMES = { llm_provider: 'Primary', scoring_llm_provider: 'Scoring', l
 // `style` so `Input` keeps owning ground, border, radius, shadow and height.
 const MONO_FIELD = { fontSize: 'var(--t-11-5)' }
 // Empty-options menu needs a reason string, not a bare box — ui.jsx's Select takes it as `emptyText`.
-const NO_MODELS = 'no models for this provider — add one under Model catalog'
+const NO_MODELS = t`no models for this provider — add one under Model catalog`
 const MASK = '••••••'
 // Effort picker options: '' leaves the choice to the model (or to the Primary, on an override row).
-const effortOptions = (list, emptyLabel) => [['', emptyLabel], ...list.map((v) => [v, `${v} effort`])]
+const effortOptions = (list, emptyLabel) => [['', emptyLabel], ...list.map((v) => [v, t`${v} effort`])]
 
 // Spread kb(fn) onto a span/div with onClick to make it focusable, announce a role, and fire fn on Enter/Space.
 // Local copy of the same helper in ResumeSections.jsx; focus ring is theme.css's `[tabindex="0"]:focus-visible`.
@@ -141,7 +141,7 @@ function TextBox({ value, onSave, width, mono, secret, placeholder, ariaLabel, i
       mono={mono} width={width || '340px'}
       // the show/hide toggle rides INSIDE the field's box — Input's `adornment` slot
       adornment={secret && !!value ? (
-        <Link onClick={toggleShown} ariaLabel={`${shown ? 'Hide' : 'Show'} ${ariaLabel || 'value'}`}
+        <Link onClick={toggleShown} ariaLabel={`${shown ? t`Hide` : t`Show`} ${ariaLabel || 'value'}`}
           style={{ whiteSpace: 'nowrap', flex: '0 0 auto' }}>
           {shown ? 'hide' : 'show'}
         </Link>
@@ -173,11 +173,11 @@ function CronBox({ value, onSave, width, ariaLabel, onInvalid }) {
   const parsed = expr && expr.split(/\s+/).length === 5 ? describeCron(expr) : null
   const bad = !!expr && !parsed
   const line = !expr ? 'off'
-    : bad ? 'invalid expression'
+    : bad ? t`invalid expression`
       // No `next` means either an expression that can never fire (31 February) — a warning — or one describeCron
       // declined to evaluate (an APScheduler extension it echoes back), which is not.
-      : `${parsed.text} UTC${parsed.next ? ` · next ${whenShort(parsed.next)} (your time)`
-        : (parsed.unparsed ? '' : ' · never fires')}`
+      : t`${parsed.text} UTC${parsed.next ? t` · next ${whenShort(parsed.next)} (your time)`
+        : (parsed.unparsed ? '' : t` · never fires`)}`
 
   return (
     // the description reserves its own line, so the row's height is the same
@@ -320,7 +320,7 @@ export default function Settings() {
   const hasMe = !!me
   const isOwner = !!me && me.role === 'owner'
   const member = multi && !isOwner
-  const ownerName = (acctData?.accounts || []).find((a) => a.role === 'owner')?.name || 'the owner'
+  const ownerName = (acctData?.accounts || []).find((a) => a.role === 'owner')?.name || t`the owner`
   const unlocked = !!unlockedUntil
   // the unlock ends on its own after 15 minutes
   useEffect(() => {
@@ -344,7 +344,7 @@ export default function Settings() {
     setPolicies((p) => ({ ...p, [policyFor]: { ...(p[policyFor] || {}), [section]: mode } }))
     try {
       await api.patch('/settings/policies', { account_id: policyFor, section, mode })
-      flash(mode === 'own' ? `${who} keeps their own ${title}` : `${who} inherits your ${title}`)
+      flash(mode === 'own' ? t`${who} keeps their own ${title}` : t`${who} inherits your ${title}`)
     } catch (e) {
       setPolicies((p) => ({ ...p, [policyFor]: { ...(p[policyFor] || {}), [section]: prev } }))
       flash(errorText(e, t`Could not change the policy`), true)
@@ -437,7 +437,7 @@ export default function Settings() {
       // warning — a green "Saved" over that would read as if nothing went wrong.
       const w = Array.isArray(data?.warnings) ? data.warnings.filter(Boolean) : []
       if (w.length) flash(String(w[0]), true)
-      else flash('Saved')
+      else flash(t`Saved`)
       return true
     } catch (e) {
       console.error(e)
@@ -513,32 +513,32 @@ export default function Settings() {
     if (typeof vp === 'string') { try { vp = JSON.parse(vp) } catch { vp = [] } }
     const voiceOpts = (Array.isArray(vp) ? vp : []).filter((v) => v && v.id).map((v) => [v.id, v.label || v.id])
     const curVoice = S.cover_letter_default_voice
-    if (curVoice && !voiceOpts.some((o) => o[0] === curVoice)) voiceOpts.push([curVoice, `${curVoice} — not in presets`])
+    if (curVoice && !voiceOpts.some((o) => o[0] === curVoice)) voiceOpts.push([curVoice, t`${curVoice} — not in presets`])
     // Default template: the two rules on top, then the templates on this install. A stored id
     // this install does not have stays visible (letters follow the résumé then).
     const tplOpts = [['same_as_resume', t`Same as résumé`], ['last_selected', t`Last selected`],
       ...letterTemplates.map((t) => [t.id, t.name || t.id])]
     const curTpl = S.cover_letter_template
-    if (curTpl && !tplOpts.some((o) => o[0] === curTpl)) tplOpts.push([curTpl, `${curTpl} — not on this install`])
+    if (curTpl && !tplOpts.some((o) => o[0] === curTpl)) tplOpts.push([curTpl, t`${curTpl} — not on this install`])
     const resTplOpts = [['last_selected', t`Last selected`], ...resumeTemplates.map((t) => [t.id, t.name || t.id])]
     const curResTpl = S.resume_template
-    if (curResTpl && !resTplOpts.some((o) => o[0] === curResTpl)) resTplOpts.push([curResTpl, `${curResTpl} — not on this install`])
+    if (curResTpl && !resTplOpts.some((o) => o[0] === curResTpl)) resTplOpts.push([curResTpl, t`${curResTpl} — not on this install`])
 
     // QA F2 / D2: the owner's "Accounts" section (one account too) / a member's "Your account" comes first.
     // Their bodies are not rows (`block`), so they carry no row list and match the search by title.
     const people = !hasMe ? [] : isOwner
-      ? [['accounts', 'People', 'Accounts', '', [], 'accounts']]
-      : [['account', 'You', t`Your account`, '', [], 'account']]
+      ? [['accounts', t`People`, t`Accounts`, '', [], 'accounts']]
+      : [['account', t`You`, t`Your account`, '', [], 'account']]
     // which LLM slots currently run on a given provider (override slots default to empty = follow Primary)
     const usedBy = (prov) => CLAUDE_CODE_SLOTS.filter((k) => val(k, k === 'llm_provider' ? 'claude_api' : '') === prov).map((k) => SLOT_NAMES[k])
     // the (i) line that says why a provider row is showing: which model settings below use it
-    const usedLine = (prov) => { const s = usedBy(prov); return s.length ? ` Model settings using ${(PROVIDER_LABEL[prov] || prov).replace(/\s*\(.*\)$/, '')}: ${s.join(', ')}.` : '' }
+    const usedLine = (prov) => { const s = usedBy(prov); return s.length ? t` Model settings using ${(PROVIDER_LABEL[prov] || prov).replace(/\s*\(.*\)$/, '')}: ${s.join(', ')}.` : '' }
     const primaryProv = val('llm_provider', 'claude_api')
     return [
       ...people,
       // Appearance, Theme and Language live in this browser's localStorage: no `key`, never PATCH /settings.
       // They sit first because they change what every screen below looks like.
-      ['appearance', 'General', 'Display', '', [
+      ['appearance', t`General`, t`Display`, '', [
         { kind: 'appearance', label: t`Appearance`, help: t`Light, dark, or follow your OS. Saved in this browser.` },
         { kind: 'theme', label: t`Theme`, help: t`The app’s look: colours, fonts and shapes. Saved in this browser.` },
         { kind: 'language', label: t`Language`, help: t`The language of the app’s screens. Saved in this browser.` },
@@ -546,7 +546,7 @@ export default function Settings() {
         SW(t`Zoom control on postings`, t`The small + / − floater top-right of a posting.`, t`Hidden — postings open at last selected zoom level.`, 'feed_zoom_floater',
           { dflt: true, info: t`Zoom is remembered per browser, not per job: set it once and every posting opens at that size. Both the live page and the cached copy are frames, so zoom scales the frame and the page reflows to the new width.` }),
       ]],
-      ['models', 'AI', 'Models', '', [
+      ['models', 'AI', t`Models`, '', [
         { kind: 'pair', label: t`Primary provider · model`, help: t`Every AI feature uses this pair unless overridden below.`,
           pKey: 'llm_provider', mKey: 'llm_model', eKey: 'llm_effort',
           info: t`Providers: Claude API, Claude Code, Codex CLI (your ChatGPT subscription), Antigravity CLI (Google subscription), OpenCode Go (subscription), OpenAI, Ollama (local), LM Studio (local), OpenRouter. The model list shows that provider's models, including any you added under Model catalog. OpenRouter covers every vendor with one key but has no prompt-cache discount. The subscription CLIs are meant for attended use and have plan limits; a limit hit fails over to the fallback without retrying. Reasoning effort sets how much the model thinks before it answers: higher is slower and costs more. 'default effort' keeps the model's own default. Not every model takes every level; Claude Code steps down to the nearest level, the APIs return an error. Antigravity CLI sets effort in the model name, and Ollama and LM Studio have no effort setting. Antigravity's -high models can think for 5 minutes on a tailoring or a PDF import; -medium answers in under a minute.` },
@@ -571,12 +571,12 @@ export default function Settings() {
         B(t`Ollama address`, t`Empty uses OLLAMA_BASE_URL from .env.`, 'ollama_base_url', {
           info: 'With neither set: http://localhost:11434. The app runs in Docker, so Ollama on this computer is http://host.docker.internal:11434.' + usedLine('ollama'),
           mono: true, w: '340px', placeholder: effective.ollama_base_url, hide: () => member || (!multi && !usedBy('ollama').length) }),
-        LLM('Scoring', t`Model that scores new jobs against your résumés.`, 'scoring_llm'),
+        LLM(t`Scoring`, t`Model that scores new jobs against your résumés.`, 'scoring_llm'),
         LLM(t`Scoring fallback`, t`Retries scoring once on error or rate limit — scoring only.`, 'llm_fallback',
           { info: t`Used only when the scoring call fails or is rate-limited. One retry, then the job stays unscored until the next run. Choose a cheap model from a different provider than the primary.` }),
-        LLM('Tailoring', t`Model that rewrites résumé bullets for a posting.`, 'cv_tailor_llm'),
+        LLM(t`Tailoring`, t`Model that rewrites résumé bullets for a posting.`, 'cv_tailor_llm'),
         LLM(t`Cover letters`, t`Model that drafts letters from résumé + posting + Persona.`, 'cover_letter_llm'),
-        LLM('Autofill', t`Model that answers application-form questions in the extension.`, 'autofill_llm'),
+        LLM(t`Autofill`, t`Model that answers application-form questions in the extension.`, 'autofill_llm'),
         LLM(t`Email classification`, t`Model that sorts Gmail replies into application events.`, 'email_llm'),
         { kind: 'models', label: t`Model catalog`, help: t`Add new or unlisted models and remove your additions.`,
           info: t`Add models that are not in the built-in list. Search uses the provider’s catalog for OpenRouter, OpenAI, Claude and OpenCode Go. For Ollama/LM Studio, type the local model name. Removed models stay removed.` },
@@ -611,7 +611,7 @@ export default function Settings() {
         E(t`Voice presets`, t`One label and prompt per voice. Add more if you want.`, 'cover_letter_voice_presets', { json: true, sub: t`JSON — id, label, instruction per voice` }),
         E(t`Cover letter prompt`, t`The generation instruction.`, 'cover_letter_prompt', { sub: t`placeholders: {voice_instruction} {length_instruction} {job_description}` }),
       ]],
-      ['autofill', '', 'Autofill', '', [
+      ['autofill', '', t`Autofill`, '', [
         B(t`Default answer length`, t`Target length for form answers, in characters.`, 'autofill_default_length', { mono: true, int: true, w: '135px' }),
         E(t`Autofill prompt`, t`Answers as the candidate, from Persona autofill content only.`, 'autofill_prompt', { sub: t`placeholders: {persona} {qa_bank} {company} {position} {question} {max_chars}` }),
         E(t`Field patterns`, t`Maps form-field names to Persona fields.`, 'autofill_field_patterns', { json: true, sub: t`JSON — Persona field → name patterns` }),
@@ -630,9 +630,9 @@ export default function Settings() {
         { kind: 'button', lockKey: 'gmail_refresh_token', label: 'Gmail', help: t`The mailbox the email check reads for replies to your applications.`,
           previewBox: '260px', hide: () => !gmail || !(multi || (gmail.configured && gmail.source !== 'env')),
           preview: !gmail ? '' : gmail.status === 'expired' ? t`Expired — Google refused the token`
-            : gmail.status === 'connected' ? (gmail.source === 'env' ? t`Connected (from .env)` : 'Connected')
+            : gmail.status === 'connected' ? (gmail.source === 'env' ? t`Connected (from .env)` : t`Connected`)
               : gmail.configured ? t`Not connected` : t`Not set up on this install`,
-          btnLabel: gmail?.status === 'connected' && gmail.source === 'account' ? 'Disconnect'
+          btnLabel: gmail?.status === 'connected' && gmail.source === 'account' ? t`Disconnect`
             : gmail?.status === 'none' ? t`Connect Gmail ↗` : t`Reconnect ↗`,
           info: t`Connecting opens Google’s consent page (read-only access). The token is stored with this account only. The install’s Google OAuth client comes from GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET in .env.`,
           act: async () => {
@@ -652,15 +652,15 @@ export default function Settings() {
             return false
           } },
         SW(t`LLM classification`, t`Replies are auto-classified into interview / rejection / offer and attached to the right application.`, t`Disabled — replies only show as raw snippets.`, 'email_llm_enabled'),
-        B(t`Confidence threshold`, '0–100 — below this, the email is flagged for manual review instead.', 'email_llm_confidence_threshold', { mono: true, int: true, w: '135px' }),
+        B(t`Confidence threshold`, t`0–100 — below this, the email is flagged for manual review instead.`, 'email_llm_confidence_threshold', { mono: true, int: true, w: '135px' }),
         E(t`Classification prompt`, t`Labels + confidence + application hint.`, 'email_llm_prompt', { sub: t`placeholders: {applications} {from} {subject} {body}` }),
         E(t`Gmail query · subjects`, t`Subject terms the Gmail poll searches for.`, 'email_gmail_query_subjects', { list: true, sub: t`one term per line · OR-combined in the Gmail query` }),
         E(t`Gmail query · senders`, t`Extra sender domains treated as job-related email.`, 'email_gmail_query_senders', { list: true, sub: t`one domain per line` }),
         E(t`Gmail query · exclusions`, t`Ignore newsletters and job-alert email.`, 'email_gmail_query_exclusions', { list: true, sub: t`one term per line · appended as -term` }),
       ]],
-      ['scheduler', 'Pipeline', 'Scheduler', 'intervals in minutes (0 = off) · crons empty = off', [
+      ['scheduler', t`Pipeline`, t`Scheduler`, t`intervals in minutes (0 = off) · crons empty = off`, [
         B(t`Scrape all companies`, t`Runs every active company scrape on this interval.`, 'scrape_interval_minutes', { mono: true, int: true, w: '135px' }),
-        B(t`Scrapes at once`, '1 or 2. Run all, one company, one search and the scheduled scrape wait their turn beyond this.', 'scrape_max_concurrent', { mono: true, int: true, w: '135px',
+        B(t`Scrapes at once`, t`1 or 2. Run all, one company, one search and the scheduled scrape wait their turn beyond this.`, 'scrape_max_concurrent', { mono: true, int: true, w: '135px',
           info: t`Each scrape can start its own Chromium, so 1 keeps memory low: a second Run all, from you or another account, waits until the first finishes. A fetch another run made in the last 10 minutes is reused instead of downloaded again.` }),
         B(t`Email check`, t`Polls Gmail for replies to your applications.`, 'email_check_interval_minutes', { mono: true, int: true, w: '135px' }),
         B(t`Cleanup after`, t`Days before ignored and skipped job postings are removed.`, 'job_archive_after_days', { mono: true, int: true, w: '135px' }),
@@ -687,21 +687,21 @@ export default function Settings() {
         SEL(t`Same role, another city`, t`The same posting or role listed in another city: the same job number, or a word-for-word identical description.`, 'dedup_copy_city', [['ignored', t`Ignored — listed under ‘Also listed’`], ['new', t`New — stays in the feed`]], { w: '260px', dflt: 'ignored' }),
         SEL(t`Same role, new posting`, t`The same role posted again under a new id in the same city, with a word-for-word identical description (repost).`, 'dedup_copy_repost', [['ignored', t`Ignored — listed under ‘Also listed’`], ['new', t`New — stays in the feed`]], { w: '260px', dflt: 'ignored' }),
       ]],
-      ['notifications', 'Integrations', 'Notifications', '', [
+      ['notifications', t`Integrations`, t`Notifications`, '', [
         SW('Telegram', t`New high-scoring jobs and the daily digest are sent to your chat. The digest schedule is under Scheduler.`, t`Off — no push notifications.`, 'telegram_enabled'),
         // MT-17: a member sends through the household (owner's) bot or a bot of its own; the owner always uses the household bot.
-        SEL('Bot', t`Which Telegram bot sends your alerts and digest.`, 'telegram_bot_mode',
+        SEL(t`Bot`, t`Which Telegram bot sends your alerts and digest.`, 'telegram_bot_mode',
           [['household', t`Use the household bot`], ['own', t`Use my own bot`]], { w: '260px', dflt: 'household', hide: () => !member,
             info: t`The household bot is the one the owner set up. Your own bot comes from @BotFather; its token stays in your account. System alerts (scrape health) always go to the owner.` }),
         B(t`Bot token`, t`Your bot’s token from @BotFather.`, 'telegram_bot_token',
           { secret: true, mono: true, w: '340px', hide: () => !member || val('telegram_bot_mode', 'household') !== 'own' }),
         // From two accounts on: link the chat with a one-time code instead of looking up the chat id by hand.
         { kind: 'button', lockKey: 'telegram_chat_id', label: t`Link Telegram`, help: t`Links your Telegram chat to this account with a one-time code.`,
-          btnLabel: val('telegram_chat_id') ? 'Relink…' : 'Link…', previewBox: '260px', hide: () => !multi,
+          btnLabel: val('telegram_chat_id') ? t`Relink…` : t`Link…`, previewBox: '260px', hide: () => !multi,
           preview: val('telegram_chat_id') ? t`Linked · chat ${val('telegram_chat_id')}` : t`Not linked`,
           act: async () => {
             const { data } = await api.post('/telegram/link-code')
-            const bot = data.bot === 'own' ? 'your own bot' : 'the household bot'
+            const bot = data.bot === 'own' ? t`your own bot` : t`the household bot`
             await askText({ title: t`Link Telegram`,
               body: t`Send this to ${bot} in Telegram within 10 minutes (the number alone works too). The bot answers “Linked to ${data.account}”.`,
               value: `/start ${data.code}`, readOnly: true, mono: true, label: t`Done` })
@@ -709,10 +709,10 @@ export default function Settings() {
           } },
         B(t`Chat ID`, t`Your Telegram chat — get it by messaging @userinfobot.`, 'telegram_chat_id', { mono: true, w: '135px' }),
         B(t`Score threshold`, t`Only jobs scoring at or above this trigger an instant alert.`, 'fit_score_threshold', { mono: true, int: true, w: '135px' }),
-        BT('Test', t`Confirms the bot token and chat ID work end to end.`, t`Send test message`, () => api.post('/telegram/test'), { lockKey: 'telegram_chat_id' }),
+        BT(t`Test`, t`Confirms the bot token and chat ID work end to end.`, t`Send test message`, () => api.post('/telegram/test'), { lockKey: 'telegram_chat_id' }),
         { kind: 'button', lockKey: 'telegram_webhook_secret', label: t`Webhook secret`, help: t`Optional. Checks every call from Telegram to the backend. Alerts and the digest work without it.`,
-          btnLabel: 'Rotate', previewBox: '260px',
-          preview: S.telegram_webhook_secret === MASK ? t`Set (hidden — rotate to view)` : (S.telegram_webhook_secret ? 'Set' : t`Not set`),
+          btnLabel: t`Rotate`, previewBox: '260px',
+          preview: S.telegram_webhook_secret === MASK ? t`Set (hidden — rotate to view)` : (S.telegram_webhook_secret ? t`Set` : t`Not set`),
           info: t`Telegram sends this secret with every webhook call. Calls with the wrong secret are rejected. After rotating, the new secret is shown once: copy it, then register the webhook again.`,
           act: async () => {
             const go = await ask({ title: t`Rotate the webhook secret?`, body: t`Telegram stops accepting the old one immediately — you must re-register the webhook afterwards.`, label: t`Rotate`, danger: true })
@@ -723,7 +723,7 @@ export default function Settings() {
           } },
         BT(t`Register webhook`, member && val('telegram_bot_mode', 'household') === 'own'
           ? t`Points your own bot at the public URL so its buttons and link codes reach the backend.`
-          : t`Points Telegram at your public URL so inbound bot commands reach the backend.`, 'Register…', async () => {
+          : t`Points Telegram at your public URL so inbound bot commands reach the backend.`, t`Register…`, async () => {
           // R6-08: own bot without a token has nothing to register (the server says owner_only)
           if (member && val('telegram_bot_mode', 'household') === 'own' && !val('telegram_bot_token')) {
             flash(t`Add your bot token above first — then register its webhook.`, true); return false
@@ -741,8 +741,8 @@ export default function Settings() {
           { info: t`Each application gets its own short link for every document link. When a recruiter opens one, it is recorded in Stats for that application.` }),
         B(t`Base URL`, t`Your tracked link domain.`, 'tracer_links_base_url', { mono: true, w: '260px', placeholder: t`https://yourdomain.com` }),
         SEL(t`URL style`, t`Your domain must support the selected link style.`, 'tracer_links_url_style',
-          [['path', t`Path + random (/cv/a7x2kp)`], ['param', 'Param + random (?cv=a7x2kp)'],
-            ['path_jobid', t`Path + job ID (/cv/142li)`], ['param_jobid', 'Param + job ID (?cv=142li)']], { w: '260px', dflt: 'path' }),
+          [['path', t`Path + random (/cv/a7x2kp)`], ['param', t`Param + random (?cv=a7x2kp)`],
+            ['path_jobid', t`Path + job ID (/cv/142li)`], ['param_jobid', t`Param + job ID (?cv=142li)`]], { w: '260px', dflt: 'path' }),
       ]],
       ['apify', '', 'Apify', '', [
         B(t`Apify API key`, t`Used by Apify searches. Apify bills this account for each result.`, 'apify_api_key',
@@ -754,9 +754,9 @@ export default function Settings() {
         }),
       ]],
       ['jobright', '', 'Jobright.ai', '', [
-        B('Email', t`Your Jobright account.`, 'jobright_email', { w: '260px' }),
-        B('Password', t`Stored locally.`, 'jobright_password', { secret: true, w: '260px' }),
-        RO('Session', t`Signed in automatically the first time a Jobright search runs.`, 'jobright_session_id',
+        B(t`Email`, t`Your Jobright account.`, 'jobright_email', { w: '260px' }),
+        B(t`Password`, t`Stored locally.`, 'jobright_password', { secret: true, w: '260px' }),
+        RO(t`Session`, t`Signed in automatically the first time a Jobright search runs.`, 'jobright_session_id',
           { sinceKey: 'jobright_session_obtained_at', days: 60, clearLabel: t`Sign out`,
             clearKeys: ['jobright_session_id', 'jobright_session_obtained_at'],
             emptyText: t`Not signed in — the next Jobright run signs in for you.`,
@@ -773,12 +773,12 @@ export default function Settings() {
         B(t`Mock account password`, t`Stored locally only.`, 'linkedin_mock_password', { secret: true, w: '260px' }),
         { kind: 'linkedin', which: 'mock', lockKey: 'linkedin_email', label: t`Mock session`, help: t`Signed in with the mock account. The extension import uses it, and after every scrape it finds the direct apply link.` },
       ]],
-      ['advanced', 'System', 'Advanced', '', [
-        B(t`Proxy URL`, 'Used by scrapes that hit rate limits or geo-blocks. Empty = direct.', 'proxy_url', { mono: true, w: '340px', placeholder: t`socks5://127.0.0.1:9050` }),
+      ['advanced', t`System`, t`Advanced`, '', [
+        B(t`Proxy URL`, t`Used by scrapes that hit rate limits or geo-blocks. Empty = direct.`, 'proxy_url', { mono: true, w: '340px', placeholder: t`socks5://127.0.0.1:9050` }),
         { kind: 'apikey', label: t`Dashboard API key`, help: t`Saving refreshes the session cookie so iframes keep working.` },
         BT(t`DB backup`, t`DB snapshot now, outside the cron.`, t`Run backup`, () => api.post('/db/backup'), { ownerOnly: true }),
       ]],
-      ['telemetry', '', 'Telemetry', '', [
+      ['telemetry', '', t`Telemetry`, '', [
         { kind: 'telemetry', label: t`Allow anonymous telemetry`, help: PURPOSE,
           info: SENT_SUMMARY },
       ]],
@@ -947,7 +947,7 @@ export default function Settings() {
                     const sec = sidx?.byId?.[id]
                     if (isOwner && sec?.scope === 'policy') {
                       if (!policyFor) return null
-                      const name = (acctData?.accounts || []).find((a) => a.id === policyFor)?.name || 'Member'
+                      const name = (acctData?.accounts || []).find((a) => a.id === policyFor)?.name || t`Member`
                       return <PolicyToggle memberName={name} sectionTitle={title}
                         mode={policies[policyFor]?.[id] || sec.default} onChange={(m) => setPolicy(id, title, m)} />
                     }
@@ -1258,13 +1258,13 @@ function ApiKeyRow({ value, save, flash }) {
             style={{ whiteSpace: 'nowrap', flex: '0 0 auto' }}>{shown ? 'hide' : 'show'}</Link>
         )} />
       <ActionBtn label={t`Save key`} state="" ariaLabel={t`Save the dashboard API key`} onClick={async () => {
-        if (!local.trim()) { flash('Type the new key first', true); return }
+        if (!local.trim()) { flash(t`Type the new key first`, true); return }
         // If the PATCH failed, writing the key locally would lock the dashboard out on the next request — stop before touching localStorage.
         const saved = await save('dashboard_api_key', local.trim())
         if (!saved) return
         try { localStorage.setItem('jobnavigator_api_key', local.trim()) } catch {}
         try { await api.post('/auth/set-session', { api_key: local.trim() }) } catch { /* cookie refresh is best effort */ }
-        setLocal(''); flash('Key saved')
+        setLocal(''); flash(t`Key saved`)
       }} />
     </>
   )
@@ -1299,7 +1299,7 @@ function LinkedInRow({ which, li, setLi, flash }) {
         {phase === 'awaiting_pin' ? (li?.detail || t`LinkedIn emailed a PIN.`)
           : phase === 'running' ? (li?.detail || t`Signing in…`)
             : phase === 'failed' && li?.detail ? li.detail
-            : (li?.signed_in_as ? `${li.signed_in_as} · ` : '') + (li?.summary || 'Unknown')}
+            : (li?.signed_in_as ? `${li.signed_in_as} · ` : '') + (li?.summary || t`Unknown`)}
       </Helper>
       {phase === 'awaiting_pin' && (
         <>
@@ -1308,9 +1308,9 @@ function LinkedInRow({ which, li, setLi, flash }) {
           <ActionBtn label={t`Submit PIN`} state="" onClick={async () => {
             try {
               const { data } = await api.post('/linkedin/session/pin', { pin }, { params: { which } })
-              if (!data.ok) flash(data.detail || 'Enter the digits from the email', true)
-              else { setPin(''); flash('PIN sent') }
-            } catch (e) { flash(errorText(e, 'Could not send the PIN'), true) }
+              if (!data.ok) flash(data.detail || t`Enter the digits from the email`, true)
+              else { setPin(''); flash(t`PIN sent`) }
+            } catch (e) { flash(errorText(e, t`Could not send the PIN`), true) }
           }} />
         </>
       )}

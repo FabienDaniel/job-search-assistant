@@ -44,7 +44,7 @@ function computeChanges(base, copy) {
   if (!base || !copy) return []
   const out = []
   const sd = wordDiff(base.summary, copy.summary)
-  if (sd) out.push({ key: 'summary', where: 'Summary', kind: 'modified', path: 'summary', baseText: base.summary || '', ...sd })
+  if (sd) out.push({ key: 'summary', where: t`Summary`, kind: 'modified', path: 'summary', baseText: base.summary || '', ...sd })
   ;(copy.experience || []).forEach((ce, i) => {
     const be = (base.experience || [])[i] || {}
     const bb = be.bullets || [], cb = ce.bullets || []
@@ -64,9 +64,9 @@ function computeChanges(base, copy) {
 const timeAgo = (s) => {
   if (!s) return ''
   const m = Math.floor((Date.now() - new Date(s).getTime()) / 60000)
-  if (m < 1) return 'just now'; if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+  if (m < 1) return t`just now`; if (m < 60) return t`${m}m ago`
+  const h = Math.floor(m / 60); if (h < 24) return t`${h}h ago`
+  return t`${Math.floor(h / 24)}d ago`
 }
 
 // Shared field/section components live in ResumeSections.jsx so /persona can reuse them.
@@ -182,7 +182,7 @@ export default function ResumeEditor() {
   // the tailoring LLM against another base, or take a plain copy for fresh tracer links.
   const runRetailor = useCallback(async ({ mode, baseId }) => {
     setTailorOpen(false)
-    const company = jobData?.company || 'this job'
+    const company = jobData?.company || t`this job`
     try {
       if (mode === 'copy') {
         const { data } = await api.post('/resumes/copy', { base_resume_id: baseId, job_id: doc.job_id })
@@ -402,7 +402,7 @@ export default function ResumeEditor() {
     if (!isCopy) return null
     if (changes.length && !reviewed) return { label: plural(changes.length, { one: t`Review # change`, other: t`Review # changes` }), act: () => setReviewOpen(true) }
     const scoreable = !!doc.job_id || !!freeformJd
-    if (scoreable && scores.tailored == null) return { label: scoring ? 'Scoring…' : t`Score the result`, act: () => runScore('full') }
+    if (scoreable && scores.tailored == null) return { label: scoring ? t`Scoring…` : t`Score the result`, act: () => runScore('full') }
     if (!coverExists) return { label: t`✉ Write cover letter`, act: goCover }
     if (!doc.job_id) return { label: t`Ready ✓`, act: null, done: true }
     if (jobData?.status !== 'applied') return { label: t`Mark applied`, act: markApplied }
@@ -513,7 +513,7 @@ export default function ResumeEditor() {
 
   const counts = sectionCounts(data)
   const sectionNames = resumeSectionNames(doc)
-  const tplLabel = templates.find((t) => t.id === template)?.name || template || 'Template'
+  const tplLabel = templates.find((t) => t.id === template)?.name || template || t`Template`
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -564,7 +564,7 @@ export default function ResumeEditor() {
               {!ctxReady ? NBSP : <>
               {jobErr ? t`Couldn’t load the linked job.`
                 : jobless && !freeformJd ? t`No job or description linked, so this copy can’t be scored.`
-                  : (changes.length && !reviewed ? plural(changes.length, { one: '# reviewable change', other: '# reviewable changes' }) : scores.tailored == null ? t`not scored yet` : t`ready`)}
+                  : (changes.length && !reviewed ? plural(changes.length, { one: '# reviewable change', other: '# reviewable changes' }) : scores.tailored == null ? t`not scored yet` : 'ready')}
               {tracers.length > 0 && <> <Trans>· tracked links: {tracers.map((t) => `${t.source_label} ${t.clicks}`).join(' · ')}</Trans></>}
               </>}
             </Helper>
@@ -639,7 +639,7 @@ export default function ResumeEditor() {
             <SectionShell key={name} name={name} count={counts[name]} open={open.has(name)} onToggle={() => toggle(name)}
               meta={changedSections.has(name) ? <span title={t`Contains unreviewed tailoring changes`} style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--warn)' }}><Trans>● changed by tailoring</Trans></span> : null}>
               <SectionEditor name={name} data={data} setField={setField} mutate={mutate} baseData={baseData} onError={(msg) => pushToast({ kind: 'error', msg })}
-                onRemoved={(msg, undo) => pushToast({ kind: 'undo', msg, action: 'Undo', onAction: undo })} />
+                onRemoved={(msg, undo) => pushToast({ kind: 'undo', msg, action: t`Undo`, onAction: undo })} />
             </SectionShell>
           ))}
         </section>
@@ -663,7 +663,7 @@ export default function ResumeEditor() {
             </div>}
             {/* format */}
             {tplReady && <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-              <ToolbarTrigger label={t`Paper`} value={format === 'a4' ? 'A4' : 'US Letter'} line="inherit" title={t`Paper size`}
+              <ToolbarTrigger label={t`Paper`} value={format === 'a4' ? 'A4' : t`US Letter`} line={'inherit'} title={t`Paper size`}
                 onClick={() => { setFmtOpen((v) => !v); setTplOpen(false) }} />
               {fmtOpen && (
                   <Menu role="listbox" ariaLabel={t`Paper size`} style={{ position: 'absolute', top: '100%', left: 0, marginTop: 5, zIndex: 21, width: 130 }}>
@@ -768,8 +768,8 @@ function RetailorModal({ doc, job, chain, onClose, onRun, pushToast }) {
   const canRun = !!baseId && !disabled(baseId)
 
   const MODES = [
-    ['tailor', '✦ Tailor', t`Rewrites bullets against this job description`],
-    ['copy', 'Copy', t`Exact copy of the base, with its own tracked links`],
+    ['tailor', t`✦ Tailor`, t`Rewrites bullets against this job description`],
+    ['copy', t`Copy`, t`Exact copy of the base, with its own tracked links`],
   ]
 
   return (
@@ -781,7 +781,7 @@ function RetailorModal({ doc, job, chain, onClose, onRun, pushToast }) {
         <Helper>{mode === 'tailor' ? t`Runs in the background` : t`Instant — no LLM call`}</Helper>
         {mode === 'tailor' && <Helper size="xs" style={{ textWrap: 'pretty' }}>{chainNote(chain)}</Helper>}
       </>}
-      action={mode === 'tailor' ? '✦ Re-tailor' : 'Make copy'} actionVariant={mode === 'tailor' ? 'ai' : 'primary'} actionDisabled={!canRun}
+      action={mode === 'tailor' ? t`✦ Re-tailor` : t`Make copy`} actionVariant={mode === 'tailor' ? 'ai' : 'primary'} actionDisabled={!canRun}
       onAction={() => onRun({ mode, baseId })}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <Label><Trans>How</Trans></Label>
@@ -859,7 +859,7 @@ function TailorModal({ doc, chain, onClose, onRun, pushToast }) {
             `if chain_depth and job_id`), so a freeform run says nothing */}
         {pick && <Helper size="xs" style={{ textWrap: 'pretty' }}>{chainNote(chain)}</Helper>}
       </>}
-      action="✦ Tailor" actionVariant="ai" actionDisabled={!canRun} onAction={run}>
+      action={t`✦ Tailor`} actionVariant="ai" actionDisabled={!canRun} onAction={run}>
       <Check checked={personaBase} onChange={setPersonaBase} label={t`Tailor from Persona instead of this base`} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <Label><Trans>Pick a job · saved and scored first</Trans></Label>

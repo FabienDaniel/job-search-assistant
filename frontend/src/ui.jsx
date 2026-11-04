@@ -491,7 +491,7 @@ export function Textarea({ value, defaultValue, onChange, placeholder, rows = 3,
 // Both take the accent on focus from theme.css — no ring either way. The boxed
 // variant matches Input/Select's 32px box; the underline variant is a visually
 // different control with its own 36.
-export function SearchInput({ value, onChange, placeholder = 'Search…', variant = 'boxed', width, invalid, ariaLabel, style, className }) {
+export function SearchInput({ value, onChange, placeholder = t`Search…`, variant = 'boxed', width, invalid, ariaLabel, style, className }) {
   const under = variant === 'underline'
   const field = under
     ? {
@@ -1274,7 +1274,7 @@ export function PinPad({
 
   const msg = cooling
     ? t`Too many tries · try again in ${left}s`
-    : error || (busy ? 'Checking…' : hint || '')
+    : error || (busy ? t`Checking…` : hint || '')
   const bad = cooling || !!error
   return (
     <div className={className} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, ...style }}>
@@ -1941,11 +1941,11 @@ export function NavLink({ pad, onClick, title, ariaLabel, children, style, class
 // RemoveLink is the worded form ("Remove role") that closes a card; RemoveX the
 // glyph a single row carries. Both are muted at rest and swing to --hover-bad-*
 // on hover (`v2-hover-bad` washes the box, `v2-hover-bad-text` the ink).
-export const RemoveLink = ({ onClick, children = 'Remove' }) => (
+export const RemoveLink = ({ onClick, children = t`Remove` }) => (
   <span {...act(onClick, false)} className="v2-hover-bad v2-hover-bad-text"
     style={{ fontSize: 'var(--t-11-5)', lineHeight: '17px', color: 'var(--helper-ink)', cursor: 'pointer', whiteSpace: 'nowrap' }}>{children}</span>
 )
-export const RemoveX = ({ onClick, title = 'Remove', size = 11, lh }) => (
+export const RemoveX = ({ onClick, title = t`Remove`, size = 11, lh }) => (
   <span {...act(onClick, false)} title={title} aria-label={title} className="v2-hover-bad v2-hover-bad-text"
     style={{ flex: '0 0 auto', color: 'var(--helper-ink)', fontSize: size, cursor: 'pointer', lineHeight: lh }}>✕</span>
 )
@@ -2559,7 +2559,7 @@ export function ChoiceRow({
 // `note` is the footer's left column — a fragment of Helpers, not a string.
 export function ChoiceModal({
   width = 480, title, sub, subClamp, labelledBy, note,
-  cancel = 'Cancel', action, actionVariant, actionDisabled, actionBusy, onAction,
+  cancel = t`Cancel`, action, actionVariant, actionDisabled, actionBusy, onAction,
   bodyGap = 13, bodyMax = 460, onClose, zIndex = 60, children, style, className,
 }) {
   // Round 7 #4: where a themed caption bar exists, the modal's NAME lives there

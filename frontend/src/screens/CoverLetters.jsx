@@ -12,7 +12,7 @@ import '../theme.css'
 import { ago, agoShort } from '../time'
 import { fetchRunOutcome, runFailed, runFailureReason, useSettled, useWarm, NBSP, DASH } from '../hooks'
 
-export const LENGTHS = [['concise', 'Concise'], ['standard', 'Standard'], ['detailed', 'Detailed']]
+export const LENGTHS = [['concise', t`Concise`], ['standard', t`Standard`], ['detailed', t`Detailed`]]
 
 // Stage chip on a row mirrors the Applications stage colours.
 export const STAGE_CLASS = { applied: 'cc-smartrecruiters', interview: 'cc-workday', offer: 'cc-tier1', rejected: 'cc-generic' }
@@ -304,14 +304,14 @@ export default function CoverLetters() {
     const m = runMeta[r.run_id]
     if (m) return [m.label, m.voice, m.length].filter(Boolean).join(' · ')
     const j = jobs.find((x) => x.id === r.target_job_id)
-    return j ? (j.company ? `${j.company} — ${j.title}` : j.title) : 'a cover letter'
+    return j ? (j.company ? `${j.company} — ${j.title}` : j.title) : t`a cover letter`
   }
 
   // One row, dimmed with a neutral chip when it sits in the Not-active group
   const row = (c, arc) => {
     const bits = [c.source_name, presets.find((p) => p.id === c.voice)?.label || c.voice,
       LENGTHS.find(([id]) => id === c.length)?.[1] || c.length].filter(Boolean)
-    const sub = [...bits, `edited ${ago(c.updated_at)}`].join(' · ')
+    const sub = [...bits, t`edited ${ago(c.updated_at)}`].join(' · ')
     return (
       <Card key={c.id} onClick={() => navigate(`/cover-letters/${c.id}`)}
         style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px',
@@ -412,7 +412,7 @@ export default function CoverLetters() {
             {archived.length > 0 && (
               <ArchiveBand onClick={() => { if (!query.trim()) setArchOpen((v) => !v) }} title={query.trim() ? t`Archived letters are shown while you search` : undefined}
                 style={{ marginTop: 6 }}
-                action={query.trim() ? 'shown while searching' : showArch ? 'hide ⌄' : 'browse ›'}>
+                action={query.trim() ? t`shown while searching` : showArch ? t`hide ⌄` : t`browse ›`}>
                 {plural(archived.length, { one: 'Archived · # letter from rejected applications & skipped jobs', other: 'Archived · # letters from rejected applications & skipped jobs' })}
               </ArchiveBand>
             )}

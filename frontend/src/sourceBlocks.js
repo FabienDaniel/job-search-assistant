@@ -7,7 +7,7 @@ import { t } from '@lingui/core/macro'
 export const BLOCKED_BADGE = t`Often blocked`
 
 export const SOURCE_BLOCKS = {
-  zip_recruiter: 'ZipRecruiter redirects this scraper to a regional site that it does not read, or refuses its requests.',
+  zip_recruiter: t`ZipRecruiter redirects this scraper to a regional site that it does not read, or refuses its requests.`,
   google: t`Google usually returns a JavaScript check page instead of job data, and this scraper cannot read that page.`,
 }
 
@@ -15,7 +15,7 @@ export const SOURCE_BLOCKS = {
 // the reason under the mode note; the run then fails with the backend's text
 // (backend/scraper/sources/caribbeanjobs.py `CLOUDFLARE_BLOCKED`). Change both places together.
 export const MODE_BLOCKS = {
-  caribbeanjobs: 'caribbeanjobs.com answers many networks with a Cloudflare challenge, which this scraper does not pass. From such a network every run and Test fails and says so.',
+  caribbeanjobs: t`caribbeanjobs.com answers many networks with a Cloudflare challenge, which this scraper does not pass. From such a network every run and Test fails and says so.`,
 }
 
 // Terms notices for modes that scrape a site which discourages automated access.

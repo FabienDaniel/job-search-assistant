@@ -12,6 +12,56 @@ msgstr ""
 msgid " · {0} archived"
 msgstr " · {0} archived"
 
+#. placeholder {0}: company.h1b_approval_rate
+#: src/screens/Companies.jsx:622
+msgid " · {0}% approved"
+msgstr " · {0}% approved"
+
+#. placeholder {0}: Math.round((100 * r.direct) / r.total)
+#: src/screens/Searches.jsx:119
+msgid " · {0}% direct links"
+msgstr " · {0}% direct links"
+
+#: src/screens/Companies.jsx:929
+msgid " · {bodyExcluded} would be ignored (body phrases)"
+msgstr " · {bodyExcluded} would be ignored (body phrases)"
+
+#: src/screens/Companies.jsx:932
+msgid " · {bodyUnchecked} with the posting body text check skipped"
+msgstr " · {bodyUnchecked} with the posting body text check skipped"
+
+#: src/screens/Applications.jsx:209
+msgid " · {nStale} with no reply for 7+ days"
+msgstr " · {nStale} with no reply for 7+ days"
+
+#. placeholder {0}: Math.max(0, passCo - kept - bodyExcluded)
+#: src/screens/Companies.jsx:931
+msgid " · {passCo} pass this company's filters · {0} removed by the global exclude list"
+msgstr " · {passCo} pass this company's filters · {0} removed by the global exclude list"
+
+#: src/screens/Companies.jsx:930
+msgid " · {rejected} invalid"
+msgstr " · {rejected} invalid"
+
+#. placeholder {0}: res.backup
+#: src/screens/SettingsAccounts.jsx:522
+msgid " · backup {0}"
+msgstr " · backup {0}"
+
+#. placeholder {0}: ago(s.last_run_at)
+#: src/screens/Searches.jsx:124
+msgid " · last run {0}"
+msgstr " · last run {0}"
+
+#: src/screens/Settings.jsx:180
+msgid " · never fires"
+msgstr " · never fires"
+
+#. placeholder {0}: whenShort(parsed.next)
+#: src/screens/Settings.jsx:179
+msgid " · next {0} (your time)"
+msgstr " · next {0} (your time)"
+
 #: src/screens/JobFeed.jsx:1818
 msgid " · original may have expired"
 msgstr " · original may have expired"
@@ -21,13 +71,42 @@ msgstr " · original may have expired"
 msgid " · PIN"
 msgstr " · PIN"
 
+#: src/screens/feedActivity.js:81
+msgid " · re-tailoring"
+msgstr " · re-tailoring"
+
 #: src/screens/Applications.jsx:1005
 msgid " · reading…"
 msgstr " · reading…"
 
+#: src/screens/feedActivity.js:81
+msgid " · scoring again"
+msgstr " · scoring again"
+
+#. placeholder {0}: apps.length
+#: src/screens/Applications.jsx:210
+msgid " · showing {0}"
+msgstr " · showing {0}"
+
 #: src/screens/Companies.jsx:1017
 msgid " · showing the first {limit}"
 msgstr " · showing the first {limit}"
+
+#. placeholder {0}: d >= 0 ? '+' : ''
+#: src/screens/Resumes.jsx:46
+msgid " ({0}{d} vs {baseName} avg)"
+msgstr " ({0}{d} vs {baseName} avg)"
+
+#. placeholder {0}: PROVIDER_KEY[prov].toUpperCase()
+#: src/screens/Settings.jsx:71
+msgid " Empty uses {0} from .env."
+msgstr " Empty uses {0} from .env."
+
+#. placeholder {0}: (PROVIDER_LABEL[prov] || prov).replace(/\s*\(.*\)$/, '')
+#. placeholder {1}: s.join(', ')
+#: src/screens/Settings.jsx:535
+msgid " Model settings using {0}: {1}."
+msgstr " Model settings using {0}: {1}."
 
 #: src/screens/JobFeed.jsx:1721
 msgid " Score against your résumés for the"
@@ -40,6 +119,18 @@ msgstr " This continues in the background if you navigate away."
 #: src/screens/SettingsAccounts.jsx:458
 msgid " Your account has no PIN, so the shared settings are only a privacy latch."
 msgstr " Your account has no PIN, so the shared settings are only a privacy latch."
+
+#: src/screens/Persona.jsx:106
+msgid "— not answered"
+msgstr "— not answered"
+
+#: src/Shell.jsx:177
+msgid ", current"
+msgstr ", current"
+
+#: src/AccountPicker.jsx:150
+msgid ", PIN"
+msgstr ", PIN"
 
 #: src/screens/ResumeEditor.jsx:882
 msgid "…or a freeform job description"
@@ -54,7 +145,7 @@ msgid ".pdf"
 msgstr ".pdf"
 
 #. placeholder {0}: money(sub.spend)
-#. placeholder {1}: sub.period ? `in ${sub.period}d` : 'all time'
+#. placeholder {1}: sub.period ? `in ${sub.period}d` : t`all time`
 #: src/screens/Stats.jsx:403
 msgid "· {0} on LLM calls {1}"
 msgstr "· {0} on LLM calls {1}"
@@ -123,11 +214,11 @@ msgstr "“{0}” deleted"
 msgid "“{0}” is already running"
 msgstr "“{0}” is already running"
 
-#: src/screens/ResumeSections.jsx:333
+#: src/screens/ResumeSections.jsx:335
 msgid "“{newK}” already exists — renaming onto it would erase its values."
 msgstr "“{newK}” already exists — renaming onto it would erase its values."
 
-#: src/screens/ResumeSections.jsx:332
+#: src/screens/ResumeSections.jsx:334
 msgid "“{newK}” can’t be used as a category name."
 msgstr "“{newK}” can’t be used as a category name."
 
@@ -304,6 +395,12 @@ msgstr "{0} · {1} H-1B filings, {2}% approved. Used for each job's H-1B verdict
 msgid "{0} · {1} H-1B filings. Used for each job's H-1B verdict."
 msgstr "{0} · {1} H-1B filings. Used for each job's H-1B verdict."
 
+#. placeholder {0}: s.direct_url ? short(s.direct_url) : t`No levels.fyi URL yet`
+#. placeholder {1}: s.max_pages || 50
+#: src/screens/Searches.jsx:135
+msgid "{0} · {1} pages{last}"
+msgstr "{0} · {1} pages{last}"
+
 #. placeholder {0}: job?.company ? `${job.company}${job.title ? ` — ${job.title}` : ''}` : t`the job this copy is for`
 #: src/screens/ResumeEditor.jsx:778
 msgid "{0} · adds a new copy"
@@ -311,7 +408,7 @@ msgstr "{0} · adds a new copy"
 
 #. placeholder {0}: company.last_error ? t`Last scrape run` : t`Detected in recent runs`
 #. placeholder {1}: ago(company.last_run_at || company.last_scraped_at)
-#. placeholder {2}: bannerMuted ? ` · ${company.active ? `acknowledged ${ago(company.warning_acknowledged_at)}` : 'paused, so it is not counted'}` : null
+#. placeholder {2}: bannerMuted ? ` · ${company.active ? t`acknowledged ${ago(company.warning_acknowledged_at)}` : t`paused, so it is not counted`}` : null
 #: src/screens/Companies.jsx:684
 msgid "{0} · last ran {1}{2}"
 msgstr "{0} · last ran {1}{2}"
@@ -320,6 +417,17 @@ msgstr "{0} · last ran {1}{2}"
 #: src/screens/JobFeed.jsx:1591
 msgid "{0} · scoring"
 msgstr "{0} · scoring"
+
+#. placeholder {0}: doc.source_name
+#: src/screens/CoverLetterEditor.jsx:322
+msgid "{0} · tailored copy"
+msgstr "{0} · tailored copy"
+
+#. placeholder {0}: a.name
+#: src/screens/SettingsAccounts.jsx:228
+#: src/screens/SettingsAccounts.jsx:581
+msgid "{0} (owner)"
+msgstr "{0} (owner)"
 
 #. placeholder {0}: c.name
 #: src/screens/Companies.jsx:301
@@ -350,7 +458,7 @@ msgid "{0} against résumés — {1}"
 msgstr "{0} against résumés — {1}"
 
 #. placeholder {0}: txt.length
-#: src/screens/ResumeSections.jsx:315
+#: src/screens/ResumeSections.jsx:317
 msgid "{0} characters"
 msgstr "{0} characters"
 
@@ -375,6 +483,23 @@ msgstr "{0} deleted"
 msgid "{0} does not allow its page to be shown inside another site. {1}"
 msgstr "{0} does not allow its page to be shown inside another site. {1}"
 
+#. placeholder {0}: e.label || e.source
+#. placeholder {1}: e.error
+#: src/screens/Searches.jsx:593
+msgid "{0} failed ({1})"
+msgstr "{0} failed ({1})"
+
+#. placeholder {0}: found + rejected
+#. placeholder {1}: Math.max(0, found - kept - bodyExcluded)
+#: src/screens/Companies.jsx:928
+msgid "{0} found · {kept} kept · {1} removed by title filter"
+msgstr "{0} found · {kept} kept · {1} removed by title filter"
+
+#. placeholder {0}: job.name
+#: src/screens/Stats.jsx:272
+msgid "{0} is already running."
+msgstr "{0} is already running."
+
 #. placeholder {0}: j.name
 #: src/screens/Stats.jsx:670
 #: src/screens/Stats.jsx:670
@@ -398,6 +523,11 @@ msgstr "{0} matched · {1} missing"
 msgid "{0} need attention"
 msgstr "{0} need attention"
 
+#. placeholder {0}: cfg.results_wanted
+#: src/screens/Searches.jsx:1028
+msgid "{0} new per run"
+msgstr "{0} new per run"
+
 #. placeholder {0}: visible.length
 #. placeholder {1}: letters.length
 #: src/screens/CoverLetters.jsx:270
@@ -409,6 +539,11 @@ msgstr "{0} of {1, plural, one {# letter} other {# letters}} match · {live, plu
 #: src/screens/Applications.jsx:517
 msgid "{0} of {1} shown"
 msgstr "{0} of {1} shown"
+
+#. placeholder {0}: errs.map((e) => t`${e.label || e.source} failed (${e.error})`).join(' · ')
+#: src/screens/Searches.jsx:593
+msgid "{0} on the last run"
+msgstr "{0} on the last run"
 
 #. placeholder {0}: head.total
 #. placeholder {1}: head.arrived
@@ -424,6 +559,17 @@ msgstr "{0} open roles · {1} arrived today · {2} not yet scored"
 msgid "{0} open roles from {1} in the Job Feed · {2} found in the last 7 days — everything discovered, including titles the filters rejected"
 msgstr "{0} open roles from {1} in the Job Feed · {2} found in the last 7 days — everything discovered, including titles the filters rejected"
 
+#. placeholder {0}: acc.name
+#: src/screens/SettingsAccounts.jsx:445
+msgid "{0} opens without a PIN now"
+msgstr "{0} opens without a PIN now"
+
+#. placeholder {0}: cfg.results_wanted
+#: src/screens/Searches.jsx:1017
+#: src/screens/Searches.jsx:1030
+msgid "{0} per board max"
+msgstr "{0} per board max"
+
 #. placeholder {0}: int(scores?.scored_count)
 #: src/screens/Stats.jsx:533
 msgid "{0} scored jobs · best résumé per job"
@@ -435,14 +581,17 @@ msgid "{0} screenshots"
 msgstr "{0} screenshots"
 
 #. placeholder {0}: checked.size
+#. placeholder {0}: ids.length
 #. placeholder {0}: rescoreSel.length
 #: src/screens/Applications.jsx:645
+#: src/screens/Companies.jsx:361
 #: src/screens/JobFeed.jsx:1275
 #: src/screens/JobFeed.jsx:1914
 msgid "{0} selected"
 msgstr "{0} selected"
 
 #. placeholder {0}: picker.jobs.length
+#: src/screens/JobFeed.jsx:1841
 #: src/screens/JobFeed.jsx:1845
 msgid "{0} selected roles"
 msgstr "{0} selected roles"
@@ -462,6 +611,33 @@ msgstr "{0} started."
 msgid "{0} to review"
 msgstr "{0} to review"
 
+#. placeholder {0}: warm.n
+#. placeholder {1}: warm.active
+#. placeholder {2}: warm.down
+#: src/screens/Companies.jsx:277
+msgid "{0} tracked · {1} active · {2} need attention"
+msgstr "{0} tracked · {1} active · {2} need attention"
+
+#. placeholder {0}: acc.name
+#: src/screens/SettingsAccounts.jsx:442
+msgid "{0} uses the new PIN from now on; your own PIN keeps opening their account."
+msgstr "{0} uses the new PIN from now on; your own PIN keeps opening their account."
+
+#. placeholder {0}: parsed.text
+#. placeholder {1}: parsed.next ? t` · next ${whenShort(parsed.next)} (your time)` : (parsed.unparsed ? '' : t` · never fires`)
+#: src/screens/Settings.jsx:179
+msgid "{0} UTC{1}"
+msgstr "{0} UTC{1}"
+
+#. placeholder {0}: cfg.results_wanted
+#. placeholder {0}: cfg.results_wanted || 100
+#: src/screens/Searches.jsx:1011
+#: src/screens/Searches.jsx:1021
+#: src/screens/Searches.jsx:1025
+#: src/screens/Searches.jsx:1036
+msgid "{0} wanted"
+msgstr "{0} wanted"
+
 #. placeholder {0}: open ? '▾' : '▸'
 #: src/TelemetryChoice.jsx:91
 msgid "{0} What is sent?"
@@ -478,6 +654,11 @@ msgstr "{0}, {1} — switch account"
 msgid "{0}'s PIN"
 msgstr "{0}'s PIN"
 
+#. placeholder {0}: acc.name
+#: src/screens/SettingsAccounts.jsx:443
+msgid "{0}’s PIN reset"
+msgstr "{0}’s PIN reset"
+
 #. placeholder {0}: nGlobalExcluded > 0 && ( <> · <b style={{ color: 'var(--bad)' }}><Trans>{nGlobalExcluded} removed by the global list</Trans></b> {nPassSearch != null && <span style={{ color: 'var(--muted)' }}> <Trans>({nPassSearch} pass this search’s filters)</Trans></span>} </> )
 #. placeholder {1}: nBodyExcluded > 0 && <> · <b style={{ color: 'var(--warn)' }}><Trans>{nBodyExcluded} would be ignored (body phrases)</Trans></b></>
 #. placeholder {2}: d.duration != null && <span style={{ color: 'var(--muted)' }}> · {d.duration}s</span>
@@ -486,10 +667,31 @@ msgstr "{0}'s PIN"
 msgid "{0}{1} · {nRaw} found{2}{3}"
 msgstr "{0}{1} · {nRaw} found{2}{3}"
 
+#. placeholder {0}: weekly.now - weekly.prev >= 0 ? '+' : ''
+#. placeholder {1}: weekly.now - weekly.prev
+#: src/screens/Stats.jsx:459
+msgid "{0}{1} vs previous period"
+msgstr "{0}{1} vs previous period"
+
+#. placeholder {0}: Math.floor(h / 24)
+#: src/screens/Applications.jsx:35
+#: src/screens/JobFeed.jsx:55
+#: src/screens/ResumeEditor.jsx:69
+#: src/screens/Searches.jsx:25
+#: src/screens/Stats.jsx:75
+#: src/Shell.jsx:52
+msgid "{0}d ago"
+msgstr "{0}d ago"
+
 #. placeholder {0}: scrapeEvery > 0 ? t`Your first scrape runs within ${everyText(scrapeEvery)}. ` : t`Scheduled scraping is off — run a search or a company by hand. `
 #: src/screens/JobFeed.jsx:1307
 msgid "{0}Jobs come from your <0>Searches</0> and <1>Companies</1>."
 msgstr "{0}Jobs come from your <0>Searches</0> and <1>Companies</1>."
+
+#. placeholder {0}: Math.max(1, m)
+#: src/screens/Applications.jsx:32
+msgid "{0}m ago"
+msgstr "{0}m ago"
 
 #. placeholder {0}: refreshing ? <Spinner size={10} /> : <span style={{ fontSize: 12 }}>↻</span>
 #: src/screens/Stats.jsx:437
@@ -510,6 +712,15 @@ msgstr "{0}Test"
 #: src/screens/SettingsAccounts.jsx:752
 msgid "{0}Unlock to change the shared values as {ownerName} for 15 minutes. {NO_OWNER_PIN_NOTE}"
 msgstr "{0}Unlock to change the shared values as {ownerName} for 15 minutes. {NO_OWNER_PIN_NOTE}"
+
+#. placeholder {0}: Math.floor(days / 7)
+#: src/screens/Resumes.jsx:20
+msgid "{0}w ago"
+msgstr "{0}w ago"
+
+#: src/useTitle.js:34
+msgid "{APP} Dashboard"
+msgstr "{APP} Dashboard"
 
 #: src/screens/Settings.jsx:192
 msgid "{ariaLabel} — pick a common schedule"
@@ -537,13 +748,34 @@ msgstr "{base} at :{minute}"
 msgid "{baseCopyCount, plural, one {# tailored copy} other {# tailored copies}}"
 msgstr "{baseCopyCount, plural, one {# tailored copy} other {# tailored copies}}"
 
+#: src/screens/Settings.jsx:525
+msgid "{curResTpl} — not on this install"
+msgstr "{curResTpl} — not on this install"
+
+#: src/screens/Settings.jsx:522
+msgid "{curTpl} — not on this install"
+msgstr "{curTpl} — not on this install"
+
+#: src/screens/Settings.jsx:516
+msgid "{curVoice} — not in presets"
+msgstr "{curVoice} — not in presets"
+
+#: src/screens/SettingsAccounts.jsx:99
+msgid "{d} d ago"
+msgstr "{d} d ago"
+
 #: src/time.js:19
 msgid "{d}d"
 msgstr "{d}d"
 
+#: src/screens/Companies.jsx:24
 #: src/time.js:11
 msgid "{d}d ago"
 msgstr "{d}d ago"
+
+#: src/screens/Resumes.jsx:19
+msgid "{days}d ago"
+msgstr "{days}d ago"
 
 #: src/Shell.jsx:321
 msgid "{failing, plural, one {# source needs attention} other {# sources need attention}}"
@@ -553,13 +785,34 @@ msgstr "{failing, plural, one {# source needs attention} other {# sources need a
 msgid "{h, plural, one {# hour} other {# hours}}"
 msgstr "{h, plural, one {# hour} other {# hours}}"
 
+#: src/screens/SettingsAccounts.jsx:97
+msgid "{h} h ago"
+msgstr "{h} h ago"
+
 #: src/time.js:19
 msgid "{h}h"
 msgstr "{h}h"
 
+#: src/screens/Applications.jsx:34
+#: src/screens/Companies.jsx:22
+#: src/screens/JobFeed.jsx:54
+#: src/screens/ResumeEditor.jsx:68
+#: src/screens/Resumes.jsx:17
+#: src/screens/Searches.jsx:24
+#: src/screens/Stats.jsx:75
+#: src/Shell.jsx:52
 #: src/time.js:11
 msgid "{h}h ago"
 msgstr "{h}h ago"
+
+#: src/screens/Stats.jsx:461
+msgid "{inPlay} open"
+msgstr "{inPlay} open"
+
+#. placeholder {0}: company.h1b_approval_rate ? t` · ${company.h1b_approval_rate}% approved` : ''
+#: src/screens/Companies.jsx:622
+msgid "{lca} H-1B filings on record{0}. Each job's H-1B verdict is based on these."
+msgstr "{lca} H-1B filings on record{0}. Each job's H-1B verdict is based on these."
 
 #: src/screens/ResumeEditor.jsx:947
 msgid "{liveApplied} applied · {liveSuggested} suggested — added on Done reviewing"
@@ -570,10 +823,19 @@ msgstr "{liveApplied} applied · {liveSuggested} suggested — added on Done rev
 msgid "{liveApplied} applied · {liveSuggested} suggested — added on Done reviewing · {0} declined"
 msgstr "{liveApplied} applied · {liveSuggested} suggested — added on Done reviewing · {0} declined"
 
+#: src/screens/SettingsAccounts.jsx:95
+msgid "{m} min ago"
+msgstr "{m} min ago"
+
 #: src/time.js:16
 msgid "{m}m"
 msgstr "{m}m"
 
+#: src/screens/Companies.jsx:20
+#: src/screens/ResumeEditor.jsx:67
+#: src/screens/Searches.jsx:22
+#: src/screens/Stats.jsx:73
+#: src/Shell.jsx:50
 #: src/time.js:8
 msgid "{m}m ago"
 msgstr "{m}m ago"
@@ -586,6 +848,14 @@ msgstr "{matched} of {0} match · or paste a model id and press Add"
 #: src/Shell.jsx:191
 msgid "{MAX_ACCOUNTS} max"
 msgstr "{MAX_ACCOUNTS} max"
+
+#: src/screens/SettingsAccounts.jsx:678
+msgid "{memberName} keeps their own values"
+msgstr "{memberName} keeps their own values"
+
+#: src/screens/SettingsAccounts.jsx:677
+msgid "{memberName} sees your values, read-only"
+msgstr "{memberName} sees your values, read-only"
 
 #: src/screens/SettingsAccounts.jsx:674
 msgid "{memberName}’s policy:"
@@ -652,7 +922,7 @@ msgstr "{name} — click to rename"
 msgid "{nApp, plural, one {# application} other {# applications}}"
 msgstr "{nApp, plural, one {# application} other {# applications}}"
 
-#: src/screens/ResumeSections.jsx:252
+#: src/screens/ResumeSections.jsx:254
 msgid "{nb, plural, one {# bullet} other {# bullets}}"
 msgstr "{nb, plural, one {# bullet} other {# bullets}}"
 
@@ -701,6 +971,10 @@ msgstr "{ownerName} enters their PIN; for 15 minutes this browser can change the
 msgid "{ownerName}’s PIN"
 msgstr "{ownerName}’s PIN"
 
+#: src/screens/JobFeed.jsx:165
+msgid "{PICK_KEY}-click"
+msgstr "{PICK_KEY}-click"
+
 #: src/screens/JobFeed.jsx:110
 msgid "{r, plural, one {# minute} other {# minutes}}"
 msgstr "{r, plural, one {# minute} other {# minutes}}"
@@ -709,6 +983,10 @@ msgstr "{r, plural, one {# minute} other {# minutes}}"
 #: src/screens/JobFeed.jsx:1661
 msgid "{reqMet} of {0} met"
 msgstr "{reqMet} of {0} met"
+
+#: src/screens/JobFeed.jsx:768
+msgid "{scored} already scored"
+msgstr "{scored} already scored"
 
 #: src/screens/SettingsAccounts.jsx:676
 msgid "{sectionTitle} for {memberName}"
@@ -721,6 +999,27 @@ msgstr "{shown, plural, one {# application} other {# applications}} · {nIntervi
 #: src/screens/JobFeed.jsx:1428
 msgid "{total, plural, one {End of the list · # job} other {End of the list · # jobs}}"
 msgstr "{total, plural, one {End of the list · # job} other {End of the list · # jobs}}"
+
+#: src/screens/Settings.jsx:87
+msgid "{v} effort"
+msgstr "{v} effort"
+
+#. placeholder {0}: act.baseName
+#: src/screens/feedActivity.js:58
+msgid "{verb} from {0}"
+msgstr "{verb} from {0}"
+
+#: src/screens/Settings.jsx:347
+msgid "{who} inherits your {title}"
+msgstr "{who} inherits your {title}"
+
+#: src/screens/Settings.jsx:347
+msgid "{who} keeps their own {title}"
+msgstr "{who} keeps their own {title}"
+
+#: src/screens/Persona.jsx:450
+msgid "↑ From a PDF"
+msgstr "↑ From a PDF"
 
 #: src/screens/ResumeEditor.jsx:735
 msgid "↓ Download"
@@ -758,8 +1057,8 @@ msgstr "+ Add another career page"
 msgid "+ Add answer"
 msgstr "+ Add answer"
 
-#: src/screens/ResumeSections.jsx:289
-#: src/screens/ResumeSections.jsx:440
+#: src/screens/ResumeSections.jsx:291
+#: src/screens/ResumeSections.jsx:442
 msgid "+ Add bullet"
 msgstr "+ Add bullet"
 
@@ -768,15 +1067,15 @@ msgid "+ Add company"
 msgstr "+ Add company"
 
 #: src/screens/CoverLetterEditor.jsx:463
-#: src/screens/ResumeSections.jsx:218
+#: src/screens/ResumeSections.jsx:220
 msgid "+ Add contact item"
 msgstr "+ Add contact item"
 
-#: src/screens/ResumeSections.jsx:413
+#: src/screens/ResumeSections.jsx:415
 msgid "+ Add education"
 msgstr "+ Add education"
 
-#: src/screens/ResumeSections.jsx:299
+#: src/screens/ResumeSections.jsx:301
 msgid "+ Add experience"
 msgstr "+ Add experience"
 
@@ -788,15 +1087,15 @@ msgstr "+ Add interview"
 msgid "+ Add paragraph"
 msgstr "+ Add paragraph"
 
-#: src/screens/ResumeSections.jsx:448
+#: src/screens/ResumeSections.jsx:450
 msgid "+ Add project"
 msgstr "+ Add project"
 
-#: src/screens/ResumeSections.jsx:466
+#: src/screens/ResumeSections.jsx:468
 msgid "+ Add publication"
 msgstr "+ Add publication"
 
-#: src/screens/ResumeSections.jsx:374
+#: src/screens/ResumeSections.jsx:376
 msgid "+ Add skill row"
 msgstr "+ Add skill row"
 
@@ -841,34 +1140,104 @@ msgstr "✦ Generate cover letter"
 msgid "✦ Open tailored ↗"
 msgstr "✦ Open tailored ↗"
 
+#: src/screens/ResumeEditor.jsx:784
+msgid "✦ Re-tailor"
+msgstr "✦ Re-tailor"
+
+#: src/screens/JobFeed.jsx:1520
+msgid "✦ Re-tailor résumé"
+msgstr "✦ Re-tailor résumé"
+
 #: src/screens/Applications.jsx:1036
 msgid "✦ saves the row first, then tailors a copy of that résumé in the background."
 msgstr "✦ saves the row first, then tailors a copy of that résumé in the background."
+
+#: src/screens/ResumeEditor.jsx:771
+#: src/screens/ResumeEditor.jsx:862
+msgid "✦ Tailor"
+msgstr "✦ Tailor"
 
 #: src/screens/ResumeEditor.jsx:613
 msgid "✦ Tailor for a job…"
 msgstr "✦ Tailor for a job…"
 
+#: src/screens/JobFeed.jsx:1861
+msgid "✦ Tailor with AI"
+msgstr "✦ Tailor with AI"
+
 #: src/screens/JobFeed.jsx:1504
 msgid "✦ Tailoring…"
 msgstr "✦ Tailoring…"
+
+#: src/screens/Persona.jsx:449
+msgid "☰ From a résumé"
+msgstr "☰ From a résumé"
+
+#: src/screens/Searches.jsx:388
+#: src/screens/Searches.jsx:396
+msgid "0 = no age limit"
+msgstr "0 = no age limit"
+
+#: src/screens/Searches.jsx:380
+msgid "0 = no age limit. Behance freelance briefs carry no date."
+msgstr "0 = no age limit. Behance freelance briefs carry no date."
+
+#: src/screens/Searches.jsx:339
+msgid "0 = no filter"
+msgstr "0 = no filter"
+
+#: src/time.js:228
+msgid "0 8 * * mon"
+msgstr "0 8 * * mon"
+
+#: src/time.js:227
+msgid "0 9 * * mon-fri"
+msgstr "0 9 * * mon-fri"
 
 #: src/screens/Searches.jsx:471
 msgid "0 follows the global schedule from Settings"
 msgstr "0 follows the global schedule from Settings"
 
+#: src/screens/Settings.jsx:655
+msgid "0–100 — below this, the email is flagged for manual review instead."
+msgstr "0–100 — below this, the email is flagged for manual review instead."
+
+#: src/screens/Settings.jsx:663
+msgid "1 or 2. Run all, one company, one search and the scheduled scrape wait their turn beyond this."
+msgstr "1 or 2. Run all, one company, one search and the scheduled scrape wait their turn beyond this."
+
 #: src/screens/Settings.jsx:1306
 msgid "6-digit PIN"
 msgstr "6-digit PIN"
+
+#: src/screens/Persona.jsx:31
+msgid "60 or older"
+msgstr "60 or older"
 
 #: src/screens/Searches.jsx:320
 msgid "A city or a region. Country adds the country. For remote work set Remote and leave this empty."
 msgstr "A city or a region. Country adds the country. For remote work set Remote and leave this empty."
 
+#: src/screens/Searches.jsx:354
+msgid "A city or a region. Empty = the whole country."
+msgstr "A city or a region. Empty = the whole country."
+
+#: src/screens/Searches.jsx:395
+msgid "A city, 50 km around it. Empty = all of Canada."
+msgstr "A city, 50 km around it. Empty = all of Canada."
+
+#: src/screens/Applications.jsx:52
+msgid "a company scrape"
+msgstr "a company scrape"
+
 #. placeholder {0}: isApp ? t`application` : t`job`
 #: src/screens/Applications.jsx:1059
 msgid "A copy of the posting is saved with the {0}"
 msgstr "A copy of the posting is saved with the {0}"
+
+#: src/screens/CoverLetters.jsx:307
+msgid "a cover letter"
+msgstr "a cover letter"
 
 #: src/screens/SettingsAccounts.jsx:321
 msgid "A full database backup is taken first (kept in <0>backups/</0>). "
@@ -894,7 +1263,7 @@ msgstr "A reply was detected, but no snippet was stored."
 msgid "A separate account for the extension import and the employer-link lookup."
 msgstr "A separate account for the extension import and the employer-link lookup."
 
-#: src/screens/ResumeSections.jsx:331
+#: src/screens/ResumeSections.jsx:333
 msgid "A skills category needs a name."
 msgstr "A skills category needs a name."
 
@@ -943,6 +1312,7 @@ msgstr "Account colour"
 msgid "Account name"
 msgstr "Account name"
 
+#: src/screens/Settings.jsx:530
 #: src/screens/SettingsAccounts.jsx:464
 #: src/Shell.jsx:169
 msgid "Accounts"
@@ -956,6 +1326,15 @@ msgstr "Accounts: up to five people share one install, each with their own jobs,
 #: src/screens/Searches.jsx:866
 msgid "Acknowledge"
 msgstr "Acknowledge"
+
+#. placeholder {0}: ago(c.warning_acknowledged_at)
+#. placeholder {0}: ago(company.warning_acknowledged_at)
+#. placeholder {0}: ago(s.warning_acknowledged_at)
+#: src/screens/Companies.jsx:368
+#: src/screens/Companies.jsx:686
+#: src/screens/Searches.jsx:606
+msgid "acknowledged {0}"
+msgstr "acknowledged {0}"
 
 #: src/screens/Applications.jsx:1016
 #: src/screens/Companies.jsx:863
@@ -1052,7 +1431,7 @@ msgstr "Add to or remove from the filter. Multiple allowed. Saved in this browse
 msgid "Add your bot token above first — then register its webhook."
 msgstr "Add your bot token above first — then register its webhook."
 
-#: src/screens/ResumeSections.jsx:363
+#: src/screens/ResumeSections.jsx:365
 msgid "added"
 msgstr "added"
 
@@ -1061,15 +1440,19 @@ msgstr "added"
 msgid "Added {0} — switch to it from the rail"
 msgstr "Added {0} — switch to it from the rail"
 
-#: src/screens/ResumeSections.jsx:232
-#: src/screens/ResumeSections.jsx:357
-#: src/screens/ResumeSections.jsx:363
+#: src/screens/ResumeSections.jsx:234
+#: src/screens/ResumeSections.jsx:359
+#: src/screens/ResumeSections.jsx:365
 msgid "Added by tailoring"
 msgstr "Added by tailoring"
 
 #: src/screens/Settings.jsx:1528
 msgid "added by you"
 msgstr "added by you"
+
+#: src/screens/Applications.jsx:673
+msgid "Added to the Job Feed."
+msgstr "Added to the Job Feed."
 
 #: src/screens/Searches.jsx:344
 msgid "Added to the URL filters. Must appear in the posting text."
@@ -1084,7 +1467,7 @@ msgstr "added when you finish reviewing"
 msgid "Address"
 msgstr "Address"
 
-#: src/screens/ResumeSections.jsx:173
+#: src/screens/ResumeSections.jsx:175
 msgid "Adds “name - job title - company” in small type at the foot of every page."
 msgstr "Adds “name - job title - company” in small type at the foot of every page."
 
@@ -1096,6 +1479,10 @@ msgstr "adds a copy"
 #: src/screens/Applications.jsx:1001
 msgid "Adds the posting to the Job Feed at this status. No application, date or notes are stored."
 msgstr "Adds the posting to the Job Feed at this status. No application, date or notes are stored."
+
+#: src/screens/Settings.jsx:776
+msgid "Advanced"
+msgstr "Advanced"
 
 #: src/screens/Persona.jsx:59
 msgid "Age range"
@@ -1115,6 +1502,11 @@ msgstr "Aliases"
 #: src/screens/Searches.jsx:1082
 msgid "All ({0})"
 msgstr "All ({0})"
+
+#. placeholder {0}: reqRows.length
+#: src/screens/JobFeed.jsx:1666
+msgid "All {0}"
+msgstr "All {0}"
 
 #: src/screens/Stats.jsx:583
 msgid "All accounts"
@@ -1145,6 +1537,10 @@ msgstr "All selected are already in {0}"
 msgid "All steps done"
 msgstr "All steps done"
 
+#: src/screens/Stats.jsx:403
+msgid "all time"
+msgstr "all time"
+
 #: src/screens/Stats.jsx:35
 msgid "All types"
 msgstr "All types"
@@ -1162,6 +1558,10 @@ msgstr "Allow anonymous telemetry?"
 #: src/screens/ResumeEditor.jsx:927
 msgid "Already in the document and in the PDF"
 msgstr "Already in the document and in the PDF"
+
+#: src/screens/Applications.jsx:673
+msgid "Already in the Job Feed — opened it."
+msgstr "Already in the Job Feed — opened it."
 
 #: src/screens/Applications.jsx:989
 msgid "Already logged — opened the existing application."
@@ -1264,6 +1664,10 @@ msgstr "Antigravity CLI (Google Subscription)"
 msgid "Antigravity CLI login"
 msgstr "Antigravity CLI login"
 
+#: src/screens/JobFeed.jsx:1206
+#: src/screens/Searches.jsx:323
+#: src/screens/Searches.jsx:356
+#: src/screens/Searches.jsx:378
 #: src/screens/Searches.jsx:455
 msgid "Any"
 msgstr "Any"
@@ -1336,6 +1740,7 @@ msgid "Application stage"
 msgstr "Application stage"
 
 #: src/screens/Applications.jsx:467
+#: src/screens/Stats.jsx:461
 #: src/Shell.jsx:34
 #: src/useTitle.js:13
 msgid "Applications"
@@ -1351,6 +1756,7 @@ msgstr "applied"
 
 #: src/screens/Applications.jsx:61
 #: src/screens/JobFeed.jsx:84
+#: src/screens/JobFeed.jsx:105
 #: src/screens/Stats.jsx:357
 msgid "Applied"
 msgstr "Applied"
@@ -1431,6 +1837,10 @@ msgstr "Archived letters are shown while you search"
 msgid "Are you over 18?"
 msgstr "Are you over 18?"
 
+#: src/screens/Persona.jsx:27
+msgid "Asian"
+msgstr "Asian"
+
 #: src/screens/SettingsAccounts.jsx:571
 msgid "Asked when someone opens your account. The owner’s PIN opens it too."
 msgstr "Asked when someone opens your account. The owner’s PIN opens it too."
@@ -1442,6 +1852,17 @@ msgstr "at :{minute} every {hourStep} hours"
 #: src/time.js:144
 msgid "at :{minute} every hour"
 msgstr "at :{minute} every hour"
+
+#. placeholder {0}: hour.padStart(2, '0')
+#. placeholder {1}: min.padStart(2, '0')
+#: src/screens/Stats.jsx:85
+msgid "at {0}:{1}"
+msgstr "at {0}:{1}"
+
+#. placeholder {0}: hour.padStart(2, '0')
+#: src/screens/Stats.jsx:86
+msgid "at {0}:00"
+msgstr "at {0}:00"
 
 #: src/time.js:123
 #: src/time.js:143
@@ -1480,10 +1901,6 @@ msgstr "Authorized to work in the US?"
 msgid "Auto-detect"
 msgstr "Auto-detect"
 
-#: src/screens/Companies.jsx:526
-msgid "auto-detected"
-msgstr "auto-detected"
-
 #: src/screens/Settings.jsx:669
 msgid "Auto-reject · cron"
 msgstr "Auto-reject · cron"
@@ -1504,6 +1921,16 @@ msgstr "Auto-scoring"
 #: src/screens/Searches.jsx:284
 msgid "Auto-scoring depth"
 msgstr "Auto-scoring depth"
+
+#: src/screens/Settings.jsx:76
+#: src/screens/Settings.jsx:579
+#: src/screens/Settings.jsx:614
+msgid "Autofill"
+msgstr "Autofill"
+
+#: src/screens/SettingsAccounts.jsx:24
+msgid "autofill answers, without the rest of the Persona"
+msgstr "autofill answers, without the rest of the Persona"
 
 #: src/screens/Persona.jsx:375
 msgid "Autofill content"
@@ -1621,6 +2048,10 @@ msgstr "Best open score"
 msgid "Best-scoring companies first"
 msgstr "Best-scoring companies first"
 
+#: src/screens/Persona.jsx:34
+msgid "Bisexual"
+msgstr "Bisexual"
+
 #: src/screens/Persona.jsx:26
 msgid "Black/African American"
 msgstr "Black/African American"
@@ -1638,6 +2069,13 @@ msgstr "Board link"
 msgid "Boards"
 msgstr "Boards"
 
+#. placeholder {0}: (cfg.sources || []).map((k) => boardLabel(apifyBoards, k)).join(', ')
+#. placeholder {0}: (cfg.sources || []).map(creativeLabel).join(', ')
+#: src/screens/Searches.jsx:1017
+#: src/screens/Searches.jsx:1030
+msgid "Boards: {0}"
+msgstr "Boards: {0}"
+
 #. placeholder {0}: j.body_excluded_by
 #: src/screens/Companies.jsx:939
 msgid "Body exclusion: {0}"
@@ -1647,9 +2085,22 @@ msgstr "Body exclusion: {0}"
 msgid "Body phrases"
 msgstr "Body phrases"
 
+#: src/screens/SettingsAccounts.jsx:30
+msgid "body, title and company excludes"
+msgstr "body, title and company excludes"
+
+#: src/screens/Settings.jsx:693
+msgid "Bot"
+msgstr "Bot"
+
 #: src/screens/Settings.jsx:696
 msgid "Bot token"
 msgstr "Bot token"
+
+#: src/screens/CoverLetters.jsx:415
+#: src/screens/Resumes.jsx:295
+msgid "browse ›"
+msgstr "browse ›"
 
 #: src/WelcomeModal.jsx:14
 msgid "Build your résumé + Persona"
@@ -1663,7 +2114,7 @@ msgstr "Building the prep handover…"
 msgid "Builds one text block with the role, your résumé, the posting and the questions to ask, to paste into any AI chat"
 msgstr "Builds one text block with the role, your résumé, the posting and the questions to ask, to paste into any AI chat"
 
-#: src/screens/ResumeSections.jsx:429
+#: src/screens/ResumeSections.jsx:431
 msgid "Bullets"
 msgstr "Bullets"
 
@@ -1681,6 +2132,7 @@ msgid "cached"
 msgstr "cached"
 
 #: src/screens/Applications.jsx:725
+#: src/screens/JobFeed.jsx:1763
 msgid "Cached"
 msgstr "Cached"
 
@@ -1688,6 +2140,7 @@ msgstr "Cached"
 msgid "Cached snapshot · captured when you applied"
 msgstr "Cached snapshot · captured when you applied"
 
+#: src/screens/Stats.jsx:592
 #: src/screens/Stats.jsx:604
 msgid "Calls"
 msgstr "Calls"
@@ -1712,6 +2165,7 @@ msgstr "Calls"
 #: src/screens/SettingsAccounts.jsx:330
 #: src/screens/SettingsAccounts.jsx:397
 #: src/screens/SettingsAccounts.jsx:810
+#: src/ui.jsx:2562
 msgid "Cancel"
 msgstr "Cancel"
 
@@ -1725,6 +2179,10 @@ msgstr "Career page"
 msgid "Career page URL"
 msgstr "Career page URL"
 
+#: src/sourceBlocks.js:18
+msgid "caribbeanjobs.com answers many networks with a Cloudflare challenge, which this scraper does not pass. From such a network every run and Test fails and says so."
+msgstr "caribbeanjobs.com answers many networks with a Cloudflare challenge, which this scraper does not pass. From such a network every run and Test fails and says so."
+
 #: src/screens/Searches.jsx:366
 msgid "caribbeanjobs.com URL · required without a term"
 msgstr "caribbeanjobs.com URL · required without a term"
@@ -1733,7 +2191,7 @@ msgstr "caribbeanjobs.com URL · required without a term"
 msgid "Catalog provider"
 msgstr "Catalog provider"
 
-#: src/screens/ResumeSections.jsx:387
+#: src/screens/ResumeSections.jsx:389
 msgid "Category"
 msgstr "Category"
 
@@ -1752,9 +2210,9 @@ msgstr "Change row order"
 msgid "Change your PIN"
 msgstr "Change your PIN"
 
-#: src/screens/ResumeSections.jsx:233
-#: src/screens/ResumeSections.jsx:311
-#: src/screens/ResumeSections.jsx:357
+#: src/screens/ResumeSections.jsx:235
+#: src/screens/ResumeSections.jsx:313
+#: src/screens/ResumeSections.jsx:359
 msgid "Changed by tailoring"
 msgstr "Changed by tailoring"
 
@@ -1766,6 +2224,10 @@ msgstr "Changes apply from the next run"
 msgid "Changes are applied automatically. You can decline any of them afterwards."
 msgstr "Changes are applied automatically. You can decline any of them afterwards."
 
+#: src/screens/Resumes.jsx:47
+msgid "changes unreviewed"
+msgstr "changes unreviewed"
+
 #: src/screens/Settings.jsx:710
 msgid "Chat ID"
 msgstr "Chat ID"
@@ -1773,6 +2235,10 @@ msgstr "Chat ID"
 #: src/screens/Settings.jsx:751
 msgid "Check key"
 msgstr "Check key"
+
+#: src/ui.jsx:1277
+msgid "Checking…"
+msgstr "Checking…"
 
 #: src/screens/Persona.jsx:539
 msgid "Choose a PDF…"
@@ -1785,6 +2251,10 @@ msgstr "Choose a résumé PDF, or drop one here"
 #: src/AccountPicker.jsx:112
 msgid "Choose an account"
 msgstr "Choose an account"
+
+#: src/screens/Persona.jsx:45
+msgid "City"
+msgstr "City"
 
 #: src/screens/Settings.jsx:656
 msgid "Classification prompt"
@@ -1870,6 +2340,10 @@ msgstr "Close the model catalog"
 msgid "Close without saving"
 msgstr "Close without saving"
 
+#: src/screens/JobFeed.jsx:1216
+msgid "Closed"
+msgstr "Closed"
+
 #: src/screens/Applications.jsx:64
 msgid "Closed — kept in Stats"
 msgstr "Closed — kept in Stats"
@@ -1903,13 +2377,20 @@ msgstr "Collapse to icons"
 msgid "Collections"
 msgstr "Collections"
 
+#. placeholder {0}: (cfg.collections || cfg.sources || []).join(', ')
+#: src/screens/Searches.jsx:1013
+msgid "Collections: {0}"
+msgstr "Collections: {0}"
+
 #. placeholder {0}: ((s.sources || []).length ? s.sources : ['recommended', 'top-applicant']).join(', ')
 #: src/screens/Searches.jsx:136
 msgid "Collections: {0} · credentials in Settings{last}"
 msgstr "Collections: {0} · credentials in Settings{last}"
 
+#: src/screens/SettingsAccounts.jsx:119
 #: src/screens/SettingsAccounts.jsx:240
 #: src/screens/SettingsAccounts.jsx:394
+#: src/screens/SettingsAccounts.jsx:568
 msgid "Colour"
 msgstr "Colour"
 
@@ -1922,6 +2403,10 @@ msgstr "Colour {0}"
 #: src/screens/SettingsAccounts.jsx:126
 msgid "Colour {0} (in use)"
 msgstr "Colour {0} (in use)"
+
+#: src/screens/SettingsAccounts.jsx:569
+msgid "Colour saved"
+msgstr "Colour saved"
 
 #: src/Shell.jsx:420
 msgid "Coming in the redesign"
@@ -1941,6 +2426,7 @@ msgid "Common schedules"
 msgstr "Common schedules"
 
 #: src/screens/Companies.jsx:418
+#: src/screens/SettingsAccounts.jsx:26
 #: src/Shell.jsx:31
 #: src/useTitle.js:12
 msgid "Companies"
@@ -1951,7 +2437,7 @@ msgstr "Companies"
 #: src/screens/Companies.jsx:486
 #: src/screens/CoverLetterEditor.jsx:471
 #: src/screens/CoverLetterEditor.jsx:472
-#: src/screens/ResumeSections.jsx:260
+#: src/screens/ResumeSections.jsx:262
 #: src/screens/Searches.jsx:1093
 #: src/screens/Stats.jsx:749
 msgid "Company"
@@ -2003,6 +2489,10 @@ msgstr "Company{0}"
 msgid "complete"
 msgstr "complete"
 
+#: src/screens/CoverLetters.jsx:15
+msgid "Concise"
+msgstr "Concise"
+
 #: src/screens/Settings.jsx:655
 msgid "Confidence threshold"
 msgstr "Confidence threshold"
@@ -2028,6 +2518,10 @@ msgid "Connect Gmail ↗"
 msgstr "Connect Gmail ↗"
 
 #: src/screens/Settings.jsx:633
+msgid "Connected"
+msgstr "Connected"
+
+#: src/screens/Settings.jsx:633
 msgid "Connected (from .env)"
 msgstr "Connected (from .env)"
 
@@ -2040,24 +2534,28 @@ msgid "Contact / basics"
 msgstr "Contact / basics"
 
 #: src/screens/CoverLetterEditor.jsx:444
-#: src/screens/ResumeSections.jsx:206
+#: src/screens/ResumeSections.jsx:208
 msgid "Contact item text"
 msgstr "Contact item text"
 
 #: src/screens/CoverLetterEditor.jsx:449
-#: src/screens/ResumeSections.jsx:209
+#: src/screens/ResumeSections.jsx:211
 msgid "Contact item URL"
 msgstr "Contact item URL"
 
 #: src/screens/CoverLetterEditor.jsx:431
-#: src/screens/ResumeSections.jsx:197
+#: src/screens/ResumeSections.jsx:199
 msgid "Contact items"
 msgstr "Contact items"
 
 #: src/screens/ResumeEditor.jsx:640
-#: src/screens/ResumeSections.jsx:255
+#: src/screens/ResumeSections.jsx:257
 msgid "Contains unreviewed tailoring changes"
 msgstr "Contains unreviewed tailoring changes"
+
+#: src/screens/Searches.jsx:325
+msgid "Contract"
+msgstr "Contract"
 
 #: src/ConfirmDialog.jsx:53
 #: src/screens/Applications.jsx:898
@@ -2081,6 +2579,7 @@ msgid "Copies the search settings. It runs at the next scheduled pass; an Apify 
 msgstr "Copies the search settings. It runs at the next scheduled pass; an Apify search is copied paused, because each run bills the account."
 
 #: src/ConfirmDialog.jsx:53
+#: src/screens/ResumeEditor.jsx:772
 msgid "Copy"
 msgstr "Copy"
 
@@ -2183,6 +2682,10 @@ msgstr "Could not build the prep handover: {0}{1}"
 #: src/screens/Settings.jsx:350
 msgid "Could not change the policy"
 msgstr "Could not change the policy"
+
+#: src/screens/SettingsAccounts.jsx:692
+msgid "Could not check the PIN — try again."
+msgstr "Could not check the PIN — try again."
 
 #: src/screens/Applications.jsx:445
 msgid "Could not copy — select the text and copy it manually"
@@ -2418,6 +2921,10 @@ msgstr "Could not save this search"
 msgid "Could not save your changes"
 msgstr "Could not save your changes"
 
+#: src/screens/Settings.jsx:1313
+msgid "Could not send the PIN"
+msgstr "Could not send the PIN"
+
 #. placeholder {0}: s.name
 #: src/screens/Searches.jsx:692
 msgid "Could not start “{0}”"
@@ -2528,6 +3035,7 @@ msgstr "Couldn't update \"{0}\""
 msgid "Counted from the last activity on the application (stage change, email, note). Auto-rejected applications keep their history and stay in Stats."
 msgstr "Counted from the last activity on the application (stage change, email, note). Auto-rejected applications keep their history and stay in Stats."
 
+#: src/screens/Persona.jsx:47
 #: src/screens/Searches.jsx:321
 #: src/screens/Searches.jsx:355
 #: src/screens/Searches.jsx:376
@@ -2607,6 +3115,10 @@ msgstr "Create search"
 msgid "Creating…"
 msgstr "Creating…"
 
+#: src/searchModes.js:28
+msgid "Creative boards"
+msgstr "Creative boards"
+
 #: src/screens/Searches.jsx:448
 msgid "Credentials are in Settings › Accounts"
 msgstr "Credentials are in Settings › Accounts"
@@ -2648,6 +3160,10 @@ msgstr "Current PIN for {who}"
 msgid "CV_NAMES_HERE expands to your résumé names"
 msgstr "CV_NAMES_HERE expands to your résumé names"
 
+#: src/screens/Stats.jsx:93
+msgid "Daily {when}"
+msgstr "Daily {when}"
+
 #: src/time.js:226
 msgid "Daily 03:00"
 msgstr "Daily 03:00"
@@ -2660,6 +3176,10 @@ msgstr "daily arrivals across all sources"
 msgid "daily at {clock}"
 msgstr "daily at {clock}"
 
+#: src/theme.js:33
+msgid "Dark"
+msgstr "Dark"
+
 #: src/screens/Settings.jsx:778
 #: src/screens/Settings.jsx:1254
 msgid "Dashboard API key"
@@ -2671,9 +3191,13 @@ msgstr "Database snapshot."
 
 #: src/screens/CoverLetterEditor.jsx:475
 #: src/screens/CoverLetterEditor.jsx:476
-#: src/screens/ResumeSections.jsx:263
+#: src/screens/ResumeSections.jsx:265
 msgid "Date"
 msgstr "Date"
+
+#: src/screens/Stats.jsx:91
+msgid "Day {day} {when}"
+msgstr "Day {day} {when}"
 
 #: src/screens/Settings.jsx:666
 msgid "Days before ignored and skipped job postings are removed."
@@ -2711,12 +3235,12 @@ msgstr "Decline ↩"
 msgid "Decline demographic questions where the form allows it"
 msgstr "Decline demographic questions where the form allows it"
 
-#: src/screens/ResumeSections.jsx:364
+#: src/screens/ResumeSections.jsx:366
 msgid "Decline this tailoring change"
 msgstr "Decline this tailoring change"
 
-#: src/screens/ResumeSections.jsx:273
-#: src/screens/ResumeSections.jsx:313
+#: src/screens/ResumeSections.jsx:275
+#: src/screens/ResumeSections.jsx:315
 msgid "Decline this tailoring change — restores the base text"
 msgstr "Decline this tailoring change — restores the base text"
 
@@ -2772,7 +3296,7 @@ msgstr "Default: uses the Persona résumé content; falls back to the résumé p
 msgid "Defaults are unavailable — nothing was reset"
 msgstr "Defaults are unavailable — nothing was reset"
 
-#: src/screens/ResumeSections.jsx:404
+#: src/screens/ResumeSections.jsx:406
 msgid "Degree"
 msgstr "Degree"
 
@@ -2851,9 +3375,9 @@ msgstr "Depth"
 msgid "Desc"
 msgstr "Desc"
 
-#: src/screens/ResumeSections.jsx:265
-#: src/screens/ResumeSections.jsx:427
-#: src/screens/ResumeSections.jsx:460
+#: src/screens/ResumeSections.jsx:267
+#: src/screens/ResumeSections.jsx:429
+#: src/screens/ResumeSections.jsx:462
 msgid "Description"
 msgstr "Description"
 
@@ -2865,6 +3389,10 @@ msgstr "Description scraped"
 msgid "Desired salary"
 msgstr "Desired salary"
 
+#: src/screens/CoverLetters.jsx:15
+msgid "Detailed"
+msgstr "Detailed"
+
 #: src/screens/Persona.jsx:376
 msgid "Details used to fill application forms: contact, work authorization, EEO answers, salary and reusable screener answers. Not used for résumés or scoring."
 msgstr "Details used to fill application forms: contact, work authorization, EEO answers, salary and reusable screener answers. Not used for résumés or scoring."
@@ -2874,6 +3402,7 @@ msgid "Detected in recent runs"
 msgstr "Detected in recent runs"
 
 #: src/linkKinds.js:8
+#: src/screens/JobFeed.jsx:98
 msgid "Direct"
 msgstr "Direct"
 
@@ -2908,6 +3437,7 @@ msgstr "Discard changes?"
 msgid "Discard this draft?"
 msgstr "Discard this draft?"
 
+#: src/screens/Settings.jsx:635
 #: src/screens/Settings.jsx:640
 msgid "Disconnect"
 msgstr "Disconnect"
@@ -2925,13 +3455,17 @@ msgstr "Discovered in the last 7 days"
 msgid "Discovered via {0}"
 msgstr "Discovered via {0}"
 
+#: src/screens/Settings.jsx:541
+msgid "Display"
+msgstr "Display"
+
 #: src/screens/Companies.jsx:696
 #: src/screens/Companies.jsx:697
 msgid "Display name"
 msgstr "Display name"
 
 #: src/screens/CoverLetterEditor.jsx:444
-#: src/screens/ResumeSections.jsx:206
+#: src/screens/ResumeSections.jsx:208
 msgid "Display text"
 msgstr "Display text"
 
@@ -2971,9 +3505,14 @@ msgstr "Download résumé"
 msgid "Download zip"
 msgstr "Download zip"
 
+#: src/screens/CoverLetterEditor.jsx:359
 #: src/screens/CoverLetters.jsx:327
 msgid "Draft"
 msgstr "Draft"
+
+#: src/screens/Companies.jsx:937
+msgid "Drop"
+msgstr "Drop"
 
 #: src/screens/ResumeEditor.jsx:931
 msgid "Drop ↩"
@@ -2990,6 +3529,15 @@ msgstr "Drop the PDF here"
 #: src/screens/ResumeEditor.jsx:928
 msgid "dropped"
 msgstr "dropped"
+
+#: src/screens/Searches.jsx:30
+#: src/screens/Searches.jsx:625
+msgid "due now"
+msgstr "due now"
+
+#: src/screens/Searches.jsx:915
+msgid "Duplicate"
+msgstr "Duplicate"
 
 #: src/screens/Stats.jsx:725
 msgid "Duration"
@@ -3076,6 +3624,11 @@ msgstr "Earliest start date"
 msgid "Edit"
 msgstr "Edit"
 
+#. placeholder {0}: account.name
+#: src/screens/SettingsAccounts.jsx:385
+msgid "Edit {0}"
+msgstr "Edit {0}"
+
 #. placeholder {0}: a.name
 #: src/screens/SettingsAccounts.jsx:486
 msgid "Edit {0}’s policies"
@@ -3106,8 +3659,10 @@ msgstr "Edit the questions added at the end in Settings → AI"
 msgid "Edit this interview"
 msgstr "Edit this interview"
 
+#. placeholder {0}: ago(c.updated_at)
 #. placeholder {0}: timeAgo(b.updated_at)
 #. placeholder {0}: timeAgo(persona.updated_at)
+#: src/screens/CoverLetters.jsx:314
 #: src/screens/Resumes.jsx:216
 #: src/screens/Resumes.jsx:258
 msgid "edited {0}"
@@ -3127,6 +3682,16 @@ msgstr "edits here affect new copies only"
 msgid "Edits to {0} have not been saved."
 msgstr "Edits to {0} have not been saved."
 
+#: src/screens/ResumeSections.jsx:26
+msgid "Education"
+msgstr "Education"
+
+#: src/screens/Persona.jsx:43
+#: src/screens/Settings.jsx:757
+#: src/screens/Stats.jsx:35
+msgid "Email"
+msgstr "Email"
+
 #: src/screens/Settings.jsx:665
 msgid "Email check"
 msgstr "Email check"
@@ -3137,7 +3702,7 @@ msgstr "Email check"
 msgid "Email classification"
 msgstr "Email classification"
 
-#: src/screens/ResumeSections.jsx:116
+#: src/screens/ResumeSections.jsx:118
 msgid "Empty sections are left out of the PDF."
 msgstr "Empty sections are left out of the PDF."
 
@@ -3180,6 +3745,10 @@ msgstr "Enter PIN"
 msgid "Enter the current PIN."
 msgstr "Enter the current PIN."
 
+#: src/screens/Settings.jsx:1311
+msgid "Enter the digits from the email"
+msgstr "Enter the digits from the email"
+
 #: src/screens/Settings.jsx:1500
 msgid "Enter the local model name…"
 msgstr "Enter the local model name…"
@@ -3188,9 +3757,14 @@ msgstr "Enter the local model name…"
 msgid "Enter your dashboard API key — you can view or change it later in Settings."
 msgstr "Enter your dashboard API key — you can view or change it later in Settings."
 
+#: src/screens/Companies.jsx:368
 #: src/screens/Companies.jsx:369
 msgid "error · {warn}"
 msgstr "error · {warn}"
+
+#: src/screens/JobFeed.jsx:165
+msgid "Esc"
+msgstr "Esc"
 
 #: src/screens/Applications.jsx:797
 msgid "Escape cancels"
@@ -3207,6 +3781,16 @@ msgstr "Essentials — scraper and AI health only"
 #: src/TelemetryChoice.jsx:33
 msgid "Essentials, once a day from the server: {0}. Yes adds: {1}. Never sent: {2} {3}"
 msgstr "Essentials, once a day from the server: {0}. Yes adds: {1}. Never sent: {2} {3}"
+
+#. placeholder {0}: min.slice(2)
+#: src/screens/Stats.jsx:87
+msgid "every {0} min"
+msgstr "every {0} min"
+
+#. placeholder {0}: hour.slice(2)
+#: src/screens/Stats.jsx:88
+msgid "every {0}h"
+msgstr "every {0}h"
 
 #: src/time.js:117
 msgid "every {hourStep} hours"
@@ -3243,6 +3827,10 @@ msgstr "every hour"
 #: src/time.js:113
 msgid "every minute"
 msgstr "every minute"
+
+#: src/screens/SettingsAccounts.jsx:23
+msgid "every node, Q&A bank included"
+msgstr "every node, Q&A bank included"
 
 #: src/screens/Stats.jsx:690
 msgid "every run and change, newest first"
@@ -3283,6 +3871,10 @@ msgstr "Exact duplicate with tracked links · instant"
 msgid "Expand navigation"
 msgstr "Expand navigation"
 
+#: src/screens/ResumeSections.jsx:26
+msgid "Experience"
+msgstr "Experience"
+
 #. placeholder {0}: ce.company || t`role`
 #. placeholder {1}: j + 1
 #: src/screens/ResumeEditor.jsx:52
@@ -3321,6 +3913,15 @@ msgstr "Export my data"
 msgid "Exporting…"
 msgstr "Exporting…"
 
+#: src/screens/JobFeed.jsx:98
+#: src/searchModes.js:30
+msgid "Extension"
+msgstr "Extension"
+
+#: src/screens/Searches.jsx:308
+msgid "Extension (manual Save-to-Feed)"
+msgstr "Extension (manual Save-to-Feed)"
+
 #: src/screens/Searches.jsx:890
 msgid "extension • passive capture"
 msgstr "extension • passive capture"
@@ -3348,6 +3949,10 @@ msgstr "Feed only — decide later"
 #: src/screens/Applications.jsx:75
 msgid "Feed only — shortlisted"
 msgstr "Feed only — shortlisted"
+
+#: src/screens/Persona.jsx:25
+msgid "Female"
+msgstr "Female"
 
 #: src/screens/Settings.jsx:617
 msgid "Field patterns"
@@ -3390,9 +3995,19 @@ msgstr "First name"
 msgid "fit"
 msgstr "fit"
 
+#. placeholder {0}: c.score
+#. placeholder {1}: d != null ? t` (${d >= 0 ? '+' : ''}${d} vs ${baseName} avg)` : ''
+#: src/screens/Resumes.jsx:46
+msgid "fit {0}{1}"
+msgstr "fit {0}{1}"
+
 #: src/screens/JobFeed.jsx:1722
 msgid "fit breakdown, requirements and keywords"
 msgstr "fit breakdown, requirements and keywords"
+
+#: src/screens/Stats.jsx:486
+msgid "Flow"
+msgstr "Flow"
 
 #: src/screens/Settings.jsx:1227
 msgid "following your OS — currently {resolved}"
@@ -3426,6 +4041,7 @@ msgstr "Freeform job description"
 msgid "freehire.me URL · required without a term"
 msgstr "freehire.me URL · required without a term"
 
+#: src/screens/Stats.jsx:83
 #: src/time.js:38
 msgid "Fri"
 msgstr "Fri"
@@ -3456,6 +4072,7 @@ msgid "From which base"
 msgstr "From which base"
 
 #: src/screens/Companies.jsx:103
+#: src/screens/JobFeed.jsx:1933
 #: src/screens/Searches.jsx:92
 msgid "Full"
 msgstr "Full"
@@ -3472,8 +4089,8 @@ msgstr "Full — score + keywords + report"
 
 #: src/screens/CoverLetterEditor.jsx:426
 #: src/screens/CoverLetterEditor.jsx:427
-#: src/screens/ResumeSections.jsx:186
-#: src/screens/ResumeSections.jsx:187
+#: src/screens/ResumeSections.jsx:188
+#: src/screens/ResumeSections.jsx:189
 msgid "Full name"
 msgstr "Full name"
 
@@ -3488,6 +4105,31 @@ msgstr "Full report"
 #: src/screens/Companies.jsx:103
 msgid "Full report with keywords and requirements"
 msgstr "Full report with keywords and requirements"
+
+#: src/screens/Searches.jsx:325
+msgid "Full-time"
+msgstr "Full-time"
+
+#: src/screens/Stats.jsx:486
+msgid "Funnel"
+msgstr "Funnel"
+
+#. placeholder {0}: reqRows.length - reqMet
+#: src/screens/JobFeed.jsx:1666
+msgid "Gaps {0}"
+msgstr "Gaps {0}"
+
+#: src/screens/Persona.jsx:33
+msgid "Gay"
+msgstr "Gay"
+
+#: src/screens/Persona.jsx:54
+msgid "Gender"
+msgstr "Gender"
+
+#: src/screens/Settings.jsx:541
+msgid "General"
+msgstr "General"
 
 #: src/screens/CoverLetters.jsx:353
 msgid "Generate new"
@@ -3528,6 +4170,7 @@ msgstr "Generation finished — check the list for the letter."
 msgid "github.com/vesaias/JobNavigator ↗"
 msgstr "github.com/vesaias/JobNavigator ↗"
 
+#: src/screens/Companies.jsx:945
 #: src/screens/Searches.jsx:1126
 msgid "Global"
 msgstr "Global"
@@ -3579,6 +4222,10 @@ msgstr "Google Jobs"
 #: src/sourceBlocks.js:11
 msgid "Google usually returns a JavaScript check page instead of job data, and this scraper cannot read that page."
 msgstr "Google usually returns a JavaScript check page instead of job data, and this scraper cannot read that page."
+
+#: src/screens/Companies.jsx:88
+msgid "google.com/about/careers"
+msgstr "google.com/about/careers"
 
 #: src/NewUiModal.jsx:62
 msgid "Got it"
@@ -3632,10 +4279,11 @@ msgid "Has tailoring changes you haven't reviewed"
 msgstr "Has tailoring changes you haven't reviewed"
 
 #: src/screens/CoverLetterEditor.jsx:424
+#: src/screens/ResumeSections.jsx:26
 msgid "Header"
 msgstr "Header"
 
-#: src/screens/ResumeSections.jsx:193
+#: src/screens/ResumeSections.jsx:195
 msgid "Headline, e.g. Senior Product Manager"
 msgstr "Headline, e.g. Senior Product Manager"
 
@@ -3665,8 +4313,13 @@ msgid "hide"
 msgstr "hide"
 
 #: src/screens/Companies.jsx:953
+#: src/screens/Settings.jsx:144
 msgid "Hide"
 msgstr "Hide"
+
+#: src/screens/CoverLetters.jsx:415
+msgid "hide ⌄"
+msgstr "hide ⌄"
 
 #: src/LoginModal.jsx:78
 msgid "Hide API key"
@@ -3700,6 +4353,10 @@ msgstr "Hiring manager"
 #: src/screens/Persona.jsx:56
 msgid "Hispanic or Latino?"
 msgstr "Hispanic or Latino?"
+
+#: src/screens/Persona.jsx:26
+msgid "Hispanic/Latino"
+msgstr "Hispanic/Latino"
 
 #: src/screens/Applications.jsx:856
 msgid "History"
@@ -3753,12 +4410,17 @@ msgstr "https://your-domain.example"
 msgid "https://yourdomain.com"
 msgstr "https://yourdomain.com"
 
+#: src/screens/JobFeed.jsx:77
+#: src/screens/JobFeed.jsx:81
+msgid "Hybrid"
+msgstr "Hybrid"
+
 #: src/screens/Persona.jsx:29
 msgid "I am a protected veteran"
 msgstr "I am a protected veteran"
 
 #: src/screens/CoverLetterEditor.jsx:453
-#: src/screens/ResumeSections.jsx:210
+#: src/screens/ResumeSections.jsx:212
 msgid "id"
 msgstr "id"
 
@@ -3789,7 +4451,9 @@ msgstr "Ignore everywhere"
 msgid "Ignore newsletters and job-alert email."
 msgstr "Ignore newsletters and job-alert email."
 
+#: src/screens/Companies.jsx:939
 #: src/screens/JobFeed.jsx:87
+#: src/screens/JobFeed.jsx:105
 #: src/screens/Searches.jsx:1126
 msgid "Ignored"
 msgstr "Ignored"
@@ -3868,6 +4532,10 @@ msgstr "Include by default"
 msgid "Indeed, Glassdoor and Google apply it. LinkedIn ignores it without login, so LinkedIn rows can be on-site."
 msgstr "Indeed, Glassdoor and Google apply it. LinkedIn ignores it without login, so LinkedIn rows can be on-site."
 
+#: src/screens/SettingsAccounts.jsx:677
+msgid "Inherit"
+msgstr "Inherit"
+
 #. placeholder {0}: ownerName || t`the owner`
 #: src/screens/SettingsAccounts.jsx:659
 msgid "Inherited from {0}"
@@ -3890,6 +4558,10 @@ msgstr "Instant — no LLM call"
 msgid "Instant · no LLM cost"
 msgstr "Instant · no LLM cost"
 
+#: src/screens/Settings.jsx:690
+msgid "Integrations"
+msgstr "Integrations"
+
 #: src/screens/Companies.jsx:719
 #: src/screens/Searches.jsx:454
 msgid "intern, junior, associate"
@@ -3898,6 +4570,10 @@ msgstr "intern, junior, associate"
 #: src/screens/Stats.jsx:634
 msgid "intervals and crons are in Settings"
 msgstr "intervals and crons are in Settings"
+
+#: src/screens/Settings.jsx:661
+msgid "intervals in minutes (0 = off) · crons empty = off"
+msgstr "intervals in minutes (0 = off) · crons empty = off"
 
 #: src/screens/Applications.jsx:62
 #: src/screens/Applications.jsx:387
@@ -3922,6 +4598,10 @@ msgstr "Interviews · {0}"
 msgid "Invalid API key"
 msgstr "Invalid API key"
 
+#: src/screens/Settings.jsx:176
+msgid "invalid expression"
+msgstr "invalid expression"
+
 #. placeholder {0}: PROVIDER_LABEL[m.provider] || m.provider
 #: src/screens/Settings.jsx:1470
 msgid "It disappears from every {0} model picker. Anything already pointed at it keeps its saved value."
@@ -3939,7 +4619,7 @@ msgstr "Its tailored copies will be removed too."
 msgid "Jan"
 msgstr "Jan"
 
-#: src/screens/ResumeSections.jsx:263
+#: src/screens/ResumeSections.jsx:265
 msgid "Jan 2022 – Present"
 msgstr "Jan 2022 – Present"
 
@@ -3973,6 +4653,10 @@ msgstr "Job titles, search terms, résumé, letter or persona text, anything typ
 #: src/screens/Searches.jsx:325
 msgid "Job type"
 msgstr "Job type"
+
+#: src/useTitle.js:5
+msgid "JobNavigator"
+msgstr "JobNavigator"
 
 #: src/screens/Settings.jsx:763
 msgid "Jobright hands out a 60-day cookie. The scraper stores it, reuses it across restarts and renews it on its own when it expires or is rejected; nothing here needs doing unless you want to force a fresh sign-in."
@@ -4017,6 +4701,10 @@ msgstr "Jobs open to this country, worldwide jobs included."
 msgid "Jobs this search already found are kept."
 msgstr "Jobs this search already found are kept."
 
+#: src/screens/Companies.jsx:76
+msgid "jobs.lever.co/"
+msgstr "jobs.lever.co/"
+
 #: src/screens/Settings.jsx:618
 msgid "JSON — canonical option → synonyms"
 msgstr "JSON — canonical option → synonyms"
@@ -4049,6 +4737,14 @@ msgstr "Jump to {title}"
 msgid "Jun"
 msgstr "Jun"
 
+#: src/screens/Companies.jsx:19
+#: src/screens/JobFeed.jsx:53
+#: src/screens/ResumeEditor.jsx:67
+#: src/screens/Resumes.jsx:16
+#: src/screens/Searches.jsx:21
+#: src/screens/SettingsAccounts.jsx:94
+#: src/screens/Stats.jsx:72
+#: src/Shell.jsx:49
 #: src/time.js:7
 msgid "just now"
 msgstr "just now"
@@ -4065,6 +4761,7 @@ msgstr "Keep it"
 msgid "keep placeholders like {job_description} as written; they are filled in when the prompt runs"
 msgstr "keep placeholders like {job_description} as written; they are filled in when the prompt runs"
 
+#: src/screens/Companies.jsx:941
 #: src/screens/Searches.jsx:1126
 msgid "Kept"
 msgstr "Kept"
@@ -4077,6 +4774,10 @@ msgstr "Kept ({0})"
 #: src/screens/Settings.jsx:751
 msgid "Key check"
 msgstr "Key check"
+
+#: src/screens/Settings.jsx:1267
+msgid "Key saved"
+msgstr "Key saved"
 
 #. placeholder {0}: data.username
 #: src/screens/Settings.jsx:753
@@ -4095,6 +4796,10 @@ msgstr "Keyboard"
 #: src/screens/JobFeed.jsx:1258
 msgid "Keyboard shortcuts"
 msgstr "Keyboard shortcuts"
+
+#: src/searchModes.js:26
+msgid "Keyword (JobSpy)"
+msgstr "Keyword (JobSpy)"
 
 #: src/screens/JobFeed.jsx:1635
 msgid "Keyword coverage"
@@ -4134,6 +4839,11 @@ msgstr "Last name"
 #: src/screens/Searches.jsx:598
 msgid "Last run finished cleanly but returned no jobs"
 msgstr "Last run finished cleanly but returned no jobs"
+
+#. placeholder {0}: ago(c.last_scraped_at)
+#: src/screens/Companies.jsx:30
+msgid "last run found nothing · {0}"
+msgstr "last run found nothing · {0}"
 
 #: src/screens/Companies.jsx:98
 msgid "Last scrape"
@@ -4180,6 +4890,10 @@ msgstr "Leaves out jobs from companies you scrape (active in Companies, aliases 
 msgid "Length"
 msgstr "Length"
 
+#: src/screens/Persona.jsx:33
+msgid "Lesbian"
+msgstr "Lesbian"
+
 #: src/screens/CoverLetterEditor.jsx:489
 msgid "Letter"
 msgstr "Letter"
@@ -4197,7 +4911,9 @@ msgid "Levels.fyi URL · filters applied"
 msgstr "Levels.fyi URL · filters applied"
 
 #: src/screens/Companies.jsx:102
+#: src/screens/JobFeed.jsx:1933
 #: src/screens/Searches.jsx:91
+#: src/theme.js:33
 msgid "Light"
 msgstr "Light"
 
@@ -4232,6 +4948,10 @@ msgstr "Link"
 msgid "Link Telegram"
 msgstr "Link Telegram"
 
+#: src/screens/Settings.jsx:700
+msgid "Link…"
+msgstr "Link…"
+
 #. placeholder {0}: filters.link_kind.length ? ` · ${filters.link_kind.length}` : ''
 #: src/screens/JobFeed.jsx:1170
 msgid "Link{0}"
@@ -4247,8 +4967,13 @@ msgid "LinkedIn emailed a PIN."
 msgstr "LinkedIn emailed a PIN."
 
 #: src/screens/JobFeed.jsx:100
+#: src/searchModes.js:29
 msgid "LinkedIn Extension"
 msgstr "LinkedIn Extension"
+
+#: src/screens/Searches.jsx:308
+msgid "LinkedIn Extension (passive capture)"
+msgstr "LinkedIn Extension (passive capture)"
 
 #: src/screens/Searches.jsx:357
 msgid "LinkedIn ignores it without login. On LinkedIn, Remote only drops the postings that say hybrid or on-site."
@@ -4256,6 +4981,7 @@ msgstr "LinkedIn ignores it without login. On LinkedIn, Remote only drops the po
 
 #: src/screens/Applications.jsx:53
 #: src/screens/JobFeed.jsx:99
+#: src/searchModes.js:27
 msgid "LinkedIn Personal"
 msgstr "LinkedIn Personal"
 
@@ -4270,6 +4996,10 @@ msgstr "Links your Telegram chat to this account with a one-time code."
 #: src/screens/Searches.jsx:102
 msgid "Listings link to the board (LinkedIn, Indeed, ZipRecruiter, Google), not to the company’s own page. The same job found later by a company scrape or the extension is only recognised as a duplicate when company and title match exactly."
 msgstr "Listings link to the board (LinkedIn, Indeed, ZipRecruiter, Google), not to the company’s own page. The same job found later by a company scrape or the extension is only recognised as a duplicate when company and title match exactly."
+
+#: src/screens/JobFeed.jsx:1763
+msgid "Live"
+msgstr "Live"
 
 #: src/screens/Applications.jsx:727
 msgid "Live ↗"
@@ -4321,8 +5051,8 @@ msgstr "Loading more…"
 msgid "Loading…"
 msgstr "Loading…"
 
-#: src/screens/ResumeSections.jsx:262
-#: src/screens/ResumeSections.jsx:401
+#: src/screens/ResumeSections.jsx:264
+#: src/screens/ResumeSections.jsx:403
 #: src/screens/Searches.jsx:319
 #: src/screens/Searches.jsx:353
 #: src/screens/Searches.jsx:374
@@ -4389,9 +5119,17 @@ msgstr "Make {0} inactive"
 msgid "Make active"
 msgstr "Make active"
 
+#: src/screens/ResumeEditor.jsx:784
+msgid "Make copy"
+msgstr "Make copy"
+
 #: src/screens/Companies.jsx:788
 msgid "Make inactive — jobs already found are kept"
 msgstr "Make inactive — jobs already found are kept"
+
+#: src/screens/Persona.jsx:25
+msgid "Male"
+msgstr "Male"
 
 #: src/Shell.jsx:193
 msgid "Manage accounts"
@@ -4429,6 +5167,11 @@ msgstr "Marked applied."
 msgid "max"
 msgstr "max"
 
+#. placeholder {0}: s.results_wanted || 100
+#: src/screens/Searches.jsx:138
+msgid "max {0}"
+msgstr "max {0}"
+
 #: src/screens/Searches.jsx:331
 msgid "Max pages · 1–50"
 msgstr "Max pages · 1–50"
@@ -4458,6 +5201,8 @@ msgstr "Maximum salary in thousands"
 msgid "May"
 msgstr "May"
 
+#: src/accounts.js:184
+#: src/screens/Settings.jsx:950
 #: src/screens/SettingsAccounts.jsx:481
 msgid "Member"
 msgstr "Member"
@@ -4542,6 +5287,11 @@ msgstr "Model that scores new jobs against your résumés."
 msgid "Model that sorts Gmail replies into application events."
 msgstr "Model that sorts Gmail replies into application events."
 
+#: src/screens/Settings.jsx:549
+msgid "Models"
+msgstr "Models"
+
+#: src/screens/Stats.jsx:83
 #: src/time.js:38
 msgid "Mon"
 msgstr "Mon"
@@ -4549,6 +5299,10 @@ msgstr "Mon"
 #: src/time.js:37
 msgid "Monday"
 msgstr "Monday"
+
+#: src/screens/Stats.jsx:92
+msgid "Month {month} {when}"
+msgstr "Month {month} {when}"
 
 #: src/time.js:229
 msgid "Monthly 1st 08:00"
@@ -4616,15 +5370,16 @@ msgstr "Moved to {0}"
 msgid "Moved to {0}."
 msgstr "Moved to {0}."
 
-#. placeholder {0}: c.h1b_slug || t`auto-detected`
+#. placeholder {0}: c.h1b_slug || 'auto-detected'
 #: src/screens/Companies.jsx:526
 msgid "MyVisaJobs company id · {0}"
 msgstr "MyVisaJobs company id · {0}"
 
-#: src/screens/ResumeSections.jsx:424
+#: src/screens/ResumeSections.jsx:426
 #: src/screens/Searches.jsx:305
 #: src/screens/SettingsAccounts.jsx:236
 #: src/screens/SettingsAccounts.jsx:390
+#: src/screens/SettingsAccounts.jsx:565
 msgid "Name"
 msgstr "Name"
 
@@ -4636,6 +5391,7 @@ msgstr "Name is required"
 msgid "Native American"
 msgstr "Native American"
 
+#: src/screens/Companies.jsx:627
 #: src/Shell.jsx:374
 msgid "needs attention"
 msgstr "needs attention"
@@ -4659,11 +5415,16 @@ msgstr "Needs attention — {warn}"
 msgid "Network error"
 msgstr "Network error"
 
+#: src/screens/SettingsAccounts.jsx:28
+msgid "never keys, sessions, chat ids or Gmail"
+msgstr "never keys, sessions, chat ids or Gmail"
+
 #: src/TelemetryChoice.jsx:53
 msgid "Never sent"
 msgstr "Never sent"
 
 #: src/screens/Applications.jsx:74
+#: src/screens/JobFeed.jsx:105
 msgid "New"
 msgstr "New"
 
@@ -4744,11 +5505,19 @@ msgstr "Next job"
 msgid "Next run"
 msgstr "Next run"
 
+#: src/screens/Searches.jsx:625
+msgid "next scheduled run due now"
+msgstr "next scheduled run due now"
+
+#: src/screens/Searches.jsx:625
+msgid "next scheduled run in {nxt}"
+msgstr "next scheduled run in {nxt}"
+
 #: src/screens/ResumeEditor.jsx:573
 msgid "Next step"
 msgstr "Next step"
 
-#: src/screens/ResumeSections.jsx:115
+#: src/screens/ResumeSections.jsx:117
 msgid "No {what} yet"
 msgstr "No {what} yet"
 
@@ -4784,6 +5553,11 @@ msgstr "No base résumés yet."
 msgid "No base résumés yet. Create one to start."
 msgstr "No base résumés yet. Create one to start."
 
+#: src/screens/Searches.jsx:151
+#: src/screens/Searches.jsx:164
+msgid "no board"
+msgstr "no board"
+
 #. placeholder {0}: tiers.map((t) => (t === null || t === 'none' || t === 'untiered' ? 'Untiered' : tierLabel(t, { long: true }))).join(', ')
 #: src/screens/Companies.jsx:589
 msgid "No companies in {0}."
@@ -4805,6 +5579,10 @@ msgstr "no copies"
 #: src/screens/CoverLetters.jsx:429
 msgid "No cover letters yet — generate one on the left."
 msgstr "No cover letters yet — generate one on the left."
+
+#: src/screens/SettingsAccounts.jsx:48
+msgid "no data yet"
+msgstr "no data yet"
 
 #: src/screens/JobFeed.jsx:1716
 #: src/ui.jsx:1772
@@ -4862,6 +5640,10 @@ msgstr "No LLM calls in this period."
 #: src/screens/JobFeed.jsx:1163
 msgid "No matches"
 msgstr "No matches"
+
+#: src/screens/Settings.jsx:84
+msgid "no models for this provider — add one under Model catalog"
+msgstr "no models for this provider — add one under Model catalog"
 
 #. placeholder {0}: daysSince(a.updated_at)
 #: src/screens/Applications.jsx:600
@@ -4930,6 +5712,10 @@ msgstr "No scored roles yet"
 msgid "No scrape recorded yet"
 msgstr "No scrape recorded yet"
 
+#: src/Shell.jsx:328
+msgid "no scrape run recorded yet"
+msgstr "no scrape run recorded yet"
+
 #: src/screens/Searches.jsx:953
 msgid "No searches yet"
 msgstr "No searches yet"
@@ -4962,9 +5748,17 @@ msgstr "No token to paste: Antigravity signs in once from a terminal."
 msgid "No token to paste: Codex signs in once from a terminal."
 msgstr "No token to paste: Codex signs in once from a terminal."
 
+#: src/screens/Searches.jsx:169
+msgid "no URL"
+msgstr "no URL"
+
 #: src/screens/CoverLetters.jsx:100
 msgid "No voice presets — add them in Settings → AI."
 msgstr "No voice presets — add them in Settings → AI."
+
+#: src/screens/Persona.jsx:25
+msgid "Non-binary"
+msgstr "Non-binary"
 
 #: src/screens/SettingsAccounts.jsx:243
 #: src/screens/SettingsAccounts.jsx:581
@@ -4982,6 +5776,10 @@ msgstr "Normalises dropdown options."
 #: src/screens/Persona.jsx:29
 msgid "Not a protected veteran"
 msgstr "Not a protected veteran"
+
+#: src/TelemetryChoice.jsx:121
+msgid "Not chosen yet"
+msgstr "Not chosen yet"
 
 #: src/screens/Settings.jsx:634
 msgid "Not connected"
@@ -5086,6 +5884,10 @@ msgstr "Nothing was filtered out."
 msgid "Notice period"
 msgstr "Notice period"
 
+#: src/screens/Settings.jsx:690
+msgid "Notifications"
+msgstr "Notifications"
+
 #: src/time.js:40
 msgid "Nov"
 msgstr "Nov"
@@ -5171,6 +5973,19 @@ msgstr "on days {dayTxt}"
 msgid "On save action"
 msgstr "On save action"
 
+#: src/screens/JobFeed.jsx:78
+#: src/screens/JobFeed.jsx:81
+msgid "On-site"
+msgstr "On-site"
+
+#: src/screens/Searches.jsx:1034
+msgid "on-site only"
+msgstr "on-site only"
+
+#: src/screens/Searches.jsx:323
+msgid "On-site only"
+msgstr "On-site only"
+
 #: src/screens/Searches.jsx:375
 msgid "One city name. Behance ignores it."
 msgstr "One city name. Behance ignores it."
@@ -5221,6 +6036,10 @@ msgstr "Only the owner can do that."
 msgid "Only the owner can run {0}"
 msgstr "Only the owner can run {0}"
 
+#: src/screens/JobFeed.jsx:1216
+msgid "Open"
+msgstr "Open"
+
 #: src/screens/Companies.jsx:491
 msgid "Open · 7d"
 msgstr "Open · 7d"
@@ -5241,6 +6060,10 @@ msgstr "Open {0} career pages"
 #: src/screens/ResumeEditor.jsx:189
 msgid "Open ↗"
 msgstr "Open ↗"
+
+#: src/screens/Stats.jsx:461
+msgid "Open = not rejected"
+msgstr "Open = not rejected"
 
 #: src/screens/Companies.jsx:567
 msgid "Open career page"
@@ -5343,7 +6166,7 @@ msgstr "Optional — referral, recruiter contact…"
 msgid "Optional · 4 digits · your own PIN opens this account too"
 msgstr "Optional · 4 digits · your own PIN opens this account too"
 
-#: src/screens/ResumeSections.jsx:265
+#: src/screens/ResumeSections.jsx:267
 msgid "Optional role description"
 msgstr "Optional role description"
 
@@ -5364,12 +6187,18 @@ msgstr "or at least"
 msgid "Oracle HCM"
 msgstr "Oracle HCM"
 
-#. placeholder {0}: others.map((a) => (a.role === 'owner' ? `${a.name} (owner)` : a.name)).join(', ') || t`none`
+#: src/screens/Persona.jsx:34
+#: src/screens/Persona.jsx:36
+msgid "Other"
+msgstr "Other"
+
+#. placeholder {0}: others.map((a) => (a.role === 'owner' ? t`${a.name} (owner)` : a.name)).join(', ') || t`none`
 #. placeholder {1}: owner ? `${owner.name}’s` : t`the owner’s`
 #: src/screens/SettingsAccounts.jsx:581
 msgid "Other accounts: {0}. Adding or removing people is {1} job — ask them."
 msgstr "Other accounts: {0}. Adding or removing people is {1} job — ask them."
 
+#: src/screens/Companies.jsx:946
 #: src/screens/Searches.jsx:1126
 msgid "Out"
 msgstr "Out"
@@ -5378,6 +6207,11 @@ msgstr "Out"
 msgid "Override"
 msgstr "Override"
 
+#: src/screens/SettingsAccounts.jsx:678
+msgid "Own"
+msgstr "Own"
+
+#: src/accounts.js:184
 #: src/screens/SettingsAccounts.jsx:481
 msgid "Owner"
 msgstr "Owner"
@@ -5409,7 +6243,7 @@ msgstr "Pacific Islander"
 msgid "Page {0} · {1}"
 msgstr "Page {0} · {1}"
 
-#: src/screens/ResumeSections.jsx:171
+#: src/screens/ResumeSections.jsx:173
 msgid "Page footer"
 msgstr "Page footer"
 
@@ -5424,6 +6258,7 @@ msgstr "Pages to read"
 
 #: src/screens/CoverLetterEditor.jsx:550
 #: src/screens/ResumeEditor.jsx:666
+#: src/theme.js:38
 msgid "Paper"
 msgstr "Paper"
 
@@ -5437,10 +6272,23 @@ msgstr "Paper size"
 msgid "Paper size — US Letter or A4"
 msgstr "Paper size — US Letter or A4"
 
+#: src/screens/Settings.jsx:745
+msgid "Param + job ID (?cv=142li)"
+msgstr "Param + job ID (?cv=142li)"
+
+#: src/screens/Settings.jsx:744
+msgid "Param + random (?cv=a7x2kp)"
+msgstr "Param + random (?cv=a7x2kp)"
+
 #: src/screens/Persona.jsx:330
+#: src/screens/Persona.jsx:499
 #: src/screens/Resumes.jsx:362
 msgid "Parsing…"
 msgstr "Parsing…"
+
+#: src/screens/Searches.jsx:325
+msgid "Part-time"
+msgstr "Part-time"
 
 #: src/screens/Searches.jsx:1126
 msgid "Passed all filters"
@@ -5449,6 +6297,10 @@ msgstr "Passed all filters"
 #: src/screens/Searches.jsx:126
 msgid "Passive capture on linkedin.com/jobs/collections/* · title filters apply on import"
 msgstr "Passive capture on linkedin.com/jobs/collections/* · title filters apply on import"
+
+#: src/screens/Settings.jsx:758
+msgid "Password"
+msgstr "Password"
 
 #: src/screens/Companies.jsx:848
 msgid "Paste a careers URL — the ATS is read from it."
@@ -5482,9 +6334,17 @@ msgstr "Pause — captured jobs stop importing"
 msgid "Pause. Removed from the schedule, settings kept."
 msgstr "Pause. Removed from the schedule, settings kept."
 
+#: src/screens/Searches.jsx:606
+msgid "paused"
+msgstr "paused"
+
 #: src/screens/Searches.jsx:886
 msgid "Paused"
 msgstr "Paused"
+
+#: src/screens/Companies.jsx:686
+msgid "paused, so it is not counted"
+msgstr "paused, so it is not counted"
 
 #: src/screens/ResumeEditor.jsx:677
 msgid "pdf"
@@ -5505,6 +6365,10 @@ msgstr "peak {0} · {1}"
 msgid "Pending"
 msgstr "Pending"
 
+#: src/screens/Settings.jsx:530
+msgid "People"
+msgstr "People"
+
 #: src/screens/SettingsAccounts.jsx:652
 msgid "Per device"
 msgstr "Per device"
@@ -5516,6 +6380,7 @@ msgstr "Permanent resident"
 #: src/screens/Companies.jsx:147
 #: src/screens/Persona.jsx:318
 #: src/screens/Resumes.jsx:215
+#: src/screens/SettingsAccounts.jsx:23
 #: src/Shell.jsx:39
 #: src/useTitle.js:16
 msgid "Persona"
@@ -5533,6 +6398,10 @@ msgstr "Persona is not a résumé, so it can’t be copied. Use Tailor instead."
 #: src/screens/Settings.jsx:602
 msgid "Persona tailoring prompt"
 msgstr "Persona tailoring prompt"
+
+#: src/screens/Persona.jsx:44
+msgid "Phone"
+msgstr "Phone"
 
 #: src/screens/ResumeEditor.jsx:865
 msgid "Pick a job · saved and scored first"
@@ -5592,9 +6461,34 @@ msgstr "Pick your LLM provider and add its key — Anthropic, OpenAI, Ollama or 
 msgid "Picking a country or province keeps everything under it"
 msgstr "Picking a country or province keeps everything under it"
 
+#: src/screens/SettingsAccounts.jsx:443
+msgid "PIN changed"
+msgstr "PIN changed"
+
 #: src/screens/SettingsAccounts.jsx:243
 msgid "PIN for the new account"
 msgstr "PIN for the new account"
+
+#: src/screens/SettingsAccounts.jsx:435
+#: src/screens/SettingsAccounts.jsx:590
+msgid "PIN removed"
+msgstr "PIN removed"
+
+#: src/screens/SettingsAccounts.jsx:590
+msgid "PIN saved"
+msgstr "PIN saved"
+
+#: src/screens/Settings.jsx:1312
+msgid "PIN sent"
+msgstr "PIN sent"
+
+#: src/screens/SettingsAccounts.jsx:443
+msgid "PIN set"
+msgstr "PIN set"
+
+#: src/screens/Settings.jsx:661
+msgid "Pipeline"
+msgstr "Pipeline"
 
 #: src/screens/Settings.jsx:656
 msgid "placeholders: {applications} {from} {subject} {body}"
@@ -5648,6 +6542,7 @@ msgstr "posting"
 msgid "Posting · notes"
 msgstr "Posting · notes"
 
+#: src/screens/Companies.jsx:943
 #: src/screens/Searches.jsx:1117
 msgid "posting body text check was skipped"
 msgstr "posting body text check was skipped"
@@ -5701,6 +6596,10 @@ msgstr "Preset"
 msgid "Presets"
 msgstr "Presets"
 
+#: src/screens/SettingsAccounts.jsx:29
+msgid "presets and the default voice"
+msgstr "presets and the default voice"
+
 #: src/screens/CoverLetterEditor.jsx:565
 #: src/screens/ResumeEditor.jsx:680
 msgid "Preview failed — the PDF could not be rendered."
@@ -5726,11 +6625,15 @@ msgstr "Preview run. Shows results and why each job was kept or filtered. Saves 
 msgid "Previous job"
 msgstr "Previous job"
 
+#: src/screens/Settings.jsx:75
+msgid "Primary"
+msgstr "Primary"
+
 #: src/screens/Settings.jsx:550
 msgid "Primary provider · model"
 msgstr "Primary provider · model"
 
-#: src/screens/ResumeSections.jsx:172
+#: src/screens/ResumeSections.jsx:174
 msgid "Print your name, the job title and the company at the foot of every page of this résumé's PDF and Word downloads."
 msgstr "Print your name, the job title and the company at the foot of every page of this résumé's PDF and Word downloads."
 
@@ -5743,6 +6646,10 @@ msgstr "Priority tier"
 msgid "Profile"
 msgstr "Profile"
 
+#: src/screens/ResumeSections.jsx:26
+msgid "Projects"
+msgstr "Projects"
+
 #: src/screens/Settings.jsx:592
 msgid "Prompt caching"
 msgstr "Prompt caching"
@@ -5754,6 +6661,10 @@ msgstr "Providers: Claude API, Claude Code, Codex CLI (your ChatGPT subscription
 #: src/screens/Settings.jsx:777
 msgid "Proxy URL"
 msgstr "Proxy URL"
+
+#: src/screens/ResumeSections.jsx:26
+msgid "Publications"
+msgstr "Publications"
 
 #: src/screens/Settings.jsx:673
 msgid "Purges expired postings."
@@ -5770,6 +6681,10 @@ msgstr "Q&A bank"
 #: src/screens/SettingsAccounts.jsx:24
 msgid "Q&A bank only"
 msgstr "Q&A bank only"
+
+#: src/screens/Persona.jsx:34
+msgid "Queer"
+msgstr "Queer"
 
 #: src/screens/Settings.jsx:681
 msgid "Query params removed from job URLs before duplicate detection. All utm_* are always stripped."
@@ -5799,6 +6714,10 @@ msgstr "Re-tailor for this job"
 #: src/screens/ResumeEditor.jsx:586
 msgid "Re-tailor…"
 msgstr "Re-tailor…"
+
+#: src/screens/feedActivity.js:57
+msgid "Re-tailoring"
+msgstr "Re-tailoring"
 
 #: src/screens/feedActivity.js:68
 msgid "Re-tailoring · replaces the current tailored résumé"
@@ -5833,10 +6752,6 @@ msgstr "Reads the public API of himalayas.app: no login and no key. Every job is
 msgid "Reads TrulyRemoteWork.com’s full corpus of worldwide-remote roles. Every listing is remote with no location restriction, so you narrow it with the title and company filters below. Each new job’s description is read from its own page; Test reads at most 20 of those pages."
 msgstr "Reads TrulyRemoteWork.com’s full corpus of worldwide-remote roles. Every listing is remote with no location restriction, so you narrow it with the title and company filters below. Each new job’s description is read from its own page; Test reads at most 20 of those pages."
 
-#: src/screens/ResumeEditor.jsx:567
-msgid "ready"
-msgstr "ready"
-
 #: src/screens/ResumeEditor.jsx:407
 msgid "Ready ✓"
 msgstr "Ready ✓"
@@ -5861,6 +6776,10 @@ msgstr "Recipient"
 #: src/screens/Searches.jsx:104
 msgid "Recommendations from your Jobright.ai account. Enter a search term to search instead. Credentials are in Settings › Accounts."
 msgstr "Recommendations from your Jobright.ai account. Enter a search term to search instead. Credentials are in Settings › Accounts."
+
+#: src/screens/Searches.jsx:95
+msgid "Recommended"
+msgstr "Recommended"
 
 #: src/screens/Settings.jsx:636
 msgid "Reconnect ↗"
@@ -5910,6 +6829,10 @@ msgstr "Register the Telegram webhook"
 msgid "Register webhook"
 msgstr "Register webhook"
 
+#: src/screens/Settings.jsx:726
+msgid "Register…"
+msgstr "Register…"
+
 #: src/screens/Settings.jsx:736
 msgid "Registration failed"
 msgstr "Registration failed"
@@ -5918,6 +6841,10 @@ msgstr "Registration failed"
 #: src/screens/Stats.jsx:360
 msgid "Rejected"
 msgstr "Rejected"
+
+#: src/screens/Settings.jsx:700
+msgid "Relink…"
+msgstr "Relink…"
 
 #: src/AccountChanged.jsx:34
 msgid "Reload"
@@ -5931,14 +6858,28 @@ msgstr "Reload as {who}"
 msgid "Reload every figure on this page"
 msgstr "Reload every figure on this page"
 
+#: src/screens/JobFeed.jsx:76
+#: src/screens/JobFeed.jsx:81
 #: src/screens/Searches.jsx:323
 #: src/screens/Searches.jsx:356
 #: src/screens/Searches.jsx:378
 msgid "Remote"
 msgstr "Remote"
 
+#: src/screens/Searches.jsx:1033
+msgid "remote only"
+msgstr "remote only"
+
+#: src/screens/Searches.jsx:323
+#: src/screens/Searches.jsx:356
+#: src/screens/Searches.jsx:378
+msgid "Remote only"
+msgstr "Remote only"
+
 #: src/screens/Settings.jsx:1471
 #: src/screens/SettingsAccounts.jsx:504
+#: src/ui.jsx:1944
+#: src/ui.jsx:1948
 msgid "Remove"
 msgstr "Remove"
 
@@ -5982,11 +6923,11 @@ msgstr "Remove PIN"
 msgid "Remove PIN instead"
 msgstr "Remove PIN instead"
 
-#: src/screens/ResumeSections.jsx:444
+#: src/screens/ResumeSections.jsx:446
 msgid "Remove project"
 msgstr "Remove project"
 
-#: src/screens/ResumeSections.jsx:292
+#: src/screens/ResumeSections.jsx:294
 msgid "Remove role"
 msgstr "Remove role"
 
@@ -6008,9 +6949,48 @@ msgstr "Remove your PIN"
 msgid "Removed “{0}”"
 msgstr "Removed “{0}”"
 
+#. placeholder {0}: acc.name
+#. placeholder {1}: res?.backup ? t` · backup ${res.backup}` : ''
+#: src/screens/SettingsAccounts.jsx:522
+msgid "Removed {0}{1}"
+msgstr "Removed {0}{1}"
+
 #: src/screens/Persona.jsx:265
 msgid "Removed answer"
 msgstr "Removed answer"
+
+#: src/screens/ResumeSections.jsx:276
+#: src/screens/ResumeSections.jsx:437
+msgid "Removed bullet"
+msgstr "Removed bullet"
+
+#: src/screens/ResumeSections.jsx:213
+msgid "Removed contact item"
+msgstr "Removed contact item"
+
+#: src/screens/ResumeSections.jsx:409
+msgid "Removed education entry"
+msgstr "Removed education entry"
+
+#: src/screens/CoverLetterEditor.jsx:504
+msgid "Removed paragraph"
+msgstr "Removed paragraph"
+
+#: src/screens/ResumeSections.jsx:444
+msgid "Removed project"
+msgstr "Removed project"
+
+#: src/screens/ResumeSections.jsx:463
+msgid "Removed publication"
+msgstr "Removed publication"
+
+#: src/screens/ResumeSections.jsx:292
+msgid "Removed role"
+msgstr "Removed role"
+
+#: src/screens/ResumeSections.jsx:369
+msgid "Removed skill category"
+msgstr "Removed skill category"
 
 #: src/screens/ResumeEditor.jsx:590
 #: src/screens/ResumeEditor.jsx:625
@@ -6039,6 +7019,10 @@ msgstr "Renamed to {n}"
 msgid "Rendering the preview…"
 msgstr "Rendering the preview…"
 
+#: src/screens/Persona.jsx:499
+msgid "Replace"
+msgstr "Replace"
+
 #: src/screens/Persona.jsx:497
 msgid "Replaces contact and résumé content. Work authorization, demographics, compensation, preferences and the Q&A bank stay."
 msgstr "Replaces contact and résumé content. Work authorization, demographics, compensation, preferences and the Q&A bank stay."
@@ -6061,6 +7045,10 @@ msgstr "Report + keywords"
 msgid "Reposted: see the earlier posting"
 msgstr "Reposted: see the earlier posting"
 
+#: src/screens/Searches.jsx:139
+msgid "require salary"
+msgstr "require salary"
+
 #: src/screens/Searches.jsx:480
 msgid "Require salary"
 msgstr "Require salary"
@@ -6080,6 +7068,14 @@ msgstr "Requirement"
 #: src/screens/JobFeed.jsx:1660
 msgid "Requirement mapping"
 msgstr "Requirement mapping"
+
+#: src/screens/JobFeed.jsx:165
+#: src/screens/JobFeed.jsx:654
+#: src/screens/JobFeed.jsx:768
+#: src/screens/JobFeed.jsx:1414
+#: src/screens/JobFeed.jsx:1522
+msgid "Rescore"
+msgstr "Rescore"
 
 #. placeholder {0}: spec.label
 #: src/screens/Settings.jsx:1396
@@ -6257,6 +7253,7 @@ msgstr "role"
 msgid "Role, seniority, countries and posting age are taken from the URL as is"
 msgstr "Role, seniority, countries and posting age are taken from the URL as is"
 
+#: src/screens/Settings.jsx:714
 #: src/screens/Settings.jsx:718
 msgid "Rotate"
 msgstr "Rotate"
@@ -6354,6 +7351,10 @@ msgstr "Running"
 msgid "Running · {0}"
 msgstr "Running · {0}"
 
+#: src/screens/Searches.jsx:839
+msgid "running now. Results appear in the Job Feed as they are found."
+msgstr "running now. Results appear in the Job Feed as they are found."
+
 #: src/screens/Settings.jsx:1241
 #: src/screens/Stats.jsx:673
 msgid "Running…"
@@ -6429,6 +7430,7 @@ msgstr "Same role, another city"
 msgid "Same role, new posting"
 msgstr "Same role, new posting"
 
+#: src/screens/Stats.jsx:83
 #: src/time.js:38
 msgid "Sat"
 msgstr "Sat"
@@ -6494,8 +7496,17 @@ msgstr "Save, then tailor a copy of {0} for this job"
 
 #: src/screens/Applications.jsx:75
 #: src/screens/JobFeed.jsx:85
+#: src/screens/JobFeed.jsx:105
+#: src/screens/JobFeed.jsx:574
+#: src/screens/Settings.jsx:440
+#: src/screens/Stats.jsx:460
 msgid "Saved"
 msgstr "Saved"
+
+#. placeholder {0}: acc.name
+#: src/screens/SettingsAccounts.jsx:516
+msgid "Saved {0}"
+msgstr "Saved {0}"
 
 #. placeholder {0}: ago(savedAt)
 #. placeholder {0}: timeAgo(savedAt)
@@ -6554,14 +7565,21 @@ msgstr "Scheduled"
 msgid "Scheduled scraping is off — run a search or a company by hand. "
 msgstr "Scheduled scraping is off — run a search or a company by hand. "
 
+#: src/screens/Settings.jsx:661
+msgid "Scheduler"
+msgstr "Scheduler"
+
 #: src/screens/Stats.jsx:633
 msgid "Schedules"
 msgstr "Schedules"
 
-#: src/screens/ResumeSections.jsx:400
+#: src/screens/ResumeSections.jsx:402
 msgid "School"
 msgstr "School"
 
+#: src/screens/JobFeed.jsx:654
+#: src/screens/JobFeed.jsx:720
+#: src/screens/JobFeed.jsx:768
 #: src/screens/JobFeed.jsx:1284
 #: src/screens/JobFeed.jsx:1350
 msgid "Score"
@@ -6645,6 +7663,10 @@ msgstr "Score this role — light (score only). Change the default in Settings �
 msgid "Score threshold"
 msgstr "Score threshold"
 
+#: src/screens/JobFeed.jsx:1004
+msgid "Scored"
+msgstr "Scored"
+
 #: src/screens/Companies.jsx:523
 msgid "Scored against your default résumé from Settings"
 msgstr "Scored against your default résumé from Settings"
@@ -6674,6 +7696,11 @@ msgstr "Scores only"
 #: src/screens/Companies.jsx:102
 msgid "Scores only, no report"
 msgstr "Scores only, no report"
+
+#: src/screens/Settings.jsx:75
+#: src/screens/Settings.jsx:574
+msgid "Scoring"
+msgstr "Scoring"
 
 #. placeholder {0}: job.title
 #: src/screens/JobFeed.jsx:629
@@ -6735,9 +7762,15 @@ msgstr "Scoring in progress"
 msgid "Scoring rubric"
 msgstr "Scoring rubric"
 
+#: src/screens/feedActivity.js:54
 #: src/screens/JobFeed.jsx:1344
+#: src/screens/ResumeEditor.jsx:405
 msgid "Scoring…"
 msgstr "Scoring…"
+
+#: src/screens/Stats.jsx:35
+msgid "Scrape"
+msgstr "Scrape"
 
 #: src/screens/Settings.jsx:662
 msgid "Scrape all companies"
@@ -6773,6 +7806,10 @@ msgstr "Scrapes at once"
 #: src/screens/Companies.jsx:895
 msgid "Scrapes on the next scheduled run"
 msgstr "Scrapes on the next scheduled run"
+
+#: src/screens/Companies.jsx:364
+msgid "scraping now…"
+msgstr "scraping now…"
 
 #: src/screens/Persona.jsx:74
 msgid "Screening defaults"
@@ -6860,7 +7897,12 @@ msgstr "Search title or company…"
 msgid "Search titles…"
 msgstr "Search titles…"
 
+#: src/ui.jsx:494
+msgid "Search…"
+msgstr "Search…"
+
 #: src/screens/Searches.jsx:793
+#: src/screens/SettingsAccounts.jsx:27
 #: src/Shell.jsx:30
 #: src/useTitle.js:11
 msgid "Searches"
@@ -6878,6 +7920,10 @@ msgstr "Sections where {0}’s Inherit / Own differs from the default"
 #: src/screens/Settings.jsx:1528
 msgid "seeded"
 msgstr "seeded"
+
+#: src/screens/JobFeed.jsx:165
+msgid "Select"
+msgstr "Select"
 
 #: src/screens/JobFeed.jsx:1434
 msgid "Select a job."
@@ -6942,6 +7988,14 @@ msgstr "Sent once a day, from the server"
 msgid "Sep"
 msgstr "Sep"
 
+#: src/screens/Settings.jsx:759
+msgid "Session"
+msgstr "Session"
+
+#: src/screens/Settings.jsx:715
+msgid "Set"
+msgstr "Set"
+
 #: src/screens/Settings.jsx:1255
 msgid "Set — type a new key to replace it"
 msgstr "Set — type a new key to replace it"
@@ -6959,6 +8013,11 @@ msgstr "Set {0}’s PIN"
 #: src/screens/Settings.jsx:1181
 msgid "Set by {0}"
 msgstr "Set by {0}"
+
+#. placeholder {0}: state.level
+#: src/TelemetryChoice.jsx:119
+msgid "Set by JN_TELEMETRY={0} in .env."
+msgstr "Set by JN_TELEMETRY={0} in .env."
 
 #: src/screens/SettingsAccounts.jsx:500
 #: src/screens/SettingsAccounts.jsx:500
@@ -6984,7 +8043,9 @@ msgstr "Set your filters on levels.fyi and paste the URL here. The URL contains 
 msgid "Set your PIN"
 msgstr "Set your PIN"
 
+#: src/screens/ResumeSections.jsx:26
 #: src/screens/Settings.jsx:856
+#: src/screens/SettingsAccounts.jsx:28
 #: src/Shell.jsx:41
 #: src/Shell.jsx:193
 #: src/useTitle.js:18
@@ -7008,8 +8069,12 @@ msgstr "Share of calls that reused a cached prompt"
 msgid "Shared by everyone on this install"
 msgstr "Shared by everyone on this install"
 
+#: src/screens/JobFeed.jsx:165
+msgid "Shift-click"
+msgstr "Shift-click"
+
 #: src/screens/CoverLetterEditor.jsx:454
-#: src/screens/ResumeSections.jsx:210
+#: src/screens/ResumeSections.jsx:212
 msgid "Short stub used in the tracked link, e.g. l, w, gh"
 msgstr "Short stub used in the tracked link, e.g. l, w, gh"
 
@@ -7018,6 +8083,7 @@ msgid "show"
 msgstr "show"
 
 #: src/screens/Companies.jsx:953
+#: src/screens/Settings.jsx:144
 msgid "Show"
 msgstr "Show"
 
@@ -7049,6 +8115,10 @@ msgstr "Show the dashboard API key"
 #: src/screens/JobFeed.jsx:1100
 msgid "Showing only jobs from this saved search — click to clear"
 msgstr "Showing only jobs from this saved search — click to clear"
+
+#: src/screens/CoverLetters.jsx:415
+msgid "shown while searching"
+msgstr "shown while searching"
 
 #: src/LoginModal.jsx:50
 #: src/LoginModal.jsx:84
@@ -7087,19 +8157,30 @@ msgstr "Signed in with the mock account. The extension import uses it, and after
 msgid "Signing in…"
 msgstr "Signing in…"
 
-#: src/screens/ResumeSections.jsx:387
+#. placeholder {0}: Object.keys(d.skills).length + 1
+#: src/screens/ResumeSections.jsx:376
+msgid "Skill {0}"
+msgstr "Skill {0}"
+
+#: src/screens/ResumeSections.jsx:389
 msgid "Skill category"
 msgstr "Skill category"
 
-#: src/screens/ResumeSections.jsx:359
+#: src/screens/ResumeSections.jsx:361
 msgid "Skill values…"
 msgstr "Skill values…"
+
+#: src/screens/ResumeSections.jsx:26
+msgid "Skills"
+msgstr "Skills"
 
 #: src/screens/ResumeEditor.jsx:59
 #: src/screens/ResumeEditor.jsx:60
 msgid "Skills · {cat}"
 msgstr "Skills · {cat}"
 
+#: src/screens/JobFeed.jsx:105
+#: src/screens/JobFeed.jsx:165
 #: src/screens/JobFeed.jsx:1282
 msgid "Skip"
 msgstr "Skip"
@@ -7189,6 +8270,10 @@ msgstr "Source{0}"
 msgid "Sources"
 msgstr "Sources"
 
+#: src/screens/Stats.jsx:592
+msgid "Spend"
+msgstr "Spend"
+
 #: src/screens/CoverLetters.jsx:326
 msgid "Stage of the linked application"
 msgstr "Stage of the linked application"
@@ -7196,6 +8281,10 @@ msgstr "Stage of the linked application"
 #: src/screens/Stats.jsx:522
 msgid "Stage rows count every application that reached the stage. Snapshot rows count current status only."
 msgstr "Stage rows count every application that reached the stage. Snapshot rows count current status only."
+
+#: src/screens/CoverLetters.jsx:15
+msgid "Standard"
+msgstr "Standard"
 
 #: src/screens/SettingsAccounts.jsx:245
 msgid "Start from a copy of…"
@@ -7212,6 +8301,10 @@ msgstr "Start with Settings →"
 #: src/screens/Searches.jsx:819
 msgid "Starts paused: resume it on its card when the boards look right"
 msgstr "Starts paused: resume it on its card when the boards look right"
+
+#: src/screens/Persona.jsx:46
+msgid "State"
+msgstr "State"
 
 #: src/screens/Stats.jsx:419
 #: src/screens/Stats.jsx:430
@@ -7231,11 +8324,15 @@ msgstr "Stats"
 msgid "Status"
 msgstr "Status"
 
-#. placeholder {0}: filters.status.map((s) => STATUS_OPTS.find((o) => o[0] === s)?.[1]).join(', ') || 'Any'
+#. placeholder {0}: filters.status.map((s) => STATUS_OPTS.find((o) => o[0] === s)?.[1]).join(', ') || t`Any`
 #. placeholder {1}: statusActive ? <span onClick={(e) => { e.stopPropagation(); setF({ status: [] }) }} style={{ opacity: 0.6 }}>✕</span> : <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
 #: src/screens/JobFeed.jsx:1206
 msgid "Status · {0}{1}"
 msgstr "Status · {0}{1}"
+
+#: src/theme.js:45
+msgid "Stone"
+msgstr "Stone"
 
 #: src/screens/Companies.jsx:679
 msgid "Stop counting this company as needing attention. The warning stays here; a run that fails after this raises it again."
@@ -7267,7 +8364,7 @@ msgid "Submit PIN"
 msgstr "Submit PIN"
 
 #: src/screens/ResumeEditor.jsx:928
-#: src/screens/ResumeSections.jsx:286
+#: src/screens/ResumeSections.jsx:288
 msgid "suggested"
 msgstr "suggested"
 
@@ -7279,7 +8376,7 @@ msgstr "Suggested — not in the document or the PDF yet; added when you finish 
 msgid "Suggested bullets are not in it yet: they are added when you finish reviewing."
 msgstr "Suggested bullets are not in it yet: they are added when you finish reviewing."
 
-#: src/screens/ResumeSections.jsx:283
+#: src/screens/ResumeSections.jsx:285
 msgid "Suggested by tailoring. Kept unless you decline it in Review."
 msgstr "Suggested by tailoring. Kept unless you decline it in Review."
 
@@ -7287,10 +8384,17 @@ msgstr "Suggested by tailoring. Kept unless you decline it in Review."
 msgid "Sum LLM costs across all accounts"
 msgstr "Sum LLM costs across all accounts"
 
+#: src/screens/ResumeEditor.jsx:47
+#: src/screens/ResumeSections.jsx:26
+msgid "Summary"
+msgstr "Summary"
+
 #: src/screens/Settings.jsx:671
 msgid "Summary of new high-fit jobs."
 msgstr "Summary of new high-fit jobs."
 
+#: src/screens/Stats.jsx:83
+#: src/screens/Stats.jsx:83
 #: src/time.js:38
 msgid "Sun"
 msgstr "Sun"
@@ -7317,6 +8421,11 @@ msgstr "Switched to {0}"
 #: src/AccountPicker.jsx:119
 msgid "Switching to {0}…"
 msgstr "Switching to {0}…"
+
+#: src/screens/Settings.jsx:776
+#: src/theme.js:33
+msgid "System"
+msgstr "System"
 
 #: src/screens/Applications.jsx:1030
 #: src/screens/JobFeed.jsx:1285
@@ -7359,10 +8468,18 @@ msgstr "Tailor résumé"
 msgid "tailored"
 msgstr "tailored"
 
+#: src/screens/JobFeed.jsx:1004
+msgid "Tailored"
+msgstr "Tailored"
+
 #. placeholder {0}: scores.tailored_avg
 #: src/screens/Stats.jsx:539
 msgid "tailored {0}"
 msgstr "tailored {0}"
+
+#: src/screens/SettingsAccounts.jsx:25
+msgid "tailored copies stay behind"
+msgstr "tailored copies stay behind"
 
 #: src/screens/ResumeEditor.jsx:543
 msgid "Tailored copy"
@@ -7388,6 +8505,12 @@ msgstr "Tailored from a pasted description"
 #: src/screens/Persona.jsx:367
 msgid "Tailored résumés use whatever you add here."
 msgstr "Tailored résumés use whatever you add here."
+
+#: src/screens/feedActivity.js:57
+#: src/screens/Settings.jsx:75
+#: src/screens/Settings.jsx:577
+msgid "Tailoring"
+msgstr "Tailoring"
 
 #. placeholder {0}: g.label
 #: src/screens/JobFeed.jsx:1591
@@ -7483,7 +8606,13 @@ msgstr "Telegram sends this secret with every webhook call. Calls with the wrong
 msgid "Telegram stops accepting the old one immediately — you must re-register the webhook afterwards."
 msgstr "Telegram stops accepting the old one immediately — you must re-register the webhook afterwards."
 
+#: src/screens/Settings.jsx:781
+msgid "Telemetry"
+msgstr "Telemetry"
+
+#: src/screens/CoverLetterEditor.jsx:363
 #: src/screens/CoverLetterEditor.jsx:537
+#: src/screens/ResumeEditor.jsx:516
 #: src/screens/ResumeEditor.jsx:656
 msgid "Template"
 msgstr "Template"
@@ -7509,6 +8638,7 @@ msgid "Terms: Himalayas allows its public API on condition that applicants go th
 msgstr "Terms: Himalayas allows its public API on condition that applicants go through its job link and the job is credited to Himalayas. The job keeps that link and shows Himalayas as its source. See LEGAL_DISCLAIMER.md."
 
 #: src/screens/Companies.jsx:560
+#: src/screens/Settings.jsx:712
 msgid "Test"
 msgstr "Test"
 
@@ -7547,7 +8677,7 @@ msgid "Testing…"
 msgstr "Testing…"
 
 #: src/screens/CoverLetterEditor.jsx:434
-#: src/screens/ResumeSections.jsx:198
+#: src/screens/ResumeSections.jsx:200
 msgid "text · link · stub"
 msgstr "text · link · stub"
 
@@ -7566,6 +8696,10 @@ msgstr "That account token is no longer valid — create a new one."
 #: src/screens/Companies.jsx:329
 msgid "That company is already being scraped"
 msgstr "That company is already being scraped"
+
+#: src/screens/Persona.jsx:531
+msgid "That is not a PDF."
+msgstr "That is not a PDF."
 
 #: src/screens/JobFeed.jsx:919
 msgid "That job no longer exists"
@@ -7603,6 +8737,10 @@ msgstr "The ATS is detected once you paste a URL."
 msgid "The backend image does not match the code. {FIX}"
 msgstr "The backend image does not match the code. {FIX}"
 
+#: src/screens/SettingsAccounts.jsx:27
+msgid "the built-in extension searches are always there"
+msgstr "the built-in extension searches are always there"
+
 #: src/Shell.jsx:330
 msgid "The dashboard could not reach the backend. Nothing below is live — check that the server is running."
 msgstr "The dashboard could not reach the backend. Nothing below is live — check that the server is running."
@@ -7624,6 +8762,10 @@ msgstr "The email check stops reading this mailbox for this account. You can con
 msgid "The export failed — try again."
 msgstr "The export failed — try again."
 
+#: src/screens/Applications.jsx:54
+msgid "the extension"
+msgstr "the extension"
+
 #: src/NewUiModal.jsx:27
 msgid "The extension, redesigned: AI-assisted answers to application questions and structured autofill of ATS forms from your Persona."
 msgstr "The extension, redesigned: AI-assisted answers to application questions and structured autofill of ATS forms from your Persona."
@@ -7632,6 +8774,10 @@ msgstr "The extension, redesigned: AI-assisted answers to application questions 
 msgid "The generation instruction."
 msgstr "The generation instruction."
 
+#: src/screens/Settings.jsx:704
+msgid "the household bot"
+msgstr "the household bot"
+
 #: src/screens/Settings.jsx:695
 msgid "The household bot is the one the owner set up. Your own bot comes from @BotFather; its token stays in your account. System alerts (scrape health) always go to the owner."
 msgstr "The household bot is the one the owner set up. Your own bot comes from @BotFather; its token stays in your account. System alerts (scrape health) always go to the owner."
@@ -7639,6 +8785,10 @@ msgstr "The household bot is the one the owner set up. Your own bot comes from @
 #: src/screens/Settings.jsx:594
 msgid "The instruction block every scoring call starts from."
 msgstr "The instruction block every scoring call starts from."
+
+#: src/screens/Applications.jsx:56
+msgid "the Job Feed"
+msgstr "the Job Feed"
 
 #: src/screens/Applications.jsx:302
 msgid "The job goes back to Saved in the feed. This cannot be undone."
@@ -7652,9 +8802,17 @@ msgstr "the job this copy is for"
 msgid "The language of the app’s screens. Saved in this browser."
 msgstr "The language of the app’s screens. Saved in this browser."
 
+#: src/screens/Applications.jsx:53
+msgid "the LinkedIn extension"
+msgstr "the LinkedIn extension"
+
 #: src/screens/Settings.jsx:608
 msgid "The list comes from the voice presets below."
 msgstr "The list comes from the voice presets below."
+
+#: src/screens/Applications.jsx:52
+msgid "the Log application form"
+msgstr "the Log application form"
 
 #: src/screens/Settings.jsx:630
 msgid "The mailbox the email check reads for replies to your applications."
@@ -7672,6 +8830,7 @@ msgstr "The only country source. Every board receives it."
 msgid "The other accounts have no {kind} to copy."
 msgstr "The other accounts have no {kind} to copy."
 
+#: src/screens/Settings.jsx:323
 #: src/screens/SettingsAccounts.jsx:659
 msgid "the owner"
 msgstr "the owner"
@@ -7703,6 +8862,10 @@ msgstr "The public base URL Telegram should post updates to."
 #: src/screens/Settings.jsx:621
 msgid "The questions added at the end of the prep handover."
 msgstr "The questions added at the end of the prep handover."
+
+#: src/hooks.js:182
+msgid "the run did not finish"
+msgstr "the run did not finish"
 
 #: src/screens/Settings.jsx:686
 msgid "The same posting found again under another link, in the same city."
@@ -7777,6 +8940,10 @@ msgstr "Theme"
 msgid "These changes were applied automatically. Decline any you don't want to restore the base text."
 msgstr "These changes were applied automatically. Decline any you don't want to restore the base text."
 
+#: src/screens/SettingsAccounts.jsx:26
+msgid "they ride the same scrapes"
+msgstr "they ride the same scrapes"
+
 #: src/screens/ResumeEditor.jsx:623
 msgid "This base"
 msgstr "This base"
@@ -7813,6 +8980,10 @@ msgstr "This install already has {n} accounts — remove one to add another."
 msgid "This install already has 5 accounts — remove one first."
 msgstr "This install already has 5 accounts — remove one first."
 
+#: src/screens/ResumeEditor.jsx:185
+msgid "this job"
+msgstr "this job"
+
 #: src/screens/CoverLetterEditor.jsx:114
 msgid "This letter no longer exists."
 msgstr "This letter no longer exists."
@@ -7845,6 +9016,7 @@ msgstr "This tab was switched to {who}"
 msgid "This tab was switched to another account — reload it."
 msgstr "This tab was switched to another account — reload it."
 
+#: src/screens/Stats.jsx:83
 #: src/time.js:38
 msgid "Thu"
 msgstr "Thu"
@@ -7858,6 +9030,10 @@ msgstr "Thursday"
 msgid "Tier"
 msgstr "Tier"
 
+#: src/screens/Companies.jsx:54
+msgid "Tier {letter}"
+msgstr "Tier {letter}"
+
 #: src/screens/Companies.jsx:95
 msgid "Tier A first, untiered last"
 msgstr "Tier A first, untiered last"
@@ -7870,10 +9046,10 @@ msgstr "Time"
 #: src/screens/Applications.jsx:1011
 #: src/screens/Applications.jsx:1012
 #: src/screens/Companies.jsx:993
-#: src/screens/ResumeSections.jsx:192
-#: src/screens/ResumeSections.jsx:193
-#: src/screens/ResumeSections.jsx:261
-#: src/screens/ResumeSections.jsx:459
+#: src/screens/ResumeSections.jsx:194
+#: src/screens/ResumeSections.jsx:195
+#: src/screens/ResumeSections.jsx:263
+#: src/screens/ResumeSections.jsx:461
 #: src/screens/Searches.jsx:1094
 msgid "Title"
 msgstr "Title"
@@ -7954,13 +9130,21 @@ msgid "Total jobs"
 msgstr "Total jobs"
 
 #: src/screens/CoverLetterEditor.jsx:453
-#: src/screens/ResumeSections.jsx:210
+#: src/screens/ResumeSections.jsx:212
 msgid "Tracked link stub"
 msgstr "Tracked link stub"
 
 #: src/screens/Settings.jsx:739
 msgid "Tracked links"
 msgstr "Tracked links"
+
+#: src/screens/JobFeed.jsx:1861
+msgid "tracked links — short links that record when a recruiter opens them"
+msgstr "tracked links — short links that record when a recruiter opens them"
+
+#: src/screens/Persona.jsx:60
+msgid "Transgender?"
+msgstr "Transgender?"
 
 #: src/screens/Stats.jsx:724
 msgid "Trigger"
@@ -7984,6 +9168,7 @@ msgstr "try again"
 msgid "Try again"
 msgstr "Try again"
 
+#: src/screens/Stats.jsx:83
 #: src/time.js:38
 msgid "Tue"
 msgstr "Tue"
@@ -8017,6 +9202,10 @@ msgstr "Type the account name to confirm"
 msgid "Type the account’s name exactly to confirm."
 msgstr "Type the account’s name exactly to confirm."
 
+#: src/screens/Settings.jsx:1261
+msgid "Type the new key first"
+msgstr "Type the new key first"
+
 #. placeholder {0}: companyList.length
 #: src/screens/JobFeed.jsx:1147
 msgid "Type to search {0} companies…"
@@ -8046,11 +9235,24 @@ msgstr "Unavailable — the request failed"
 msgid "Under 30"
 msgstr "Under 30"
 
+#: src/screens/Applications.jsx:336
+#: src/screens/Applications.jsx:362
+#: src/screens/Applications.jsx:387
+#: src/screens/CoverLetterEditor.jsx:163
+#: src/screens/JobFeed.jsx:559
+#: src/screens/JobFeed.jsx:758
+#: src/screens/Persona.jsx:265
+#: src/screens/Persona.jsx:366
+#: src/screens/ResumeEditor.jsx:642
+msgid "Undo"
+msgstr "Undo"
+
 #: src/LoginModal.jsx:37
 msgid "Unexpected response from server"
 msgstr "Unexpected response from server"
 
 #: src/screens/CoverLetterEditor.jsx:480
+#: src/screens/Settings.jsx:1302
 msgid "Unknown"
 msgstr "Unknown"
 
@@ -8067,6 +9269,7 @@ msgid "Unknown job board. The page is read as HTML. If no jobs are found, set a 
 msgstr "Unknown job board. The page is read as HTML. If no jobs are found, set a wait-for selector in the company settings."
 
 #: src/screens/Applications.jsx:457
+#: src/screens/Applications.jsx:690
 msgid "unknown résumé"
 msgstr "unknown résumé"
 
@@ -8103,21 +9306,26 @@ msgstr "Unlocked as {ownerName} until {0}"
 msgid "Unsave (s)"
 msgstr "Unsave (s)"
 
+#: src/screens/JobFeed.jsx:574
+msgid "Unsaved"
+msgstr "Unsaved"
+
 #: src/screens/Applications.jsx:806
 msgid "Unscheduled"
 msgstr "Unscheduled"
 
+#: src/screens/Companies.jsx:53
 #: src/screens/Companies.jsx:445
 msgid "Untiered"
 msgstr "Untiered"
 
 #: src/screens/CoverLetters.jsx:245
-#: src/screens/ResumeSections.jsx:249
+#: src/screens/ResumeSections.jsx:251
 msgid "Untitled role"
 msgstr "Untitled role"
 
 #: src/screens/CoverLetterEditor.jsx:449
-#: src/screens/ResumeSections.jsx:209
+#: src/screens/ResumeSections.jsx:211
 msgid "URL (optional)"
 msgstr "URL (optional)"
 
@@ -8131,6 +9339,7 @@ msgid "URLs scraped · {0}"
 msgstr "URLs scraped · {0}"
 
 #: src/screens/CoverLetterEditor.jsx:26
+#: src/screens/ResumeEditor.jsx:666
 #: src/screens/ResumeEditor.jsx:670
 msgid "US Letter"
 msgstr "US Letter"
@@ -8152,6 +9361,10 @@ msgstr "Use the household bot"
 msgid "Used by Apify searches. Apify bills this account for each result."
 msgstr "Used by Apify searches. Apify bills this account for each result."
 
+#: src/screens/Settings.jsx:777
+msgid "Used by scrapes that hit rate limits or geo-blocks. Empty = direct."
+msgstr "Used by scrapes that hit rate limits or geo-blocks. Empty = direct."
+
 #: src/screens/Settings.jsx:576
 msgid "Used only when the scoring call fails or is rate-limited. One retry, then the job stays unscored until the next run. Choose a cheap model from a different provider than the primary."
 msgstr "Used only when the scoring call fails or is rate-limited. One retry, then the job stays unscored until the next run. Choose a cheap model from a different provider than the primary."
@@ -8164,9 +9377,27 @@ msgstr "Used when a company has no résumés of its own selected."
 msgid "Used when neither the company nor the search sets its own."
 msgstr "Used when neither the company nor the search sets its own."
 
+#: src/screens/Companies.jsx:627
+msgid "using defaults"
+msgstr "using defaults"
+
 #: src/theme.js:46
 msgid "V1 Style"
 msgstr "V1 Style"
+
+#: src/screens/Companies.jsx:364
+#: src/screens/Companies.jsx:364
+#: src/screens/JobFeed.jsx:77
+msgid "var(--accent)"
+msgstr "var(--accent)"
+
+#: src/screens/JobFeed.jsx:76
+msgid "var(--good)"
+msgstr "var(--good)"
+
+#: src/screens/JobFeed.jsx:78
+msgid "var(--muted)"
+msgstr "var(--muted)"
 
 #: src/versionCheck.js:29
 msgid "Version mismatch"
@@ -8210,6 +9441,10 @@ msgstr "Visa holder"
 msgid "Voice"
 msgstr "Voice"
 
+#: src/screens/CoverLetterEditor.jsx:362
+msgid "voice and length unknown for this letter"
+msgstr "voice and length unknown for this letter"
+
 #: src/screens/Settings.jsx:611
 msgid "Voice presets"
 msgstr "Voice presets"
@@ -8228,6 +9463,10 @@ msgstr "Waiting"
 msgid "Waiting for another scrape"
 msgstr "Waiting for another scrape"
 
+#: src/screens/Companies.jsx:364
+msgid "waiting for another scrape…"
+msgstr "waiting for another scrape…"
+
 #: src/screens/Applications.jsx:78
 msgid "Waiting longest"
 msgstr "Waiting longest"
@@ -8245,6 +9484,10 @@ msgstr "Wana Create"
 msgid "Warnings, then active, then inactive"
 msgstr "Warnings, then active, then inactive"
 
+#: src/screens/Searches.jsx:798
+msgid "was copied"
+msgstr "was copied"
+
 #: src/screens/Settings.jsx:736
 msgid "Webhook registered"
 msgstr "Webhook registered"
@@ -8253,6 +9496,7 @@ msgstr "Webhook registered"
 msgid "Webhook secret"
 msgstr "Webhook secret"
 
+#: src/screens/Stats.jsx:83
 #: src/time.js:38
 msgid "Wed"
 msgstr "Wed"
@@ -8352,6 +9596,10 @@ msgstr "Which search types, job boards and AI providers are in use"
 msgid "Which Telegram bot sends your alerts and digest."
 msgstr "Which Telegram bot sends your alerts and digest."
 
+#: src/screens/Persona.jsx:26
+msgid "White"
+msgstr "White"
+
 #: src/screens/Applications.jsx:794
 #: src/screens/Applications.jsx:831
 msgid "Who I'm meeting, what to revise…"
@@ -8381,6 +9629,10 @@ msgstr "with report"
 msgid "Without an owner PIN this is only a privacy latch."
 msgstr "Without an owner PIN this is only a privacy latch."
 
+#: src/screens/SettingsAccounts.jsx:434
+msgid "Without your PIN anyone at a browser opens your account with one click, and a member’s Unlock of the shared settings needs no PIN."
+msgstr "Without your PIN anyone at a browser opens your account with one click, and a member’s Unlock of the shared settings needs no PIN."
+
 #: src/screens/ResumeEditor.jsx:740
 msgid "Word"
 msgstr "Word"
@@ -8402,6 +9654,10 @@ msgstr "Work With Indies"
 #: src/screens/JobFeed.jsx:1109
 msgid "Work{0}"
 msgstr "Work{0}"
+
+#: src/screens/Searches.jsx:1027
+msgid "worldwide remote"
+msgstr "worldwide remote"
 
 #. placeholder {0}: s.results_wanted || 100
 #: src/screens/Searches.jsx:160
@@ -8425,9 +9681,14 @@ msgstr "Written from your Persona"
 msgid "Wrong PIN"
 msgstr "Wrong PIN"
 
-#: src/screens/ResumeSections.jsx:405
+#: src/screens/ResumeSections.jsx:407
 msgid "Years"
 msgstr "Years"
+
+#: src/screens/Persona.jsx:30
+#: src/screens/Persona.jsx:32
+msgid "Yes"
+msgstr "Yes"
 
 #: src/TelemetryChoice.jsx:13
 msgid "Yes — health and how the app is used"
@@ -8437,6 +9698,7 @@ msgstr "Yes — health and how the app is used"
 msgid "you"
 msgstr "you"
 
+#: src/screens/Settings.jsx:531
 #: src/Shell.jsx:38
 msgid "You"
 msgstr "You"
@@ -8521,6 +9783,10 @@ msgstr "Your Jobright account."
 msgid "Your name and colour"
 msgstr "Your name and colour"
 
+#: src/screens/Settings.jsx:704
+msgid "your own bot"
+msgstr "your own bot"
+
 #: src/screens/Settings.jsx:555
 msgid "Your own Claude subscription token."
 msgstr "Your own Claude subscription token."
@@ -8553,6 +9819,10 @@ msgstr "Your tracked link domain."
 #: src/screens/SettingsAccounts.jsx:659
 msgid "Yours"
 msgstr "Yours"
+
+#: src/sourceBlocks.js:10
+msgid "ZipRecruiter redirects this scraper to a regional site that it does not read, or refuses its requests."
+msgstr "ZipRecruiter redirects this scraper to a regional site that it does not read, or refuses its requests."
 
 #: src/screens/Applications.jsx:789
 #: src/screens/Applications.jsx:826

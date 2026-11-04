@@ -22,6 +22,8 @@ export const kb = (fn, role = 'button') => ({
   onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(e) } },
 })
 export const EMPTY = { header: { name: '', contact_items: [] }, summary: '', experience: [], skills: {}, education: [], projects: [], publications: [] }
+// Section names double as ids in state and in the SectionEditor switch, so only their display is translated.
+const SECTION_LABEL = { Header: t`Header`, Summary: t`Summary`, Experience: t`Experience`, Skills: t`Skills`, Education: t`Education`, Projects: t`Projects`, Publications: t`Publications`, Settings: t`Settings` }
 export const SECTION_ORDER = ['Header', 'Summary', 'Experience', 'Skills', 'Education', 'Projects', 'Publications']
 // The résumé editor's sections: the page footer needs a job's title and company, so only a
 // job-linked tailored copy gets the 'Settings' section (never a base, a freeform tailor or Persona).
@@ -132,7 +134,7 @@ export function SectionShell({ name, count, open, onToggle, meta, children }) {
     <Card style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
       <SectionHead card open={!!open} onToggle={onToggle} style={{ padding: '10px 14px' }}>
         <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>{name}</span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{SECTION_LABEL[name] || name}</span>
           {count != null && <Helper>({count})</Helper>}
         </span>
         {meta}
@@ -208,7 +210,7 @@ export function HeaderEditor({ data, setField, mutate, onRemoved }) {
               <div style={{ flex: '55 1 0', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>   {/* url + stub: 55 % */}
               <Input value={it.url || ''} onChange={(v) => setField(`header.contact_items.${i}.url`, v)} placeholder={t`URL (optional)`} ariaLabel={t`Contact item URL`} style={{ flex: 1, minWidth: 0 }} />
               {showStub && <Input value={it.stub || ''} onChange={(v) => setField(`header.contact_items.${i}.stub`, v)} placeholder={t`id`} mono ariaLabel={t`Tracked link stub`} title={t`Short stub used in the tracked link, e.g. l, w, gh`} style={{ flex: '0 0 34px', padding: '0 6px', textAlign: 'center' }} />}
-              <RemoveX onClick={() => undoRemove('Removed contact item',
+              <RemoveX onClick={() => undoRemove(t`Removed contact item`,
                 (d) => d.header.contact_items.splice(i, 1),
                 (d) => { d.header = d.header || {}; (d.header.contact_items = d.header.contact_items || []).splice(i, 0, it) })} />
               </div>
@@ -271,7 +273,7 @@ export function ExperienceEditor({ emptyNote, data, setField, mutate, baseExp, o
                       <span title={m?.label || ''} style={{ flex: '0 0 auto', color: m ? 'var(--ai)' : 'var(--muted)', fontSize: 11, lineHeight: '19px' }}>{m ? '✦' : '—'}</span>
                       <BulletText value={b} onChange={(v) => setBullet(i, bi, v)} />
                       {m?.kind === 'changed' && <span onClick={() => setBullet(i, bi, m.base)} title={t`Decline this tailoring change — restores the base text`} style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--warn)', cursor: 'pointer', fontWeight: 500, lineHeight: '19px' }}>↩</span>}
-                      <RemoveX size={10} lh="19px" onClick={() => undoRemove('Removed bullet',
+                      <RemoveX size={10} lh="19px" onClick={() => undoRemove(t`Removed bullet`,
                         (d) => d.experience[i].bullets.splice(bi, 1),
                         (d) => { d.experience[i].bullets = d.experience[i].bullets || []; d.experience[i].bullets.splice(bi, 0, b) })} />
                     </div>
@@ -287,7 +289,7 @@ export function ExperienceEditor({ emptyNote, data, setField, mutate, baseExp, o
                   </div>
                 ))}
                 <DashedAdd onClick={() => addBullet(i)}><Trans>+ Add bullet</Trans></DashedAdd>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove('Removed role',
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove(t`Removed role`,
                   (d) => d.experience.splice(i, 1),
                   (d) => { d.experience = d.experience || []; d.experience.splice(i, 0, e) })}><Trans>Remove role</Trans></RemoveLink></div>
               </div>
@@ -364,14 +366,14 @@ export function SkillsEditor({ emptyNote, data, mutate, baseSkills, onError, onR
               {changed && <span onClick={() => setVal(k, baseSkills[k])} title={t`Decline this tailoring change`} style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--warn)', cursor: 'pointer', fontWeight: 500 }}>↩</span>}
             </div>
             {/* restore rebuilds the key order so the row comes back where it was */}
-            <RemoveX onClick={() => undoRemove('Removed skill category',
+            <RemoveX onClick={() => undoRemove(t`Removed skill category`,
               (d) => { delete d.skills[k] },
               (d) => { const en = Object.entries(d.skills || {}); en.splice(ei, 0, [k, v]); d.skills = Object.fromEntries(en) })} />
           </div>
         )
       })}
       {entries.length === 0 && <EmptyState note={emptyNote} what="skills" />}
-      <DashedAdd onClick={() => mutate((d) => { d.skills = d.skills || {}; d.skills[`Skill ${Object.keys(d.skills).length + 1}`] = '' })}><Trans>+ Add skill row</Trans></DashedAdd>
+      <DashedAdd onClick={() => mutate((d) => { d.skills = d.skills || {}; d.skills[t`Skill ${Object.keys(d.skills).length + 1}`] = '' })}><Trans>+ Add skill row</Trans></DashedAdd>
     </div>
   )
 }
@@ -404,7 +406,7 @@ export function EducationEditor({ emptyNote, data, setField, mutate, onRemoved }
             <MicroField label={t`Degree`} value={e.degree} onChange={(v) => setField(`education.${i}.degree`, v)} />
             <MicroField label={t`Years`} value={e.years} onChange={(v) => setField(`education.${i}.years`, v)} placeholder="2015 – 2019" />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove('Removed education entry',
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove(t`Removed education entry`,
             (d) => d.education.splice(i, 1),
             (d) => { d.education = d.education || []; d.education.splice(i, 0, e) })} /></div>
         </Card>
@@ -432,14 +434,14 @@ export function ProjectsEditor({ emptyNote, data, setField, mutate, onRemoved })
               <div key={bi} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', border: '1px solid var(--line)', background: 'var(--surface)', borderRadius: 'var(--radius-field)' }}>
                 <span style={{ flex: '0 0 auto', color: 'var(--muted)', fontSize: 11, lineHeight: '19px' }}>—</span>
                 <BulletText value={b} onChange={(v) => mutate((d) => { d.projects[i].bullets[bi] = v })} />
-                <RemoveX size={10} lh="19px" onClick={() => undoRemove('Removed bullet',
+                <RemoveX size={10} lh="19px" onClick={() => undoRemove(t`Removed bullet`,
                   (d) => d.projects[i].bullets.splice(bi, 1),
                   (d) => { d.projects[i].bullets = d.projects[i].bullets || []; d.projects[i].bullets.splice(bi, 0, b) })} />
               </div>
             ))}
             <DashedAdd onClick={() => mutate((d) => { d.projects[i].bullets = d.projects[i].bullets || []; d.projects[i].bullets.push('') })}><Trans>+ Add bullet</Trans></DashedAdd>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove('Removed project',
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove(t`Removed project`,
             (d) => d.projects.splice(i, 1),
             (d) => { d.projects = d.projects || []; d.projects.splice(i, 0, p) })}><Trans>Remove project</Trans></RemoveLink></div>
         </Card>
@@ -458,7 +460,7 @@ export function PublicationsEditor({ emptyNote, data, setField, mutate, onRemove
         <Card key={i} style={{ padding: 11, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <MicroField label={t`Title`} value={p.title} onChange={(v) => setField(`publications.${i}.title`, v)} />
           <MicroField label={t`Description`} value={p.description} onChange={(v) => setField(`publications.${i}.description`, v)} />
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove('Removed publication',
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove(t`Removed publication`,
             (d) => d.publications.splice(i, 1),
             (d) => { d.publications = d.publications || []; d.publications.splice(i, 0, p) })} /></div>
         </Card>

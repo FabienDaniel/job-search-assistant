@@ -46,10 +46,10 @@ const GROUPS = [
 const ago = (iso) => {
   if (!iso) return null
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
+  if (m < 1) return t`just now`
+  if (m < 60) return t`${m}m ago`
   const h = Math.floor(m / 60)
-  return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`
+  return h < 24 ? t`${h}h ago` : t`${Math.floor(h / 24)}d ago`
 }
 
 // Badges and health are cached and read back synchronously on init so the
@@ -174,7 +174,7 @@ function AccountSwitcher({ open }) {
             return (
               <MenuItem key={a.id} selected={cur} onClick={() => switchTo(a)} disabled={!!a.disabled}
                 hint={i < MAX_SHORTCUTS ? `${SWITCH_MOD}${i + 1}` : undefined} hintMono
-                ariaLabel={`${a.name}, ${roleLabel(a)}${cur ? ', current' : ''}`}>
+                ariaLabel={`${a.name}, ${roleLabel(a)}${cur ? t`, current` : ''}`}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                   <Avatar name={a.name} color={a.color} size={20} />
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
@@ -325,7 +325,7 @@ export default function Shell() {
   // label merges both signals into one number; tooltip names them separately
   const nC = warn.companies || 0
   const nS = warn.searches || 0
-  const lastSweep = health ? (ago(health.finished_at || health.started_at) || '—') : 'no scrape run recorded yet'
+  const lastSweep = health ? (ago(health.finished_at || health.started_at) || '—') : t`no scrape run recorded yet`
   const healthTip = down
     ? t`The dashboard could not reach the backend. Nothing below is live — check that the server is running.`
     : versionWarn

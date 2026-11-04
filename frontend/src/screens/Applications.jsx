@@ -29,10 +29,10 @@ const daysSince = (iso) => (iso ? Math.max(0, Math.floor((Date.now() - new Date(
 const ago = (iso) => {
   if (!iso) return ''
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 60) return `${Math.max(1, m)}m ago`
+  if (m < 60) return t`${Math.max(1, m)}m ago`
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+  if (h < 24) return t`${h}h ago`
+  return t`${Math.floor(h / 24)}d ago`
 }
 // interview slot: "Tue 9 Sep, 14:00" — locale-formatted from the stored UTC instant
 const fmtWhen = (iso) => {
@@ -49,11 +49,11 @@ const fmtSalary = (lo, hi) => {
 
 // `boards` (useApifyBoards) names the `apify_<board>` sources.
 const srcLabel = (v, boards = []) => apifySourceLabel(boards, v, ' via Apify') || ({
-  direct: 'a company scrape', manual: 'the Log application form', jobright: 'Jobright.ai', levels_fyi: 'Levels.fyi',
-  linkedin_personal: t`LinkedIn Personal`, linkedin_extension: 'the LinkedIn extension',
-  extension: 'the extension', freehire: 'freehire.me', caribbeanjobs: 'caribbeanjobs.com', trulyremote: 'trulyremotework.com',
+  direct: t`a company scrape`, manual: t`the Log application form`, jobright: 'Jobright.ai', levels_fyi: 'Levels.fyi',
+  linkedin_personal: t`LinkedIn Personal`, linkedin_extension: t`the LinkedIn extension`,
+  extension: t`the extension`, freehire: 'freehire.me', caribbeanjobs: 'caribbeanjobs.com', trulyremote: 'trulyremotework.com',
   behance: 'Behance', hollylist: 'hollylist.com', wanacreate: 'wanacreate.art', himalayas: 'himalayas.app', eluta: 'eluta.ca', dribbble: 'Dribbble', artstation: 'ArtStation', workwithindies: 'workwithindies.com',
-}[v] || (v ? v.replace(/^jobspy_/, '').replace(/_/g, ' ') : 'the Job Feed'))
+}[v] || (v ? v.replace(/^jobspy_/, '').replace(/_/g, ' ') : t`the Job Feed`))
 
 // Dots read the shared --stage-* tokens (theme.css), not generic --warn/--good/--bad,
 // so a stage is the same colour here, in the Stats funnel, and on the Sankey nodes.
@@ -206,8 +206,8 @@ export default function Applications() {
   // request is in flight, an em dash says the load failed, numbers mean numbers.
   const countLine = !loaded ? NBSP : loadErr ? DASH
     : t`${plural(shown, { one: '# application', other: '# applications' })} · ${nInterview} interviewing · ${plural(nOffer, { one: '# offer', other: '# offers' })}`
-      + (nStale ? ` · ${nStale} with no reply for 7+ days` : '')
-      + (total > apps.length ? ` · showing ${apps.length}` : '')
+      + (nStale ? t` · ${nStale} with no reply for 7+ days` : '')
+      + (total > apps.length ? t` · showing ${apps.length}` : '')
 
   const companyOf = (a) => a.company_canonical || a.company || t`Unknown Company`
   // live companies (≥1 non-rejected application) first, then a rule, then the closed ones
@@ -333,7 +333,7 @@ export default function Applications() {
     const prev = app.status
     if (!prev || prev === status) return
     patch(app.id, { status })
-    pushToast({ kind: 'undo', msg: t`Moved to ${STAGE[status]?.label || status}.`, action: 'Undo',
+    pushToast({ kind: 'undo', msg: t`Moved to ${STAGE[status]?.label || status}.`, action: t`Undo`,
       onAction: () => patch(app.id, { status: prev, undo: true }) })
   }
   const bulkUndo = async (prev) => {
@@ -359,7 +359,7 @@ export default function Applications() {
     try {
       await api.post('/applications/bulk-update', { ids, status })
       load(); window.dispatchEvent(new CustomEvent('jn:counts-changed'))
-      pushToast({ kind: 'undo', msg: t`Moved ${ids.length} to ${STAGE[status].label}.`, action: 'Undo', onAction: () => bulkUndo(prev) })
+      pushToast({ kind: 'undo', msg: t`Moved ${ids.length} to ${STAGE[status].label}.`, action: t`Undo`, onAction: () => bulkUndo(prev) })
     } catch (e) {
       console.error(e); pushToast({ kind: 'error', msg: plural(ids.length, { one: t`Could not move # application`, other: t`Could not move # applications` }) + errSuffix(e) }); load()
     } finally { setBulkBusy(false) }
@@ -384,7 +384,7 @@ export default function Applications() {
     try {
       await api.delete(`/applications/interviews/${iv.id}`); load()
       // no confirm — an undo toast re-creates the interview from the row we still hold
-      pushToast({ kind: 'undo', msg: t`Removed “${iv.what || t`Interview`}”`, action: 'Undo', onAction: async () => {
+      pushToast({ kind: 'undo', msg: t`Removed “${iv.what || t`Interview`}”`, action: t`Undo`, onAction: async () => {
         try { await api.post(`/applications/${d.id}/interviews`, { what: iv.what, when_at: iv.when_at, where_text: iv.where_text, status: iv.status || 'scheduled', prep: iv.prep }); load() }
         catch (e) { pushToast({ kind: 'error', msg: t`Could not restore the interview` + errSuffix(e) }) }
       } })
@@ -670,7 +670,7 @@ export default function Applications() {
           force it again — the user may have moved on by then — so it's a plain load(). */}
       {logOpen && <LogModal onClose={closeLog} onDirty={(v) => { logDirty.current = v }} onSaved={(id) => { dropLog(); load(id); setTimeout(() => load(), 5000); window.dispatchEvent(new CustomEvent('jn:counts-changed')) }}
         // a feed job has no row on this screen — hand it to the Feed, where its status lives
-        onJobSaved={(jobId, existing) => { dropLog(); pushToast({ kind: 'progress', msg: existing ? 'Already in the Job Feed — opened it.' : 'Added to the Job Feed.' }); window.dispatchEvent(new CustomEvent('jn:counts-changed')); navigate(`/feed?job=${jobId}`) }}
+        onJobSaved={(jobId, existing) => { dropLog(); pushToast({ kind: 'progress', msg: existing ? t`Already in the Job Feed — opened it.` : t`Added to the Job Feed.` }); window.dispatchEvent(new CustomEvent('jn:counts-changed')); navigate(`/feed?job=${jobId}`) }}
         pushToast={pushToast} />}
       {confirm && <ConfirmDialog {...confirm} onCancel={() => setConfirm(null)} />}
       <ToastStack toasts={toasts} onClose={dismissToast} />
@@ -687,7 +687,7 @@ function Detail({ d, history, menuOpen, setMenuOpen, onStage, onNotes, onDelete,
                   editIv, setEditIv, ivDraft, setIvDraft, openIvEdit, saveInterview,
                   addInterview, canAddInterview, delInterview, toggleInterview, openPrep }) {
   const meta = [fmtSalary(d.salary_min, d.salary_max), d.location].filter(Boolean).join(' · ') || t`No posting details captured`
-  const cv = d.tailored_resume_name || d.cv_version_used || d.best_cv || 'unknown résumé'
+  const cv = d.tailored_resume_name || d.cv_version_used || d.best_cv || t`unknown résumé`
   const ivs = d.interviews || []
 
   return (

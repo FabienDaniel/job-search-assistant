@@ -30,19 +30,19 @@ export const THEME_PICKER = ['default', 'board', 'cobalt', 'saas', 'win98']
 
 // Three-state control (Light → Dark → System), so it needs three glyphs.
 export const MODE_ICON = { light: '◐', dark: '◑', system: '◒' }
-export const MODE_LABEL = { light: 'Light', dark: 'Dark', system: 'System' }
+export const MODE_LABEL = { light: t`Light`, dark: t`Dark`, system: t`System` }
 export const MODE_OPTIONS = MODES.map((m) => [m, MODE_LABEL[m]])
 // Picker labels name what you see, not the id behind it — the ids never move,
 // so a stored `cobalt` keeps painting while the row reads "Stone".
 export const THEME_LABEL = {
-  default: 'Paper',
+  default: t`Paper`,
   board: t`Green Paper`,
   tone1: t`Tone 1 — ¼ toward Editorial`,
   tone2: t`Tone 2 — ½ toward Editorial`,
   tone3: t`Tone 3 — ¾ toward Editorial`,
   editorial: t`Editorial — original board tones`,
   alt: t`Alt — cool slate`,
-  cobalt: 'Stone',
+  cobalt: t`Stone`,
   saas: t`V1 Style`,
   win98: t`Windows 98`,
 }

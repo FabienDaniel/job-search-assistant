@@ -16,18 +16,18 @@ import '../theme.css'
 const ago = (iso) => {
   if (!iso) return 'never'
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
+  if (m < 1) return t`just now`
+  if (m < 60) return t`${m}m ago`
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return t`${h}h ago`
   const d = Math.floor(h / 24)
-  return `${d}d ago`
+  return t`${d}d ago`
 }
 
 // A paused company's last-run state stays on the row as muted "inactive" history rather than
 // driving the ▲/attention count/rail dot; same for an acknowledged warning until a newer run fails.
 const warnTextOf = (c, downReason) => c.last_error || downReason
-  || (c.last_run_warning ? `last run found nothing · ${ago(c.last_scraped_at)}` : null)
+  || (c.last_run_warning ? t`last run found nothing · ${ago(c.last_scraped_at)}` : null)
 const warnMuted = (c) => !c.active || !!c.warning_acknowledged
 const isAlarming = (c, downReason) => !!warnTextOf(c, downReason) && !warnMuted(c)
 // FastAPI's `detail` is a plain string for HTTPException; append it when present. Coded
@@ -48,10 +48,10 @@ const tierSlug = (key) => 'cc-tier' + (key === 'none' ? 'none' : key)
 // Company.tier is stored as an integer 1/2/3 (nullable) — backend/models/db.py.
 // The UI shows priority tiers as letters; tierLabel(1) -> 'A', tierLabel(1, { long: true }) -> 'Tier A'.
 const TIER_LETTERS = { 1: 'A', 2: 'B', 3: 'C' }
-const tierLabel = (t, { long = false } = {}) => {
-  const letter = TIER_LETTERS[t]
-  if (!letter) return long ? 'Untiered' : '—'
-  return long ? `Tier ${letter}` : letter
+const tierLabel = (tier, { long = false } = {}) => {
+  const letter = TIER_LETTERS[tier]
+  if (!letter) return long ? t`Untiered` : '—'
+  return long ? t`Tier ${letter}` : letter
 }
 
 // client-side ATS detection (mirror of backend detect, for live editor chips)
@@ -73,7 +73,7 @@ const detectAts = (url) => {
   // URL (hash included) on an oraclecloud.com host or careers.oracle.com
   if (url.includes('oraclecloud.com/hcmUI/CandidateExperience')) return t`Oracle HCM`
   if (url.includes('/sites/') && url.includes('/jobs') && hostMatches(url, 'oraclecloud.com', 'careers.oracle.com')) return t`Oracle HCM`
-  if (url.toLowerCase().includes('jobs.lever.co/')) return 'Lever'
+  if (url.toLowerCase().includes(t`jobs.lever.co/`)) return 'Lever'
   if (url.toLowerCase().includes('/search-jobs/results?')) return 'TalentBrew'
   if (hostMatches(url, 'jobs.ashbyhq.com')) return 'Ashby'
   if (hostMatches(url, 'greenhouse.io')) return 'Greenhouse'
@@ -85,7 +85,7 @@ const detectAts = (url) => {
   if (hostMatches(url, 'jobs.uber.com') && /^\/([a-z]{2}(-[a-z]{2})?\/)?jobs\/?$/i.test(new URL(url).pathname)) return 'Uber'
   if (hostMatches(url, 'uber.com') && pathHas(url, '/careers/list') && !/\/careers\/list\/\d+/.test(new URL(url).pathname)) return 'Uber'
   if (hostMatches(url, 'metacareers.com')) return 'Meta'
-  if (url.toLowerCase().includes('google.com/about/careers')) return 'Google'
+  if (url.toLowerCase().includes(t`google.com/about/careers`)) return 'Google'
   return 'Generic'
 }
 
@@ -274,7 +274,7 @@ export default function Companies() {
   const { warm, style: warmStyle } = useWarm('companies', ready
     ? { n: companies.length, active: activeCount, down: downCount, tiers: tierCounts }
     : null, ready, !loadErr)
-  const countLine = warm ? `${warm.n} tracked · ${warm.active} active · ${warm.down} need attention` : loadErr ? DASH : NBSP
+  const countLine = warm ? t`${warm.n} tracked · ${warm.active} active · ${warm.down} need attention` : loadErr ? DASH : NBSP
   const warmTier = (t) => (warm && warm.tiers ? warm.tiers[t] : undefined)
   const inactiveInFilter = filtered.filter((c) => !c.active)
   const activeInFilter = filtered.filter((c) => c.active)
@@ -358,14 +358,14 @@ export default function Companies() {
     // ids that resolve to nothing (list not loaded, or deleted résumés) must still
     // read as a selection, matching what the drawer shows.
     if (names.length) return names.join(', ')
-    return `${ids.length} selected`
+    return t`${ids.length} selected`
   }
   const healthOf = (c) => {
-    if (scraping[c.id]) return { dot: 'var(--accent)', fg: 'var(--accent)', text: scraping[c.id] === 'waiting' ? 'waiting for another scrape…' : 'scraping now…' }
+    if (scraping[c.id]) return { dot: t`var(--accent)`, fg: t`var(--accent)`, text: scraping[c.id] === 'waiting' ? t`waiting for another scrape…` : t`scraping now…` }
     const warn = warnTextOf(c, downMap[c.id])
     // paused or acknowledged: keep the verdict, drop the alarm colours
     if (warn && warnMuted(c)) return { dot: 'var(--edge)', fg: 'var(--muted)',
-      text: `${c.last_error ? `error · ${warn}` : warn} · ${c.active ? `acknowledged ${ago(c.warning_acknowledged_at)}` : 'inactive'}` }
+      text: `${c.last_error ? t`error · ${warn}` : warn} · ${c.active ? t`acknowledged ${ago(c.warning_acknowledged_at)}` : 'inactive'}` }
     if (c.last_error) return { dot: 'var(--bad)', fg: 'var(--bad)', text: t`error · ${warn}` }
     if (warn) return { dot: 'var(--warn)', fg: 'var(--warn)', text: warn }
     if (c.active && !c.last_scraped_at) return { dot: 'var(--edge)', fg: 'var(--muted)', text: t`not scraped yet` }
@@ -523,7 +523,7 @@ export default function Companies() {
               {showResumes && <Helper title={rn || t`Scored against your default résumé from Settings`} style={{ flex: '0 0 198px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 10, ...(rn ? { color: 'var(--text-2)' } : null) }}>{rn || t`Default`}</Helper>}
               {/* ats */}
               {showAts && <span style={{ flex: '0 0 108px', display: 'flex', alignItems: 'center', gap: 6, paddingRight: 10 }}>
-                {urls.length > 0 && <span className={atsSlug(firstAts)} title={[...urls.map((u) => `${detectAts(u)} · ${u}`), t`MyVisaJobs company id · ${c.h1b_slug || t`auto-detected`}`].join('\n')} style={{ flex: '0 0 auto', fontFamily: 'var(--mono)', fontSize: 9.5, letterSpacing: '.05em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 'var(--radius-control)', whiteSpace: 'nowrap' }}>{firstAts}</span>}
+                {urls.length > 0 && <span className={atsSlug(firstAts)} title={[...urls.map((u) => `${detectAts(u)} · ${u}`), t`MyVisaJobs company id · ${c.h1b_slug || 'auto-detected'}`].join('\n')} style={{ flex: '0 0 auto', fontFamily: 'var(--mono)', fontSize: 9.5, letterSpacing: '.05em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 'var(--radius-control)', whiteSpace: 'nowrap' }}>{firstAts}</span>}
                 {urls.length > 1 && <Helper size="xs" title={urls.join('\n')} style={{ flex: '0 0 auto' }}>+{urls.length - 1}</Helper>}
                 {urls.length === 0 && <Helper>—</Helper>}
               </span>}
@@ -619,12 +619,12 @@ function Drawer({ state, setState, onClose, resumes, personaPopulated, onSave, o
   const nUrl = draft.scrape_urls.filter(Boolean).length, nApp = company.application_count || 0
   const subtitle = `${tierLabel(draft.tier, { long: true })} · ${plural(nUrl, { one: '# career URL', other: '# career URLs' })} · ${plural(nApp, { one: '# application', other: '# applications' })}`
   const lca = company.h1b_lca_count
-  const lcaLine = lca ? `${lca} H-1B filings on record${company.h1b_approval_rate ? ` · ${company.h1b_approval_rate}% approved` : ''}. Each job's H-1B verdict is based on these.` : t`No H-1B filings on record, so jobs show H-1B Unknown. Leave blank to detect the company from its name.`
+  const lcaLine = lca ? t`${lca} H-1B filings on record${company.h1b_approval_rate ? t` · ${company.h1b_approval_rate}% approved` : ''}. Each job's H-1B verdict is based on these.` : t`No H-1B filings on record, so jobs show H-1B Unknown. Leave blank to detect the company from its name.`
   const selNames = [...resumes.filter((r) => draft.selected_resume_ids.includes(r.id)).map((r) => r.name), ...(draft.selected_resume_ids.includes('persona') ? ['Persona'] : [])]
   const resumeHelp = selNames.length ? t`New jobs are scored against ${selNames.join(', ')}.` : t`Nothing selected, so new jobs use your default résumé from Settings.`
   const bannerText = warnTextOf(company, downReason)
   const bannerMuted = !!bannerText && warnMuted(company)
-  const tuningNote = (bannerText && !bannerMuted) ? 'needs attention' : (draft.scrape_interval_minutes || draft.wait_for_selector || (draft.max_pages && draft.max_pages !== 5) || draft.h1b_slug) ? 'customised' : 'using defaults'
+  const tuningNote = (bannerText && !bannerMuted) ? t`needs attention` : (draft.scrape_interval_minutes || draft.wait_for_selector || (draft.max_pages && draft.max_pages !== 5) || draft.h1b_slug) ? 'customised' : t`using defaults`
 
   const [saveErr, setSaveErr] = useState('')
   const [saving, setSaving] = useState(false)
@@ -683,7 +683,7 @@ function Drawer({ state, setState, onClose, resumes, personaPopulated, onSave, o
             <Helper size="xs">
               <Trans>{company.last_error ? t`Last scrape run` : t`Detected in recent runs`} · last ran {ago(company.last_run_at || company.last_scraped_at)}
               {bannerMuted
-                ? ` · ${company.active ? `acknowledged ${ago(company.warning_acknowledged_at)}` : 'paused, so it is not counted'}`
+                ? ` · ${company.active ? t`acknowledged ${ago(company.warning_acknowledged_at)}` : t`paused, so it is not counted`}`
                 : null}</Trans>
             </Helper>
           </Notice>
@@ -925,25 +925,25 @@ function TestModal({ test, onClose, showShots, setShowShots }) {
   const bodyExcluded = test.body_excluded_count ?? 0
   const bodyUnchecked = test.body_unchecked_count ?? 0
   const bodyPhrases = test.body_phrase_count ?? 0
-  const summary = `${found + rejected} found · ${kept} kept · ${Math.max(0, found - kept - bodyExcluded)} removed by title filter`
-    + (bodyExcluded ? ` · ${bodyExcluded} would be ignored (body phrases)` : '')
-    + ` · ${rejected} invalid`
-    + (passCo != null && passCo !== kept ? ` · ${passCo} pass this company's filters · ${Math.max(0, passCo - kept - bodyExcluded)} removed by the global exclude list` : '')
-    + (bodyUnchecked ? ` · ${bodyUnchecked} with the posting body text check skipped` : '')
+  const summary = t`${found + rejected} found · ${kept} kept · ${Math.max(0, found - kept - bodyExcluded)} removed by title filter`
+    + (bodyExcluded ? t` · ${bodyExcluded} would be ignored (body phrases)` : '')
+    + t` · ${rejected} invalid`
+    + (passCo != null && passCo !== kept ? t` · ${passCo} pass this company's filters · ${Math.max(0, passCo - kept - bodyExcluded)} removed by the global exclude list` : '')
+    + (bodyUnchecked ? t` · ${bodyUnchecked} with the posting body text check skipped` : '')
   const urls = test.urls_scraped || []
   const pag = test.pagination_debug || []
   const shots = test.screenshots || []
   const jobState = (j) => {
-    if (j.reason?.startsWith('[Validation]')) return { tag: 'Drop', tagBg: 'var(--warn-soft)', tagFg: 'var(--warn)', reasonFg: 'var(--warn)', reason: j.reason.replace('[Validation] ', '') }
+    if (j.reason?.startsWith('[Validation]')) return { tag: t`Drop`, tagBg: 'var(--warn-soft)', tagFg: 'var(--warn)', reasonFg: 'var(--warn)', reason: j.reason.replace('[Validation] ', '') }
     // a body-phrase drop is stored as `ignored`, not filtered out of the feed; label it with the phrase that did it.
-    if (j.body_excluded_by) return { tag: 'Ignored', tagBg: 'var(--warn-soft)', tagFg: 'var(--warn)', reasonFg: 'var(--warn)', reason: j.reason || t`Body exclusion: ${j.body_excluded_by}` }
+    if (j.body_excluded_by) return { tag: t`Ignored`, tagBg: 'var(--warn-soft)', tagFg: 'var(--warn)', reasonFg: 'var(--warn)', reason: j.reason || t`Body exclusion: ${j.body_excluded_by}` }
     if (j.kept) return {
-      tag: 'Kept', tagBg: 'var(--accent-soft)', tagFg: 'var(--good)', reasonFg: 'var(--muted)',
+      tag: t`Kept`, tagBg: 'var(--accent-soft)', tagFg: 'var(--good)', reasonFg: 'var(--muted)',
       // a kept row the body scan couldn't run on is not a promise — say so
-      reason: j.reason || (bodyPhrases > 0 && j.body_checked === false ? 'posting body text check was skipped' : ''),
+      reason: j.reason || (bodyPhrases > 0 && j.body_checked === false ? t`posting body text check was skipped` : ''),
     }
-    if (j.reason?.startsWith('[Global]')) return { tag: 'Global', tagBg: 'var(--warn-soft)', tagFg: 'var(--warn)', reasonFg: 'var(--warn)', reason: j.reason.replace('[Global] ', '') }   // the global exclude list, not this company's filters
-    return { tag: 'Out', tagBg: 'var(--bad-soft)', tagFg: 'var(--bad)', reasonFg: 'var(--bad)', reason: j.reason || '' }
+    if (j.reason?.startsWith('[Global]')) return { tag: t`Global`, tagBg: 'var(--warn-soft)', tagFg: 'var(--warn)', reasonFg: 'var(--warn)', reason: j.reason.replace('[Global] ', '') }   // the global exclude list, not this company's filters
+    return { tag: t`Out`, tagBg: 'var(--bad-soft)', tagFg: 'var(--bad)', reasonFg: 'var(--bad)', reason: j.reason || '' }
   }
   return (
     <ModalPanel width={840} title={t`Test scrape — ${test.company}`} onClose={onClose} zIndex={60} style={{ maxHeight: 660, overflow: 'hidden' }}>

@@ -147,7 +147,7 @@ export default function AccountPicker({ account: initial = null, required = fals
             <div role="list" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14 }}>
               {accounts.map((a, i) => (
                 <div role="listitem" key={a.id}>
-                  <Card interactive onClick={() => pick(a)} ariaLabel={`${a.name}, ${roleLabel(a)}${a.has_pin ? ', PIN' : ''} (${i + 1})`}
+                  <Card interactive onClick={() => pick(a)} ariaLabel={`${a.name}, ${roleLabel(a)}${a.has_pin ? t`, PIN` : ''} (${i + 1})`}
                     style={{ width: 116, padding: '14px 8px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
                     <Avatar name={a.name} color={a.color} size={44} />
                     <span style={{ maxWidth: '100%', fontSize: 13, lineHeight: '18px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>

@@ -224,8 +224,8 @@ export const CRON_PRESETS = [
   [t`Hourly`, '0 * * * *'],
   [t`Every 6 hours`, '0 */6 * * *'],
   [t`Daily 03:00`, '0 3 * * *'],
-  [t`Weekdays 09:00`, '0 9 * * mon-fri'],
-  [t`Weekly Monday 08:00`, '0 8 * * mon'],
+  [t`Weekdays 09:00`, t`0 9 * * mon-fri`],
+  [t`Weekly Monday 08:00`, t`0 8 * * mon`],
   [t`Monthly 1st 08:00`, '0 8 1 * *'],
   [t`Off`, ''],
 ]

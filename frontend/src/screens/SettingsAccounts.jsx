@@ -20,14 +20,14 @@ import {
 // the Settings page reload their lists) and `jn:counts-changed` (rail badges).
 
 export const COPY_ITEMS = [
-  ['persona', 'Persona', 'every node, Q&A bank included'],
-  ['qa', t`Q&A bank only`, 'autofill answers, without the rest of the Persona'],
-  ['resumes', t`Base résumés`, 'tailored copies stay behind'],
-  ['companies', 'Companies', 'they ride the same scrapes'],
-  ['searches', 'Searches', 'the built-in extension searches are always there'],
-  ['settings', 'Settings', 'never keys, sessions, chat ids or Gmail'],
-  ['voices', t`Cover-letter voices`, 'presets and the default voice'],
-  ['excludes', t`Global excludes`, 'body, title and company excludes'],
+  ['persona', t`Persona`, t`every node, Q&A bank included`],
+  ['qa', t`Q&A bank only`, t`autofill answers, without the rest of the Persona`],
+  ['resumes', t`Base résumés`, t`tailored copies stay behind`],
+  ['companies', t`Companies`, t`they ride the same scrapes`],
+  ['searches', t`Searches`, t`the built-in extension searches are always there`],
+  ['settings', t`Settings`, t`never keys, sessions, chat ids or Gmail`],
+  ['voices', t`Cover-letter voices`, t`presets and the default voice`],
+  ['excludes', t`Global excludes`, t`body, title and company excludes`],
 ]
 
 const COUNT_LABELS = [
@@ -45,7 +45,7 @@ export function countsLine(counts, all = false) {
   const parts = COUNT_LABELS
     .filter(([k]) => all || Number(c[k]) > 0)
     .map(([k, word]) => `${Number(c[k] || 0).toLocaleString(intlLocale())} ${word(Number(c[k] || 0))}`)
-  return parts.length ? parts.join(' · ') : 'no data yet'
+  return parts.length ? parts.join(' · ') : t`no data yet`
 }
 
 export const accountsChanged = () => {
@@ -91,12 +91,12 @@ const ago = (iso) => {
   if (!iso) return 'never'
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
   if (!Number.isFinite(m)) return '—'
-  if (m < 2) return 'just now'
-  if (m < 60) return `${m} min ago`
+  if (m < 2) return t`just now`
+  if (m < 60) return t`${m} min ago`
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h} h ago`
+  if (h < 24) return t`${h} h ago`
   const d = Math.floor(h / 24)
-  return d < 30 ? `${d} d ago` : new Date(iso).toLocaleDateString(intlLocale())
+  return d < 30 ? t`${d} d ago` : new Date(iso).toLocaleDateString(intlLocale())
 }
 
 // Export = a zip streamed by GET /accounts/{id}/export. Fetched through axios so the
@@ -116,7 +116,7 @@ export async function downloadExport(account) {
 // ── colour swatches ─────────────────────────────────────────────────────────
 // The five account colours as avatars carrying the account's initials; the
 // chosen one is marked by the radio state, not by a hand-drawn ring.
-export function ColorPicker({ name, value, onPick, taken = [], ariaLabel = 'Colour' }) {
+export function ColorPicker({ name, value, onPick, taken = [], ariaLabel = t`Colour` }) {
   return (
     <div role="radiogroup" aria-label={ariaLabel} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
       {ACCOUNT_SWATCHES.map((c, i) => {
@@ -225,7 +225,7 @@ export function AddAccountModal({ accounts, onClose, onCreated }) {
     }
   }
 
-  const sources = [['', t`Nothing — start empty`], ...accounts.map((a) => [a.id, a.role === 'owner' ? `${a.name} (owner)` : a.name])]
+  const sources = [['', t`Nothing — start empty`], ...accounts.map((a) => [a.id, a.role === 'owner' ? t`${a.name} (owner)` : a.name])]
   return (
     <ModalPanel width={520} title={t`Add account`} onClose={busy ? undefined : onClose} zIndex={70}
       style={{ padding: '22px 24px 18px', gap: 14, maxHeight: '92vh', overflow: 'auto' }}>
@@ -382,7 +382,7 @@ export function EditAccountModal({ account, self = false, taken = [], onClose, o
       setBusy(false)
     }
   }
-  const title = self ? t`Your name and colour` : `Edit ${account.name}`
+  const title = self ? t`Your name and colour` : t`Edit ${account.name}`
   return (
     <ModalPanel width={440} title={title} onClose={busy ? undefined : onClose} zIndex={70}
       style={{ padding: '22px 24px 18px', gap: 14 }}>
@@ -431,18 +431,18 @@ export function AccountsTable({ data, me, onAdd, onChanged, push, policyFor = ''
     if (self && pinFor.mode === 'remove') {
       return (
         <PinDialog title={t`Remove your PIN`} mode="remove" needCurrent
-          intro={others ? 'Without your PIN anyone at a browser opens your account with one click, and a member’s Unlock of the shared settings needs no PIN.' : undefined}
-          onSubmit={async (b) => { await api.patch(`/accounts/${acc.id}`, b); done('PIN removed') }}
+          intro={others ? t`Without your PIN anyone at a browser opens your account with one click, and a member’s Unlock of the shared settings needs no PIN.` : undefined}
+          onSubmit={async (b) => { await api.patch(`/accounts/${acc.id}`, b); done(t`PIN removed`) }}
           onClose={() => setPinFor(null)} />
       )
     }
     return (
       <PinDialog title={self ? (acc.has_pin ? t`Change your PIN` : t`Set your PIN`) : t`Reset ${acc.name}’s PIN`}
         who={self ? null : acc.name} mode="set" needCurrent={self && acc.has_pin}
-        intro={self ? undefined : `${acc.name} uses the new PIN from now on; your own PIN keeps opening their account.`}
-        onSubmit={async (b) => { await api.patch(`/accounts/${acc.id}`, b); done(self ? (acc.has_pin ? 'PIN changed' : 'PIN set') : `${acc.name}’s PIN reset`) }}
+        intro={self ? undefined : t`${acc.name} uses the new PIN from now on; your own PIN keeps opening their account.`}
+        onSubmit={async (b) => { await api.patch(`/accounts/${acc.id}`, b); done(self ? (acc.has_pin ? t`PIN changed` : t`PIN set`) : t`${acc.name}’s PIN reset`) }}
         onRemove={acc.has_pin ? (self ? () => setPinFor({ account: acc, mode: 'remove' }) : async () => {
-          try { await api.patch(`/accounts/${acc.id}`, { pin: null }); done(`${acc.name} opens without a PIN now`) } catch (err) { push({ kind: 'error', msg: errorText(err) }) }
+          try { await api.patch(`/accounts/${acc.id}`, { pin: null }); done(t`${acc.name} opens without a PIN now`) } catch (err) { push({ kind: 'error', msg: errorText(err) }) }
         }) : undefined}
         onClose={() => setPinFor(null)} />
     )
@@ -513,13 +513,13 @@ export function AccountsTable({ data, me, onAdd, onChanged, push, policyFor = ''
         <EditAccountModal account={editing} self={editing.id === me?.id}
           taken={accounts.filter((x) => x.id !== editing.id).map((x) => (x.color || '').toLowerCase())}
           onClose={() => setEditing(null)}
-          onSaved={(acc) => { setEditing(null); push({ kind: 'success', msg: `Saved ${acc.name}` }); onChanged() }} />
+          onSaved={(acc) => { setEditing(null); push({ kind: 'success', msg: t`Saved ${acc.name}` }); onChanged() }} />
       )}
       {removing && (
         <RemoveAccountModal account={removing} onClose={() => setRemoving(null)}
           onRemoved={(acc, res) => {
             setRemoving(null)
-            push({ kind: 'success', msg: `Removed ${acc.name}${res?.backup ? ` · backup ${res.backup}` : ''}` })
+            push({ kind: 'success', msg: t`Removed ${acc.name}${res?.backup ? t` · backup ${res.backup}` : ''}` })
             onChanged()
           }} />
       )}
@@ -562,11 +562,11 @@ export function YourAccount({ data, me, onChanged, push }) {
   )
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {row('Name', t`How you appear in the picker and the rail.`,
+      {row(t`Name`, t`How you appear in the picker and the rail.`,
         <Input value={name} onChange={setName} onBlur={rename} ariaLabel={t`Your account name`} width="260px"
           onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />)}
-      {row('Colour', t`Your avatar colour — the standing cue for which account is open.`,
-        <ColorPicker name={mine.name} value={mine.color} onPick={(c) => c !== mine.color && patch({ color: c }, 'Colour saved')}
+      {row(t`Colour`, t`Your avatar colour — the standing cue for which account is open.`,
+        <ColorPicker name={mine.name} value={mine.color} onPick={(c) => c !== mine.color && patch({ color: c }, t`Colour saved`)}
           taken={others.map((a) => (a.color || '').toLowerCase())} ariaLabel={t`Your colour`} />)}
       {row('PIN', mine.has_pin ? t`Asked when someone opens your account. The owner’s PIN opens it too.` : t`Off — anyone at this browser can open your account with one click.`,
         <>
@@ -578,7 +578,7 @@ export function YourAccount({ data, me, onChanged, push }) {
       {row(t`API token`, t`For scripts and API clients: send it as X-Account-Token with the install key to act as you. A PIN change ends it.`,
         <ApiTokenButton account={mine} push={push} />)}
       <Helper style={{ padding: '12px 0 0', textWrap: 'pretty' }}>
-        <Trans>Other accounts: {others.map((a) => (a.role === 'owner' ? `${a.name} (owner)` : a.name)).join(', ') || t`none`}.
+        <Trans>Other accounts: {others.map((a) => (a.role === 'owner' ? t`${a.name} (owner)` : a.name)).join(', ') || t`none`}.
         {' '}Adding or removing people is {owner ? `${owner.name}’s` : t`the owner’s`} job — ask them.</Trans>
       </Helper>
       {pinMode && (
@@ -587,7 +587,7 @@ export function YourAccount({ data, me, onChanged, push }) {
           onSubmit={async (b) => {
             await api.patch(`/accounts/${me.id}`, b)
             setPinMode(null)
-            push({ kind: 'success', msg: pinMode === 'remove' ? 'PIN removed' : 'PIN saved' })
+            push({ kind: 'success', msg: pinMode === 'remove' ? t`PIN removed` : t`PIN saved` })
             onChanged()
           }}
           onClose={() => setPinMode(null)} />
@@ -674,8 +674,8 @@ export function PolicyToggle({ memberName, mode, onChange, sectionTitle }) {
       <Helper size="xs"><Trans>{memberName}’s policy:</Trans></Helper>
       <Segmented variant="inset" grow={false} value={mode} onChange={onChange}
         ariaLabel={t`${sectionTitle} for ${memberName}`}
-        options={[{ value: 'inherit', label: 'Inherit', hint: `${memberName} sees your values, read-only` },
-          { value: 'own', label: 'Own', hint: `${memberName} keeps their own values` }]} />
+        options={[{ value: 'inherit', label: t`Inherit`, hint: t`${memberName} sees your values, read-only` },
+          { value: 'own', label: t`Own`, hint: t`${memberName} keeps their own values` }]} />
     </span>
   )
 }
@@ -689,7 +689,7 @@ export async function verifyOwnerPin(pin) {
     return Number.isFinite(t) ? t : Date.now() + 15 * 60000
   } catch (err) {
     const f = authFailure(err)
-    const e = new Error(errorText(err, 'Could not check the PIN — try again.'))
+    const e = new Error(errorText(err, t`Could not check the PIN — try again.`))
     if (f?.kind === 'pin_cooldown') e.retryAfter = f.retryAfter
     throw e
   }

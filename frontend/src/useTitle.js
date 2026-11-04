@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { t } from '@lingui/core/macro'
 import { useLocation } from 'react-router-dom'
 
-const APP = 'JobNavigator'
+const APP = t`JobNavigator`
 
 // Longest prefix wins, so /resumes/:id falls back to "Résumé" until the
 // editor loads and names the actual document.
@@ -31,7 +31,7 @@ export function TitleSync() {
   const { pathname } = useLocation()
   useEffect(() => {
     const name = titleFor(pathname)
-    document.title = name ? `${name} · ${APP}` : `${APP} Dashboard`
+    document.title = name ? `${name} · ${APP}` : t`${APP} Dashboard`
   }, [pathname])
   return null
 }

@@ -18,16 +18,16 @@ import '../theme.css'
 const ago = (iso) => {
   if (!iso) return 'never'
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
+  if (m < 1) return t`just now`
+  if (m < 60) return t`${m}m ago`
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+  if (h < 24) return t`${h}h ago`
+  return t`${Math.floor(h / 24)}d ago`
 }
 const until = (iso) => {
   if (!iso) return null
   const m = Math.round((new Date(iso).getTime() - Date.now()) / 60000)
-  if (m <= 0) return 'due now'
+  if (m <= 0) return t`due now`
   if (m < 60) return `${m}m`
   const h = Math.floor(m / 60)
   if (h < 24) return `${h}h ${m % 60}m`
@@ -92,7 +92,7 @@ const DEPTHS = [
   { id: 'full', label: t`Full`, dots: 2, hint: t`Score plus the full report with keywords and requirements` },
 ]
 const SOURCES = [['linkedin', 'LinkedIn'], ['indeed', 'Indeed'], ['zip_recruiter', 'ZipRecruiter'], ['google', t`Google Jobs`], ['direct', t`Direct (Playwright)`]]
-const COLLECTIONS = [['recommended', 'Recommended'], ['top-applicant', t`Top Applicant`]]
+const COLLECTIONS = [['recommended', t`Recommended`], ['top-applicant', t`Top Applicant`]]
 // backend/scraper/search_modes.py CREATIVE_BOARDS, same order
 const CREATIVE_BOARDS = [['behance', 'Behance'], ['hollylist', 'Hollylist'], ['wanacreate', t`Wana Create`], ['dribbble', 'Dribbble'], ['artstation', 'ArtStation'], ['workwithindies', t`Work With Indies`]]
 const creativeLabel = (k) => (CREATIVE_BOARDS.find(([id]) => id === k) || [k, k])[1]
@@ -116,12 +116,12 @@ const noteFor = (mode) => {
 // share of the search's jobs (last 90 days) with a direct link to the employer; said from five jobs on
 const directRate = (s) => {
   const r = s.direct_rate
-  return r && r.total >= 5 ? ` · ${Math.round((100 * r.direct) / r.total)}% direct links` : ''
+  return r && r.total >= 5 ? t` · ${Math.round((100 * r.direct) / r.total)}% direct links` : ''
 }
 
 // one-line summary of what this search does; `boards` names the Apify boards
 const summaryOf = (s, boards = []) => {
-  const last = s.last_run_at ? ` · last run ${ago(s.last_run_at)}` : ''
+  const last = s.last_run_at ? t` · last run ${ago(s.last_run_at)}` : ''
   const m = s.search_mode
   if (m === 'linkedin_extension') return t`Passive capture on linkedin.com/jobs/collections/* · title filters apply on import`
   if (m === 'extension') return t`Manual “Save to Job Feed” button on any website`
@@ -132,11 +132,11 @@ const summaryOf = (s, boards = []) => {
     if ((s.sources || []).length) bits.push((s.sources || []).join(', '))
     return bits.join(' · ') + last
   }
-  if (m === 'levels_fyi') return `${s.direct_url ? short(s.direct_url) : t`No levels.fyi URL yet`} · ${s.max_pages || 50} pages${last}`
+  if (m === 'levels_fyi') return t`${s.direct_url ? short(s.direct_url) : t`No levels.fyi URL yet`} · ${s.max_pages || 50} pages${last}`
   if (m === 'linkedin_personal') return t`Collections: ${((s.sources || []).length ? s.sources : ['recommended', 'top-applicant']).join(', ')} · credentials in Settings${last}`
   if (m === 'jobright') {
-    const bits = [s.search_term ? `“${s.search_term}”` : t`AI recommendations`, `max ${s.results_wanted || 100}`]
-    if (s.require_salary) bits.push('require salary')
+    const bits = [s.search_term ? `“${s.search_term}”` : t`AI recommendations`, t`max ${s.results_wanted || 100}`]
+    if (s.require_salary) bits.push(t`require salary`)
     return bits.join(' · ') + last
   }
   if (m === 'freehire') {
@@ -148,7 +148,7 @@ const summaryOf = (s, boards = []) => {
   if (m === 'apify') {
     const bits = [`“${s.search_term || ''}”`]
     if (s.location) bits.push(s.location)
-    bits.push((s.sources || []).map((k) => boardLabel(boards, k)).join(', ') || 'no board')
+    bits.push((s.sources || []).map((k) => boardLabel(boards, k)).join(', ') || t`no board`)
     return bits.join(' · ') + last
   }
   if (m === 'caribbeanjobs') {
@@ -161,12 +161,12 @@ const summaryOf = (s, boards = []) => {
   if (m === 'creative') {
     const bits = [`“${s.search_term || ''}”`]
     if (s.location) bits.push(s.location)
-    bits.push((s.sources || []).map(creativeLabel).join(', ') || 'no board')
+    bits.push((s.sources || []).map(creativeLabel).join(', ') || t`no board`)
     return bits.join(' · ') + last
   }
   if (m === 'himalayas') return t`“${s.search_term || ''}” · Remote${s.country ? ` · ${s.country}` : ''}${last}`
   if (m === 'eluta') return `“${s.search_term || ''}” · ${s.location || 'Canada'}${last}`
-  return `${short(s.direct_url) || 'no URL'}${last}`
+  return `${short(s.direct_url) || t`no URL`}${last}`
 }
 
 // Matches backend/countries.py DEFAULT_COUNTRY — jobspy's own alias for the US.
@@ -305,7 +305,7 @@ function ConfigForm({ d, set }) {
   fields.push(<Cell key="name" label={t`Name`} value={d.name} onChange={(v) => set({ name: v })} placeholder={t`e.g. TPM roles — Tier 1`} />)
   if (ext) {
     fields.push(<Cell key="mode" label={t`Mode`} span={2} disabled
-      value={m === 'extension' ? 'Extension (manual Save-to-Feed)' : 'LinkedIn Extension (passive capture)'} onChange={() => {}} />)
+      value={m === 'extension' ? t`Extension (manual Save-to-Feed)` : t`LinkedIn Extension (passive capture)`} onChange={() => {}} />)
   } else {
     fields.push(<Cell key="mode" label={t`Mode`} value={m} options={MODE_OPTIONS} onChange={(v) => {
       const patch = { search_mode: v }
@@ -320,9 +320,9 @@ function ConfigForm({ d, set }) {
         sub={t`A city or a region. Country adds the country. For remote work set Remote and leave this empty.`} />,
       <Cell key="ctry" label={t`Country`} value={d.country} options={countries} onChange={(v) => set({ country: v })}
         sub={t`The only country source. Every board receives it.`} />,
-      <Cell key="rem" label={t`Remote`} value={d.is_remote} options={[['', 'Any'], ['true', 'Remote only'], ['false', 'On-site only']]} onChange={(v) => set({ is_remote: v })}
+      <Cell key="rem" label={t`Remote`} value={d.is_remote} options={[['', t`Any`], ['true', t`Remote only`], ['false', t`On-site only`]]} onChange={(v) => set({ is_remote: v })}
         sub={t`Indeed, Glassdoor and Google apply it. LinkedIn ignores it without login, so LinkedIn rows can be on-site.`} />,
-      <Cell key="jt" label={t`Job type`} value={d.job_type} options={[['fulltime', 'Full-time'], ['parttime', 'Part-time'], ['contract', 'Contract']]} onChange={(v) => set({ job_type: v })} />,
+      <Cell key="jt" label={t`Job type`} value={d.job_type} options={[['fulltime', t`Full-time`], ['parttime', t`Part-time`], ['contract', t`Contract`]]} onChange={(v) => set({ job_type: v })} />,
       <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} />,
       <Cell key="rw" label={t`Results wanted · 1–500`} mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
     )
@@ -336,7 +336,7 @@ function ConfigForm({ d, set }) {
     fields.push(
       <Cell key="term" label={t`Search term · optional`} value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`Leave empty for AI recommendations`} />,
       <Cell key="rw" label={t`Results wanted · 20–500`} mono type="number" min={BOUNDS.results_wanted_jobright[0]} max={BOUNDS.results_wanted_jobright[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
-      <Cell key="ms" label={t`Min score · 0–100`} mono type="number" min={BOUNDS.min_fit_score[0]} max={BOUNDS.min_fit_score[1]} value={d.min_fit_score} onChange={(v) => set({ min_fit_score: v })} placeholder="0 = no filter" />,
+      <Cell key="ms" label={t`Min score · 0–100`} mono type="number" min={BOUNDS.min_fit_score[0]} max={BOUNDS.min_fit_score[1]} value={d.min_fit_score} onChange={(v) => set({ min_fit_score: v })} placeholder={t`0 = no filter`} />,
     )
   } else if (m === 'freehire') {
     fields.push(
@@ -351,9 +351,9 @@ function ConfigForm({ d, set }) {
     fields.push(
       <Cell key="term" label={t`Search term · required`} mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`e.g. technical program manager`} />,
       <Cell key="loc" label={t`Location`} value={d.location} onChange={(v) => set({ location: v })} placeholder={t`e.g. Austin`}
-        sub="A city or a region. Empty = the whole country." />,
+        sub={t`A city or a region. Empty = the whole country.`} />,
       <Cell key="ctry" label={t`Country`} value={d.country} options={countries} onChange={(v) => set({ country: v })} />,
-      <Cell key="rem" label={t`Remote`} value={d.is_remote} options={[['', 'Any'], ['true', 'Remote only']]} onChange={(v) => set({ is_remote: v })}
+      <Cell key="rem" label={t`Remote`} value={d.is_remote} options={[['', t`Any`], ['true', t`Remote only`]]} onChange={(v) => set({ is_remote: v })}
         sub={t`LinkedIn ignores it without login. On LinkedIn, Remote only drops the postings that say hybrid or on-site.`} />,
       <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })}
         sub={t`Rounded up to the steps of each board (see Boards)`} />,
@@ -375,9 +375,9 @@ function ConfigForm({ d, set }) {
         sub={t`One city name. Behance ignores it.`} />,
       <Cell key="ctry" label={t`Country`} value={d.country} options={countries} onChange={(v) => set({ country: v })}
         sub={t`Behance on Remote searches: jobs open to this country, worldwide jobs included.`} />,
-      <Cell key="rem" label={t`Remote`} value={d.is_remote} options={[['', 'Any'], ['true', 'Remote only']]} onChange={(v) => set({ is_remote: v })} />,
+      <Cell key="rem" label={t`Remote`} value={d.is_remote} options={[['', t`Any`], ['true', t`Remote only`]]} onChange={(v) => set({ is_remote: v })} />,
       <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })}
-        sub="0 = no age limit. Behance freelance briefs carry no date." />,
+        sub={t`0 = no age limit. Behance freelance briefs carry no date.`} />,
       <Cell key="rw" label={t`Results wanted · 1–500 per board`} mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
     )
   } else if (m === 'himalayas') {
@@ -385,15 +385,15 @@ function ConfigForm({ d, set }) {
       <Cell key="term" label={t`Search term · required`} mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`e.g. designer`} />,
       <Cell key="ctry" label={t`Country`} value={d.country} options={countries} onChange={(v) => set({ country: v })}
         sub={t`Jobs open to this country, worldwide jobs included.`} />,
-      <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} sub="0 = no age limit" />,
+      <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} sub={t`0 = no age limit`} />,
       <Cell key="rw" label={t`Results wanted · 1–500`} mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
     )
   } else if (m === 'eluta') {
     fields.push(
       <Cell key="term" label={t`Search term · required`} mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`e.g. designer`} />,
       <Cell key="loc" label={t`Location`} value={d.location} onChange={(v) => set({ location: v })} placeholder={t`e.g. Vancouver`}
-        sub="A city, 50 km around it. Empty = all of Canada." />,
-      <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} sub="0 = no age limit" />,
+        sub={t`A city, 50 km around it. Empty = all of Canada.`} />,
+      <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} sub={t`0 = no age limit`} />,
     )
   } else if (m === 'trulyremote') {
     // The whole board is read on every run; this caps the new jobs whose pages one run opens.
@@ -590,7 +590,7 @@ export default function Searches() {
   const sourceWarnOf = (s) => {
     const errs = s.last_source_errors || []
     if (!errs.length) return null
-    return `${errs.map((e) => `${e.label || e.source} failed (${e.error})`).join(' · ')} on the last run`
+    return t`${errs.map((e) => t`${e.label || e.source} failed (${e.error})`).join(' · ')} on the last run`
   }
   // a failed source wins; then an error; then health's 3-run verdict; then a
   // single clean-but-empty run
@@ -601,9 +601,9 @@ export default function Searches() {
   const warnMuted = (s) => !s.active || !!s.warning_acknowledged
   const warnOf = (s) => { const t = warnTextOf(s); return t && !warnMuted(s) ? t : null }
   const mutedWarnOf = (s) => {
-    const t = warnTextOf(s)
-    if (!t || !warnMuted(s)) return null
-    return `${t} · ${s.active ? `acknowledged ${ago(s.warning_acknowledged_at)}` : 'paused'}`
+    const warning = warnTextOf(s)
+    if (!warning || !warnMuted(s)) return null
+    return `${warning} · ${s.active ? t`acknowledged ${ago(s.warning_acknowledged_at)}` : t`paused`}`
   }
   // Header count uses health's verdict alone — same source as the rail's “N need
   // attention”; the row ▲ and drawer banner keep the broader warnOf() predicate.
@@ -622,7 +622,7 @@ export default function Searches() {
       plural(sub.n, { one: '# config', other: '# configs' }),
       t`${sub.active} active`,
       ...(sub.warn ? [t`${sub.warn} need attention`] : []),
-      ...(nxt ? [nxt === 'due now' ? 'next scheduled run due now' : `next scheduled run in ${nxt}`] : []),
+      ...(nxt ? [nxt === t`due now` ? t`next scheduled run due now` : t`next scheduled run in ${nxt}`] : []),
     ].join(' · ')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sub && sub.n, sub && sub.active, sub && sub.warn, sub && sub.next, tick, loadErr])
@@ -795,7 +795,7 @@ export default function Searches() {
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           <CopyFrom kind="searches" pushToast={pushToast} onCloned={async (row) => {
-            await load(); loadAux(); bumpCounts(); notePaused(row, 'was copied')   // R30 I-04
+            await load(); loadAux(); bumpCounts(); notePaused(row, t`was copied`)   // R30 I-04
             setNewOpen(false); setMenuFor(null); setEditing(row.id); setDraft(draftOf(row))
           }} />
           <Button onClick={() => { setNewOpen((v) => !v); setEditing(null); setMenuFor(null) }}><Trans>+ New search</Trans></Button>
@@ -836,7 +836,7 @@ export default function Searches() {
           const testBlocked = !!testingId && testingId !== s.id
           const mutedWarn = mutedWarnOf(s)
           const cfgErr = configError(s)
-          const summary = spin ? 'running now. Results appear in the Job Feed as they are found.' : (cfgErr || warn || mutedWarn || summaryOf(s, apifyBoards) + directRate(s))
+          const summary = spin ? t`running now. Results appear in the Job Feed as they are found.` : (cfgErr || warn || mutedWarn || summaryOf(s, apifyBoards) + directRate(s))
           const summaryFg = spin ? 'var(--accent)' : (cfgErr || warn) ? 'var(--warn)' : 'var(--muted)'
           return (
             /* Same card hover as Résumés/Cover Letters, suppressed while open; a warned
@@ -912,7 +912,7 @@ export default function Searches() {
                       <Menu ariaLabel={t`${s.name} actions`} onDismiss={() => setMenuFor(null)} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 40, marginTop: 4, width: 236, textAlign: 'left' }}>
                         {[['✎', t`Edit search`, () => openEdit(s)],
                           ['☰', t`View results in feed`, () => navigate(`/feed?search=${s.id}`)],
-                          [<CopyGlyph key="dup" />, 'Duplicate', () => duplicate(s)]].map(([g, label, act]) => (
+                          [<CopyGlyph key="dup" />, t`Duplicate`, () => duplicate(s)]].map(([g, label, act]) => (
                           <MenuItem key={label} icon={g} onClick={act}>{label}</MenuItem>
                         ))}
                         <MenuItem danger icon="✕" onClick={() => remove(s)}><Trans>Delete search</Trans></MenuItem>
@@ -1008,32 +1008,32 @@ function TestModal({ test, tab, setTab, onClose }) {
   // params strip — mode aware (v1 rendered freehire through the keyword branch)
   const params = []
   if (cfg.mode === 'jobright') {
-    params.push(cfg.search_term ? `“${cfg.search_term}”` : t`AI recommendations`, `${cfg.results_wanted || 100} wanted`)
+    params.push(cfg.search_term ? `“${cfg.search_term}”` : t`AI recommendations`, t`${cfg.results_wanted || 100} wanted`)
   } else if (cfg.mode === 'linkedin_personal') {
-    params.push(`Collections: ${(cfg.collections || cfg.sources || []).join(', ')}`)
+    params.push(t`Collections: ${(cfg.collections || cfg.sources || []).join(', ')}`)
   } else if (cfg.mode === 'levels_fyi') {
     params.push(short(cfg.url || cfg.direct_url, 70))
   } else if (cfg.mode === 'apify') {
-    params.push(`Boards: ${(cfg.sources || []).map((k) => boardLabel(apifyBoards, k)).join(', ')}`, `${cfg.results_wanted} per board max`)
+    params.push(t`Boards: ${(cfg.sources || []).map((k) => boardLabel(apifyBoards, k)).join(', ')}`, t`${cfg.results_wanted} per board max`)
   } else if (cfg.mode === 'freehire') {
     if (cfg.search_term) params.push(`“${cfg.search_term}”`)
     if (cfg.direct_url) params.push(short(cfg.direct_url, 60))
-    if (cfg.results_wanted) params.push(`${cfg.results_wanted} wanted`)
+    if (cfg.results_wanted) params.push(t`${cfg.results_wanted} wanted`)
   } else if (cfg.mode === 'caribbeanjobs') {
     if (cfg.search_term) params.push(`“${cfg.search_term}”`)
     if (cfg.direct_url) params.push(short(cfg.direct_url, 60))
-    if (cfg.results_wanted) params.push(`${cfg.results_wanted} wanted`)
+    if (cfg.results_wanted) params.push(t`${cfg.results_wanted} wanted`)
   } else if (cfg.mode === 'trulyremote') {
-    params.push('worldwide remote')
-    if (cfg.results_wanted) params.push(`${cfg.results_wanted} new per run`)
+    params.push(t`worldwide remote`)
+    if (cfg.results_wanted) params.push(t`${cfg.results_wanted} new per run`)
   } else if (cfg.mode === 'creative') {
-    params.push(`Boards: ${(cfg.sources || []).map(creativeLabel).join(', ')}`, `${cfg.results_wanted} per board max`)
+    params.push(t`Boards: ${(cfg.sources || []).map(creativeLabel).join(', ')}`, t`${cfg.results_wanted} per board max`)
   } else {
     if (cfg.location) params.push(cfg.location)
-    if (cfg.is_remote === true) params.push('remote only')
-    if (cfg.is_remote === false) params.push('on-site only')
+    if (cfg.is_remote === true) params.push(t`remote only`)
+    if (cfg.is_remote === false) params.push(t`on-site only`)
     if (cfg.hours_old) params.push(`${cfg.hours_old}h`)
-    if (cfg.results_wanted) params.push(`${cfg.results_wanted} wanted`)
+    if (cfg.results_wanted) params.push(t`${cfg.results_wanted} wanted`)
   }
 
   return (

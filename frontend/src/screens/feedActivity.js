@@ -51,11 +51,11 @@ export function activityText(act) {
   const parts = []
   if (act.running) {
     const n = act.rescoreNames.length
-    parts.push(n ? plural(n, { one: 'Scoring # résumé', other: 'Scoring # résumés' }) : 'Scoring…')
+    parts.push(n ? plural(n, { one: 'Scoring # résumé', other: 'Scoring # résumés' }) : t`Scoring…`)
   }
   if (act.tailoring) {
-    const verb = act.replaces ? 'Re-tailoring' : 'Tailoring'
-    parts.push(act.baseName ? `${verb} from ${act.baseName}` : `${verb}…`)
+    const verb = act.replaces ? t`Re-tailoring` : t`Tailoring`
+    parts.push(act.baseName ? t`${verb} from ${act.baseName}` : `${verb}…`)
   }
   return parts.join(' · ')
 }
@@ -78,7 +78,7 @@ export function tabBusy(act, tab) {
   return null
 }
 
-export const tabBusyHint = (tone) => (tone === 'ai' ? ' · re-tailoring' : tone ? ' · scoring again' : '')
+export const tabBusyHint = (tone) => (tone === 'ai' ? t` · re-tailoring` : tone ? t` · scoring again` : '')
 
 /**
  * Tabs for résumés that are in the run but have no report yet — dashed, muted,

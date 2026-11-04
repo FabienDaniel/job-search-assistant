@@ -22,42 +22,42 @@ import {
 
 // ── the autofill field table ────────────────────────────────────────────────
 // Mirrors backend/autofill_schema.py ANSWER_SCHEMA one-for-one (31 answerable fields + the decline flag).
-const GENDER = [['male', 'Male'], ['female', 'Female'], ['nonbinary', 'Non-binary']]
-const RACE = [['hispanic_latino', 'Hispanic/Latino'], ['white', 'White'], ['black', t`Black/African American`],
-  ['asian', 'Asian'], ['native_american', t`Native American`], ['pacific_islander', t`Pacific Islander`],
+const GENDER = [['male', t`Male`], ['female', t`Female`], ['nonbinary', t`Non-binary`]]
+const RACE = [['hispanic_latino', t`Hispanic/Latino`], ['white', t`White`], ['black', t`Black/African American`],
+  ['asian', t`Asian`], ['native_american', t`Native American`], ['pacific_islander', t`Pacific Islander`],
   ['two_or_more', t`Two or more`]]
 const VETERAN = [['protected_veteran', t`I am a protected veteran`], ['not_protected_veteran', t`Not a protected veteran`]]
-const YESNO = [['yes', 'Yes'], ['no', 'No']]
-const AGE = [['under_30', t`Under 30`], ['30_39', '30–39'], ['40_49', '40–49'], ['50_59', '50–59'], ['60_plus', '60 or older']]
-const TRANS = [['no', 'No'], ['yes', 'Yes']]
-const ORIENT = [['heterosexual', t`Heterosexual / straight`], ['gay', 'Gay'], ['lesbian', 'Lesbian'],
-  ['bisexual', 'Bisexual'], ['queer', 'Queer'], ['other', 'Other']]
+const YESNO = [['yes', t`Yes`], ['no', 'No']]
+const AGE = [['under_30', t`Under 30`], ['30_39', '30–39'], ['40_49', '40–49'], ['50_59', '50–59'], ['60_plus', t`60 or older`]]
+const TRANS = [['no', 'No'], ['yes', t`Yes`]]
+const ORIENT = [['heterosexual', t`Heterosexual / straight`], ['gay', t`Gay`], ['lesbian', t`Lesbian`],
+  ['bisexual', t`Bisexual`], ['queer', t`Queer`], ['other', t`Other`]]
 const WORK_AUTH_TYPE = [['citizen', t`U.S. citizen`], ['permanent_resident', t`Permanent resident`],
-  ['visa', t`Visa holder`], ['other', 'Other']]
+  ['visa', t`Visa holder`], ['other', t`Other`]]
 
 // GROUPS: [id, title, fields[]]   fields: [node, key, label, kind, opts]
 const GROUPS = [
   ['contact', t`Contact / basics`, [
     ['contact', 'first_name', t`First name`, 'text'],
     ['contact', 'last_name', t`Last name`, 'text'],
-    ['contact', 'email', 'Email', 'text'],
-    ['contact', 'phone', 'Phone', 'text'],
-    ['contact', 'city', 'City', 'text'],
-    ['contact', 'state', 'State', 'text'],
-    ['contact', 'country', 'Country', 'text'],
+    ['contact', 'email', t`Email`, 'text'],
+    ['contact', 'phone', t`Phone`, 'text'],
+    ['contact', 'city', t`City`, 'text'],
+    ['contact', 'state', t`State`, 'text'],
+    ['contact', 'country', t`Country`, 'text'],
     ['contact', 'current_company', t`Current company`, 'text'],
     ['contact', 'linkedin', 'LinkedIn', 'text'],
     ['contact', 'github', 'GitHub', 'text'],
     ['contact', 'portfolio', t`Portfolio URL`, 'text', { wide: true }],
   ]],
   ['demographics', t`Demographics · EEO`, [
-    ['demographics', 'gender', 'Gender', 'enum', { options: GENDER }],
+    ['demographics', 'gender', t`Gender`, 'enum', { options: GENDER }],
     ['demographics', 'race_ethnicity', t`Race / ethnicity`, 'enum', { options: RACE }],
     ['demographics', 'hispanic_latino', t`Hispanic or Latino?`, 'enum', { options: YESNO }],
     ['demographics', 'veteran_status', t`Veteran status`, 'enum', { options: VETERAN }],
     ['demographics', 'disability_status', t`Disability status`, 'enum', { options: YESNO }],
     ['demographics', 'age_range', t`Age range`, 'enum', { options: AGE }],
-    ['demographics', 'transgender', 'Transgender?', 'enum', { options: TRANS }],
+    ['demographics', 'transgender', t`Transgender?`, 'enum', { options: TRANS }],
     ['demographics', 'sexual_orientation', t`Sexual orientation`, 'enum', { options: ORIENT }],
     ['demographics', 'decline_demographics', '', 'check', {
       wide: true, uncounted: true,
@@ -103,7 +103,7 @@ const FIELD_LABEL = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'e
 // Thin wrapper over ui.jsx's Select that keeps the "— not answered" row: clearing an
 // answer is a real action here (unset differs from empty for the autofill extension).
 function Picker({ value, options, onChange, placeholder = '—', ariaLabel }) {
-  const opts = useMemo(() => [[UNSET, '— not answered'], ...options], [options])
+  const opts = useMemo(() => [[UNSET, t`— not answered`], ...options], [options])
   return (
     <Select value={isSet(value) ? value : ''} options={opts} placeholder={placeholder}
       ariaLabel={ariaLabel} onPick={(v) => onChange(v === UNSET ? undefined : v)}
@@ -262,7 +262,7 @@ export default function Persona() {
   const removeQa = (i) => {
     const gone = qa[i]
     writeQa(qa.filter((_, j) => j !== i))
-    pushToast({ kind: 'undo', msg: t`Removed answer`, action: 'Undo', onAction: () => writeQa([...qaRef.current.slice(0, i), gone, ...qaRef.current.slice(i)]) })
+    pushToast({ kind: 'undo', msg: t`Removed answer`, action: t`Undo`, onAction: () => writeQa([...qaRef.current.slice(0, i), gone, ...qaRef.current.slice(i)]) })
   }
 
   const filled = useMemo(() => {
@@ -363,7 +363,7 @@ export default function Persona() {
               <SectionShell key={name} name={name} count={counts[name]} open={sections.has(name)} onToggle={() => toggleSection(name)}>
                 <SectionEditor name={name} data={resume} setField={setField} mutate={mutate}
                   onError={(msg) => pushToast({ kind: 'error', msg })}
-                  onRemoved={(msg, undo) => pushToast({ kind: 'undo', msg, action: 'Undo', onAction: undo })}
+                  onRemoved={(msg, undo) => pushToast({ kind: 'undo', msg, action: t`Undo`, onAction: undo })}
                   pageHint={false} emptyNote={t`Tailored résumés use whatever you add here.`} />
               </SectionShell>
             ))}
@@ -446,8 +446,8 @@ export default function Persona() {
 // Same ChoiceModal shell as the résumé editor's Tailor modal, with this screen's two
 // sources as ChoiceCards/ChoiceRows. Escape closes (ModalPanel's useEscape), Enter picks a row (kb()).
 const IMPORT_SOURCES = [
-  ['resume', '☰ From a résumé', t`Copies a base résumé’s header and sections — no LLM call`],
-  ['pdf', '↑ From a PDF', t`The AI reads the file — one LLM call; nothing is stored as a résumé`],
+  ['resume', t`☰ From a résumé`, t`Copies a base résumé’s header and sections — no LLM call`],
+  ['pdf', t`↑ From a PDF`, t`The AI reads the file — one LLM call; nothing is stored as a résumé`],
 ]
 
 function ImportModal({ busy, onClose, onRun, pushToast }) {
@@ -496,7 +496,7 @@ function ImportModal({ busy, onClose, onRun, pushToast }) {
       note={<Helper style={{ textWrap: 'pretty' }}>
         <Trans>Replaces contact and résumé content. Work authorization, demographics, compensation, preferences and the Q&amp;A bank stay.</Trans>
       </Helper>}
-      action={busy ? 'Parsing…' : 'Replace'} actionVariant="danger" actionBusy={busy}
+      action={busy ? t`Parsing…` : t`Replace`} actionVariant={'danger'} actionBusy={busy}
       actionDisabled={!canRun} onAction={run}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <Label><Trans>Where from</Trans></Label>
@@ -528,7 +528,7 @@ function ImportModal({ busy, onClose, onRun, pushToast }) {
             e.preventDefault(); setDropping(false)
             const f = e.dataTransfer?.files?.[0]
             if (f && /\.pdf$/i.test(f.name)) takePdf(f)
-            else if (f) pushToast({ kind: 'error', msg: 'That is not a PDF.' })
+            else if (f) pushToast({ kind: 'error', msg: t`That is not a PDF.` })
           }}>
           <Label><Trans>Which PDF</Trans></Label>
           <DashedAdd big title={t`Choose a résumé PDF, or drop one here`}

@@ -160,7 +160,7 @@ export default function CoverLetterEditor() {
   }
 
   // Undoable, like every other destructive edit in the three builders.
-  const undoRemove = useUndoRemove(update, (msg, undo) => pushToast({ kind: 'undo', msg, action: 'Undo', onAction: undo }))
+  const undoRemove = useUndoRemove(update, (msg, undo) => pushToast({ kind: 'undo', msg, action: t`Undo`, onAction: undo }))
 
   // live PDF, debounced behind the save so we never render a stale draft
   useEffect(() => {
@@ -319,7 +319,7 @@ export default function CoverLetterEditor() {
     // not in this list (showed "Select a source…" while Regenerate used it) — prepend it if missing.
     const own = doc?.resume_id
     if (own && !doc.from_persona && !opts.some((o) => String(o.id) === String(own))) {
-      opts.unshift({ id: own, label: doc.source_name ? `${doc.source_name} · tailored copy` : t`This letter’s tailored copy` })
+      opts.unshift({ id: own, label: doc.source_name ? t`${doc.source_name} · tailored copy` : t`This letter’s tailored copy` })
     }
     return opts
   }, [resumes, personaAvailable, doc])
@@ -356,11 +356,11 @@ export default function CoverLetterEditor() {
   // Sentence case at the source: the span below already reads --label-case, but
   // an upper-cased STRING has nothing left to lower, so win98 (--label-case:none)
   // still drew "DRAFT" after the case fix landed (R4-T3-08).
-  const badge = stage ? stage.charAt(0).toUpperCase() + stage.slice(1) : 'Draft'
+  const badge = stage ? stage.charAt(0).toUpperCase() + stage.slice(1) : t`Draft`
   const voiceLabel = presets.find((p) => p.id === doc.voice)?.label || doc.voice
   const lengthLabel = LENGTHS.find(([lid]) => lid === doc.length)?.[1] || doc.length
-  const voiceLen = [voiceLabel, lengthLabel].filter(Boolean).join(' · ') || 'voice and length unknown for this letter'
-  const tplLabel = templates.find((t) => t.id === template)?.name || template || 'Template'
+  const voiceLen = [voiceLabel, lengthLabel].filter(Boolean).join(' · ') || t`voice and length unknown for this letter`
+  const tplLabel = templates.find((t) => t.id === template)?.name || template || t`Template`
   const fmtLabel = PAGE_FORMATS.find(([f]) => f === format)?.[1] || format
 
   return (
@@ -501,7 +501,7 @@ export default function CoverLetterEditor() {
                     style={{ marginLeft: 'auto', width: 20, height: 20, borderRadius: 'var(--radius-mini)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: i === 0 ? 'var(--line-strong)' : 'var(--text-2)', cursor: i === 0 ? 'default' : 'pointer' }}>↑</span>
                   <span onClick={() => i < paras.length - 1 && update((d) => { const a = d.body_paragraphs; [a[i + 1], a[i]] = [a[i], a[i + 1]] })} title={t`Move down`} className={i < paras.length - 1 ? 'v2-parabtn' : ''}
                     style={{ width: 20, height: 20, borderRadius: 'var(--radius-mini)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: i === paras.length - 1 ? 'var(--line-strong)' : 'var(--text-2)', cursor: i === paras.length - 1 ? 'default' : 'pointer' }}>↓</span>
-                  <span onClick={() => undoRemove('Removed paragraph',
+                  <span onClick={() => undoRemove(t`Removed paragraph`,
                     (d) => { d.body_paragraphs.splice(i, 1) },
                     (d) => { d.body_paragraphs = d.body_paragraphs || []; d.body_paragraphs.splice(i, 0, text) })} title={t`Delete paragraph`} className="v2-parabtn-bad"
                     style={{ width: 20, height: 20, borderRadius: 'var(--radius-mini)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--edge)', cursor: 'pointer' }}>✕</span>

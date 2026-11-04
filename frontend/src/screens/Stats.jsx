@@ -32,7 +32,7 @@ const TYPE_CLASS = {
   scrape: 'sm-keyword', h1b: 'sm-lipersonal', cv_score: 'sm-levels',
   email: 'sm-freehire', telegram: 'sm-jobright',
 }
-const TYPE_OPTS = [['', t`All types`], ['scrape', 'Scrape'], ['h1b', 'H-1B'], ['cv_score', t`Résumé score`], ['email', 'Email'], ['telegram', 'Telegram']]
+const TYPE_OPTS = [['', t`All types`], ['scrape', t`Scrape`], ['h1b', 'H-1B'], ['cv_score', t`Résumé score`], ['email', t`Email`], ['telegram', 'Telegram']]
 
 // v2 draws controls as span/div, so spread kb(fn) on one to make it focusable and
 // keyboard-operable; the focus ring is theme.css's `[tabindex="0"]:focus-visible`.
@@ -69,10 +69,10 @@ const dur = (s) => (s == null ? '—' : s < 60 ? `${Math.round(s)}s` : `${Math.f
 const ago = (iso) => {
   if (!iso) return null
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
+  if (m < 1) return t`just now`
+  if (m < 60) return t`${m}m ago`
   const h = Math.floor(m / 60)
-  return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`
+  return h < 24 ? t`${h}h ago` : t`${Math.floor(h / 24)}d ago`
 }
 // Turn a 5-field cron into English; anything else (including "Every 90 min") passes through.
 const decodeCron = (expr) => {
@@ -80,17 +80,17 @@ const decodeCron = (expr) => {
   const p = expr.trim().split(/\s+/)
   if (p.length !== 5) return expr
   const [min, hour, day, month, dow] = p
-  const DOW = { 0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun' }
-  let t
-  if (hour !== '*' && min !== '*') t = `at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`
-  else if (hour !== '*') t = `at ${hour.padStart(2, '0')}:00`
-  else if (min.startsWith('*/')) t = `every ${min.slice(2)} min`
-  else if (hour.startsWith('*/')) t = `every ${hour.slice(2)}h`
+  const DOW = { 0: t`Sun`, 1: t`Mon`, 2: t`Tue`, 3: t`Wed`, 4: t`Thu`, 5: t`Fri`, 6: t`Sat`, 7: t`Sun` }
+  let when
+  if (hour !== '*' && min !== '*') when = t`at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`
+  else if (hour !== '*') when = t`at ${hour.padStart(2, '0')}:00`
+  else if (min.startsWith('*/')) when = t`every ${min.slice(2)} min`
+  else if (hour.startsWith('*/')) when = t`every ${hour.slice(2)}h`
   else return expr
-  if (dow !== '*') return `${DOW[dow] || dow} ${t}`
-  if (day !== '*') return `Day ${day} ${t}`
-  if (month !== '*') return `Month ${month} ${t}`
-  return `Daily ${t}`
+  if (dow !== '*') return `${DOW[dow] || dow} ${when}`
+  if (day !== '*') return t`Day ${day} ${when}`
+  if (month !== '*') return t`Month ${month} ${when}`
+  return t`Daily ${when}`
 }
 
 // ui: keep — H serves only the run-history/activity-log tabs (kb() control + accent underline); Heading covers everything else.
@@ -269,7 +269,7 @@ export default function Stats() {
     } catch (e) {
       console.error('trigger', e)
       clear()
-      pushToast({ kind: 'error', msg: e.response?.data?.detail === 'scheduled_scrape_running' ? t`The scheduled scrape is running — try again when it finishes.` : e.response?.status === 409 ? `${job.name} is already running.` : t`Could not start ${job.name}` + errSuffix(e) })
+      pushToast({ kind: 'error', msg: e.response?.data?.detail === 'scheduled_scrape_running' ? t`The scheduled scrape is running — try again when it finishes.` : e.response?.status === 409 ? t`${job.name} is already running.` : t`Could not start ${job.name}` + errSuffix(e) })
     }
   }
 
@@ -400,7 +400,7 @@ export default function Stats() {
     <>
       {sub.has ? (sub.status === 'failed' ? t`Last scrape run failed ${ago(sub.at) || '—'}` : t`Last scrape run ${ago(sub.at) || '—'}`) : t`No scrape recorded yet`}
       {sub.failing > 0 && <> · <span style={{ color: 'var(--warn)' }}>{plural(sub.failing, { one: '# source needs attention', other: '# sources need attention' })}</span></>}
-      {sub.spend != null && <> <Trans>· {money(sub.spend)} on LLM calls {sub.period ? `in ${sub.period}d` : 'all time'}</Trans></>}
+      {sub.spend != null && <> <Trans>· {money(sub.spend)} on LLM calls {sub.period ? `in ${sub.period}d` : t`all time`}</Trans></>}
     </>
   )
   // Volume, outcomes, scoring and spend already have cards below; the header carries
@@ -456,9 +456,9 @@ export default function Stats() {
         <Card style={{ padding: 0, display: 'flex' }}>
           {[
             [t`Total jobs`, int(stats?.total_jobs), '', t`All jobs ever found, excluding ones removed by cleanup`],
-            [t`New this week`, int(timeline ? weekly.now : null), timeline && weekly.prev ? `${weekly.now - weekly.prev >= 0 ? '+' : ''}${weekly.now - weekly.prev} vs previous period` : '', t`Discovered in the last 7 days`],
-            ['Saved', int(stats?.saved_jobs), '', t`In your feed shortlist`],
-            ['Applications', int(stats?.total_applications), `${inPlay} open`, 'Open = not rejected'],
+            [t`New this week`, int(timeline ? weekly.now : null), timeline && weekly.prev ? t`${weekly.now - weekly.prev >= 0 ? '+' : ''}${weekly.now - weekly.prev} vs previous period` : '', t`Discovered in the last 7 days`],
+            [t`Saved`, int(stats?.saved_jobs), '', t`In your feed shortlist`],
+            [t`Applications`, int(stats?.total_applications), t`${inPlay} open`, t`Open = not rejected`],
             [t`Best open score`, bestScore, bestScore === '—' ? '' : (best?.company || ''), t`Highest-scoring posting you haven’t applied to`],
           ].map(([label, value, sub, hint], i, arr) => (
             <div key={label} title={hint} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 11, padding: '14px 20px 10px', borderRight: `1px solid ${i === arr.length - 1 ? 'transparent' : 'var(--line-soft)'}` }}>
@@ -483,7 +483,7 @@ export default function Stats() {
               <span style={{ flex: 1 }} />
               {sankey && (
                 <span style={{ alignSelf: 'center', display: 'flex', gap: 3 }}>
-                  {[['bar', 'Funnel'], ['sankey', 'Flow']].map(([id, label]) => {
+                  {[['bar', t`Funnel`], ['sankey', t`Flow`]].map(([id, label]) => {
                     const on = flowView === id
                     return <UiPill key={id} size="sm" on={on} onClick={() => setFlowView(id)}>{label}</UiPill>
                   })}
@@ -589,7 +589,7 @@ export default function Stats() {
               </span>
             </div>
             <div style={{ display: 'flex', gap: 18 }}>
-              {[['Spend', money(costs?.total_cost_usd)], ['Calls', int(costs?.total_calls)],
+              {[[t`Spend`, money(costs?.total_cost_usd)], [t`Calls`, int(costs?.total_calls)],
                 [t`Avg / call`, costs?.total_calls ? money(costs.total_cost_usd / costs.total_calls) : '—']].map(([l, v]) => (
                 <div key={l} style={{ display: 'flex', flexDirection: 'column' }}>
                   <Label>{l}</Label>

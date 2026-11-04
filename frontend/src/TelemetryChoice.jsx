@@ -116,9 +116,9 @@ export function TelemetrySettingRow() {
   const load = () => api.get('/telemetry').then(({ data }) => setState(data)).catch(() => {})
   useEffect(() => { load() }, [])
   if (!state) return null
-  if (state.locked) return <Helper style={{ flex: 1, minWidth: 0 }}>{`Set by JN_TELEMETRY=${state.level} in .env.`}</Helper>
+  if (state.locked) return <Helper style={{ flex: 1, minWidth: 0 }}>{t`Set by JN_TELEMETRY=${state.level} in .env.`}</Helper>
   return (
-    <Select value={state.asked ? state.level : ''} options={state.asked ? LEVELS : [['', 'Not chosen yet'], ...LEVELS]}
+    <Select value={state.asked ? state.level : ''} options={state.asked ? LEVELS : [['', t`Not chosen yet`], ...LEVELS]}
       width="300px" ariaLabel={t`Allow anonymous telemetry`}
       onPick={async (v) => { if (v) { await choose(v); load() } }} />
   )
