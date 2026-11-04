@@ -14,7 +14,7 @@ import '../theme.css'
 // Stats reads the pipeline back: funnel, scorer, LLM costs, scheduler activity.
 // Score averages and run result summaries come from the newer endpoint fields.
 
-const PERIODS = [[1, '1d'], [7, '7d'], [30, '30d'], [0, 'all']]
+const PERIODS = [[1, t`1d`], [7, t`7d`], [30, t`30d`], [0, t`all`]]
 // Both logs page via limit+offset; the control hides itself when a page comes back short.
 const RUN_PAGE = 30
 const ACT_PAGE = 50
@@ -65,7 +65,7 @@ const when = (iso) => {
   try { return new Date(iso).toLocaleString(intlLocale('en-GB'), { timeZone: TZ, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', ' ·') }
   catch { return iso }
 }
-const dur = (s) => (s == null ? '—' : s < 60 ? `${Math.round(s)}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`)
+const dur = (s) => (s == null ? '—' : s < 60 ? t`${Math.round(s)}s` : t`${Math.floor(s / 60)}m ${Math.round(s % 60)}s`)
 const ago = (iso) => {
   if (!iso) return null
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
@@ -400,7 +400,7 @@ export default function Stats() {
     <>
       {sub.has ? (sub.status === 'failed' ? t`Last scrape run failed ${ago(sub.at) || '—'}` : t`Last scrape run ${ago(sub.at) || '—'}`) : t`No scrape recorded yet`}
       {sub.failing > 0 && <> · <span style={{ color: 'var(--warn)' }}>{plural(sub.failing, { one: '# source needs attention', other: '# sources need attention' })}</span></>}
-      {sub.spend != null && <> <Trans>· {money(sub.spend)} on LLM calls {sub.period ? `in ${sub.period}d` : t`all time`}</Trans></>}
+      {sub.spend != null && <> <Trans>· {money(sub.spend)} on LLM calls {sub.period ? t`in ${sub.period}d` : t`all time`}</Trans></>}
     </>
   )
   // Volume, outcomes, scoring and spend already have cards below; the header carries
@@ -457,7 +457,7 @@ export default function Stats() {
           {[
             [t`Total jobs`, int(stats?.total_jobs), '', t`All jobs ever found, excluding ones removed by cleanup`],
             [t`New this week`, int(timeline ? weekly.now : null), timeline && weekly.prev ? t`${weekly.now - weekly.prev >= 0 ? '+' : ''}${weekly.now - weekly.prev} vs previous period` : '', t`Discovered in the last 7 days`],
-            [t`Saved`, int(stats?.saved_jobs), '', t`In your feed shortlist`],
+            [t({ message: 'Saved', context: 'stat card, number of jobs' }), int(stats?.saved_jobs), '', t`In your feed shortlist`],
             [t`Applications`, int(stats?.total_applications), t`${inPlay} open`, t`Open = not rejected`],
             [t`Best open score`, bestScore, bestScore === '—' ? '' : (best?.company || ''), t`Highest-scoring posting you haven’t applied to`],
           ].map(([label, value, sub, hint], i, arr) => (
@@ -637,10 +637,10 @@ export default function Stats() {
             <div style={{ padding: '26px 20px 30px', borderTop: '1px solid var(--line-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--muted)' }}><Trans>Unavailable — the request failed</Trans></div>
           ) : (<>
           <TableHead height={26} pad="0 20px" top style={{ background: 'transparent' }}>
-            <span style={{ flex: '0 1 250px', minWidth: 0 }}><Trans>Job</Trans></span>
-            {showId && <span style={{ flex: '0 0 132px' }}><Trans>Job ID</Trans></span>}
+            <span style={{ flex: '0 1 250px', minWidth: 0 }}>{t({ message: 'Job', context: 'background task' })}</span>
+            {showId && <span style={{ flex: '0 0 132px' }}>{t({ message: 'Job ID', context: 'background task' })}</span>}
             {showSched && <span style={{ flex: '0 0 140px' }}><Trans>Schedule</Trans></span>}
-            {showNext && <span style={{ flex: '0 0 132px' }}><Trans>Next run</Trans></span>}
+            {showNext && <span style={{ flex: '0 0 132px' }}>{t({ message: 'Next run', context: 'table header' })}</span>}
             <span style={{ flex: 1, minWidth: 0 }}>{showStatus ? t`Status` : ''}</span>
             <span style={{ flex: '0 0 110px', textAlign: 'right' }}><Trans>Run</Trans></span>
           </TableHead>

@@ -28,10 +28,10 @@ const until = (iso) => {
   if (!iso) return null
   const m = Math.round((new Date(iso).getTime() - Date.now()) / 60000)
   if (m <= 0) return t`due now`
-  if (m < 60) return `${m}m`
+  if (m < 60) return t`${m}m`
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ${m % 60}m`
-  return `${Math.floor(h / 24)}d ${h % 24}h`
+  if (h < 24) return t`${h}h ${m % 60}m`
+  return t`${Math.floor(h / 24)}d ${h % 24}h`
 }
 const short = (u, n = 52) => {
   const s = (u || '').replace(/^https?:\/\//, '')
@@ -1032,7 +1032,7 @@ function TestModal({ test, tab, setTab, onClose }) {
     if (cfg.location) params.push(cfg.location)
     if (cfg.is_remote === true) params.push(t`remote only`)
     if (cfg.is_remote === false) params.push(t`on-site only`)
-    if (cfg.hours_old) params.push(`${cfg.hours_old}h`)
+    if (cfg.hours_old) params.push(t`${cfg.hours_old}h`)
     if (cfg.results_wanted) params.push(t`${cfg.results_wanted} wanted`)
   }
 

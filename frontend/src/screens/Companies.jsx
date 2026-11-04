@@ -361,7 +361,7 @@ export default function Companies() {
     return t`${ids.length} selected`
   }
   const healthOf = (c) => {
-    if (scraping[c.id]) return { dot: t`var(--accent)`, fg: t`var(--accent)`, text: scraping[c.id] === 'waiting' ? t`waiting for another scrape…` : t`scraping now…` }
+    if (scraping[c.id]) return { dot: 'var(--accent)', fg: 'var(--accent)', text: scraping[c.id] === 'waiting' ? t`waiting for another scrape…` : t`scraping now…` }
     const warn = warnTextOf(c, downMap[c.id])
     // paused or acknowledged: keep the verdict, drop the alarm colours
     if (warn && warnMuted(c)) return { dot: 'var(--edge)', fg: 'var(--muted)',

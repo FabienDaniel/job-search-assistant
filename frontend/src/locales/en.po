@@ -145,7 +145,7 @@ msgid ".pdf"
 msgstr ".pdf"
 
 #. placeholder {0}: money(sub.spend)
-#. placeholder {1}: sub.period ? `in ${sub.period}d` : t`all time`
+#. placeholder {1}: sub.period ? t`in ${sub.period}d` : t`all time`
 #: src/screens/Stats.jsx:403
 msgid "· {0} on LLM calls {1}"
 msgstr "· {0} on LLM calls {1}"
@@ -674,6 +674,12 @@ msgid "{0}{1} vs previous period"
 msgstr "{0}{1} vs previous period"
 
 #. placeholder {0}: Math.floor(h / 24)
+#. placeholder {1}: h % 24
+#: src/screens/Searches.jsx:34
+msgid "{0}d {1}h"
+msgstr "{0}d {1}h"
+
+#. placeholder {0}: Math.floor(h / 24)
 #: src/screens/Applications.jsx:35
 #: src/screens/JobFeed.jsx:55
 #: src/screens/ResumeEditor.jsx:69
@@ -683,10 +689,21 @@ msgstr "{0}{1} vs previous period"
 msgid "{0}d ago"
 msgstr "{0}d ago"
 
+#. placeholder {0}: cfg.hours_old
+#: src/screens/Searches.jsx:1035
+msgid "{0}h"
+msgstr "{0}h"
+
 #. placeholder {0}: scrapeEvery > 0 ? t`Your first scrape runs within ${everyText(scrapeEvery)}. ` : t`Scheduled scraping is off — run a search or a company by hand. `
 #: src/screens/JobFeed.jsx:1307
 msgid "{0}Jobs come from your <0>Searches</0> and <1>Companies</1>."
 msgstr "{0}Jobs come from your <0>Searches</0> and <1>Companies</1>."
+
+#. placeholder {0}: Math.floor(s / 60)
+#. placeholder {1}: Math.round(s % 60)
+#: src/screens/Stats.jsx:68
+msgid "{0}m {1}s"
+msgstr "{0}m {1}s"
 
 #. placeholder {0}: Math.max(1, m)
 #: src/screens/Applications.jsx:32
@@ -702,6 +719,11 @@ msgstr "{0}Refresh"
 #: src/screens/CoverLetterEditor.jsx:395
 msgid "{0}Regenerate…"
 msgstr "{0}Regenerate…"
+
+#. placeholder {0}: Math.round(s)
+#: src/screens/Stats.jsx:68
+msgid "{0}s"
+msgstr "{0}s"
 
 #. placeholder {0}: testingId === s.id ? <Spinner /> : <FlaskGlyph size={11} />
 #: src/screens/Searches.jsx:905
@@ -793,6 +815,11 @@ msgstr "{h} h ago"
 msgid "{h}h"
 msgstr "{h}h"
 
+#. placeholder {0}: m % 60
+#: src/screens/Searches.jsx:33
+msgid "{h}h {0}m"
+msgstr "{h}h {0}m"
+
 #: src/screens/Applications.jsx:34
 #: src/screens/Companies.jsx:22
 #: src/screens/JobFeed.jsx:54
@@ -827,6 +854,7 @@ msgstr "{liveApplied} applied · {liveSuggested} suggested — added on Done rev
 msgid "{m} min ago"
 msgstr "{m} min ago"
 
+#: src/screens/Searches.jsx:31
 #: src/time.js:16
 msgid "{m}m"
 msgstr "{m}m"
@@ -1206,6 +1234,14 @@ msgstr "0–100 — below this, the email is flagged for manual review instead."
 msgid "1 or 2. Run all, one company, one search and the scheduled scrape wait their turn beyond this."
 msgstr "1 or 2. Run all, one company, one search and the scheduled scrape wait their turn beyond this."
 
+#: src/screens/Stats.jsx:17
+msgid "1d"
+msgstr "1d"
+
+#: src/screens/Stats.jsx:17
+msgid "30d"
+msgstr "30d"
+
 #: src/screens/Settings.jsx:1306
 msgid "6-digit PIN"
 msgstr "6-digit PIN"
@@ -1213,6 +1249,10 @@ msgstr "6-digit PIN"
 #: src/screens/Persona.jsx:31
 msgid "60 or older"
 msgstr "60 or older"
+
+#: src/screens/Stats.jsx:17
+msgid "7d"
+msgstr "7d"
 
 #: src/screens/Searches.jsx:320
 msgid "A city or a region. Country adds the country. For remote work set Remote and leave this empty."
@@ -1488,6 +1528,10 @@ msgstr "Advanced"
 msgid "Age range"
 msgstr "Age range"
 
+#: src/screens/Settings.jsx:549
+msgid "AI"
+msgstr "AI"
+
 #: src/screens/Searches.jsx:138
 #: src/screens/Searches.jsx:1011
 msgid "AI recommendations"
@@ -1497,6 +1541,10 @@ msgstr "AI recommendations"
 #: src/screens/Companies.jsx:867
 msgid "Aliases"
 msgstr "Aliases"
+
+#: src/screens/Stats.jsx:17
+msgid "all"
+msgstr "all"
 
 #. placeholder {0}: jobs.length
 #: src/screens/Searches.jsx:1082
@@ -3268,6 +3316,11 @@ msgstr "Default answer length"
 msgid "Default depth"
 msgstr "Default depth"
 
+#: src/screens/Settings.jsx:1065
+#: src/screens/Settings.jsx:1075
+msgid "default effort"
+msgstr "default effort"
+
 #: src/screens/Settings.jsx:585
 msgid "Default résumé"
 msgstr "Default résumé"
@@ -4499,6 +4552,11 @@ msgstr "Import rules"
 msgid "Imported {0, plural, one {# role} other {# roles}} · {1, plural, one {# bullet} other {# bullets}} · {2, plural, one {# skill group} other {# skill groups}} from {label}"
 msgstr "Imported {0, plural, one {# role} other {# roles}} · {1, plural, one {# bullet} other {# bullets}} · {2, plural, one {# skill group} other {# skill groups}} from {label}"
 
+#. placeholder {0}: sub.period
+#: src/screens/Stats.jsx:403
+msgid "in {0}d"
+msgstr "in {0}d"
+
 #: src/time.js:153
 msgid "in {monthList}"
 msgstr "in {monthList}"
@@ -4628,7 +4686,11 @@ msgid "job"
 msgstr "job"
 
 #: src/screens/ResumeEditor.jsx:592
+msgid "Job"
+msgstr "Job"
+
 #: src/screens/Stats.jsx:640
+msgctxt "background task"
 msgid "Job"
 msgstr "Job"
 
@@ -4641,8 +4703,12 @@ msgstr "Job actions"
 msgid "Job cleanup · cron"
 msgstr "Job cleanup · cron"
 
-#: src/screens/Stats.jsx:641
 #: src/screens/Stats.jsx:724
+msgid "Job ID"
+msgstr "Job ID"
+
+#: src/screens/Stats.jsx:641
+msgctxt "background task"
 msgid "Job ID"
 msgstr "Job ID"
 
@@ -4757,9 +4823,10 @@ msgstr "Just you. Add people to this install — each gets their own jobs, résu
 msgid "Keep it"
 msgstr "Keep it"
 
+#. placeholder {0}: '{job_description}'
 #: src/screens/Settings.jsx:594
-msgid "keep placeholders like {job_description} as written; they are filled in when the prompt runs"
-msgstr "keep placeholders like {job_description} as written; they are filled in when the prompt runs"
+msgid "keep placeholders like {0} as written; they are filled in when the prompt runs"
+msgstr "keep placeholders like {0} as written; they are filled in when the prompt runs"
 
 #: src/screens/Companies.jsx:941
 #: src/screens/Searches.jsx:1126
@@ -5502,6 +5569,7 @@ msgid "Next job"
 msgstr "Next job"
 
 #: src/screens/Stats.jsx:643
+msgctxt "table header"
 msgid "Next run"
 msgstr "Next run"
 
@@ -6490,25 +6558,16 @@ msgstr "PIN set"
 msgid "Pipeline"
 msgstr "Pipeline"
 
-#: src/screens/Settings.jsx:656
-msgid "placeholders: {applications} {from} {subject} {body}"
-msgstr "placeholders: {applications} {from} {subject} {body}"
-
-#: src/screens/Settings.jsx:602
-msgid "placeholders: {job_description} {persona_json}"
-msgstr "placeholders: {job_description} {persona_json}"
-
+#. placeholder {0}: '{applications} {from} {subject} {body}'
+#. placeholder {0}: '{job_description} {persona_json}'
+#. placeholder {0}: '{job_description} {resume_json}'
 #: src/screens/Settings.jsx:601
-msgid "placeholders: {job_description} {resume_json}"
-msgstr "placeholders: {job_description} {resume_json}"
-
-#: src/screens/Settings.jsx:616
-msgid "placeholders: {persona} {qa_bank} {company} {position} {question} {max_chars}"
-msgstr "placeholders: {persona} {qa_bank} {company} {position} {question} {max_chars}"
-
+#: src/screens/Settings.jsx:602
 #: src/screens/Settings.jsx:612
-msgid "placeholders: {voice_instruction} {length_instruction} {job_description}"
-msgstr "placeholders: {voice_instruction} {length_instruction} {job_description}"
+#: src/screens/Settings.jsx:616
+#: src/screens/Settings.jsx:656
+msgid "placeholders: {0}"
+msgstr "placeholders: {0}"
 
 #: src/screens/Settings.jsx:621
 msgid "plain text, no placeholders"
@@ -6628,6 +6687,10 @@ msgstr "Previous job"
 #: src/screens/Settings.jsx:75
 msgid "Primary"
 msgstr "Primary"
+
+#: src/screens/Settings.jsx:1075
+msgid "Primary effort"
+msgstr "Primary effort"
 
 #: src/screens/Settings.jsx:550
 msgid "Primary provider · model"
@@ -7499,7 +7562,11 @@ msgstr "Save, then tailor a copy of {0} for this job"
 #: src/screens/JobFeed.jsx:105
 #: src/screens/JobFeed.jsx:574
 #: src/screens/Settings.jsx:440
+msgid "Saved"
+msgstr "Saved"
+
 #: src/screens/Stats.jsx:460
+msgctxt "stat card, number of jobs"
 msgid "Saved"
 msgstr "Saved"
 
@@ -9384,20 +9451,6 @@ msgstr "using defaults"
 #: src/theme.js:46
 msgid "V1 Style"
 msgstr "V1 Style"
-
-#: src/screens/Companies.jsx:364
-#: src/screens/Companies.jsx:364
-#: src/screens/JobFeed.jsx:77
-msgid "var(--accent)"
-msgstr "var(--accent)"
-
-#: src/screens/JobFeed.jsx:76
-msgid "var(--good)"
-msgstr "var(--good)"
-
-#: src/screens/JobFeed.jsx:78
-msgid "var(--muted)"
-msgstr "var(--muted)"
 
 #: src/versionCheck.js:29
 msgid "Version mismatch"

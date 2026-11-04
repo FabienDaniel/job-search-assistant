@@ -73,9 +73,9 @@ const H1B = {
 // A posting carries a set, so it may show more than one. Nothing is drawn when
 // no source resolved it — an absent badge means "unknown", never "on-site".
 const ARRANGEMENT = [
-  ['remote', t`Remote`, t`var(--good)`],
-  ['hybrid', t`Hybrid`, t`var(--accent)`],
-  ['onsite', t`On-site`, t`var(--muted)`],
+  ['remote', t`Remote`, 'var(--good)'],
+  ['hybrid', t`Hybrid`, 'var(--accent)'],
+  ['onsite', t`On-site`, 'var(--muted)'],
 ]
 const arrangementsOf = (j) => ARRANGEMENT.filter(([key]) => j[`arr_${key}`])
 const ARRANGEMENT_LABEL = { remote: t`Remote`, hybrid: t`Hybrid`, onsite: t`On-site`, unknown: t`Not stated` }

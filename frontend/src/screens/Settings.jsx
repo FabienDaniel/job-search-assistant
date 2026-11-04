@@ -546,7 +546,7 @@ export default function Settings() {
         SW(t`Zoom control on postings`, t`The small + / − floater top-right of a posting.`, t`Hidden — postings open at last selected zoom level.`, 'feed_zoom_floater',
           { dflt: true, info: t`Zoom is remembered per browser, not per job: set it once and every posting opens at that size. Both the live page and the cached copy are frames, so zoom scales the frame and the page reflows to the new width.` }),
       ]],
-      ['models', 'AI', t`Models`, '', [
+      ['models', t`AI`, t`Models`, '', [
         { kind: 'pair', label: t`Primary provider · model`, help: t`Every AI feature uses this pair unless overridden below.`,
           pKey: 'llm_provider', mKey: 'llm_model', eKey: 'llm_effort',
           info: t`Providers: Claude API, Claude Code, Codex CLI (your ChatGPT subscription), Antigravity CLI (Google subscription), OpenCode Go (subscription), OpenAI, Ollama (local), LM Studio (local), OpenRouter. The model list shows that provider's models, including any you added under Model catalog. OpenRouter covers every vendor with one key but has no prompt-cache discount. The subscription CLIs are meant for attended use and have plan limits; a limit hit fails over to the fallback without retrying. Reasoning effort sets how much the model thinks before it answers: higher is slower and costs more. 'default effort' keeps the model's own default. Not every model takes every level; Claude Code steps down to the nearest level, the APIs return an error. Antigravity CLI sets effort in the model name, and Ollama and LM Studio have no effort setting. Antigravity's -high models can think for 5 minutes on a tailoring or a PDF import; -medium answers in under a minute.` },
@@ -591,15 +591,15 @@ export default function Settings() {
           [['off', t`Off — don't score on save`], ['light', t`Light — score only`], ['full', t`Full — score + keywords + report`]], { w: '260px', dflt: 'off' }),
         SW(t`Prompt caching`, t`Sends the rubric, résumés and schema as a cached block. Repeat calls cost about 10× less.`, t`Disabled — full price per call.`, 'prompt_caching_enabled',
           { dflt: true, info: t`Only applies to the Claude API provider. If scores look outdated after you edit the rubric, turn this off, run once, then turn it back on.` }),
-        E(t`Scoring rubric`, t`The instruction block every scoring call starts from.`, 'scoring_rubric', { sub: t`keep placeholders like {job_description} as written; they are filled in when the prompt runs` }),
+        E(t`Scoring rubric`, t`The instruction block every scoring call starts from.`, 'scoring_rubric', { sub: t`keep placeholders like ${'{job_description}'} as written; they are filled in when the prompt runs` }),
         E(t`Light output schema`, t`JSON shape for Light runs.`, 'scoring_output_light', { sub: t`CV_NAMES_HERE expands to your résumé names` }),
         E(t`Full output schema`, t`JSON shape for Full runs.`, 'scoring_output_full', { sub: t`CV_NAMES_HERE expands to your résumé names` }),
       ]],
       ['tailoring', '', t`Résumé & tailoring`, '', [
         SEL(t`Default résumé template`, t`The template a new résumé starts with.`, 'resume_template', resTplOpts, { w: '260px', dflt: 'last_selected',
           info: t`Last selected: the template you last picked in the résumé editor (yours only, never another account’s). A template: every new résumé gets it. Applies to a blank or imported résumé and one tailored from Persona; a copy tailored from a résumé keeps that résumé’s template. Before any pick, the first template on the list.` }),
-        E(t`Résumé tailoring prompt`, t`Default: rewrites only bullets that the job description makes relevant.`, 'cv_tailor_prompt', { sub: t`placeholders: {job_description} {resume_json}` }),
-        E(t`Persona tailoring prompt`, t`Default: uses the Persona résumé content; falls back to the résumé prompt if empty.`, 'persona_tailor_prompt', { sub: t`placeholders: {job_description} {persona_json}` }),
+        E(t`Résumé tailoring prompt`, t`Default: rewrites only bullets that the job description makes relevant.`, 'cv_tailor_prompt', { sub: t`placeholders: ${'{job_description} {resume_json}'}` }),
+        E(t`Persona tailoring prompt`, t`Default: uses the Persona résumé content; falls back to the résumé prompt if empty.`, 'persona_tailor_prompt', { sub: t`placeholders: ${'{job_description} {persona_json}'}` }),
         B(t`Max parallel tailors`, t`Tailoring and cover-letter generation share this limit.`, 'tailoring_max_concurrent', { mono: true, int: true, w: '135px' }),
         SEL(t`Auto-score after tailoring`, t`Scores a tailored résumé as soon as tailoring finishes.`, 'tailor_auto_quick_score',
           [['off', t`Off — don't score after tailoring`], ['light', t`Light — score only`], ['full', t`Full — score + keywords + report`]], { w: '260px', dflt: 'light' }),
@@ -609,11 +609,11 @@ export default function Settings() {
         SEL(t`Default template`, t`The template a new letter starts with.`, 'cover_letter_template', tplOpts, { w: '260px', dflt: 'same_as_resume',
           info: t`Same as résumé: the letter takes its résumé’s template. Last selected: the template you last picked in the cover-letter editor (yours only, never another account’s). A template: every new letter gets it. When none applies (a blank letter, a letter from Persona, a Modern Professional résumé, nothing picked yet) the letter gets Garamond Modern.` }),
         E(t`Voice presets`, t`One label and prompt per voice. Add more if you want.`, 'cover_letter_voice_presets', { json: true, sub: t`JSON — id, label, instruction per voice` }),
-        E(t`Cover letter prompt`, t`The generation instruction.`, 'cover_letter_prompt', { sub: t`placeholders: {voice_instruction} {length_instruction} {job_description}` }),
+        E(t`Cover letter prompt`, t`The generation instruction.`, 'cover_letter_prompt', { sub: t`placeholders: ${'{voice_instruction} {length_instruction} {job_description}'}` }),
       ]],
       ['autofill', '', t`Autofill`, '', [
         B(t`Default answer length`, t`Target length for form answers, in characters.`, 'autofill_default_length', { mono: true, int: true, w: '135px' }),
-        E(t`Autofill prompt`, t`Answers as the candidate, from Persona autofill content only.`, 'autofill_prompt', { sub: t`placeholders: {persona} {qa_bank} {company} {position} {question} {max_chars}` }),
+        E(t`Autofill prompt`, t`Answers as the candidate, from Persona autofill content only.`, 'autofill_prompt', { sub: t`placeholders: ${'{persona} {qa_bank} {company} {position} {question} {max_chars}'}` }),
         E(t`Field patterns`, t`Maps form-field names to Persona fields.`, 'autofill_field_patterns', { json: true, sub: t`JSON — Persona field → name patterns` }),
         E(t`Option synonyms`, t`Normalises dropdown options.`, 'autofill_option_synonyms', { json: true, sub: t`JSON — canonical option → synonyms` }),
       ]],
@@ -653,7 +653,7 @@ export default function Settings() {
           } },
         SW(t`LLM classification`, t`Replies are auto-classified into interview / rejection / offer and attached to the right application.`, t`Disabled — replies only show as raw snippets.`, 'email_llm_enabled'),
         B(t`Confidence threshold`, t`0–100 — below this, the email is flagged for manual review instead.`, 'email_llm_confidence_threshold', { mono: true, int: true, w: '135px' }),
-        E(t`Classification prompt`, t`Labels + confidence + application hint.`, 'email_llm_prompt', { sub: t`placeholders: {applications} {from} {subject} {body}` }),
+        E(t`Classification prompt`, t`Labels + confidence + application hint.`, 'email_llm_prompt', { sub: t`placeholders: ${'{applications} {from} {subject} {body}'}` }),
         E(t`Gmail query · subjects`, t`Subject terms the Gmail poll searches for.`, 'email_gmail_query_subjects', { list: true, sub: t`one term per line · OR-combined in the Gmail query` }),
         E(t`Gmail query · senders`, t`Extra sender domains treated as job-related email.`, 'email_gmail_query_senders', { list: true, sub: t`one domain per line` }),
         E(t`Gmail query · exclusions`, t`Ignore newsletters and job-alert email.`, 'email_gmail_query_exclusions', { list: true, sub: t`one term per line · appended as -term` }),
@@ -1062,7 +1062,7 @@ function Row({ r, ctx }) {
           <>
             <Select value={p} options={PROVIDERS} onPick={(v) => pickProvider(r.pKey, r.eKey, v)} width="220px" ariaLabel={`${r.label} — provider`} />
             <Select value={val(r.mKey)} options={modelsFor(p)} onPick={(v) => save(r.mKey, v)} width="260px" mono placeholder={t`pick model…`} ariaLabel={`${r.label} — model`} emptyText={NO_MODELS} />
-            {eff.length > 0 && <Select value={val(r.eKey)} options={effortOptions(eff, 'default effort')} onPick={(v) => save(r.eKey, v)} width="150px" ariaLabel={`${r.label} — reasoning effort`} />}
+            {eff.length > 0 && <Select value={val(r.eKey)} options={effortOptions(eff, t`default effort`)} onPick={(v) => save(r.eKey, v)} width="150px" ariaLabel={`${r.label} — reasoning effort`} />}
           </>
         )
       }
@@ -1072,7 +1072,7 @@ function Row({ r, ctx }) {
         const primary = val('llm_provider', 'claude_api')
         const eff = effortsFor(p || primary)
         // The fallback has no Primary to inherit from; an override row inherits the Primary's effort on the same provider.
-        const effortEmpty = r.base !== 'llm_fallback' && (p || primary) === primary ? 'Primary effort' : 'default effort'
+        const effortEmpty = r.base !== 'llm_fallback' && (p || primary) === primary ? t`Primary effort` : t`default effort`
         return (
           <>
             {on && <Select value={p} options={PROVIDERS} onPick={(v) => pickProvider(`${r.base}_provider`, `${r.base}_effort`, v)} width="200px" placeholder={t`pick provider…`} ariaLabel={`${r.label} — provider`} />}
