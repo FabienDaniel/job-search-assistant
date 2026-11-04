@@ -3,7 +3,7 @@
 // Compose bind-mounts ./backend into a prebuilt image, so `git pull` alone runs new
 // backend code in an old image; /health then reports `image_outdated` with a
 // message naming what differs. The frontend is a separate image: it knows its own
-// release (__APP_VERSION__, major.minor) and /health returns the backend's, so a
+// release (__APP_VERSION__) and /health returns the backend's, so a
 // dashboard left on another release is caught here too. A matching install gets
 // null and nothing on screen changes.
 import { useEffect, useState } from 'react'
