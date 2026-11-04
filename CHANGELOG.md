@@ -11,6 +11,10 @@ Releases are named major.minor ("3.2"), with a patch number when needed ("3.2.1"
 ### Fixed
 - **False version warning on patch releases:** on 3.1.1 the dashboard reported itself as v3.1 and warned that it did not match the v3.1.1 backend, even when both were built from the same code, and rebuilding did not clear the warning. The dashboard now keeps the patch number, so the warning only appears for a real mismatch and Settings shows the right version.
 
+### Added
+
+- **French interface:** the dashboard can be displayed in French. Pick the language in Settings › Display or on the sign-in and account screens. The choice is saved per browser and defaults to the browser language. Dates, numbers and schedules follow it. The Chrome extension, Telegram messages, the activity log, generated résumés and letters, and backend messages not yet listed stay in English.
+
 ## [3.1.1] — 2026-11-03
 
 Tag created to highlight the starting point of divergence with the original repository from **vesaias**.

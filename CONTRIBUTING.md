@@ -43,6 +43,30 @@ Add tests with the change. Backend tests run with `MT_STRICT=1`: a query with no
 - Say what changed and how you tested it; add a screenshot for UI changes.
 - Update `CHANGELOG.md` under `[Unreleased]` for anything a user would notice.
 
+## Write translatable text
+
+Dashboard text uses [Lingui](https://lingui.dev). English in the source is the message, so there are no keys to name.
+
+- Use `<Trans>Save</Trans>` in JSX and `` t`Save` `` everywhere else. Import them from `@lingui/react/macro` and `@lingui/core/macro`.
+- Use `plural(n, { one: '# job', other: '# jobs' })`, never an `n === 1 ?` ternary. Write whole sentences, because word order differs between languages.
+- Never wrap identifiers: option values, statuses, API values, CSS or URLs. English hides this mistake, because `` t`saved` `` is still `saved` until the French catalog changes it.
+- Never compare translated text in logic. Compare the id.
+- A variable named `t` hides the macro. Rename it.
+- Give the same English a `context` when it needs two translations: `t({ message: 'Job', context: 'background task' })`.
+- For a backend message users can reach, add it to `frontend/src/serverText.js`.
+- Dates and numbers take `intlLocale()` from `frontend/src/i18n.js`.
+
+After changing text, run this and translate the new entries in `frontend/src/locales/fr.po`, using `GLOSSARY.md` in that folder. CI fails if the catalogs are stale or a translation is missing.
+
+```bash
+cd frontend && npm run i18n:extract && npm run i18n:check
+```
+
+## Add a language
+
+1. Add the code to `locales` in `frontend/lingui.config.js` and to `LANGUAGES` in `frontend/src/i18n.js`.
+2. Run `npm run i18n:extract`, then translate `frontend/src/locales/<code>.po` and add its terms to `GLOSSARY.md`.
+
 ## Add a job-board source
 
 Copy `backend/scraper/sources/trulyremote.py` (shared fetch, detail pages, preview) and its tests (`backend/tests/test_trulyremote_*.py`). A board with its own JSON API or feed and no shared fetch needs less: describe it as a `Board` for `backend/scraper/_shared/job_boards.py`, as `sources/himalayas.py` does.
