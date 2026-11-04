@@ -1,0 +1,103 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-11-04 11:25+0100\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: fr\n"
+
+#: src/AccountChanged.jsx:26
+msgid "Account changed"
+msgstr "Compte modifié"
+
+#: src/AccountChanged.jsx:24
+msgid "another account"
+msgstr "un autre compte"
+
+#: src/AccountChanged.jsx:31
+msgid "Another tab switched this browser to {who}. Nothing more is saved from this tab — reload it to carry on as {who}."
+msgstr "Un autre onglet a basculé ce navigateur sur {who}. Plus rien n’est enregistré depuis cet onglet : rechargez-le pour continuer en tant que {who}."
+
+#: src/LoginModal.jsx:70
+msgid "API key"
+msgstr "Clé API"
+
+#: src/LoginModal.jsx:65
+msgid "Enter your dashboard API key — you can view or change it later in Settings."
+msgstr "Saisissez la clé API de votre tableau de bord. Vous pourrez la consulter ou la modifier plus tard dans les paramètres."
+
+#: src/LoginModal.jsx:79
+msgid "hide"
+msgstr "masquer"
+
+#: src/LoginModal.jsx:78
+msgid "Hide API key"
+msgstr "Masquer la clé API"
+
+#: src/LoginModal.jsx:89
+msgid "If no API key is set yet, leave this blank and sign in. You can add a key later in Settings › Advanced."
+msgstr "Si aucune clé API n’est encore définie, laissez ce champ vide et connectez-vous. Vous pourrez en ajouter une plus tard dans Paramètres › Avancé."
+
+#: src/LoginModal.jsx:41
+msgid "Invalid API key"
+msgstr "Clé API non valide"
+
+#: src/LanguageSelect.jsx:6
+#: src/screens/Settings.jsx:542
+msgid "Language"
+msgstr "Langue"
+
+#: src/LoginModal.jsx:57
+msgid "Loading dashboard…"
+msgstr "Chargement du tableau de bord…"
+
+#: src/LoginModal.jsx:41
+msgid "Login failed: {reason}"
+msgstr "Échec de la connexion : {reason}"
+
+#: src/AccountChanged.jsx:34
+msgid "Reload"
+msgstr "Recharger"
+
+#: src/AccountChanged.jsx:34
+msgid "Reload as {who}"
+msgstr "Recharger en tant que {who}"
+
+#: src/LoginModal.jsx:79
+msgid "show"
+msgstr "afficher"
+
+#: src/LoginModal.jsx:78
+msgid "Show API key"
+msgstr "Afficher la clé API"
+
+#: src/LoginModal.jsx:50
+#: src/LoginModal.jsx:84
+#: src/LoginModal.jsx:85
+msgid "Sign in"
+msgstr "Se connecter"
+
+#: src/LoginModal.jsx:56
+msgid "Signed in"
+msgstr "Connecté"
+
+#: src/LoginModal.jsx:85
+msgid "Signing in…"
+msgstr "Connexion…"
+
+#: src/screens/Settings.jsx:542
+msgid "The language of the app’s screens. Saved in this browser."
+msgstr "La langue des écrans de l’application. Enregistrée dans ce navigateur."
+
+#: src/AccountChanged.jsx:29
+msgid "This tab was switched to {who}"
+msgstr "Cet onglet a basculé sur {who}"
+
+#: src/LoginModal.jsx:37
+msgid "Unexpected response from server"
+msgstr "Réponse inattendue du serveur"
+
+#: src/LoginModal.jsx:40
+msgid "unknown error"
+msgstr "erreur inconnue"

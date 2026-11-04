@@ -3,6 +3,8 @@ import ConfirmDialog, { PromptDialog } from '../ConfirmDialog'
 import { useEscape, useSettled, useSingleOpen, NBSP } from '../hooks'
 import { Button, FooterRow, GlyphBadge, Heading, HeaderRow, Helper, IconButton, Input, Label, Link, Menu, MenuHead, MenuItem, ModalPanel, Mono, PageTitle, Pill, Select, Spinner, Surface, Switch, Textarea, ToolbarTrigger, VisuallyHidden } from '../ui'
 import { useTheme, MODE_OPTIONS, themeOptions } from '../theme'
+import { t } from '@lingui/core/macro'
+import LanguageSelect from '../LanguageSelect'
 import { describeCron, whenShort, CRON_PRESETS } from '../time'
 import api, { authFailure } from '../api'
 import { MAX_ACCOUNTS, useFlushBeforeSwitch } from '../accounts'
@@ -532,11 +534,12 @@ export default function Settings() {
     const primaryProv = val('llm_provider', 'claude_api')
     return [
       ...people,
-      // Appearance and Theme live in this browser's localStorage (theme.js): no `key`, never PATCH /settings.
+      // Appearance, Theme and Language live in this browser's localStorage: no `key`, never PATCH /settings.
       // They sit first because they change what every screen below looks like.
       ['appearance', 'General', 'Display', '', [
         { kind: 'appearance', label: 'Appearance', help: 'Light, dark, or follow your OS. Saved in this browser.' },
         { kind: 'theme', label: 'Theme', help: 'The app’s look: colours, fonts and shapes. Saved in this browser.' },
+        { kind: 'language', label: t`Language`, help: t`The language of the app’s screens. Saved in this browser.` },
         // a DB setting (feed_zoom_floater, the backend's "feed" section) shown with the look rows
         SW('Zoom control on postings', 'The small + / − floater top-right of a posting.', 'Hidden — postings open at last selected zoom level.', 'feed_zoom_floater',
           { dflt: true, info: 'Zoom is remembered per browser, not per job: set it once and every posting opens at that size. Both the live page and the cached copy are frames, so zoom scales the frame and the page reflows to the new width.' }),
@@ -1044,6 +1047,8 @@ function Row({ r, ctx }) {
         return <AppearanceRow label={r.label} />
       case 'theme':
         return <ThemeRow label={r.label} />
+      case 'language':
+        return <LanguageSelect />
       case 'switch': {
         const on = isOn(r.key, r.dflt)
         return <Toggle on={on} label={on ? 'On' : 'Off'} onPick={() => save(r.key, on ? 'false' : 'true')} ariaLabel={r.label} />

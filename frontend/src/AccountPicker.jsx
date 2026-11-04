@@ -3,6 +3,7 @@ import api, { authFailure } from './api'
 import { Avatar, Card, Heading, Helper, ModalPanel, NavLink, PinPad, Spinner } from './ui'
 import { useTheme, themeAttrs } from './theme'
 import { finishSwitch, roleLabel, switchAccount } from './accounts'
+import LanguageSelect from './LanguageSelect'
 import './theme.css'
 
 // The account picker (MT-12). Same overlay shell as the sign-in (LoginModal):
@@ -159,6 +160,7 @@ export default function AccountPicker({ account: initial = null, required = fals
             </div>
           )}
           {(error || loadErr) && <Helper style={{ color: 'var(--bad)', textAlign: 'center' }}>{error || loadErr}</Helper>}
+          <div style={{ display: 'flex', justifyContent: 'center' }}><LanguageSelect width="180px" /></div>
           {dismissable && <div style={{ display: 'flex', justifyContent: 'center' }}><NavLink onClick={onClose}>Cancel</NavLink></div>}
         </>
       )}

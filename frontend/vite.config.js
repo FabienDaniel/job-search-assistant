@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { lingui } from '@lingui/vite-plugin'
+import { fileURLToPath } from 'node:url'
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 // Releases are named major.minor ("3.2"), with a patch when needed ("3.2.1"). package.json
@@ -10,7 +12,8 @@ const appVersion = pkg.version.replace(/\.0$/, '')
 
 export default defineConfig({
   base: process.env.VITE_DEMO === '1' ? '/JobNavigator-demo/' : '/',
-  plugins: [react()],
+  plugins: [react({ babel: { plugins: ['@lingui/babel-plugin-lingui-macro'] } }), lingui()],
+  resolve: { alias: { 'jn-i18n-trans': fileURLToPath(new URL('./src/i18nTrans.jsx', import.meta.url)) } },
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
     __DEMO__: JSON.stringify(process.env.VITE_DEMO === '1'),
