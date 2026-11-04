@@ -1,25 +1,29 @@
+import { t, selectOrdinal } from '@lingui/core/macro'
+
 // One clock for every v2 screen, so the list and the editor never disagree about the same timestamp.
 const mins = (iso) => (iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 60000) : null)
 export const ago = (iso) => {
   const m = mins(iso); if (m == null) return ''
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
+  if (m < 1) return t`just now`
+  if (m < 60) return t`${m}m ago`
   const h = Math.floor(m / 60)
-  return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`
+  const d = Math.floor(h / 24)
+  return h < 24 ? t`${h}h ago` : t`${d}d ago`
 }
 export const agoShort = (iso) => {
   const m = mins(iso); if (m == null) return ''
-  if (m < 1) return 'now'
-  if (m < 60) return `${m}m`
+  if (m < 1) return t`now`
+  if (m < 60) return t`${m}m`
   const h = Math.floor(m / 60)
-  return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`
+  const d = Math.floor(h / 24)
+  return h < 24 ? t`${h}h` : t`${d}d`
 }
 
 // whenShort's "Sat 06 Sep 05:00" shape matches Stats' toLocaleString('en-GB')
 // output by hand, since ICU's own formatting (e.g. "Sept") would make the two halves of a schedule line disagree on how a day is named.
 
 // ── cron ────────────────────────────────────────────────────────────────────
-// describeCron(expr): plain-English sentence + next fire time for one Scheduler
+// describeCron(expr): plain-language sentence + next fire time for one Scheduler
 // cron field. Pure, no dependency. Two backend-verified departures from standard
 // cron: weekday numbers are APScheduler's, not vixie cron's (0=Monday — `0 8 * * 1`
 // fires Tuesday in the container), and day-of-month/day-of-week are ANDed, not
@@ -30,10 +34,10 @@ export const agoShort = (iso) => {
 // evaluate is echoed as `{ text: <raw line>, unparsed: true }` rather than called
 // invalid — see CRON_DAY_EXTRA for exactly which ones, and why the rest are not.
 const DOW_NAMES = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']   // APScheduler order: index 0 = Monday
-const DOW_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-const DOW_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DOW_FULL = [t`Monday`, t`Tuesday`, t`Wednesday`, t`Thursday`, t`Friday`, t`Saturday`, t`Sunday`]
+const DOW_SHORT = [t`Mon`, t`Tue`, t`Wed`, t`Thu`, t`Fri`, t`Sat`, t`Sun`]
 const MON_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
-const MON_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MON_SHORT = [t`Jan`, t`Feb`, t`Mar`, t`Apr`, t`May`, t`Jun`, t`Jul`, t`Aug`, t`Sep`, t`Oct`, t`Nov`, t`Dec`]
 
 const pad2 = (n) => String(n).padStart(2, '0')
 export const whenShort = (d) => {
@@ -41,10 +45,7 @@ export const whenShort = (d) => {
   // local getters on purpose: the Date is a UTC instant, read in the viewer's zone
   return `${DOW_SHORT[(d.getDay() + 6) % 7]} ${pad2(d.getDate())} ${MON_SHORT[d.getMonth()]} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }
-const ord = (n) => {
-  const s = ['th', 'st', 'nd', 'rd']; const v = n % 100
-  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`
-}
+const ord = (n) => selectOrdinal(n, { one: '#st', two: '#nd', few: '#rd', other: '#th' })
 
 // one token → its number, by digits or by three-letter name. Out of range is a
 // hard failure (the backend refuses the same value), never a clamp.
@@ -101,46 +102,58 @@ function cronText(M, H, D, MO, W) {
   const hm = (h, m) => `${pad2(h)}:${pad2(m)}`
   const one = (F) => F.list.length === 1
   const anyDay = D.star && MO.star && W.star
+  const minuteStep = M.step
+  const hourStep = H.step
+  const minute = pad2(M.list[0])
+  const clock = hm(H.list[0], M.list[0])
+  const weekdayList = W.list.map((d) => DOW_SHORT[d]).join(', ')
 
   // the seven shapes worth a plain sentence
   if (anyDay) {
-    if (H.star && (M.star || M.step === 1)) return 'every minute'
-    if (H.star && M.step) return `every ${M.step} minutes`
-    if (H.star && one(M)) return `hourly at :${pad2(M.list[0])}`
+    if (H.star && (M.star || M.step === 1)) return t`every minute`
+    if (H.star && M.step) return t`every ${minuteStep} minutes`
+    if (H.star && one(M)) return t`hourly at :${minute}`
     if (H.step && one(M)) {
-      const base = H.step === 1 ? 'every hour' : `every ${H.step} hours`
-      return M.list[0] === 0 ? base : `${base} at :${pad2(M.list[0])}`
+      const base = H.step === 1 ? t`every hour` : t`every ${hourStep} hours`
+      return M.list[0] === 0 ? base : t`${base} at :${minute}`
     }
-    if (one(M) && one(H)) return `daily at ${hm(H.list[0], M.list[0])}`
+    if (one(M) && one(H)) return t`daily at ${clock}`
   }
   if (one(M) && one(H)) {
-    const at = `at ${hm(H.list[0], M.list[0])}`
+    const at = t`at ${clock}`
     if (D.star && MO.star && !W.star) {
       const k = W.list.join(',')
-      if (k === '0,1,2,3,4') return `weekdays ${at}`         // 0 = Monday (see the note above)
-      if (k === '5,6') return `weekends ${at}`
-      if (one(W)) return `every ${DOW_FULL[W.list[0]]} ${at}`
-      return `every ${W.list.map((d) => DOW_SHORT[d]).join(', ')} ${at}`
+      if (k === '0,1,2,3,4') return t`weekdays ${at}`       // 0 = Monday (see the note above)
+      if (k === '5,6') return t`weekends ${at}`
+      const weekday = DOW_FULL[W.list[0]]
+      if (one(W)) return t`every ${weekday} ${at}`
+      return t`every ${weekdayList} ${at}`
     }
-    if (MO.star && W.star && one(D)) return `monthly on the ${ord(D.list[0])} ${at}`
+    const day = ord(D.list[0])
+    if (MO.star && W.star && one(D)) return t`monthly on the ${day} ${at}`
   }
 
   // …and the generic reading for everything else
   let timePart
   const times = []
   for (const h of H.list) for (const m of M.list) times.push(hm(h, m))
-  if (one(M) && one(H)) timePart = `at ${hm(H.list[0], M.list[0])}`
-  else if (one(M) && H.star) timePart = `at :${pad2(M.list[0])} every hour`
-  else if (one(M) && H.step) timePart = `at :${pad2(M.list[0])} every ${H.step} hours`
-  else if (times.length <= 6) timePart = `at ${times.join(', ')}`
-  else timePart = `at minute ${fieldTxt(M)} of hour ${fieldTxt(H)}`
+  const timeList = times.join(', ')
+  const minuteTxt = fieldTxt(M)
+  const hourTxt = fieldTxt(H)
+  if (one(M) && one(H)) timePart = t`at ${clock}`
+  else if (one(M) && H.star) timePart = t`at :${minute} every hour`
+  else if (one(M) && H.step) timePart = t`at :${minute} every ${hourStep} hours`
+  else if (times.length <= 6) timePart = t`at ${timeList}`
+  else timePart = t`at minute ${minuteTxt} of hour ${hourTxt}`
 
   const segs = [timePart]
-  if (!D.star) segs.push(`on ${D.list.length > 1 ? 'days' : 'day'} ${fieldTxt(D)}`)
-  if (!MO.star) segs.push(`in ${MO.list.map((m) => MON_SHORT[m - 1]).join(', ')}`)
-  else if (!D.star) segs.push('of every month')
+  const dayTxt = fieldTxt(D)
+  const monthList = MO.list.map((m) => MON_SHORT[m - 1]).join(', ')
+  if (!D.star) segs.push(D.list.length > 1 ? t`on days ${dayTxt}` : t`on day ${dayTxt}`)
+  if (!MO.star) segs.push(t`in ${monthList}`)
+  else if (!D.star) segs.push(t`of every month`)
   // "and on" where a day-of-month is also set: APScheduler ANDs the two fields
-  if (!W.star) segs.push(`${D.star ? 'on' : 'and on'} ${W.list.map((d) => DOW_SHORT[d]).join(', ')}`)
+  if (!W.star) segs.push(D.star ? t`on ${weekdayList}` : t`and on ${weekdayList}`)
   return segs.join(' ')
 }
 
@@ -208,13 +221,13 @@ export function describeCron(expr, opts = {}) {
 // Presets use names (mon-fri, mon) not digits: under APScheduler's numbering
 // 1-5/1 mean Tue-Sat/Tuesday, so digits would mislabel the schedule (DECISIONS D-20).
 export const CRON_PRESETS = [
-  ['Hourly', '0 * * * *'],
-  ['Every 6 hours', '0 */6 * * *'],
-  ['Daily 03:00', '0 3 * * *'],
-  ['Weekdays 09:00', '0 9 * * mon-fri'],
-  ['Weekly Monday 08:00', '0 8 * * mon'],
-  ['Monthly 1st 08:00', '0 8 1 * *'],
-  ['Off', ''],
+  [t`Hourly`, '0 * * * *'],
+  [t`Every 6 hours`, '0 */6 * * *'],
+  [t`Daily 03:00`, '0 3 * * *'],
+  [t`Weekdays 09:00`, '0 9 * * mon-fri'],
+  [t`Weekly Monday 08:00`, '0 8 * * mon'],
+  [t`Monthly 1st 08:00`, '0 8 1 * *'],
+  [t`Off`, ''],
 ]
 
 // ── describeCron, checked ───────────────────────────────────────────────────

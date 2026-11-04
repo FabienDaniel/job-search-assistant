@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { intlLocale } from '../i18n'
 import { useLocation } from 'react-router-dom'
 import { ResponsiveContainer, Sankey, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 import api from '../api'
@@ -40,26 +41,26 @@ const kb = (fn, role = 'button') => ({
 })
 
 const money = (n) => (n == null ? '—' : n === 0 || n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(n < 0.01 ? 4 : 3)}`)
-const int = (n) => (n == null ? '—' : Number(n).toLocaleString('en-US'))
+const int = (n) => (n == null ? '—' : Number(n).toLocaleString(intlLocale('en-US')))
 // Timeline keys are calendar dates in the viewer's zone; `new Date('2026-09-02')` parses
 // as UTC midnight and renders a day early west of UTC — build the Date from parts instead.
 const localKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const dayLabel = (key) => {
   const p = String(key).split('-').map(Number)
   if (p.length === 3 && p.every((n) => Number.isFinite(n))) {
-    try { return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString('en-GB', { timeZone: TZ, month: 'short', day: 'numeric' }) } catch { return key }
+    try { return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString(intlLocale('en-GB'), { timeZone: TZ, month: 'short', day: 'numeric' }) } catch { return key }
   }
-  try { return new Date(key).toLocaleDateString('en-GB', { timeZone: TZ, month: 'short', day: 'numeric' }) } catch { return key }
+  try { return new Date(key).toLocaleDateString(intlLocale('en-GB'), { timeZone: TZ, month: 'short', day: 'numeric' }) } catch { return key }
 }
 // The viewer's own zone — v1 hardcoded Europe/Berlin, which is only right for one person.
 const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return 'UTC' } })()
 const TZ_SHORT = (() => {
-  try { return new Intl.DateTimeFormat('en-GB', { timeZone: TZ, timeZoneName: 'short' }).formatToParts(new Date()).find((x) => x.type === 'timeZoneName')?.value || TZ }
+  try { return new Intl.DateTimeFormat(intlLocale('en-GB'), { timeZone: TZ, timeZoneName: 'short' }).formatToParts(new Date()).find((x) => x.type === 'timeZoneName')?.value || TZ }
   catch { return TZ }
 })()
 const when = (iso) => {
   if (!iso) return '—'
-  try { return new Date(iso).toLocaleString('en-GB', { timeZone: TZ, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', ' ·') }
+  try { return new Date(iso).toLocaleString(intlLocale('en-GB'), { timeZone: TZ, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', ' ·') }
   catch { return iso }
 }
 const dur = (s) => (s == null ? '—' : s < 60 ? `${Math.round(s)}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`)

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { intlLocale } from '../i18n'
 import api, { authFailure } from '../api'
 import { PromptDialog } from '../ConfirmDialog'
 import {
@@ -37,7 +38,7 @@ export function countsLine(counts, all = false) {
   const c = counts || {}
   const parts = COUNT_LABELS
     .filter(([k]) => all || Number(c[k]) > 0)
-    .map(([k, one, many]) => `${Number(c[k] || 0).toLocaleString()} ${Number(c[k]) === 1 ? one : many}`)
+    .map(([k, one, many]) => `${Number(c[k] || 0).toLocaleString(intlLocale())} ${Number(c[k]) === 1 ? one : many}`)
   return parts.length ? parts.join(' · ') : 'no data yet'
 }
 
@@ -89,7 +90,7 @@ const ago = (iso) => {
   const h = Math.floor(m / 60)
   if (h < 24) return `${h} h ago`
   const d = Math.floor(h / 24)
-  return d < 30 ? `${d} d ago` : new Date(iso).toLocaleDateString()
+  return d < 30 ? `${d} d ago` : new Date(iso).toLocaleDateString(intlLocale())
 }
 
 // Export = a zip streamed by GET /accounts/{id}/export. Fetched through axios so the
@@ -305,7 +306,7 @@ export function RemoveAccountModal({ account, onClose, onRemoved }) {
         {COUNT_LABELS.map(([k, one, many]) => (
           <span key={k} style={{ display: 'flex', fontSize: 12, lineHeight: '18px' }}>
             <span style={{ flex: 1 }}>{Number(c[k]) === 1 ? one : many}</span>
-            <span style={{ fontFamily: 'var(--mono)' }}>{Number(c[k] || 0).toLocaleString()}</span>
+            <span style={{ fontFamily: 'var(--mono)' }}>{Number(c[k] || 0).toLocaleString(intlLocale())}</span>
           </span>
         ))}
         <Helper size="xs" style={{ paddingTop: 2 }}>plus their Persona, settings, links and run history</Helper>
@@ -688,7 +689,7 @@ export async function verifyOwnerPin(pin) {
   }
 }
 
-export const hhmm = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+export const hhmm = (ms) => new Date(ms).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit' })
 
 // The owner-PIN pad used by the lock card and the header pill's dialog.
 export function OwnerPinPad({ ownerName, onUnlocked, autoFocus = false }) {

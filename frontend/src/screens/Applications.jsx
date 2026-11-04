@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { intlLocale } from '../i18n'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { track } from '../telemetry'
@@ -36,7 +37,7 @@ const fmtWhen = (iso) => {
   if (!iso) return ''
   const dt = new Date(iso)
   if (isNaN(dt)) return ''
-  return dt.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return dt.toLocaleString(intlLocale(), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 const fmtSalary = (lo, hi) => {
   const k = (v) => `$${Math.round(v / 1000)}K`

@@ -5,6 +5,7 @@ import { Button, FooterRow, GlyphBadge, Heading, HeaderRow, Helper, IconButton, 
 import { useTheme, MODE_OPTIONS, themeOptions } from '../theme'
 import { t } from '@lingui/core/macro'
 import LanguageSelect from '../LanguageSelect'
+import { intlLocale } from '../i18n'
 import { describeCron, whenShort, CRON_PRESETS } from '../time'
 import api, { authFailure } from '../api'
 import { MAX_ACCOUNTS, useFlushBeforeSwitch } from '../accounts'
@@ -1161,8 +1162,8 @@ function Row({ r, ctx }) {
             <Mono size="xl" tone="base" code style={{ flex: '0 0 auto' }}>{'•'.repeat(6)}</Mono>
             <Helper style={{ flex: 1, minWidth: 0, color: expired ? 'var(--warn)' : 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {until
-                ? (expired ? `expired ${until.toLocaleDateString()} — renewed on the next run`
-                  : `session valid until ${until.toLocaleDateString()}`)
+                ? (expired ? `expired ${until.toLocaleDateString(intlLocale())} — renewed on the next run`
+                  : `session valid until ${until.toLocaleDateString(intlLocale())}`)
                 : 'session stored — expiry unknown'}
             </Helper>
             {r.clearLabel && (

@@ -20,6 +20,19 @@ const readStored = () => { try { return window.localStorage.getItem(LOCALE_KEY) 
 
 export const currentLocale = () => i18n.locale || DEFAULT_LOCALE
 
+/**
+ * The tag for Intl and toLocale* calls: the browser's regional variant when it matches the
+ * app's language (fr-CA, en-GB), else the language itself. Dates and numbers then never
+ * follow a browser language the screen is not written in. `englishTag` pins the English
+ * format for a screen that has always used one.
+ */
+export function intlLocale(englishTag) {
+  const locale = currentLocale()
+  if (locale === 'en' && englishTag) return englishTag
+  const browser = typeof navigator === 'undefined' ? '' : String(navigator.language || '')
+  return browser.toLowerCase().split('-')[0] === locale ? browser : locale
+}
+
 /** Must finish before any screen module is imported: many labels are module-level constants read once at import. */
 export async function initI18n() {
   const locale = resolveLocale(readStored(), navigator.languages || [navigator.language])

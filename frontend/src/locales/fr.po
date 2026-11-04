@@ -7,9 +7,45 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: fr\n"
 
+#: src/time.js:118
+msgid "{base} at :{minute}"
+msgstr "{base} à :{minute}"
+
+#: src/time.js:19
+msgid "{d}d"
+msgstr "{d} j"
+
+#: src/time.js:11
+msgid "{d}d ago"
+msgstr "il y a {d} j"
+
+#: src/time.js:19
+msgid "{h}h"
+msgstr "{h} h"
+
+#: src/time.js:11
+msgid "{h}h ago"
+msgstr "il y a {h} h"
+
+#: src/time.js:16
+msgid "{m}m"
+msgstr "{m} min"
+
+#: src/time.js:8
+msgid "{m}m ago"
+msgstr "il y a {m} min"
+
+#: src/time.js:48
+msgid "{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}"
+msgstr "{n, selectordinal, one {#er} other {#}}"
+
 #: src/AccountChanged.jsx:26
 msgid "Account changed"
 msgstr "Compte modifié"
+
+#: src/time.js:156
+msgid "and on {weekdayList}"
+msgstr "et le {weekdayList}"
 
 #: src/AccountChanged.jsx:24
 msgid "another account"
@@ -23,9 +59,90 @@ msgstr "Un autre onglet a basculé ce navigateur sur {who}. Plus rien n’est en
 msgid "API key"
 msgstr "Clé API"
 
+#: src/time.js:40
+msgid "Apr"
+msgstr "avr."
+
+#: src/time.js:145
+msgid "at :{minute} every {hourStep} hours"
+msgstr "à :{minute} toutes les {hourStep} heures"
+
+#: src/time.js:144
+msgid "at :{minute} every hour"
+msgstr "à :{minute} chaque heure"
+
+#: src/time.js:123
+#: src/time.js:143
+msgid "at {clock}"
+msgstr "à {clock}"
+
+#: src/time.js:146
+msgid "at {timeList}"
+msgstr "à {timeList}"
+
+#: src/time.js:147
+msgid "at minute {minuteTxt} of hour {hourTxt}"
+msgstr "à la minute {minuteTxt} de l’heure {hourTxt}"
+
+#: src/time.js:40
+msgid "Aug"
+msgstr "août"
+
+#: src/time.js:226
+msgid "Daily 03:00"
+msgstr "Tous les jours à 03:00"
+
+#: src/time.js:120
+msgid "daily at {clock}"
+msgstr "tous les jours à {clock}"
+
+#: src/time.js:40
+msgid "Dec"
+msgstr "déc."
+
 #: src/LoginModal.jsx:65
 msgid "Enter your dashboard API key — you can view or change it later in Settings."
 msgstr "Saisissez la clé API de votre tableau de bord. Vous pourrez la consulter ou la modifier plus tard dans les paramètres."
+
+#: src/time.js:117
+msgid "every {hourStep} hours"
+msgstr "toutes les {hourStep} heures"
+
+#: src/time.js:114
+msgid "every {minuteStep} minutes"
+msgstr "toutes les {minuteStep} minutes"
+
+#: src/time.js:129
+msgid "every {weekday} {at}"
+msgstr "chaque {weekday} {at}"
+
+#: src/time.js:130
+msgid "every {weekdayList} {at}"
+msgstr "chaque {weekdayList} {at}"
+
+#: src/time.js:225
+msgid "Every 6 hours"
+msgstr "Toutes les 6 heures"
+
+#: src/time.js:117
+msgid "every hour"
+msgstr "chaque heure"
+
+#: src/time.js:113
+msgid "every minute"
+msgstr "chaque minute"
+
+#: src/time.js:40
+msgid "Feb"
+msgstr "févr."
+
+#: src/time.js:38
+msgid "Fri"
+msgstr "ven."
+
+#: src/time.js:37
+msgid "Friday"
+msgstr "vendredi"
 
 #: src/LoginModal.jsx:79
 msgid "hide"
@@ -35,16 +152,44 @@ msgstr "masquer"
 msgid "Hide API key"
 msgstr "Masquer la clé API"
 
+#: src/time.js:224
+msgid "Hourly"
+msgstr "Toutes les heures"
+
+#: src/time.js:115
+msgid "hourly at :{minute}"
+msgstr "chaque heure à :{minute}"
+
 #: src/LoginModal.jsx:89
 msgid "If no API key is set yet, leave this blank and sign in. You can add a key later in Settings › Advanced."
 msgstr "Si aucune clé API n’est encore définie, laissez ce champ vide et connectez-vous. Vous pourrez en ajouter une plus tard dans Paramètres › Avancé."
+
+#: src/time.js:153
+msgid "in {monthList}"
+msgstr "en {monthList}"
 
 #: src/LoginModal.jsx:41
 msgid "Invalid API key"
 msgstr "Clé API non valide"
 
+#: src/time.js:40
+msgid "Jan"
+msgstr "janv."
+
+#: src/time.js:40
+msgid "Jul"
+msgstr "juil."
+
+#: src/time.js:40
+msgid "Jun"
+msgstr "juin"
+
+#: src/time.js:7
+msgid "just now"
+msgstr "à l’instant"
+
 #: src/LanguageSelect.jsx:6
-#: src/screens/Settings.jsx:542
+#: src/screens/Settings.jsx:543
 msgid "Language"
 msgstr "Langue"
 
@@ -56,6 +201,62 @@ msgstr "Chargement du tableau de bord…"
 msgid "Login failed: {reason}"
 msgstr "Échec de la connexion : {reason}"
 
+#: src/time.js:40
+msgid "Mar"
+msgstr "mars"
+
+#: src/time.js:40
+msgid "May"
+msgstr "mai"
+
+#: src/time.js:38
+msgid "Mon"
+msgstr "lun."
+
+#: src/time.js:37
+msgid "Monday"
+msgstr "lundi"
+
+#: src/time.js:229
+msgid "Monthly 1st 08:00"
+msgstr "Le 1er du mois à 08:00"
+
+#: src/time.js:133
+msgid "monthly on the {day} {at}"
+msgstr "chaque mois le {day} {at}"
+
+#: src/time.js:40
+msgid "Nov"
+msgstr "nov."
+
+#: src/time.js:15
+msgid "now"
+msgstr "maintenant"
+
+#: src/time.js:40
+msgid "Oct"
+msgstr "oct."
+
+#: src/time.js:154
+msgid "of every month"
+msgstr "de chaque mois"
+
+#: src/time.js:230
+msgid "Off"
+msgstr "Désactivé"
+
+#: src/time.js:156
+msgid "on {weekdayList}"
+msgstr "le {weekdayList}"
+
+#: src/time.js:152
+msgid "on day {dayTxt}"
+msgstr "le jour {dayTxt}"
+
+#: src/time.js:152
+msgid "on days {dayTxt}"
+msgstr "les jours {dayTxt}"
+
 #: src/AccountChanged.jsx:34
 msgid "Reload"
 msgstr "Recharger"
@@ -63,6 +264,18 @@ msgstr "Recharger"
 #: src/AccountChanged.jsx:34
 msgid "Reload as {who}"
 msgstr "Recharger en tant que {who}"
+
+#: src/time.js:38
+msgid "Sat"
+msgstr "sam."
+
+#: src/time.js:37
+msgid "Saturday"
+msgstr "samedi"
+
+#: src/time.js:40
+msgid "Sep"
+msgstr "sept."
 
 #: src/LoginModal.jsx:79
 msgid "show"
@@ -86,13 +299,37 @@ msgstr "Connecté"
 msgid "Signing in…"
 msgstr "Connexion…"
 
-#: src/screens/Settings.jsx:542
+#: src/time.js:38
+msgid "Sun"
+msgstr "dim."
+
+#: src/time.js:37
+msgid "Sunday"
+msgstr "dimanche"
+
+#: src/screens/Settings.jsx:543
 msgid "The language of the app’s screens. Saved in this browser."
 msgstr "La langue des écrans de l’application. Enregistrée dans ce navigateur."
 
 #: src/AccountChanged.jsx:29
 msgid "This tab was switched to {who}"
 msgstr "Cet onglet a basculé sur {who}"
+
+#: src/time.js:38
+msgid "Thu"
+msgstr "jeu."
+
+#: src/time.js:37
+msgid "Thursday"
+msgstr "jeudi"
+
+#: src/time.js:38
+msgid "Tue"
+msgstr "mar."
+
+#: src/time.js:37
+msgid "Tuesday"
+msgstr "mardi"
 
 #: src/LoginModal.jsx:37
 msgid "Unexpected response from server"
@@ -101,3 +338,27 @@ msgstr "Réponse inattendue du serveur"
 #: src/LoginModal.jsx:40
 msgid "unknown error"
 msgstr "erreur inconnue"
+
+#: src/time.js:38
+msgid "Wed"
+msgstr "mer."
+
+#: src/time.js:37
+msgid "Wednesday"
+msgstr "mercredi"
+
+#: src/time.js:126
+msgid "weekdays {at}"
+msgstr "du lundi au vendredi {at}"
+
+#: src/time.js:227
+msgid "Weekdays 09:00"
+msgstr "Du lundi au vendredi à 09:00"
+
+#: src/time.js:127
+msgid "weekends {at}"
+msgstr "le week-end {at}"
+
+#: src/time.js:228
+msgid "Weekly Monday 08:00"
+msgstr "Chaque lundi à 08:00"
