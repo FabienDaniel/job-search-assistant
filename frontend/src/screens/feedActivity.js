@@ -1,3 +1,4 @@
+import { t, plural } from '@lingui/core/macro'
 // Feed activity: what a job's in-flight runs mean on screen. A report that exists
 // is never hidden by a run; activity lives in the band, the tabs and the ✦ mark.
 // Inputs: job.in_flight (job types) and job.in_flight_detail ([{ job_type, meta }]);
@@ -50,7 +51,7 @@ export function activityText(act) {
   const parts = []
   if (act.running) {
     const n = act.rescoreNames.length
-    parts.push(n ? `Scoring ${n} résumé${n === 1 ? '' : 's'}` : 'Scoring…')
+    parts.push(n ? plural(n, { one: 'Scoring # résumé', other: 'Scoring # résumés' }) : 'Scoring…')
   }
   if (act.tailoring) {
     const verb = act.replaces ? 'Re-tailoring' : 'Tailoring'
@@ -61,10 +62,10 @@ export function activityText(act) {
 
 /** The card's ✦ mark while a tailor runs — the only card state activity owns. */
 export function tailorMarkTitle(act) {
-  if (!act.replaces) return 'Tailoring a résumé for this job…'
+  if (!act.replaces) return t`Tailoring a résumé for this job…`
   return act.baseName
-    ? `Re-tailoring from ${act.baseName} · replaces the current tailored résumé`
-    : 'Re-tailoring · replaces the current tailored résumé'
+    ? t`Re-tailoring from ${act.baseName} · replaces the current tailored résumé`
+    : t`Re-tailoring · replaces the current tailored résumé`
 }
 
 /**
@@ -111,6 +112,6 @@ export const flightDetail = (rows) => list(rows)
 // so an account with neither cannot score. True only once BOTH answers loaded and
 // came back empty — an unknown state (still loading, or a request failed) keeps
 // the score actions as they were.
-export const NO_BASES_HINT = 'Add a base résumé to score jobs'
+export const NO_BASES_HINT = t`Add a base résumé to score jobs`
 export const noScoreSource = ({ basesLoaded, bases, personaLoaded, personaHasContent }) =>
   !!basesLoaded && Array.isArray(bases) && bases.length === 0 && !!personaLoaded && !personaHasContent

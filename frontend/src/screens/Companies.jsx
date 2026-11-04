@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { track } from '../telemetry'
@@ -69,8 +71,8 @@ const detectAts = (url) => {
   if (hostMatches(url, 'myworkdayjobs.com')) return 'Workday'
   // oracle_hcm.is_oracle_hcm: exact hcmUI path, or /sites/ + /jobs anywhere in the
   // URL (hash included) on an oraclecloud.com host or careers.oracle.com
-  if (url.includes('oraclecloud.com/hcmUI/CandidateExperience')) return 'Oracle HCM'
-  if (url.includes('/sites/') && url.includes('/jobs') && hostMatches(url, 'oraclecloud.com', 'careers.oracle.com')) return 'Oracle HCM'
+  if (url.includes('oraclecloud.com/hcmUI/CandidateExperience')) return t`Oracle HCM`
+  if (url.includes('/sites/') && url.includes('/jobs') && hostMatches(url, 'oraclecloud.com', 'careers.oracle.com')) return t`Oracle HCM`
   if (url.toLowerCase().includes('jobs.lever.co/')) return 'Lever'
   if (url.toLowerCase().includes('/search-jobs/results?')) return 'TalentBrew'
   if (hostMatches(url, 'jobs.ashbyhq.com')) return 'Ashby'
@@ -88,19 +90,19 @@ const detectAts = (url) => {
 }
 
 const SORT_OPTIONS = [
-  { id: 'health', label: 'Needs attention', hint: 'Warnings, then active, then inactive' },
-  { id: 'name', label: 'Company name', hint: 'A to Z' },
-  { id: 'tier', label: 'Priority tier', hint: 'Tier A first, untiered last' },
-  { id: 'open', label: 'Open roles', hint: 'Most roles in the feed first' },
-  { id: 'fit', label: 'Average fit', hint: 'Best-scoring companies first' },
-  { id: 'run', label: 'Last scrape', hint: 'Longest since last run' },
+  { id: 'health', label: t`Needs attention`, hint: t`Warnings, then active, then inactive` },
+  { id: 'name', label: t`Company name`, hint: t`A to Z` },
+  { id: 'tier', label: t`Priority tier`, hint: t`Tier A first, untiered last` },
+  { id: 'open', label: t`Open roles`, hint: t`Most roles in the feed first` },
+  { id: 'fit', label: t`Average fit`, hint: t`Best-scoring companies first` },
+  { id: 'run', label: t`Last scrape`, hint: t`Longest since last run` },
 ]
 const DEPTHS = [
-  { id: 'off', label: 'Off', hint: 'New jobs are stored unscored' },
-  { id: 'light', label: 'Light', hint: 'Scores only, no report' },
-  { id: 'full', label: 'Full', hint: 'Full report with keywords and requirements' },
+  { id: 'off', label: t`Off`, hint: t`New jobs are stored unscored` },
+  { id: 'light', label: t`Light`, hint: t`Scores only, no report` },
+  { id: 'full', label: t`Full`, hint: t`Full report with keywords and requirements` },
 ]
-const TIER_BTNS = [{ v: 1, label: tierLabel(1) }, { v: 2, label: tierLabel(2) }, { v: 3, label: tierLabel(3) }, { v: null, label: 'None' }]
+const TIER_BTNS = [{ v: 1, label: tierLabel(1) }, { v: 2, label: tierLabel(2) }, { v: 3, label: tierLabel(3) }, { v: null, label: t`None` }]
 
 // A Playwright board can return ~600 rows; page them client-side with the pager
 // the résumé shelf and Stats logs already use.
@@ -117,13 +119,13 @@ function UrlEditor({ urls, onChange }) {
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             <span className={atsSlug(detectAts(u))} style={{ flex: '0 0 auto', fontFamily: 'var(--mono)', fontSize: 9.5, letterSpacing: '.05em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 'var(--radius-control)', whiteSpace: 'nowrap' }}>{detectAts(u)}</span>
             <Input value={u} onChange={(v) => set(i, v)} placeholder="https://boards.greenhouse.io/company"
-              mono ariaLabel="Career page URL" style={{ flex: 1, minWidth: 0 }} />
-            <span title="Remove this URL" onClick={() => onChange(urls.filter((_, j) => j !== i))} className="v2-hover-bad v2-hover-bad-text"
+              mono ariaLabel={t`Career page URL`} style={{ flex: 1, minWidth: 0 }} />
+            <span title={t`Remove this URL`} onClick={() => onChange(urls.filter((_, j) => j !== i))} className="v2-hover-bad v2-hover-bad-text"
               style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--muted)', cursor: 'pointer', padding: 2, borderRadius: 'var(--radius-inline)' }}>✕</span>
           </div>
         )
       })}
-      <DashedAdd onClick={() => onChange([...urls, ''])}>+ Add another career page</DashedAdd>
+      <DashedAdd onClick={() => onChange([...urls, ''])}><Trans>+ Add another career page</Trans></DashedAdd>
     </div>
   )
 }
@@ -142,7 +144,7 @@ const ResumeChips = ({ resumes, personaPopulated, selected, toggle }) => (
       return <Pill key={r.id} size="sm" on={on} onClick={() => toggle(r.id)}>{r.name}</Pill>
     })}
     {personaPopulated && (() => { const on = selected.includes('persona'); return (
-      <Pill size="sm" on={on} onClick={() => toggle('persona')}>Persona</Pill>
+      <Pill size="sm" on={on} onClick={() => toggle('persona')}><Trans>Persona</Trans></Pill>
     ) })()}
   </div>
 )
@@ -187,7 +189,7 @@ export default function Companies() {
   }, [])
   const fetchCompanies = useCallback(async () => {
     try { const { data } = await api.get('/companies'); setCompanies(data); setLoadErr(null) }
-    catch (e) { console.error(e); const msg = 'Could not load companies' + errSuffix(e); setLoadErr(msg); pushToast({ kind: 'error', msg }) }
+    catch (e) { console.error(e); const msg = t`Could not load companies` + errSuffix(e); setLoadErr(msg); pushToast({ kind: 'error', msg }) }
     return fetchHealth()
   }, [pushToast, fetchHealth])
   // list, health, résumé names and running scrapes settle together via useSettled, so the table,
@@ -277,8 +279,8 @@ export default function Companies() {
   const inactiveInFilter = filtered.filter((c) => !c.active)
   const activeInFilter = filtered.filter((c) => c.active)
   const bulkHint = tiers.length || query.trim()
-    ? `Applies to the ${filtered.length} companies shown. Jobs already found are kept.`
-    : `Applies to all ${filtered.length} companies · jobs already found are kept`
+    ? t`Applies to the ${filtered.length} companies shown. Jobs already found are kept.`
+    : t`Applies to all ${filtered.length} companies · jobs already found are kept`
 
   // ── actions ──
   // the shell re-reads its rail badges (including the amber health dot) on this
@@ -288,7 +290,7 @@ export default function Companies() {
     // pausing/resuming changes what /health/entities counts, so the row, the
     // header count and the rail dot are all re-read — not just the list.
     try { await api.patch(`/companies/${id}`, patch); fetchCompanies(); fetchHealth(); bumpCounts(); return true }
-    catch (e) { console.error(e); pushToast({ kind: 'error', msg: 'Could not save company changes' + errSuffix(e) }); return false }
+    catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Could not save company changes` + errSuffix(e) }); return false }
   }
   // "I have seen this, stop shouting" — the warning stays on the row, muted,
   // and /health/entities re-raises it by itself once a newer run fails.
@@ -296,15 +298,15 @@ export default function Companies() {
     try {
       await api.post(`/companies/${c.id}/acknowledge`)
       fetchCompanies(); fetchHealth(); bumpCounts()
-      pushToast({ kind: 'success', msg: `${c.name} acknowledged — it stops counting until a later run fails` })
-    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: `Could not acknowledge ${c.name}` + errSuffix(e) }) }
+      pushToast({ kind: 'success', msg: t`${c.name} acknowledged — it stops counting until a later run fails` })
+    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Could not acknowledge ${c.name}` + errSuffix(e) }) }
   }
   const bulkSet = async (active) => {
     const targets = active ? inactiveInFilter : activeInFilter
     const results = await Promise.allSettled(targets.map((c) => api.patch(`/companies/${c.id}`, { active })))
     const failed = results.filter((r) => r.status === 'rejected').length
-    if (failed) pushToast({ kind: 'error', msg: `Could not update ${failed} of ${targets.length} companies` })
-    else pushToast({ kind: 'success', msg: `${targets.length} companies made ${active ? 'active' : 'inactive'}` })
+    if (failed) pushToast({ kind: 'error', msg: t`Could not update ${failed} of ${targets.length} companies` })
+    else pushToast({ kind: 'success', msg: (active ? t`${targets.length} companies made active` : t`${targets.length} companies made inactive`) })
     fetchCompanies()
   }
   const runScrape = async (id) => {
@@ -318,14 +320,14 @@ export default function Companies() {
     catch (e) {
       // The scheduled scrape is running: nothing was started, so drop the spinner.
       if (e.response?.data?.detail === 'scheduled_scrape_running') {
-        pushToast({ kind: 'error', msg: 'The scheduled scrape is running — try again when it finishes' })
+        pushToast({ kind: 'error', msg: t`The scheduled scrape is running — try again when it finishes` })
         setScraping((m) => { const n = { ...m }; delete n[id]; return n })
         return
       }
       // 409 means the run is genuinely in flight — keep the spinner, the
       // /monitor/active poll clears it when the run finishes.
-      if (e.response?.status === 409) { pushToast({ kind: 'progress', msg: 'That company is already being scraped' }); return }
-      console.error(e); pushToast({ kind: 'error', msg: 'Could not start the scrape' + errSuffix(e) })
+      if (e.response?.status === 409) { pushToast({ kind: 'progress', msg: t`That company is already being scraped` }); return }
+      console.error(e); pushToast({ kind: 'error', msg: t`Could not start the scrape` + errSuffix(e) })
       setScraping((m) => { const n = { ...m }; delete n[id]; return n })
     }
   }
@@ -341,10 +343,10 @@ export default function Companies() {
   // the row menu is cleared BEFORE the dialog goes up (the Feed already does this):
   // left mounted, it sat under the confirm's scrim as clutter, and cancelling with
   // the button left it open (R4-T2A-15).
-  const deleteCompany = (c) => setConfirm({ title: `Delete ${c.name}?`, body: 'Jobs already found are kept.', label: 'Delete', danger: true, onConfirm: async () => {   // styled, not window.confirm
+  const deleteCompany = (c) => setConfirm({ title: t`Delete ${c.name}?`, body: t`Jobs already found are kept.`, label: t`Delete`, danger: true, onConfirm: async () => {   // styled, not window.confirm
     setConfirm(null)
-    try { await api.delete(`/companies/${c.id}`); setMenuId(null); setDrawer(null); fetchCompanies(); pushToast({ kind: 'success', msg: `${c.name} deleted` }) }
-    catch (e) { console.error(e); pushToast({ kind: 'error', msg: `Could not delete ${c.name}` + errSuffix(e) }) }
+    try { await api.delete(`/companies/${c.id}`); setMenuId(null); setDrawer(null); fetchCompanies(); pushToast({ kind: 'success', msg: t`${c.name} deleted` }) }
+    catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Could not delete ${c.name}` + errSuffix(e) }) }
   } })
 
   // ── row cell derivations ──
@@ -364,11 +366,11 @@ export default function Companies() {
     // paused or acknowledged: keep the verdict, drop the alarm colours
     if (warn && warnMuted(c)) return { dot: 'var(--edge)', fg: 'var(--muted)',
       text: `${c.last_error ? `error · ${warn}` : warn} · ${c.active ? `acknowledged ${ago(c.warning_acknowledged_at)}` : 'inactive'}` }
-    if (c.last_error) return { dot: 'var(--bad)', fg: 'var(--bad)', text: `error · ${warn}` }
+    if (c.last_error) return { dot: 'var(--bad)', fg: 'var(--bad)', text: t`error · ${warn}` }
     if (warn) return { dot: 'var(--warn)', fg: 'var(--warn)', text: warn }
-    if (c.active && !c.last_scraped_at) return { dot: 'var(--edge)', fg: 'var(--muted)', text: 'not scraped yet' }
-    if (c.active) return { dot: 'var(--good)', fg: 'var(--text-2)', text: `healthy · scraped ${ago(c.last_scraped_at)}` }
-    return { dot: 'var(--edge)', fg: 'var(--muted)', text: `inactive · last run ${ago(c.last_scraped_at)}` }
+    if (c.active && !c.last_scraped_at) return { dot: 'var(--edge)', fg: 'var(--muted)', text: t`not scraped yet` }
+    if (c.active) return { dot: 'var(--good)', fg: 'var(--text-2)', text: t`healthy · scraped ${ago(c.last_scraped_at)}` }
+    return { dot: 'var(--edge)', fg: 'var(--muted)', text: t`inactive · last run ${ago(c.last_scraped_at)}` }
   }
   const fitColor = (f) => (f == null ? 'var(--muted)' : f >= 80 ? 'var(--good)' : f >= 65 ? 'var(--text-2)' : 'var(--warn)')
   const testBusy = !!testingId   // a running test locks every other Test/Run pill
@@ -399,12 +401,12 @@ export default function Companies() {
   // Escape, the ✕, and clicking another row all route through here so an edited draft is never dropped silently
   const closeDrawer = () => {
     const cur = drawerRef.current
-    if (drawerDirty(cur)) { setConfirm({ title: 'Discard changes?', body: `Edits to ${cur.company.name} have not been saved.`, label: 'Discard', danger: true, onConfirm: () => { setConfirm(null); setDrawer(null) } }); return }
+    if (drawerDirty(cur)) { setConfirm({ title: t`Discard changes?`, body: t`Edits to ${cur.company.name} have not been saved.`, label: t`Discard`, danger: true, onConfirm: () => { setConfirm(null); setDrawer(null) } }); return }
     setDrawer(null)
   }
   const openDrawer = (c) => {
     const cur = drawerRef.current
-    if (cur && cur.company.id !== c.id && drawerDirty(cur)) { setConfirm({ title: 'Discard changes?', body: `Edits to ${cur.company.name} have not been saved.`, label: 'Discard', danger: true, onConfirm: () => { setConfirm(null); setDrawer({ company: c, draft: toDraft(c) }) } }); return }
+    if (cur && cur.company.id !== c.id && drawerDirty(cur)) { setConfirm({ title: t`Discard changes?`, body: t`Edits to ${cur.company.name} have not been saved.`, label: t`Discard`, danger: true, onConfirm: () => { setConfirm(null); setDrawer({ company: c, draft: toDraft(c) }) } }); return }
     setDrawer({ company: c, draft: toDraft(c) })
   }
 
@@ -413,7 +415,7 @@ export default function Companies() {
       {/* header — title + subtitle, matching The Feed */}
       <HeaderRow as="header" pad="22px 30px 16px 24px" line="none" align="flex-end" style={{ gap: 18 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <PageTitle>Companies</PageTitle>
+          <PageTitle><Trans>Companies</Trans></PageTitle>
           {/* integer line-height: at inherited 1.5 this 13px line is 19.5px tall, ending the header
               on a half pixel and dropping the 1px border on alternating rows below. */}
           <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--muted)', ...warmStyle }}>{countLine}</span>
@@ -424,23 +426,23 @@ export default function Companies() {
             window.dispatchEvent(new CustomEvent('jn:counts-changed'))
             openDrawer(row)
           }} />
-          <Button onClick={() => setAddOpen(true)}>+ Add company</Button>
+          <Button onClick={() => setAddOpen(true)}><Trans>+ Add company</Trans></Button>
         </div>
       </HeaderRow>
 
       {/* toolbar */}
       <HeaderRow pad="2px 30px 12px 24px" align="center" style={{ flexWrap: 'wrap', gap: 8 }}>
         <SearchInput width="226px" value={query} onChange={setQuery}
-          placeholder="Search name, alias, URL or ATS…" ariaLabel="Search companies" />
+          placeholder={t`Search name, alias, URL or ATS…`} ariaLabel={t`Search companies`} />
         <Rule vertical length={20} tone="line" style={{ margin: '0 3px' }} />
-        {['1', '2', '3', 'none'].map((t) => {
-          const on = tiers.includes(t)
+        {['1', '2', '3', 'none'].map((tier) => {
+          const on = tiers.includes(tier)
           return (
-            <Pill key={t} on={on} onClick={() => setTiers((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])}
-              title="Add to or remove from the filter. Multiple allowed. Saved in this browser.">
+            <Pill key={tier} on={on} onClick={() => setTiers((p) => p.includes(tier) ? p.filter((x) => x !== tier) : [...p, tier])}
+              title={t`Add to or remove from the filter. Multiple allowed. Saved in this browser.`}>
               {/* the count comes from the warm snapshot until the list settles, so
                   the pill is its final width on the first frame */}
-              <span>{t === 'none' ? 'Untiered' : tierLabel(t, { long: true })}<span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, opacity: 0.7, marginLeft: 6, ...warmStyle }}>{warmTier(t) != null ? warmTier(t) : NBSP}</span></span>
+              <span>{tier === 'none' ? t`Untiered` : tierLabel(tier, { long: true })}<span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, opacity: 0.7, marginLeft: 6, ...warmStyle }}>{warmTier(tier) != null ? warmTier(tier) : NBSP}</span></span>
             </Pill>
           )
         })}
@@ -450,20 +452,20 @@ export default function Companies() {
           // tinted bulk actions leave the hand-drawn set — secondary's own v2-bdc
           // repaints the ink and would wash the accent/--warn label out.
           <Button variant="secondary" size="sm" hover="v2-act" onClick={() => bulkSet(true)} title={bulkHint}
-            style={{ height: 30, fontSize: 12, color: 'var(--accent)' }}>Make {inactiveInFilter.length} active</Button>
+            style={{ height: 30, fontSize: 12, color: 'var(--accent)' }}><Trans>Make {inactiveInFilter.length} active</Trans></Button>
         )}
         {activeInFilter.length > 0 && (
           <Button variant="secondary" size="sm" hover="v2-bd-warn" onClick={() => bulkSet(false)} title={bulkHint}
-            style={{ height: 30, fontSize: 12, color: 'var(--warn)' }}>Make {activeInFilter.length} inactive</Button>
+            style={{ height: 30, fontSize: 12, color: 'var(--warn)' }}><Trans>Make {activeInFilter.length} inactive</Trans></Button>
         )}
         <span style={{ marginLeft: 'auto', flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ position: 'relative', display: 'flex' }} onClick={(e) => e.stopPropagation()}>
-            <div onClick={() => setSortOpen((v) => !v)} title="Change row order"
+            <div onClick={() => setSortOpen((v) => !v)} title={t`Change row order`}
               style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer' }}>
-              Sort<span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{SORT_OPTIONS.find((s) => s.id === sortBy)?.label}</span><span style={{ fontSize: 10 }}>▾</span>
+              <Trans>Sort</Trans><span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{SORT_OPTIONS.find((s) => s.id === sortBy)?.label}</span><span style={{ fontSize: 10 }}>▾</span>
             </div>
             {sortOpen && (
-              <Menu ariaLabel="Row order" className="v2-scroll" onDismiss={() => setSortOpen(false)} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 45, marginTop: 5, width: 172 }}>
+              <Menu ariaLabel={t`Row order`} className="v2-scroll" onDismiss={() => setSortOpen(false)} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 45, marginTop: 5, width: 172 }}>
                 {SORT_OPTIONS.map((so) => {
                   const on = so.id === sortBy
                   return (
@@ -481,15 +483,15 @@ export default function Companies() {
           tracks the rows' — otherwise the body scrollbar shifts every column) */}
       <div ref={tableRef} className="v2-scroll" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         <TableHead height={30} pad="0 30px 0 24px" style={{ position: 'sticky', top: 0, zIndex: 3 }}>
-          <span style={{ flex: 1, minWidth: 118 }}>Company</span>
-          <span style={{ flex: '0 0 62px' }}>Tier</span>
-          <span style={{ flex: 1.9, minWidth: healthMin }}>Health</span>
-          {showResumes && <span style={{ flex: '0 0 198px' }} title="Which résumés new jobs from this company are scored against">Résumés</span>}
-          {showAts && <span style={{ flex: '0 0 108px' }} title="ATS detected from the career URLs">ATS</span>}
-          <span style={{ flex: '0 0 74px', textAlign: 'right', paddingRight: 10 }} title="Open roles in the Job Feed · postings found in the last 7 days — the +N counts everything the scraper discovered, including titles the filters rejected">Open · 7d</span>
-          {showApps && <span style={{ flex: '0 0 46px', textAlign: 'right', paddingRight: 10 }} title="Applications recorded for this company">Apps</span>}
-          {showFit && <span style={{ flex: '0 0 48px', textAlign: 'right', paddingRight: 14 }} title="Average fit across this company's scored roles">Ø Fit</span>}
-          <span style={{ flex: '0 0 88px', textAlign: 'center' }}>Status</span>
+          <span style={{ flex: 1, minWidth: 118 }}><Trans>Company</Trans></span>
+          <span style={{ flex: '0 0 62px' }}><Trans>Tier</Trans></span>
+          <span style={{ flex: 1.9, minWidth: healthMin }}><Trans>Health</Trans></span>
+          {showResumes && <span style={{ flex: '0 0 198px' }} title={t`Which résumés new jobs from this company are scored against`}><Trans>Résumés</Trans></span>}
+          {showAts && <span style={{ flex: '0 0 108px' }} title={t`ATS detected from the career URLs`}>ATS</span>}
+          <span style={{ flex: '0 0 74px', textAlign: 'right', paddingRight: 10 }} title={t`Open roles in the Job Feed · postings found in the last 7 days — the +N counts everything the scraper discovered, including titles the filters rejected`}><Trans>Open · 7d</Trans></span>
+          {showApps && <span style={{ flex: '0 0 46px', textAlign: 'right', paddingRight: 10 }} title={t`Applications recorded for this company`}><Trans>Apps</Trans></span>}
+          {showFit && <span style={{ flex: '0 0 48px', textAlign: 'right', paddingRight: 14 }} title={t`Average fit across this company's scored roles`}><Trans>Ø Fit</Trans></span>}
+          <span style={{ flex: '0 0 88px', textAlign: 'center' }}><Trans>Status</Trans></span>
           <span style={{ flex: '0 0 190px' }} />
         </TableHead>
         {filtered.map((c) => {
@@ -503,10 +505,10 @@ export default function Companies() {
               style={{ gap: 0, padding: '0 30px 0 24px' }}>
               {/* company */}
               <span style={{ flex: 1, minWidth: 118, display: 'flex', alignItems: 'center', gap: 7, paddingRight: 10 }}>
-                {isAlarming(c, downMap[c.id]) && <span title={`Needs attention — ${warnTextOf(c, downMap[c.id])}`} style={{ flex: '0 0 auto', fontSize: 11, color: c.last_error ? 'var(--bad)' : 'var(--warn)' }}>▲</span>}
-                <span title={c.h1b_lca_count ? `${c.name} · ${c.h1b_lca_count} H-1B filings${c.h1b_approval_rate ? `, ${c.h1b_approval_rate}% approved` : ''}. Used for each job's H-1B verdict.` : c.name} style={{ flex: '0 1 auto', minWidth: 0, fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+                {isAlarming(c, downMap[c.id]) && <span title={t`Needs attention — ${warnTextOf(c, downMap[c.id])}`} style={{ flex: '0 0 auto', fontSize: 11, color: c.last_error ? 'var(--bad)' : 'var(--warn)' }}>▲</span>}
+                <span title={c.h1b_lca_count ? (c.h1b_approval_rate ? t`${c.name} · ${c.h1b_lca_count} H-1B filings, ${c.h1b_approval_rate}% approved. Used for each job's H-1B verdict.` : t`${c.name} · ${c.h1b_lca_count} H-1B filings. Used for each job's H-1B verdict.`) : c.name} style={{ flex: '0 1 auto', minWidth: 0, fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
                 {/* ui: keep — the “+N aliases” count badge: 9.5 on --surface-2, pad 1 5; Tag is 10/pad 2 8 uppercase */}
-                {aliases.length > 0 && <span title={`Also scraped as ${aliases.join(', ')}`} style={{ flex: '0 0 auto', position: 'relative', top: 1, fontSize: 9.5, padding: '1px 5px', borderRadius: 'var(--radius-control)', background: 'var(--surface-2)', color: 'var(--muted)', whiteSpace: 'nowrap' }}>+{aliases.length}</span>}
+                {aliases.length > 0 && <span title={t`Also scraped as ${aliases.join(', ')}`} style={{ flex: '0 0 auto', position: 'relative', top: 1, fontSize: 9.5, padding: '1px 5px', borderRadius: 'var(--radius-control)', background: 'var(--surface-2)', color: 'var(--muted)', whiteSpace: 'nowrap' }}>+{aliases.length}</span>}
               </span>
               {/* tier */}
               <span style={{ flex: '0 0 62px' }}>
@@ -515,57 +517,57 @@ export default function Companies() {
               {/* health */}
               <span style={{ flex: 1.9, minWidth: healthMin, display: 'flex', alignItems: 'center', gap: 7, paddingRight: 10 }}>
                 <Dot style={{ background: h.dot }} />
-                <span title={c.last_error || downMap[c.id] || (c.active ? `Last successful run ${ago(c.last_scraped_at)}` : 'Inactive — jobs already found are kept')} style={{ flex: 1, minWidth: 0, fontSize: 12, color: h.fg, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.text}</span>
+                <span title={c.last_error || downMap[c.id] || (c.active ? t`Last successful run ${ago(c.last_scraped_at)}` : t`Inactive — jobs already found are kept`)} style={{ flex: 1, minWidth: 0, fontSize: 12, color: h.fg, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.text}</span>
               </span>
               {/* résumés */}
-              {showResumes && <Helper title={rn || 'Scored against your default résumé from Settings'} style={{ flex: '0 0 198px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 10, ...(rn ? { color: 'var(--text-2)' } : null) }}>{rn || 'Default'}</Helper>}
+              {showResumes && <Helper title={rn || t`Scored against your default résumé from Settings`} style={{ flex: '0 0 198px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 10, ...(rn ? { color: 'var(--text-2)' } : null) }}>{rn || t`Default`}</Helper>}
               {/* ats */}
               {showAts && <span style={{ flex: '0 0 108px', display: 'flex', alignItems: 'center', gap: 6, paddingRight: 10 }}>
-                {urls.length > 0 && <span className={atsSlug(firstAts)} title={[...urls.map((u) => `${detectAts(u)} · ${u}`), `MyVisaJobs company id · ${c.h1b_slug || 'auto-detected'}`].join('\n')} style={{ flex: '0 0 auto', fontFamily: 'var(--mono)', fontSize: 9.5, letterSpacing: '.05em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 'var(--radius-control)', whiteSpace: 'nowrap' }}>{firstAts}</span>}
+                {urls.length > 0 && <span className={atsSlug(firstAts)} title={[...urls.map((u) => `${detectAts(u)} · ${u}`), t`MyVisaJobs company id · ${c.h1b_slug || t`auto-detected`}`].join('\n')} style={{ flex: '0 0 auto', fontFamily: 'var(--mono)', fontSize: 9.5, letterSpacing: '.05em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 'var(--radius-control)', whiteSpace: 'nowrap' }}>{firstAts}</span>}
                 {urls.length > 1 && <Helper size="xs" title={urls.join('\n')} style={{ flex: '0 0 auto' }}>+{urls.length - 1}</Helper>}
                 {urls.length === 0 && <Helper>—</Helper>}
               </span>}
               {/* open · 7d */}
-              <Helper mono title={`${c.open_jobs || 0} open roles from ${c.name} in the Job Feed · ${c.open_jobs_week || 0} found in the last 7 days — everything discovered, including titles the filters rejected`} style={{ flex: '0 0 74px', textAlign: 'right', paddingRight: 10, ...(c.open_jobs ? { color: 'var(--text-2)' } : null) }}>
+              <Helper mono title={t`${c.open_jobs || 0} open roles from ${c.name} in the Job Feed · ${c.open_jobs_week || 0} found in the last 7 days — everything discovered, including titles the filters rejected`} style={{ flex: '0 0 74px', textAlign: 'right', paddingRight: 10, ...(c.open_jobs ? { color: 'var(--text-2)' } : null) }}>
                 {c.open_jobs || 0}<span style={{ color: c.open_jobs_week ? 'var(--good)' : 'var(--muted)' }}> +{c.open_jobs_week || 0}</span>
               </Helper>
               {/* apps */}
               {showApps && <Helper mono style={{ flex: '0 0 46px', textAlign: 'right', paddingRight: 10, ...(c.application_count ? { color: 'var(--text-2)' } : null) }}>{c.application_count || '·'}</Helper>}
               {/* fit */}
-              {showFit && <span title={c.avg_fit == null ? 'No scored roles yet' : `Average fit ${c.avg_fit} across this company's scored roles`} style={{ flex: '0 0 48px', textAlign: 'right', paddingRight: 14, fontFamily: 'var(--mono)', fontSize: 11.5, color: fitColor(c.avg_fit) }}>{c.avg_fit == null ? '–' : c.avg_fit}</span>}
+              {showFit && <span title={c.avg_fit == null ? t`No scored roles yet` : t`Average fit ${c.avg_fit} across this company's scored roles`} style={{ flex: '0 0 48px', textAlign: 'right', paddingRight: 14, fontFamily: 'var(--mono)', fontSize: 11.5, color: fitColor(c.avg_fit) }}>{c.avg_fit == null ? '–' : c.avg_fit}</span>}
               {/* status */}
               <span style={{ flex: '0 0 88px', display: 'flex', justifyContent: 'center' }}>
                 {/* round 7 #16: `xs`, the size Run/Test beside it already are —
                     `sm` is a 26px box against their 25 and read as taller */}
                 <Pill size="xs" on={c.active} onClick={(e) => { e.stopPropagation(); patchCompany(c.id, { active: !c.active }) }}
-                  title={c.active ? 'Click to pause scraping' : 'Click to resume scraping'}>{c.active ? 'Active' : 'Inactive'}</Pill>
+                  title={c.active ? t`Click to pause scraping` : t`Click to resume scraping`}>{c.active ? t`Active` : t`Inactive`}</Pill>
               </span>
               {/* actions: pinned to the right edge of the scroller so the ⋯ stays reachable when the row is wider than the pane at 1024px */}
               {/* position:sticky makes this cell its own stacking context, trapping the menu's z-index 40 inside it;
                   raise the cell itself while its menu is open: 28 clears the sticky head (3)/rows, stays under drawer (29/30). */}
               <span className="v2-cactions" style={{ flex: '0 0 190px', display: 'flex', alignSelf: 'stretch', alignItems: 'center', justifyContent: 'flex-end', gap: 4, position: 'sticky', right: 0, paddingLeft: 8, zIndex: menuId === c.id ? 28 : undefined }} onClick={(e) => e.stopPropagation()}>
                 <Pill size="xs" line="inherit" disabled={testBusy} onClick={() => runScrape(c.id)}
-                  title={testBusy ? 'A test is already running' : scraping[c.id] === 'waiting' ? 'Queued: another scrape is running, this one starts when it finishes' : 'Scrape this company now'}>
+                  title={testBusy ? t`A test is already running` : scraping[c.id] === 'waiting' ? t`Queued: another scrape is running, this one starts when it finishes` : t`Scrape this company now`}>
                   {scraping[c.id]
                     ? <Spinner />
                     : <span style={{ fontSize: 11 }}>↻</span>}
-                  {scraping[c.id] === 'waiting' ? 'Waiting' : scraping[c.id] ? 'Running' : 'Run'}
+                  {scraping[c.id] === 'waiting' ? t`Waiting` : scraping[c.id] ? t`Running` : t`Run`}
                 </Pill>
                 {/* the running test names itself; every other pill goes quiet, so the running one keeps full opacity while un-clickable */}
                 <Pill size="xs" line="inherit" on={testingId === c.id} disabled={testBusy} onClick={() => runTest(c.id)}
                   style={testingId === c.id ? { opacity: 1 } : undefined}
-                  title={testingId === c.id ? 'Reading the board — nothing is saved' : testBusy ? 'A test is already running' : 'Preview run — shows what would be kept, saves nothing'}>
-                  {testingId === c.id ? <Spinner color="var(--spinner-on-ink)" /> : <FlaskGlyph size={11} />}{testingId === c.id ? 'Testing…' : 'Test'}
+                  title={testingId === c.id ? t`Reading the board — nothing is saved` : testBusy ? t`A test is already running` : t`Preview run — shows what would be kept, saves nothing`}>
+                  {testingId === c.id ? <Spinner color="var(--spinner-on-ink)" /> : <FlaskGlyph size={11} />}{testingId === c.id ? t`Testing…` : t`Test`}
                 </Pill>
                 <IconButton size={25} line="inherit" on={menuId === c.id} onClick={() => setMenuId(menuId === c.id ? null : c.id)}
-                  title="More actions" ariaExpanded={menuId === c.id} ariaHaspopup="menu">⋯</IconButton>
+                  title={t`More actions`} ariaExpanded={menuId === c.id} ariaHaspopup="menu">⋯</IconButton>
                 {menuId === c.id && (
-                  <Menu ariaLabel={`${c.name} actions`} onDismiss={() => setMenuId(null)} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 40, marginTop: 4, width: 236, textAlign: 'left' }}>
-                    <MenuItem icon="✎" onClick={() => { setMenuId(null); openDrawer(c) }}>Edit config</MenuItem>
-                    {urls.length > 0 && <MenuItem icon="↗" onClick={() => { setMenuId(null); urls.forEach((u) => window.open(u, '_blank', 'noopener,noreferrer')) }}>{urls.length > 1 ? `Open ${urls.length} career pages` : 'Open career page'}</MenuItem>}
+                  <Menu ariaLabel={t`${c.name} actions`} onDismiss={() => setMenuId(null)} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 40, marginTop: 4, width: 236, textAlign: 'left' }}>
+                    <MenuItem icon="✎" onClick={() => { setMenuId(null); openDrawer(c) }}><Trans>Edit config</Trans></MenuItem>
+                    {urls.length > 0 && <MenuItem icon="↗" onClick={() => { setMenuId(null); urls.forEach((u) => window.open(u, '_blank', 'noopener,noreferrer')) }}>{urls.length > 1 ? t`Open ${urls.length} career pages` : t`Open career page`}</MenuItem>}
                     <MenuItem icon="☰" href={`/feed?company=${encodeURIComponent(c.name)}`}
-                      onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; e.preventDefault(); setMenuId(null); navigate(`/feed?company=${encodeURIComponent(c.name)}`) }}>View jobs in feed</MenuItem>
-                    <MenuItem danger icon="✕" onClick={() => { setMenuId(null); deleteCompany(c) }}>Delete company</MenuItem>
+                      onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; e.preventDefault(); setMenuId(null); navigate(`/feed?company=${encodeURIComponent(c.name)}`) }}><Trans>View jobs in feed</Trans></MenuItem>
+                    <MenuItem danger icon="✕" onClick={() => { setMenuId(null); deleteCompany(c) }}><Trans>Delete company</Trans></MenuItem>
                   </Menu>
                 )}
               </span>
@@ -576,16 +578,16 @@ export default function Companies() {
         {/* loadErr is checked separately so a failed GET never reads as "nothing matches your search", where Clear filters would fix nothing */}
         {ready && loadErr && companies.length === 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '44px 28px' }}>
-            <span style={{ fontSize: 13, color: 'var(--bad)' }}>Couldn’t load companies</span>
+            <span style={{ fontSize: 13, color: 'var(--bad)' }}><Trans>Couldn’t load companies</Trans></span>
             <Helper>{loadErr}</Helper>
-            <Link onClick={() => setReload((n) => n + 1)} style={{ paddingTop: 2 }}>Try again</Link>
+            <Link onClick={() => setReload((n) => n + 1)} style={{ paddingTop: 2 }}><Trans>Try again</Trans></Link>
           </div>
         )}
         {ready && filtered.length === 0 && !(loadErr && companies.length === 0) && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '44px 28px' }}>
-            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{companies.length === 0 ? 'No companies yet' : 'No companies match'}</span>
-            <Helper>{companies.length === 0 ? 'Add one with + Add company — its career page is scraped and the jobs appear in the Feed.' : query.trim() ? `Nothing matches "${query}" in names, aliases, URLs or ATS.` : `No companies in ${tiers.map((t) => (t === null || t === 'none' || t === 'untiered' ? 'Untiered' : tierLabel(t, { long: true }))).join(', ')}.`}</Helper>
-            {companies.length > 0 && <Link onClick={clearFilters} style={{ paddingTop: 2 }}>Clear filters</Link>}
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{companies.length === 0 ? t`No companies yet` : t`No companies match`}</span>
+            <Helper>{companies.length === 0 ? t`Add one with + Add company — its career page is scraped and the jobs appear in the Feed.` : query.trim() ? t`Nothing matches "${query}" in names, aliases, URLs or ATS.` : t`No companies in ${tiers.map((t) => (t === null || t === 'none' || t === 'untiered' ? 'Untiered' : tierLabel(t, { long: true }))).join(', ')}.`}</Helper>
+            {companies.length > 0 && <Link onClick={clearFilters} style={{ paddingTop: 2 }}><Trans>Clear filters</Trans></Link>}
           </div>
         )}
       </div>
@@ -615,11 +617,11 @@ function Drawer({ state, setState, onClose, resumes, personaPopulated, onSave, o
   const set = (patch) => setState((s) => ({ ...s, draft: { ...s.draft, ...patch } }))
   const toggleResume = (id) => set({ selected_resume_ids: draft.selected_resume_ids.includes(id) ? draft.selected_resume_ids.filter((x) => x !== id) : [...draft.selected_resume_ids, id] })
   const nUrl = draft.scrape_urls.filter(Boolean).length, nApp = company.application_count || 0
-  const subtitle = `${tierLabel(draft.tier, { long: true })} · ${nUrl} career URL${nUrl === 1 ? '' : 's'} · ${nApp} application${nApp === 1 ? '' : 's'}`
+  const subtitle = `${tierLabel(draft.tier, { long: true })} · ${plural(nUrl, { one: '# career URL', other: '# career URLs' })} · ${plural(nApp, { one: '# application', other: '# applications' })}`
   const lca = company.h1b_lca_count
-  const lcaLine = lca ? `${lca} H-1B filings on record${company.h1b_approval_rate ? ` · ${company.h1b_approval_rate}% approved` : ''}. Each job's H-1B verdict is based on these.` : 'No H-1B filings on record, so jobs show H-1B Unknown. Leave blank to detect the company from its name.'
+  const lcaLine = lca ? `${lca} H-1B filings on record${company.h1b_approval_rate ? ` · ${company.h1b_approval_rate}% approved` : ''}. Each job's H-1B verdict is based on these.` : t`No H-1B filings on record, so jobs show H-1B Unknown. Leave blank to detect the company from its name.`
   const selNames = [...resumes.filter((r) => draft.selected_resume_ids.includes(r.id)).map((r) => r.name), ...(draft.selected_resume_ids.includes('persona') ? ['Persona'] : [])]
-  const resumeHelp = selNames.length ? `New jobs are scored against ${selNames.join(', ')}.` : 'Nothing selected, so new jobs use your default résumé from Settings.'
+  const resumeHelp = selNames.length ? t`New jobs are scored against ${selNames.join(', ')}.` : t`Nothing selected, so new jobs use your default résumé from Settings.`
   const bannerText = warnTextOf(company, downReason)
   const bannerMuted = !!bannerText && warnMuted(company)
   const tuningNote = (bannerText && !bannerMuted) ? 'needs attention' : (draft.scrape_interval_minutes || draft.wait_for_selector || (draft.max_pages && draft.max_pages !== 5) || draft.h1b_slug) ? 'customised' : 'using defaults'
@@ -649,7 +651,7 @@ function Drawer({ state, setState, onClose, resumes, personaPopulated, onSave, o
     setSaving(true)
     const ok = await onSave(company.id, payload)
     setSaving(false)
-    if (ok) setState(null); else setSaveErr('Save failed — nothing was changed. Try again.')
+    if (ok) setState(null); else setSaveErr(t`Save failed — nothing was changed. Try again.`)
   }
 
   return (
@@ -663,7 +665,7 @@ function Drawer({ state, setState, onClose, resumes, personaPopulated, onSave, o
           <span className="v2-dialogtitle" style={{ fontFamily: 'var(--serif)', fontSize: 20, letterSpacing: '-.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{draft.name || company.name}</span>
           <Helper>{subtitle}</Helper>
         </div>
-        <IconButton onClick={onClose} title="Close" style={{ flex: '0 0 auto' }}>✕</IconButton>
+        <IconButton onClick={onClose} title={t`Close`} style={{ flex: '0 0 auto' }}>✕</IconButton>
       </HeaderRow>
 
       <div className="v2-scroll" style={{ flex: 1, overflow: 'auto', padding: '15px 22px 20px', display: 'flex', flexDirection: 'column', gap: 15, minHeight: 0 }}>
@@ -674,30 +676,30 @@ function Drawer({ state, setState, onClose, resumes, personaPopulated, onSave, o
             action={!bannerMuted && onAcknowledge && (
               /* ui: keep — "Acknowledge" is the quiet inline action on the banner: --muted 11 normal weight, where Link is --link-ink 11.5/500 */
               <span onClick={() => onAcknowledge(company)} className="v2-hover-accent-text"
-                title="Stop counting this company as needing attention. The warning stays here; a run that fails after this raises it again."
-                style={{ flex: '0 0 auto', alignSelf: 'flex-start', fontSize: 11, color: 'var(--muted)', cursor: 'pointer' }}>Acknowledge</span>
+                title={t`Stop counting this company as needing attention. The warning stays here; a run that fails after this raises it again.`}
+                style={{ flex: '0 0 auto', alignSelf: 'flex-start', fontSize: 11, color: 'var(--muted)', cursor: 'pointer' }}><Trans>Acknowledge</Trans></span>
             )}>
             <span style={{ fontSize: 12, color: bannerMuted ? 'var(--text-2)' : 'var(--text)', lineHeight: 1.5 }}>{bannerText}</span>
             <Helper size="xs">
-              {company.last_error ? 'Last scrape run' : 'Detected in recent runs'} · last ran {ago(company.last_run_at || company.last_scraped_at)}
+              <Trans>{company.last_error ? t`Last scrape run` : t`Detected in recent runs`} · last ran {ago(company.last_run_at || company.last_scraped_at)}
               {bannerMuted
                 ? ` · ${company.active ? `acknowledged ${ago(company.warning_acknowledged_at)}` : 'paused, so it is not counted'}`
-                : null}
+                : null}</Trans>
             </Helper>
           </Notice>
         )}
 
         {/* identity + sources */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-          <Heading strong={600} size={15}>Identity and sources</Heading>
+          <Heading strong={600} size={15}><Trans>Identity and sources</Trans></Heading>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={fieldLabel}>Display name</span>
-            <Input value={draft.name} onChange={(v) => set({ name: v })} ariaLabel="Display name" />
+            <span style={fieldLabel}><Trans>Display name</Trans></span>
+            <Input value={draft.name} onChange={(v) => set({ name: v })} ariaLabel={t`Display name`} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={fieldLabel}>Also known as</span>
-            <Input value={draft.aliases} onChange={(v) => set({ aliases: v })} placeholder="Alt names, comma-separated" ariaLabel="Also known as" />
-            <Helper size="xs">Postings under these names are matched to this company.</Helper>
+            <span style={fieldLabel}><Trans>Also known as</Trans></span>
+            <Input value={draft.aliases} onChange={(v) => set({ aliases: v })} placeholder={t`Alt names, comma-separated`} ariaLabel={t`Also known as`} />
+            <Helper size="xs"><Trans>Postings under these names are matched to this company.</Trans></Helper>
           </div>
           <UrlEditor urls={draft.scrape_urls} onChange={(u) => set({ scrape_urls: u })} />
         </div>
@@ -706,19 +708,19 @@ function Drawer({ state, setState, onClose, resumes, personaPopulated, onSave, o
 
         {/* which postings to keep */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-          <Heading strong={600} size={15}>Which postings to keep</Heading>
+          <Heading strong={600} size={15}><Trans>Which postings to keep</Trans></Heading>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={fieldLabel}>Title must match</span>
-            <Input value={draft.title_include_expr} onChange={(v) => set({ title_include_expr: v })} placeholder="(Product OR Project) AND Manager" ariaLabel="Title must match" />
-            <Helper size="xs">Supports AND, OR and parentheses. Blank keeps every title.</Helper>
+            <span style={fieldLabel}><Trans>Title must match</Trans></span>
+            <Input value={draft.title_include_expr} onChange={(v) => set({ title_include_expr: v })} placeholder={t`(Product OR Project) AND Manager`} ariaLabel={t`Title must match`} />
+            <Helper size="xs"><Trans>Supports AND, OR and parentheses. Blank keeps every title.</Trans></Helper>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={fieldLabel}>Skip titles containing</span>
-            <Input value={draft.title_exclude_keywords} onChange={(v) => set({ title_exclude_keywords: v })} placeholder="intern, junior, associate" ariaLabel="Skip titles containing" />
-            <Helper size="xs">Comma-separated. Applied after the match above.</Helper>
+            <span style={fieldLabel}><Trans>Skip titles containing</Trans></span>
+            <Input value={draft.title_exclude_keywords} onChange={(v) => set({ title_exclude_keywords: v })} placeholder={t`intern, junior, associate`} ariaLabel={t`Skip titles containing`} />
+            <Helper size="xs"><Trans>Comma-separated. Applied after the match above.</Trans></Helper>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span style={fieldLabel}>Score new jobs automatically</span>
+            <span style={fieldLabel}><Trans>Score new jobs automatically</Trans></span>
             <Seg opts={DEPTHS} value={draft.auto_scoring_depth} onPick={(v) => set({ auto_scoring_depth: v })} />
             <div style={{ paddingTop: 2 }}><ResumeChips resumes={resumes} personaPopulated={personaPopulated} selected={draft.selected_resume_ids} toggle={toggleResume} /></div>
             <Helper size="xs">{resumeHelp}</Helper>
@@ -731,36 +733,36 @@ function Drawer({ state, setState, onClose, resumes, personaPopulated, onSave, o
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
           <div onClick={toggleTuning} style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
             <span style={{ flex: '0 0 12px', display: 'inline-flex', justifyContent: 'center', position: 'relative', top: -2, fontSize: 11, color: 'var(--muted)' }}>{tuning ? '⌄' : '›'}</span>
-            <Heading strong={600} size={15}>Scraper tuning</Heading>
+            <Heading strong={600} size={15}><Trans>Scraper tuning</Trans></Heading>
             <Helper size="xs" style={{ ...(bannerMuted ? null : company.last_error ? { color: 'var(--bad)' } : downReason ? { color: 'var(--warn)' } : null) }}>{tuningNote}</Helper>
           </div>
           {tuning && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={fieldLabel}>Priority tier</span>
+                  <span style={fieldLabel}><Trans>Priority tier</Trans></span>
                   <Seg opts={TIER_BTNS} value={draft.tier} onPick={(v) => set({ tier: v })} valueKey="v" />
-                  <Helper size="xs">Groups companies for filtering and bulk actions.</Helper>
+                  <Helper size="xs"><Trans>Groups companies for filtering and bulk actions.</Trans></Helper>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={fieldLabel}>Scrape interval in minutes</span>
-                  <Input type="number" min={1} value={draft.scrape_interval_minutes} onChange={(v) => set({ scrape_interval_minutes: v })} placeholder="Use global interval" ariaLabel="Scrape interval in minutes" />
-                  <Helper size="xs">Blank follows the schedule set in Settings.</Helper>
+                  <span style={fieldLabel}><Trans>Scrape interval in minutes</Trans></span>
+                  <Input type="number" min={1} value={draft.scrape_interval_minutes} onChange={(v) => set({ scrape_interval_minutes: v })} placeholder={t`Use global interval`} ariaLabel={t`Scrape interval in minutes`} />
+                  <Helper size="xs"><Trans>Blank follows the schedule set in Settings.</Trans></Helper>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={fieldLabel}>Wait for element</span>
-                  <Input value={draft.wait_for_selector} onChange={(v) => set({ wait_for_selector: v })} placeholder="CSS selector" mono ariaLabel="Wait for element" />
-                  <Helper size="xs">CSS selector the page must render before reading.</Helper>
+                  <span style={fieldLabel}><Trans>Wait for element</Trans></span>
+                  <Input value={draft.wait_for_selector} onChange={(v) => set({ wait_for_selector: v })} placeholder={t`CSS selector`} mono ariaLabel={t`Wait for element`} />
+                  <Helper size="xs"><Trans>CSS selector the page must render before reading.</Trans></Helper>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={fieldLabel}>Pages to read</span>
-                  <Input type="number" min={1} max={20} value={draft.max_pages} onChange={(v) => set({ max_pages: v })} ariaLabel="Pages to read" />
-                  <Helper size="xs">Maximum number of result pages to read.</Helper>
+                  <span style={fieldLabel}><Trans>Pages to read</Trans></span>
+                  <Input type="number" min={1} max={20} value={draft.max_pages} onChange={(v) => set({ max_pages: v })} ariaLabel={t`Pages to read`} />
+                  <Helper size="xs"><Trans>Maximum number of result pages to read.</Trans></Helper>
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={fieldLabel}>H-1B employer name</span>
-                <Input value={draft.h1b_slug} onChange={(v) => set({ h1b_slug: v })} placeholder="Auto-detect" mono ariaLabel="H-1B employer name" />
+                <span style={fieldLabel}><Trans>H-1B employer name</Trans></span>
+                <Input value={draft.h1b_slug} onChange={(v) => set({ h1b_slug: v })} placeholder={t`Auto-detect`} mono ariaLabel={t`H-1B employer name`} />
                 <Helper size="xs" style={{ ...(lca ? { color: 'var(--good)' } : null) }}>{lcaLine}</Helper>
               </div>
             </div>
@@ -783,17 +785,17 @@ function Drawer({ state, setState, onClose, resumes, personaPopulated, onSave, o
         <Button variant="secondary" size="sm" hover={draft.active ? 'v2-bd-warn' : 'v2-bdc'}
           onClick={() => { onSave(company.id, { active: !draft.active }); set({ active: !draft.active }) }}
           style={{ height: 32, fontSize: 12, color: draft.active ? 'var(--warn)' : 'var(--accent)' }}>
-          {draft.active ? 'Make inactive — jobs already found are kept' : 'Make active'}
+          {draft.active ? t`Make inactive — jobs already found are kept` : t`Make active`}
         </Button>
         <Button variant="secondary" size="sm" hover="v2-act"
           onClick={testingId ? undefined : () => onTest(company.id)}
-          title={testingId && testingId !== company.id ? 'A test is already running' : undefined}
+          title={testingId && testingId !== company.id ? t`A test is already running` : undefined}
           style={{ height: 32, gap: 6, fontSize: 12, ...(testingId && testingId !== company.id ? { opacity: 0.5 } : null), ...(testingId ? { cursor: 'default' } : null) }}>
           {testingId === company.id && <Spinner />}
-          {testingId === company.id ? 'Testing…' : 'Test scrape'}
+          {testingId === company.id ? t`Testing…` : t`Test scrape`}
         </Button>
         {saveErr && <Helper style={{ marginLeft: 'auto', color: 'var(--bad)' }}>{saveErr}</Helper>}
-        <Button size="sm" onClick={save} busy={saving} style={{ marginLeft: saveErr ? 10 : 'auto' }}>{saving ? 'Saving…' : 'Save changes'}</Button>
+        <Button size="sm" onClick={save} busy={saving} style={{ marginLeft: saveErr ? 10 : 'auto' }}>{saving ? t`Saving…` : t`Save changes`}</Button>
       </FooterRow>
     </UiDrawer>
   )
@@ -811,17 +813,17 @@ function AddModal({ onClose, resumes, personaPopulated, onCreated, pushToast }) 
   const [saving, setSaving] = useState(false)
   const ats = detectAts(url)
   const known = ats !== 'Generic'
-  const atsNote = !url ? 'The ATS is detected once you paste a URL.'
-    : known ? "Jobs are read from the board's API, so no page settings are needed."
-      : 'Unknown job board. The page is read as HTML. If no jobs are found, set a wait-for selector in the company settings.'
+  const atsNote = !url ? t`The ATS is detected once you paste a URL.`
+    : known ? t`Jobs are read from the board's API, so no page settings are needed.`
+      : t`Unknown job board. The page is read as HTML. If no jobs are found, set a wait-for selector in the company settings.`
   const selNames = [...resumes.filter((r) => selected.includes(r.id)).map((r) => r.name), ...(selected.includes('persona') ? ['Persona'] : [])]
-  const scoreNote = depth === 'off' ? 'New jobs arrive unscored — you can score them by hand from the feed.'
-    : `New jobs are scored against ${selNames.length ? selNames.join(', ') : 'your default résumé from Settings'} as they arrive.`
+  const scoreNote = depth === 'off' ? t`New jobs arrive unscored — you can score them by hand from the feed.`
+    : t`New jobs are scored against ${selNames.length ? selNames.join(', ') : t`your default résumé from Settings`} as they arrive.`
   const toggle = (id) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id])
 
   const save = async () => {
     if (saving) return
-    if (!name.trim()) { pushToast({ kind: 'error', msg: 'Company name is required' }); return }
+    if (!name.trim()) { pushToast({ kind: 'error', msg: t`Company name is required` }); return }
     setSaving(true)
     try {
       await api.post('/companies', {
@@ -834,65 +836,65 @@ function AddModal({ onClose, resumes, personaPopulated, onCreated, pushToast }) 
       track('company_added', { ats: atsId(ats) })
       onCreated(); onClose()
     } catch (e) {
-      pushToast({ kind: 'error', msg: 'Could not add company' + errSuffix(e) })
+      pushToast({ kind: 'error', msg: t`Could not add company` + errSuffix(e) })
       setSaving(false)
     }
   }
 
   return (
-    <ModalPanel width={520} title="Add company" onClose={onClose} zIndex={60} style={{ overflow: 'hidden' }}>
+    <ModalPanel width={520} title={t`Add company`} onClose={onClose} zIndex={60} style={{ overflow: 'hidden' }}>
         <HeaderRow align="stretch" style={{ flexDirection: 'column', gap: 3 }}>
-          <Heading className="v2-dialogtitle">Add company</Heading>
-          <Helper>Paste a careers URL — the ATS is read from it.</Helper>
+          <Heading className="v2-dialogtitle"><Trans>Add company</Trans></Heading>
+          <Helper><Trans>Paste a careers URL — the ATS is read from it.</Trans></Helper>
         </HeaderRow>
         <div className="v2-scroll" style={{ padding: '15px 22px', display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 470, overflow: 'auto' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Label>Career page URL</Label>
+            <Label><Trans>Career page URL</Trans></Label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
               {/* ui: keep — the ATS badge: mono 9.5/.05em/pad 3 8 painted by its cc-* class; Tag is 10/.06em/pad 2 8 */}
               <span className={url ? atsSlug(ats) : undefined} style={{ flex: '0 0 auto', fontFamily: 'var(--mono)', fontSize: 9.5, letterSpacing: '.05em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 'var(--radius-control)', background: url ? undefined : 'var(--surface-2)', color: url ? undefined : 'var(--muted)', whiteSpace: 'nowrap' }}>{url ? ats : '—'}</span>
-              <Input value={url} onChange={setUrl} placeholder="https://boards.greenhouse.io/acme" mono ariaLabel="Career page URL" style={{ flex: 1, minWidth: 0 }} />
+              <Input value={url} onChange={setUrl} placeholder="https://boards.greenhouse.io/acme" mono ariaLabel={t`Career page URL`} style={{ flex: 1, minWidth: 0 }} />
             </div>
             <Helper style={{ ...(url && !known ? { color: 'var(--warn)' } : null) }}>{atsNote}</Helper>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <Label>Company name</Label>
-              <Input value={name} onChange={setName} placeholder="Acme" ariaLabel="Company name" />
+              <Label><Trans>Company name</Trans></Label>
+              <Input value={name} onChange={setName} placeholder={t`Acme`} ariaLabel={t`Company name`} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <Label>Aliases</Label>
-              <Input value={aliases} onChange={setAliases} placeholder="Alt names, comma-separated" ariaLabel="Aliases" />
+              <Label><Trans>Aliases</Trans></Label>
+              <Input value={aliases} onChange={setAliases} placeholder={t`Alt names, comma-separated`} ariaLabel={t`Aliases`} />
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <Label>Tier</Label>
+              <Label><Trans>Tier</Trans></Label>
               <Seg opts={TIER_BTNS} value={tier} onPick={setTier} valueKey="v" />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <Label>Scrape interval in minutes</Label>
-              <Input type="number" min={1} value={interval} onChange={setIntervalV} placeholder="Use global interval" ariaLabel="Scrape interval in minutes" />
+              <Label><Trans>Scrape interval in minutes</Trans></Label>
+              <Input type="number" min={1} value={interval} onChange={setIntervalV} placeholder={t`Use global interval`} ariaLabel={t`Scrape interval in minutes`} />
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 2, borderTop: '1px solid var(--line-soft)', marginTop: 2 }}>
-            <Label style={{ paddingTop: 8 }}>Score new jobs against</Label>
+            <Label style={{ paddingTop: 8 }}><Trans>Score new jobs against</Trans></Label>
             <ResumeChips resumes={resumes} personaPopulated={personaPopulated} selected={selected} toggle={toggle} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 2 }}>
-              <span style={{ fontSize: 11.5, color: 'var(--text-2)' }}>Depth</span>
+              <span style={{ fontSize: 11.5, color: 'var(--text-2)' }}><Trans>Depth</Trans></span>
               {/* same auto_scoring_depth control as the drawer, via Seg, for a consistent segmented control */}
-              <Segmented size="sm" ariaLabel="Auto-scoring depth" value={depth} onChange={setDepth}
+              <Segmented size="sm" ariaLabel={t`Auto-scoring depth`} value={depth} onChange={setDepth}
                 options={DEPTHS.map((d) => ({ value: d.id, label: d.label, hint: d.hint }))}
                 style={{ flex: 1 }} />
             </div>
           </div>
           <Helper style={{ paddingTop: 2 }}>{scoreNote}</Helper>
-          <Helper>Title filters, wait-for selector and max pages use the defaults. Change them in the company settings if needed.</Helper>
+          <Helper><Trans>Title filters, wait-for selector and max pages use the defaults. Change them in the company settings if needed.</Trans></Helper>
         </div>
         <FooterRow bg="page" style={{ flex: '0 0 auto' }}>
-          <Helper>Scrapes on the next scheduled run</Helper>
-          <Button variant="secondary" size="sm" onClick={onClose} style={{ marginLeft: 'auto' }}>Cancel</Button>
-          <Button size="sm" onClick={save} busy={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+          <Helper><Trans>Scrapes on the next scheduled run</Trans></Helper>
+          <Button variant="secondary" size="sm" onClick={onClose} style={{ marginLeft: 'auto' }}><Trans>Cancel</Trans></Button>
+          <Button size="sm" onClick={save} busy={saving}>{saving ? t`Saving…` : t`Save`}</Button>
         </FooterRow>
     </ModalPanel>
   )
@@ -904,10 +906,10 @@ function TestModal({ test, onClose, showShots, setShowShots }) {
   useEffect(() => { setLimit(TEST_PAGE) }, [test])   // a fresh run starts at page 1
   if (test.error) {
     return (
-      <ModalPanel width={520} title="Test scrape — Error" onClose={onClose} zIndex={60} style={{ padding: 22 }}>
-        <Heading className="v2-dialogtitle" style={{ display: 'block', marginBottom: 10 }}>Test scrape — Error</Heading>
+      <ModalPanel width={520} title={t`Test scrape — Error`} onClose={onClose} zIndex={60} style={{ padding: 22 }}>
+        <Heading className="v2-dialogtitle" style={{ display: 'block', marginBottom: 10 }}><Trans>Test scrape — Error</Trans></Heading>
         <div style={{ fontSize: 12.5, color: 'var(--bad)' }}>{test.error}</div>
-        <Pill onClick={onClose} style={{ marginTop: 16 }}>Close</Pill>
+        <Pill onClick={onClose} style={{ marginTop: 16 }}><Trans>Close</Trans></Pill>
       </ModalPanel>
     )
   }
@@ -934,7 +936,7 @@ function TestModal({ test, onClose, showShots, setShowShots }) {
   const jobState = (j) => {
     if (j.reason?.startsWith('[Validation]')) return { tag: 'Drop', tagBg: 'var(--warn-soft)', tagFg: 'var(--warn)', reasonFg: 'var(--warn)', reason: j.reason.replace('[Validation] ', '') }
     // a body-phrase drop is stored as `ignored`, not filtered out of the feed; label it with the phrase that did it.
-    if (j.body_excluded_by) return { tag: 'Ignored', tagBg: 'var(--warn-soft)', tagFg: 'var(--warn)', reasonFg: 'var(--warn)', reason: j.reason || `Body exclusion: ${j.body_excluded_by}` }
+    if (j.body_excluded_by) return { tag: 'Ignored', tagBg: 'var(--warn-soft)', tagFg: 'var(--warn)', reasonFg: 'var(--warn)', reason: j.reason || t`Body exclusion: ${j.body_excluded_by}` }
     if (j.kept) return {
       tag: 'Kept', tagBg: 'var(--accent-soft)', tagFg: 'var(--good)', reasonFg: 'var(--muted)',
       // a kept row the body scan couldn't run on is not a promise — say so
@@ -944,22 +946,22 @@ function TestModal({ test, onClose, showShots, setShowShots }) {
     return { tag: 'Out', tagBg: 'var(--bad-soft)', tagFg: 'var(--bad)', reasonFg: 'var(--bad)', reason: j.reason || '' }
   }
   return (
-    <ModalPanel width={840} title={`Test scrape — ${test.company}`} onClose={onClose} zIndex={60} style={{ maxHeight: 660, overflow: 'hidden' }}>
+    <ModalPanel width={840} title={t`Test scrape — ${test.company}`} onClose={onClose} zIndex={60} style={{ maxHeight: 660, overflow: 'hidden' }}>
         <HeaderRow variant="compact" align="center" style={{ gap: 10 }}>
-          <Heading className="v2-dialogtitle">Test scrape — {test.company}</Heading>
+          <Heading className="v2-dialogtitle"><Trans>Test scrape — {test.company}</Trans></Heading>
           {shots.length > 0 && (
-            <Pill size="sm" on={showShots} onClick={() => setShowShots((v) => !v)} style={{ marginLeft: 'auto' }}>{showShots ? 'Hide' : 'Show'} screenshots</Pill>
+            <Pill size="sm" on={showShots} onClick={() => setShowShots((v) => !v)} style={{ marginLeft: 'auto' }}><Trans>{showShots ? t`Hide` : t`Show`} screenshots</Trans></Pill>
           )}
-          <IconButton onClick={onClose} title="Close" style={{ marginLeft: shots.length ? 0 : 'auto' }}>✕</IconButton>
+          <IconButton onClick={onClose} title={t`Close`} style={{ marginLeft: shots.length ? 0 : 'auto' }}>✕</IconButton>
         </HeaderRow>
 
         <HeaderRow align="stretch" pad="9px 22px" bg="page" soft style={{ flexDirection: 'column', gap: 2 }}>
-          <Helper>URLs scraped · {urls.length}</Helper>
+          <Helper><Trans>URLs scraped · {urls.length}</Trans></Helper>
           {urls.map((u, i) => <Helper key={i} size="xs" mono style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u}</Helper>)}
           {(test.include_expr || (test.exclude_keywords || []).length > 0) && (
             <span style={{ fontSize: 11, color: 'var(--text-2)' }}>
-              {test.include_expr && <>Include <span style={{ fontFamily: 'var(--mono)', fontSize: 10, background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 'var(--radius-inline)' }}>{test.include_expr}</span> </>}
-              {(test.exclude_keywords || []).length > 0 && <>· Exclude <span style={{ fontFamily: 'var(--mono)', fontSize: 10, background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 'var(--radius-inline)' }}>{test.exclude_keywords.join(', ')}</span></>}
+              {test.include_expr && <><Trans>Include</Trans> <span style={{ fontFamily: 'var(--mono)', fontSize: 10, background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 'var(--radius-inline)' }}>{test.include_expr}</span> </>}
+              {(test.exclude_keywords || []).length > 0 && <><Trans>· Exclude</Trans> <span style={{ fontFamily: 'var(--mono)', fontSize: 10, background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 'var(--radius-inline)' }}>{test.exclude_keywords.join(', ')}</span></>}
             </span>
           )}
         </HeaderRow>
@@ -978,9 +980,9 @@ function TestModal({ test, onClose, showShots, setShowShots }) {
         {pag.length > 0 && (
           <HeaderRow align="stretch" pad="10px 22px" bg="recessed" soft style={{ flexDirection: 'column', gap: 3 }}>
             {/* ui: keep — the debug band's head is accent at weight 600; Label is --label-ink at 400 */}
-            <span style={{ fontSize: 10, letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 600 }}>Page-by-page details</span>
+            <span style={{ fontSize: 10, letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 600 }}><Trans>Page-by-page details</Trans></span>
             {pag.map((p, i) => (
-              <span key={i} style={{ fontSize: 11, color: p.clicked ? 'var(--good)' : 'var(--bad)' }}>Page {p.page} · {p.clicked ? `Clicked ${p.clicked_via?.selector || ''} — ${p.clicked_via?.text || ''}` : 'No next button found'}</span>
+              <span key={i} style={{ fontSize: 11, color: p.clicked ? 'var(--good)' : 'var(--bad)' }}><Trans>Page {p.page} · {p.clicked ? t`Clicked ${p.clicked_via?.selector || ''} — ${p.clicked_via?.text || ''}` : t`No next button found`}</Trans></span>
             ))}
           </HeaderRow>
         )}
@@ -988,10 +990,10 @@ function TestModal({ test, onClose, showShots, setShowShots }) {
         <div className="v2-scroll" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           <TableHead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
             <span style={{ flex: '0 0 30px' }}>#</span>
-            <span style={{ flex: 1, minWidth: 0 }}>Title</span>
-            <span style={{ flex: '0 0 62px' }}>Status</span>
-            <span style={{ flex: '0 0 260px' }}>Reason</span>
-            <span style={{ flex: '0 0 40px', textAlign: 'right' }}>Link</span>
+            <span style={{ flex: 1, minWidth: 0 }}><Trans>Title</Trans></span>
+            <span style={{ flex: '0 0 62px' }}><Trans>Status</Trans></span>
+            <span style={{ flex: '0 0 260px' }}><Trans>Reason</Trans></span>
+            <span style={{ flex: '0 0 40px', textAlign: 'right' }}><Trans>Link</Trans></span>
           </TableHead>
           {jobs.slice(0, limit).map((j, i) => {
             const st = jobState(j)
@@ -1008,12 +1010,12 @@ function TestModal({ test, onClose, showShots, setShowShots }) {
             )
           })}
           {jobs.length > limit && <ShowMore n={Math.min(TEST_PAGE, jobs.length - limit)} onClick={() => setLimit((n) => n + TEST_PAGE)} />}
-          {jobs.length === 0 && <div style={{ textAlign: 'center', padding: 32, color: 'var(--muted)', fontSize: 12.5 }}>No job links found on this page.</div>}
+          {jobs.length === 0 && <div style={{ textAlign: 'center', padding: 32, color: 'var(--muted)', fontSize: 12.5 }}><Trans>No job links found on this page.</Trans></div>}
         </div>
 
         <FooterRow variant="compact" bg="page" style={{ flex: '0 0 auto' }}>
-          <span style={{ fontSize: 11.5, color: 'var(--text-2)' }}>{summary}{jobs.length > limit ? ` · showing the first ${limit}` : ''}</span>
-          <Pill onClick={onClose} style={{ marginLeft: 'auto' }}>Close</Pill>
+          <span style={{ fontSize: 11.5, color: 'var(--text-2)' }}>{summary}{jobs.length > limit ? t` · showing the first ${limit}` : ''}</span>
+          <Pill onClick={onClose} style={{ marginLeft: 'auto' }}><Trans>Close</Trans></Pill>
         </FooterRow>
     </ModalPanel>
   )

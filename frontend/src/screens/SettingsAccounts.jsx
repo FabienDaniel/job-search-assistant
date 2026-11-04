@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { intlLocale } from '../i18n'
 import api, { authFailure } from '../api'
 import { PromptDialog } from '../ConfirmDialog'
@@ -19,18 +21,22 @@ import {
 
 export const COPY_ITEMS = [
   ['persona', 'Persona', 'every node, Q&A bank included'],
-  ['qa', 'Q&A bank only', 'autofill answers, without the rest of the Persona'],
-  ['resumes', 'Base résumés', 'tailored copies stay behind'],
+  ['qa', t`Q&A bank only`, 'autofill answers, without the rest of the Persona'],
+  ['resumes', t`Base résumés`, 'tailored copies stay behind'],
   ['companies', 'Companies', 'they ride the same scrapes'],
   ['searches', 'Searches', 'the built-in extension searches are always there'],
   ['settings', 'Settings', 'never keys, sessions, chat ids or Gmail'],
-  ['voices', 'Cover-letter voices', 'presets and the default voice'],
-  ['excludes', 'Global excludes', 'body, title and company excludes'],
+  ['voices', t`Cover-letter voices`, 'presets and the default voice'],
+  ['excludes', t`Global excludes`, 'body, title and company excludes'],
 ]
 
 const COUNT_LABELS = [
-  ['jobs', 'job', 'jobs'], ['applications', 'application', 'applications'], ['resumes', 'résumé', 'résumés'],
-  ['cover_letters', 'cover letter', 'cover letters'], ['searches', 'search', 'searches'], ['companies', 'company', 'companies'],
+  ['jobs', (n) => plural(n, { one: 'job', other: 'jobs' })],
+  ['applications', (n) => plural(n, { one: 'application', other: 'applications' })],
+  ['resumes', (n) => plural(n, { one: 'résumé', other: 'résumés' })],
+  ['cover_letters', (n) => plural(n, { one: 'cover letter', other: 'cover letters' })],
+  ['searches', (n) => plural(n, { one: 'search', other: 'searches' })],
+  ['companies', (n) => plural(n, { one: 'company', other: 'companies' })],
 ]
 
 // "1,204 jobs · 12 applications · …" — zero counts are left out.
@@ -38,7 +44,7 @@ export function countsLine(counts, all = false) {
   const c = counts || {}
   const parts = COUNT_LABELS
     .filter(([k]) => all || Number(c[k]) > 0)
-    .map(([k, one, many]) => `${Number(c[k] || 0).toLocaleString(intlLocale())} ${Number(c[k]) === 1 ? one : many}`)
+    .map(([k, word]) => `${Number(c[k] || 0).toLocaleString(intlLocale())} ${word(Number(c[k] || 0))}`)
   return parts.length ? parts.join(' · ') : 'no data yet'
 }
 
@@ -49,31 +55,31 @@ export const accountsChanged = () => {
 
 // The MT-11 error bodies are `{detail: code, message}`; PIN answers carry their own numbers.
 const CODE_TEXT = {
-  account_limit: 'This install already has 5 accounts — remove one first.',
-  name_taken: 'Another account already has that name.',
-  account_busy: 'That account has background work running — try again when it finishes.',
-  backup_failed: 'The database backup failed, so nothing was removed. See the server log.',
-  confirm_name_mismatch: 'Type the account’s name exactly to confirm.',
-  cannot_remove_owner: 'The owner account cannot be removed.',
-  cannot_remove_self: 'You cannot remove the account you are using.',
-  owner_only: 'Only the owner can do that.',
+  account_limit: t`This install already has 5 accounts — remove one first.`,
+  name_taken: t`Another account already has that name.`,
+  account_busy: t`That account has background work running — try again when it finishes.`,
+  backup_failed: t`The database backup failed, so nothing was removed. See the server log.`,
+  confirm_name_mismatch: t`Type the account’s name exactly to confirm.`,
+  cannot_remove_owner: t`The owner account cannot be removed.`,
+  cannot_remove_self: t`You cannot remove the account you are using.`,
+  owner_only: t`Only the owner can do that.`,
   // QA F7 / R6-08: every code a Settings action can answer with reads as a sentence
-  own_account_only: 'You can only do that for your own account.',
-  no_account: 'Pick an account first — this browser has none selected.',
-  gmail_not_configured: 'Gmail is not set up on this install yet — the owner adds the Google OAuth client first.',
-  scheduled_scrape_running: 'The scheduled scrape is running — try again when it finishes.',
-  account_changed: 'This tab was switched to another account — reload it.',
-  invalid_account_token: 'That account token is no longer valid — create a new one.',
-  account_required: 'Pick an account first.',
+  own_account_only: t`You can only do that for your own account.`,
+  no_account: t`Pick an account first — this browser has none selected.`,
+  gmail_not_configured: t`Gmail is not set up on this install yet — the owner adds the Google OAuth client first.`,
+  scheduled_scrape_running: t`The scheduled scrape is running — try again when it finishes.`,
+  account_changed: t`This tab was switched to another account — reload it.`,
+  invalid_account_token: t`That account token is no longer valid — create a new one.`,
+  account_required: t`Pick an account first.`,
   // QA F8 / R5-03
-  chat_in_use: 'That Telegram chat is already linked to another account — use another chat, or your own bot.',
-  'No account to link': 'Pick an account first — there is no account to link this chat to.',
+  chat_in_use: t`That Telegram chat is already linked to another account — use another chat, or your own bot.`,
+  'No account to link': t`Pick an account first — there is no account to link this chat to.`,
 }
-export function errorText(err, fallback = 'Something went wrong — try again.') {
+export function errorText(err, fallback = t`Something went wrong — try again.`) {
   const f = authFailure(err)
-  if (f?.kind === 'wrong_pin') return f.triesLeft != null ? `Wrong PIN · ${f.triesLeft} ${f.triesLeft === 1 ? 'try' : 'tries'} left` : 'Wrong PIN'
-  if (f?.kind === 'pin_required') return 'Enter the current PIN.'
-  if (f?.kind === 'pin_cooldown') return `Too many tries — wait ${f.retryAfter}s.`
+  if (f?.kind === 'wrong_pin') return f.triesLeft != null ? plural(f.triesLeft, { one: 'Wrong PIN · # try left', other: 'Wrong PIN · # tries left' }) : t`Wrong PIN`
+  if (f?.kind === 'pin_required') return t`Enter the current PIN.`
+  if (f?.kind === 'pin_cooldown') return t`Too many tries — wait ${f.retryAfter}s.`
   const d = err?.response?.data
   if (d && typeof d.detail === 'string' && CODE_TEXT[d.detail]) return CODE_TEXT[d.detail]
   if (d && typeof d.message === 'string' && d.message) return d.message
@@ -117,9 +123,9 @@ export function ColorPicker({ name, value, onPick, taken = [], ariaLabel = 'Colo
         const on = (value || '').toLowerCase() === c
         const used = taken.includes(c) && !on
         return (
-          <span key={c} role="radio" aria-checked={on} aria-label={`Colour ${i + 1}${used ? ' (in use)' : ''}`}
+          <span key={c} role="radio" aria-checked={on} aria-label={(used ? t`Colour ${i + 1} (in use)` : t`Colour ${i + 1}`)}
             onClick={() => onPick(c)} {...kb(() => onPick(c), 'radio')}
-            title={used ? 'Another account uses this colour' : undefined}
+            title={used ? t`Another account uses this colour` : undefined}
             style={{ display: 'flex', padding: 2, cursor: 'pointer', opacity: used ? 0.5 : 1,
               borderBottom: `2px solid ${on ? 'var(--accent)' : 'transparent'}` }}>
             <Avatar name={name || '?'} color={c} size={26} />
@@ -143,8 +149,8 @@ export function PinDialog({ title, who, needCurrent, mode = 'set', intro, onSubm
   const [cooldown, setCooldown] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const name = steps[step]
-  const prompt = name === 'current' ? `Current PIN${who ? ` for ${who}` : ''}`
-    : name === 'new' ? `New PIN${who ? ` for ${who}` : ''}` : 'Same PIN again'
+  const prompt = name === 'current' ? (who ? t`Current PIN for ${who}` : t`Current PIN`)
+    : name === 'new' ? (who ? t`New PIN for ${who}` : t`New PIN`) : t`Same PIN again`
 
   const finish = async (all) => {
     setBusy(true); setError('')
@@ -164,7 +170,7 @@ export function PinDialog({ title, who, needCurrent, mode = 'set', intro, onSubm
     const all = { ...vals, [name]: pin }
     setVals(all); setError('')
     if (name === 'confirm' && pin !== all.new) {
-      setError('The two PINs differ — enter the new PIN again.')
+      setError(t`The two PINs differ — enter the new PIN again.`)
       setStep(steps.indexOf('new')); setAttempt((n) => n + 1); return
     }
     if (step < steps.length - 1) { setStep(step + 1); setAttempt((n) => n + 1); return }
@@ -180,8 +186,8 @@ export function PinDialog({ title, who, needCurrent, mode = 'set', intro, onSubm
       <PinPad key={name} onComplete={complete} busy={busy} error={error} resetKey={attempt} hint={prompt}
         cooldown={cooldown} onCooldownEnd={() => setCooldown(0)} ariaLabel={prompt} style={{ paddingTop: 4 }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {onRemove && <Link onClick={onRemove}>Remove PIN instead</Link>}
-        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy} style={{ marginLeft: 'auto' }}>Cancel</Button>
+        {onRemove && <Link onClick={onRemove}><Trans>Remove PIN instead</Trans></Link>}
+        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy} style={{ marginLeft: 'auto' }}><Trans>Cancel</Trans></Button>
       </div>
     </ModalPanel>
   )
@@ -214,33 +220,33 @@ export function AddAccountModal({ accounts, onClose, onCreated }) {
       const { data } = await api.post('/accounts', body)
       onCreated(data?.account || { name: body.name }, data?.copied || {})
     } catch (err) {
-      setError(errorText(err, 'Could not add the account — try again.'))
+      setError(errorText(err, t`Could not add the account — try again.`))
       setBusy(false)
     }
   }
 
-  const sources = [['', 'Nothing — start empty'], ...accounts.map((a) => [a.id, a.role === 'owner' ? `${a.name} (owner)` : a.name])]
+  const sources = [['', t`Nothing — start empty`], ...accounts.map((a) => [a.id, a.role === 'owner' ? `${a.name} (owner)` : a.name])]
   return (
-    <ModalPanel width={520} title="Add account" onClose={busy ? undefined : onClose} zIndex={70}
+    <ModalPanel width={520} title={t`Add account`} onClose={busy ? undefined : onClose} zIndex={70}
       style={{ padding: '22px 24px 18px', gap: 14, maxHeight: '92vh', overflow: 'auto' }}>
-      <Heading size={19} className="v2-dialogtitle">Add account</Heading>
+      <Heading size={19} className="v2-dialogtitle"><Trans>Add account</Trans></Heading>
       <Helper style={{ marginTop: -8, textWrap: 'pretty' }}>
-        A person on this install with their own jobs, résumés, applications and settings. Scraping stays shared.
+        <Trans>A person on this install with their own jobs, résumés, applications and settings. Scraping stays shared.</Trans>
       </Helper>
-      <Field label="Name">
-        <Input value={name} onChange={setName} placeholder="e.g. Alex" ariaLabel="Account name" autoFocus width="100%"
+      <Field label={t`Name`}>
+        <Input value={name} onChange={setName} placeholder={t`e.g. Alex`} ariaLabel={t`Account name`} autoFocus width="100%"
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create() } }} />
       </Field>
-      <Field label="Colour"><ColorPicker name={name} value={color} onPick={setColor} taken={taken} /></Field>
-      <Field label="PIN" hint="Optional · 4 digits · your own PIN opens this account too">
+      <Field label={t`Colour`}><ColorPicker name={name} value={color} onPick={setColor} taken={taken} /></Field>
+      <Field label="PIN" hint={t`Optional · 4 digits · your own PIN opens this account too`}>
         <Input value={pin} onChange={(v) => setPin(v.replace(/\D/g, '').slice(0, 4))} type="password" inputMode="numeric"
-          autoComplete="new-password" placeholder="none" ariaLabel="PIN for the new account" mono width="120px" invalid={!pinOk} />
+          autoComplete="new-password" placeholder={t`none`} ariaLabel={t`PIN for the new account`} mono width="120px" invalid={!pinOk} />
       </Field>
-      <Field label="Start from a copy of…">
-        <Select value={source} options={sources} onPick={setSource} width="100%" ariaLabel="Copy from account" />
+      <Field label={t`Start from a copy of…`}>
+        <Select value={source} options={sources} onPick={setSource} width="100%" ariaLabel={t`Copy from account`} />
       </Field>
       {source && (
-        <div role="group" aria-label="Items to copy" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', marginTop: -4 }}>
+        <div role="group" aria-label={t`Items to copy`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', marginTop: -4 }}>
           {COPY_ITEMS.map(([k, label, hint]) => (
             <div key={k} style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
               <Check checked={items.includes(k)} onChange={() => toggle(k)} label={label} />
@@ -251,9 +257,9 @@ export function AddAccountModal({ accounts, onClose, onCreated }) {
       )}
       {error && <Helper style={{ color: 'var(--bad)' }}>{error}</Helper>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-        <Helper size="xs">No jobs, applications or letters are copied.</Helper>
-        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy} style={{ marginLeft: 'auto' }}>Cancel</Button>
-        <Button size="sm" onClick={create} disabled={!ready} busy={busy}>Add account</Button>
+        <Helper size="xs"><Trans>No jobs, applications or letters are copied.</Trans></Helper>
+        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy} style={{ marginLeft: 'auto' }}><Trans>Cancel</Trans></Button>
+        <Button size="sm" onClick={create} disabled={!ready} busy={busy}><Trans>Add account</Trans></Button>
       </div>
     </ModalPanel>
   )
@@ -285,44 +291,44 @@ export function RemoveAccountModal({ account, onClose, onRemoved }) {
       const { data } = await api.delete(`/accounts/${account.id}`, { data: { confirm_name: typed } })
       onRemoved(account, data)
     } catch (err) {
-      setError(errorText(err, 'Could not remove the account — try again.'))
+      setError(errorText(err, t`Could not remove the account — try again.`))
       setBusy(false)
     }
   }
   const exp = async () => {
     setExporting(true)
-    try { await downloadExport(account) } catch (err) { setError(errorText(err, 'The export failed — try again.')) }
+    try { await downloadExport(account) } catch (err) { setError(errorText(err, t`The export failed — try again.`)) }
     setExporting(false)
   }
   const c = account.counts || {}
   return (
-    <ModalPanel width={460} title={`Remove ${account.name}?`} onClose={busy ? undefined : onClose} zIndex={70}
+    <ModalPanel width={460} title={t`Remove ${account.name}?`} onClose={busy ? undefined : onClose} zIndex={70}
       style={{ padding: '22px 24px 18px', gap: 12 }}>
-      <Heading size={19} className="v2-dialogtitle">Remove {account.name}?</Heading>
+      <Heading size={19} className="v2-dialogtitle"><Trans>Remove {account.name}?</Trans></Heading>
       <span className="v2-dialogtext" style={{ fontSize: 12.5, lineHeight: '18px', color: 'var(--helper-ink)' }}>
-        Everything {account.name} has on this install is deleted. There is no undo.
+        <Trans>Everything {account.name} has on this install is deleted. There is no undo.</Trans>
       </span>
-      <Surface radius="row" pad="8px 12px" style={{ display: 'flex', flexDirection: 'column', gap: 2 }} aria-label="What is deleted">
-        {COUNT_LABELS.map(([k, one, many]) => (
+      <Surface radius="row" pad="8px 12px" style={{ display: 'flex', flexDirection: 'column', gap: 2 }} aria-label={t`What is deleted`}>
+        {COUNT_LABELS.map(([k, word]) => (
           <span key={k} style={{ display: 'flex', fontSize: 12, lineHeight: '18px' }}>
-            <span style={{ flex: 1 }}>{Number(c[k]) === 1 ? one : many}</span>
+            <span style={{ flex: 1 }}>{word(Number(c[k] || 0))}</span>
             <span style={{ fontFamily: 'var(--mono)' }}>{Number(c[k] || 0).toLocaleString(intlLocale())}</span>
           </span>
         ))}
-        <Helper size="xs" style={{ paddingTop: 2 }}>plus their Persona, settings, links and run history</Helper>
+        <Helper size="xs" style={{ paddingTop: 2 }}><Trans>plus their Persona, settings, links and run history</Trans></Helper>
       </Surface>
       <Helper style={{ textWrap: 'pretty' }}>
-        A full database backup is taken first (kept in <span style={{ fontFamily: 'var(--mono)' }}>backups/</span>).{' '}
-        <Link onClick={exporting ? undefined : exp}>{exporting ? 'Exporting…' : `Export ${account.name}’s data`}</Link> to keep a copy of your own.
+        <Trans>A full database backup is taken first (kept in <span style={{ fontFamily: 'var(--mono)' }}>backups/</span>).{' '}</Trans>
+        <Link onClick={exporting ? undefined : exp}>{exporting ? t`Exporting…` : t`Export ${account.name}’s data`}</Link> <Trans>to keep a copy of your own.</Trans>
       </Helper>
-      <Field label={`Type “${account.name}” to confirm`}>
-        <Input value={typed} onChange={setTyped} ariaLabel="Type the account name to confirm" autoComplete="off" width="100%"
+      <Field label={t`Type “${account.name}” to confirm`}>
+        <Input value={typed} onChange={setTyped} ariaLabel={t`Type the account name to confirm`} autoComplete="off" width="100%"
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); remove() } }} />
       </Field>
       {error && <Helper style={{ color: 'var(--bad)' }}>{error}</Helper>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
-        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
-        <Button variant="danger" size="sm" onClick={remove} disabled={!ok} busy={busy}>Remove {account.name}</Button>
+        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}><Trans>Cancel</Trans></Button>
+        <Button variant="danger" size="sm" onClick={remove} disabled={!ok} busy={busy}><Trans>Remove {account.name}</Trans></Button>
       </div>
     </ModalPanel>
   )
@@ -342,10 +348,10 @@ export function ApiTokenButton({ account, push, size = 'sm' }) {
   }
   return (
     <>
-      <Pill size={size} onClick={busy ? undefined : mint} disabled={busy} ariaLabel="Create an API token for scripts">{busy ? 'Creating…' : 'API token'}</Pill>
+      <Pill size={size} onClick={busy ? undefined : mint} disabled={busy} ariaLabel={t`Create an API token for scripts`}>{busy ? t`Creating…` : t`API token`}</Pill>
       {token && (
-        <PromptDialog title="API token" readOnly mono value={token} label="Done"
-          body={`Send it as the X-Account-Token header, with the install key as X-API-Key, to act as ${account.name}. Valid for a year; a PIN change ends it.`}
+        <PromptDialog title={t`API token`} readOnly mono value={token} label={t`Done`}
+          body={t`Send it as the X-Account-Token header, with the install key as X-API-Key, to act as ${account.name}. Valid for a year; a PIN change ends it.`}
           onSubmit={() => setToken(null)} onCancel={() => setToken(null)} />
       )}
     </>
@@ -372,24 +378,24 @@ export function EditAccountModal({ account, self = false, taken = [], onClose, o
       await api.patch(`/accounts/${account.id}`, body)
       onSaved({ ...account, ...body })
     } catch (err) {
-      setError(errorText(err, 'Could not save — try again.'))
+      setError(errorText(err, t`Could not save — try again.`))
       setBusy(false)
     }
   }
-  const title = self ? 'Your name and colour' : `Edit ${account.name}`
+  const title = self ? t`Your name and colour` : `Edit ${account.name}`
   return (
     <ModalPanel width={440} title={title} onClose={busy ? undefined : onClose} zIndex={70}
       style={{ padding: '22px 24px 18px', gap: 14 }}>
       <Heading size={19} className="v2-dialogtitle">{title}</Heading>
-      <Field label="Name">
-        <Input value={name} onChange={setName} ariaLabel="Account name" autoFocus width="100%"
+      <Field label={t`Name`}>
+        <Input value={name} onChange={setName} ariaLabel={t`Account name`} autoFocus width="100%"
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); save() } }} />
       </Field>
-      <Field label="Colour"><ColorPicker name={n} value={color} onPick={setColor} taken={taken} ariaLabel="Account colour" /></Field>
+      <Field label={t`Colour`}><ColorPicker name={n} value={color} onPick={setColor} taken={taken} ariaLabel={t`Account colour`} /></Field>
       {error && <Helper style={{ color: 'var(--bad)' }}>{error}</Helper>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 2 }}>
-        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
-        <Button size="sm" onClick={save} disabled={!ready} busy={busy}>Save</Button>
+        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}><Trans>Cancel</Trans></Button>
+        <Button size="sm" onClick={save} disabled={!ready} busy={busy}><Trans>Save</Trans></Button>
       </div>
     </ModalPanel>
   )
@@ -424,14 +430,14 @@ export function AccountsTable({ data, me, onAdd, onChanged, push, policyFor = ''
     const done = (msg) => { setPinFor(null); push({ kind: 'success', msg }); onChanged() }
     if (self && pinFor.mode === 'remove') {
       return (
-        <PinDialog title="Remove your PIN" mode="remove" needCurrent
+        <PinDialog title={t`Remove your PIN`} mode="remove" needCurrent
           intro={others ? 'Without your PIN anyone at a browser opens your account with one click, and a member’s Unlock of the shared settings needs no PIN.' : undefined}
           onSubmit={async (b) => { await api.patch(`/accounts/${acc.id}`, b); done('PIN removed') }}
           onClose={() => setPinFor(null)} />
       )
     }
     return (
-      <PinDialog title={self ? (acc.has_pin ? 'Change your PIN' : 'Set your PIN') : `Reset ${acc.name}’s PIN`}
+      <PinDialog title={self ? (acc.has_pin ? t`Change your PIN` : t`Set your PIN`) : t`Reset ${acc.name}’s PIN`}
         who={self ? null : acc.name} mode="set" needCurrent={self && acc.has_pin}
         intro={self ? undefined : `${acc.name} uses the new PIN from now on; your own PIN keeps opening their account.`}
         onSubmit={async (b) => { await api.patch(`/accounts/${acc.id}`, b); done(self ? (acc.has_pin ? 'PIN changed' : 'PIN set') : `${acc.name}’s PIN reset`) }}
@@ -447,15 +453,15 @@ export function AccountsTable({ data, me, onAdd, onChanged, push, policyFor = ''
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 0 10px' }}>
         <Helper style={{ flex: 1, minWidth: 0, textWrap: 'pretty' }}>
           {others
-            ? `Everyone on this install has their own jobs, résumés, applications and settings; scraping is shared. ${accounts.length} of ${max} accounts${accounts.length >= max ? ' — remove one to add another' : ''}.`
-            : `Just you. Add people to this install — each gets their own jobs, résumés, applications and settings; scraping stays shared. Up to ${max} accounts.`}
-          {others && selfRow && !selfRow.has_pin && ' Your account has no PIN, so the shared settings are only a privacy latch.'}
+            ? (accounts.length >= max ? t`Everyone on this install has their own jobs, résumés, applications and settings; scraping is shared. ${accounts.length} of ${max} accounts — remove one to add another.` : t`Everyone on this install has their own jobs, résumés, applications and settings; scraping is shared. ${accounts.length} of ${max} accounts.`)
+            : t`Just you. Add people to this install — each gets their own jobs, résumés, applications and settings; scraping stays shared. Up to ${max} accounts.`}
+          {others && selfRow && !selfRow.has_pin && t` Your account has no PIN, so the shared settings are only a privacy latch.`}
         </Helper>
         <Button size="sm" onClick={onAdd} disabled={accounts.length >= max}
-          title={accounts.length >= max ? `At most ${max} accounts` : undefined}
-          ariaLabel={accounts.length >= max ? `Add account — the limit is ${max} accounts` : undefined}>+ Add account</Button>
+          title={accounts.length >= max ? t`At most ${max} accounts` : undefined}
+          ariaLabel={accounts.length >= max ? t`Add account — the limit is ${max} accounts` : undefined}><Trans>+ Add account</Trans></Button>
       </div>
-      <div role="table" aria-label="Accounts" style={{ display: 'flex', flexDirection: 'column' }}>
+      <div role="table" aria-label={t`Accounts`} style={{ display: 'flex', flexDirection: 'column' }}>
         {accounts.map((a) => {
           const self = a.id === me.id
           const owner = a.role === 'owner'
@@ -467,35 +473,35 @@ export function AccountsTable({ data, me, onAdd, onChanged, push, policyFor = ''
               <div role="cell" style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, lineHeight: '18px', fontWeight: 500, minWidth: 0 }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
-                  {self && <Helper size="xs">you</Helper>}
+                  {self && <Helper size="xs"><Trans>you</Trans></Helper>}
                 </span>
                 {/* T7-05: the full line on hover; Win98's wider type gets two lines (theme.css v2-acctstats) */}
                 <Helper size="xs" title={countsLine(a.counts)} className="v2-acctstats" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{countsLine(a.counts)}</Helper>
               </div>
-              <span role="cell" style={{ flex: '0 0 74px' }}><Tag tone={owner ? 'accent' : 'neutral'}>{owner ? 'Owner' : 'Member'}</Tag></span>
-              <span role="cell" style={{ flex: '0 0 96px' }}><Helper title={a.last_active_at || ''}>{self ? 'now' : ago(a.last_active_at)}</Helper></span>
+              <span role="cell" style={{ flex: '0 0 74px' }}><Tag tone={owner ? 'accent' : 'neutral'}>{owner ? t`Owner` : t`Member`}</Tag></span>
+              <span role="cell" style={{ flex: '0 0 96px' }}><Helper title={a.last_active_at || ''}>{self ? t`now` : ago(a.last_active_at)}</Helper></span>
               {onPolicyFor && (
                 <span role="cell" style={{ flex: '0 0 216px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                   {!owner && (
-                    <Switch size="sm" on={policyFor === a.id} label="Edit policies" ariaLabel={`Edit ${a.name}’s policies`}
+                    <Switch size="sm" on={policyFor === a.id} label={t`Edit policies`} ariaLabel={t`Edit ${a.name}’s policies`}
                       onChange={(on) => onPolicyFor(on ? a.id : '')} />
                   )}
                   {offDefault > 0 && (
-                    <Helper size="xs" title={`Sections where ${a.name}’s Inherit / Own differs from the default`}
-                      style={{ whiteSpace: 'nowrap' }}>{offDefault} {offDefault === 1 ? 'policy' : 'policies'} off default</Helper>
+                    <Helper size="xs" title={t`Sections where ${a.name}’s Inherit / Own differs from the default`}
+                      style={{ whiteSpace: 'nowrap' }}>{plural(offDefault, { one: '# policy off default', other: '# policies off default' })}</Helper>
                   )}
                 </span>
               )}
               {/* fixed width so the role and last-active columns line up whatever buttons a row has */}
               <span role="cell" style={{ flex: '0 0 240px', display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' }}>
-                <Pill size="sm" onClick={() => setEditing(a)} ariaLabel={self ? 'Rename or recolour your account' : `Rename or recolour ${a.name}`}>Edit</Pill>
+                <Pill size="sm" onClick={() => setEditing(a)} ariaLabel={self ? t`Rename or recolour your account` : t`Rename or recolour ${a.name}`}><Trans>Edit</Trans></Pill>
                 <Pill size="sm" onClick={() => setPinFor({ account: a, mode: 'set' })}
-                  ariaLabel={self ? (a.has_pin ? 'Change your PIN' : 'Set your PIN') : (a.has_pin ? `Reset ${a.name}’s PIN` : `Set ${a.name}’s PIN`)}>
-                  {self ? (a.has_pin ? 'Change PIN' : 'Set PIN') : (a.has_pin ? 'Reset PIN' : 'Set PIN')}
+                  ariaLabel={self ? (a.has_pin ? t`Change your PIN` : t`Set your PIN`) : (a.has_pin ? t`Reset ${a.name}’s PIN` : t`Set ${a.name}’s PIN`)}>
+                  {self ? (a.has_pin ? t`Change PIN` : t`Set PIN`) : (a.has_pin ? t`Reset PIN` : t`Set PIN`)}
                 </Pill>
                 {self && <ApiTokenButton account={a} push={push} />}
                 {!owner && !self && (
-                  <Pill size="sm" hover="v2-hover-bad-bdc" onClick={() => setRemoving(a)} ariaLabel={`Remove ${a.name}`}>Remove</Pill>
+                  <Pill size="sm" hover="v2-hover-bad-bdc" onClick={() => setRemoving(a)} ariaLabel={t`Remove ${a.name}`}><Trans>Remove</Trans></Pill>
                 )}
               </span>
             </div>
@@ -538,11 +544,11 @@ export function YourAccount({ data, me, onChanged, push }) {
   const rename = () => {
     const n = name.trim()
     if (!n || n === mine.name) { setName(mine.name || ''); return }
-    patch({ name: n }, `Renamed to ${n}`).then((ok) => { if (!ok) setName(mine.name || '') })
+    patch({ name: n }, t`Renamed to ${n}`).then((ok) => { if (!ok) setName(mine.name || '') })
   }
   const exp = async () => {
     setExporting(true)
-    try { await downloadExport(mine); push({ kind: 'success', msg: 'Export downloaded' }) } catch (err) { push({ kind: 'error', msg: errorText(err, 'The export failed — try again.') }) }
+    try { await downloadExport(mine); push({ kind: 'success', msg: t`Export downloaded` }) } catch (err) { push({ kind: 'error', msg: errorText(err, t`The export failed — try again.`) }) }
     setExporting(false)
   }
   const row = (label, help, right) => (
@@ -556,27 +562,27 @@ export function YourAccount({ data, me, onChanged, push }) {
   )
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {row('Name', 'How you appear in the picker and the rail.',
-        <Input value={name} onChange={setName} onBlur={rename} ariaLabel="Your account name" width="260px"
+      {row('Name', t`How you appear in the picker and the rail.`,
+        <Input value={name} onChange={setName} onBlur={rename} ariaLabel={t`Your account name`} width="260px"
           onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />)}
-      {row('Colour', 'Your avatar colour — the standing cue for which account is open.',
+      {row('Colour', t`Your avatar colour — the standing cue for which account is open.`,
         <ColorPicker name={mine.name} value={mine.color} onPick={(c) => c !== mine.color && patch({ color: c }, 'Colour saved')}
-          taken={others.map((a) => (a.color || '').toLowerCase())} ariaLabel="Your colour" />)}
-      {row('PIN', mine.has_pin ? 'Asked when someone opens your account. The owner’s PIN opens it too.' : 'Off — anyone at this browser can open your account with one click.',
+          taken={others.map((a) => (a.color || '').toLowerCase())} ariaLabel={t`Your colour`} />)}
+      {row('PIN', mine.has_pin ? t`Asked when someone opens your account. The owner’s PIN opens it too.` : t`Off — anyone at this browser can open your account with one click.`,
         <>
-          <Pill size="sm" onClick={() => setPinMode('set')}>{mine.has_pin ? 'Change PIN' : 'Set PIN'}</Pill>
-          {mine.has_pin && <Pill size="sm" onClick={() => setPinMode('remove')}>Remove PIN</Pill>}
+          <Pill size="sm" onClick={() => setPinMode('set')}>{mine.has_pin ? t`Change PIN` : t`Set PIN`}</Pill>
+          {mine.has_pin && <Pill size="sm" onClick={() => setPinMode('remove')}><Trans>Remove PIN</Trans></Pill>}
         </>)}
-      {row('Export my data', 'A zip of your jobs, applications, résumés, letters, searches, companies, Persona and settings.',
-        <Pill size="sm" onClick={exporting ? undefined : exp} disabled={exporting}>{exporting ? 'Exporting…' : 'Download zip'}</Pill>)}
-      {row('API token', 'For scripts and API clients: send it as X-Account-Token with the install key to act as you. A PIN change ends it.',
+      {row(t`Export my data`, t`A zip of your jobs, applications, résumés, letters, searches, companies, Persona and settings.`,
+        <Pill size="sm" onClick={exporting ? undefined : exp} disabled={exporting}>{exporting ? t`Exporting…` : t`Download zip`}</Pill>)}
+      {row(t`API token`, t`For scripts and API clients: send it as X-Account-Token with the install key to act as you. A PIN change ends it.`,
         <ApiTokenButton account={mine} push={push} />)}
       <Helper style={{ padding: '12px 0 0', textWrap: 'pretty' }}>
-        Other accounts: {others.map((a) => (a.role === 'owner' ? `${a.name} (owner)` : a.name)).join(', ') || 'none'}.
-        {' '}Adding or removing people is {owner ? `${owner.name}’s` : 'the owner’s'} job — ask them.
+        <Trans>Other accounts: {others.map((a) => (a.role === 'owner' ? `${a.name} (owner)` : a.name)).join(', ') || t`none`}.
+        {' '}Adding or removing people is {owner ? `${owner.name}’s` : t`the owner’s`} job — ask them.</Trans>
       </Helper>
       {pinMode && (
-        <PinDialog title={pinMode === 'remove' ? 'Remove your PIN' : (mine.has_pin ? 'Change your PIN' : 'Set your PIN')}
+        <PinDialog title={pinMode === 'remove' ? t`Remove your PIN` : (mine.has_pin ? t`Change your PIN` : t`Set your PIN`)}
           mode={pinMode} needCurrent={!!mine.has_pin}
           onSubmit={async (b) => {
             await api.patch(`/accounts/${me.id}`, b)
@@ -643,14 +649,14 @@ export function rowLocked(r, { member, unlocked, meta, idx }) {
 
 // The scope tag beside a section title.
 export function scopeTag(id, { idx, member, ownerName }) {
-  if (id === 'appearance') return { label: 'Per device', tone: 'neutral' }
+  if (id === 'appearance') return { label: t`Per device`, tone: 'neutral' }
   const sec = idx?.byId?.[id]
   if (!sec) return null
-  if (sec.scope === 'owner_only') return { label: 'Owner only', tone: 'good' }
+  if (sec.scope === 'owner_only') return { label: t`Owner only`, tone: 'good' }
   // a member's own section says so; the owner needs no badge there (no toggle, nothing shared)
-  if (sec.scope === 'own_always') return member ? { label: 'Yours', tone: 'accent' } : null
+  if (sec.scope === 'own_always') return member ? { label: t`Yours`, tone: 'accent' } : null
   if (!member) return null   // the owner gets the Inherit / Own control instead
-  return sec.mode === 'own' ? { label: 'Yours', tone: 'accent' } : { label: `Inherited from ${ownerName || 'the owner'}`, tone: 'neutral' }
+  return sec.mode === 'own' ? { label: t`Yours`, tone: 'accent' } : { label: t`Inherited from ${ownerName || t`the owner`}`, tone: 'neutral' }
 }
 
 export function ScopeTag({ tag }) {
@@ -665,9 +671,9 @@ export function PolicyToggle({ memberName, mode, onChange, sectionTitle }) {
   // overflows into the head's padding instead of growing the head by 2-4px
   return (
     <span data-policy-for={memberName} style={{ display: 'flex', alignItems: 'center', gap: 7, marginLeft: 'auto', flex: '0 0 auto', height: 26 }}>
-      <Helper size="xs">{memberName}’s policy:</Helper>
+      <Helper size="xs"><Trans>{memberName}’s policy:</Trans></Helper>
       <Segmented variant="inset" grow={false} value={mode} onChange={onChange}
-        ariaLabel={`${sectionTitle} for ${memberName}`}
+        ariaLabel={t`${sectionTitle} for ${memberName}`}
         options={[{ value: 'inherit', label: 'Inherit', hint: `${memberName} sees your values, read-only` },
           { value: 'own', label: 'Own', hint: `${memberName} keeps their own values` }]} />
     </span>
@@ -709,7 +715,7 @@ export function OwnerPinPad({ ownerName, onUnlocked, autoFocus = false }) {
   }
   return (
     <PinPad onComplete={submit} busy={busy} error={error} cooldown={cooldown} onCooldownEnd={() => setCooldown(0)}
-      resetKey={attempt} autoFocus={autoFocus} hint={`${ownerName}’s PIN`} ariaLabel={`${ownerName}’s PIN`} />
+      resetKey={attempt} autoFocus={autoFocus} hint={t`${ownerName}’s PIN`} ariaLabel={t`${ownerName}’s PIN`} />
   )
 }
 
@@ -724,13 +730,13 @@ export function PlainUnlockButton({ ownerName, onUnlocked }) {
   }
   return (
     <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flex: '0 0 auto' }}>
-      <Button size="sm" onClick={go} busy={busy} ariaLabel={`Unlock the shared settings as ${ownerName}`}>Unlock</Button>
+      <Button size="sm" onClick={go} busy={busy} ariaLabel={t`Unlock the shared settings as ${ownerName}`}><Trans>Unlock</Trans></Button>
       {error && <Helper size="xs" style={{ color: 'var(--bad)' }}>{error}</Helper>}
     </span>
   )
 }
 
-export const NO_OWNER_PIN_NOTE = 'Without an owner PIN this is only a privacy latch.'
+export const NO_OWNER_PIN_NOTE = t`Without an owner PIN this is only a privacy latch.`
 
 // After the last row of a section a member cannot edit.
 export function LockCard({ ownerName, inherited, sectionTitle, onUnlocked, ownerHasPin = true }) {
@@ -740,10 +746,10 @@ export function LockCard({ ownerName, inherited, sectionTitle, onUnlocked, owner
         style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 12 }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
           <span style={{ fontSize: 12.5, lineHeight: '18px', fontWeight: 500 }}>
-            {inherited ? `Inherited from ${ownerName}` : `Shared by everyone on this install`}
+            {inherited ? t`Inherited from ${ownerName}` : t`Shared by everyone on this install`}
           </span>
           <Helper style={{ textWrap: 'pretty' }}>
-            {inherited ? `You see ${ownerName}’s values. ` : ''}Unlock to change the shared values as {ownerName} for 15 minutes. {NO_OWNER_PIN_NOTE}
+            <Trans>{inherited ? t`You see ${ownerName}’s values. ` : ''}Unlock to change the shared values as {ownerName} for 15 minutes. {NO_OWNER_PIN_NOTE}</Trans>
           </Helper>
         </div>
         <PlainUnlockButton ownerName={ownerName} onUnlocked={onUnlocked} />
@@ -755,12 +761,12 @@ export function LockCard({ ownerName, inherited, sectionTitle, onUnlocked, owner
       style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 12 }}>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <span style={{ fontSize: 12.5, lineHeight: '18px', fontWeight: 500 }}>
-          {inherited ? `Inherited from ${ownerName}` : `Shared by everyone on this install`}
+          {inherited ? t`Inherited from ${ownerName}` : t`Shared by everyone on this install`}
         </span>
         <Helper style={{ textWrap: 'pretty' }}>
           {inherited
-            ? `You see ${ownerName}’s values. ${ownerName} can give you your own here, or enter their PIN to change the shared values for 15 minutes.`
-            : `${ownerName} can change it. Ask them, or have them enter their PIN to unlock for 15 minutes.`}
+            ? t`You see ${ownerName}’s values. ${ownerName} can give you your own here, or enter their PIN to change the shared values for 15 minutes.`
+            : t`${ownerName} can change it. Ask them, or have them enter their PIN to unlock for 15 minutes.`}
         </Helper>
       </div>
       <OwnerPinPad ownerName={ownerName} onUnlocked={onUnlocked} />
@@ -775,25 +781,25 @@ export function UnlockPill({ ownerName, unlockedUntil, onUnlocked, onLock, owner
   if (unlockedUntil) {
     return (
       <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
-        <Tag tone="warn">Unlocked as {ownerName} · until {hhmm(unlockedUntil)}</Tag>
-        <Pill size="sm" disabled={busy} ariaLabel="Lock the owner sections again"
-          onClick={async () => { setBusy(true); try { await onLock() } finally { setBusy(false) } }}>Lock</Pill>
+        <Tag tone="warn"><Trans>Unlocked as {ownerName} · until {hhmm(unlockedUntil)}</Trans></Tag>
+        <Pill size="sm" disabled={busy} ariaLabel={t`Lock the owner sections again`}
+          onClick={async () => { setBusy(true); try { await onLock() } finally { setBusy(false) } }}><Trans>Lock</Trans></Pill>
       </span>
     )
   }
   return (
     <>
-      <Pill size="sm" onClick={() => setOpen(true)} ariaLabel={`Owner sections locked — unlock as ${ownerName}`}>
-        Owner sections locked · Unlock as {ownerName}
+      <Pill size="sm" onClick={() => setOpen(true)} ariaLabel={t`Owner sections locked — unlock as ${ownerName}`}>
+        <Trans>Owner sections locked · Unlock as {ownerName}</Trans>
       </Pill>
       {open && (
-        <ModalPanel width={380} title={`Unlock as ${ownerName}`} onClose={() => setOpen(false)} zIndex={75}
+        <ModalPanel width={380} title={t`Unlock as ${ownerName}`} onClose={() => setOpen(false)} zIndex={75}
           style={{ padding: '22px 24px 18px', gap: 12 }}>
-          <Heading size={19} className="v2-dialogtitle">Unlock as {ownerName}</Heading>
+          <Heading size={19} className="v2-dialogtitle"><Trans>Unlock as {ownerName}</Trans></Heading>
           <Helper style={{ textWrap: 'pretty' }}>
             {ownerHasPin
-              ? `${ownerName} enters their PIN; for 15 minutes this browser can change the shared settings as ${ownerName}.`
-              : `For 15 minutes this browser can change the shared settings as ${ownerName}. ${NO_OWNER_PIN_NOTE}`}
+              ? t`${ownerName} enters their PIN; for 15 minutes this browser can change the shared settings as ${ownerName}.`
+              : t`For 15 minutes this browser can change the shared settings as ${ownerName}. ${NO_OWNER_PIN_NOTE}`}
           </Helper>
           <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
             {ownerHasPin
@@ -801,7 +807,7 @@ export function UnlockPill({ ownerName, unlockedUntil, onUnlocked, onLock, owner
               : <PlainUnlockButton ownerName={ownerName} onUnlocked={(t) => { setOpen(false); onUnlocked(t) }} />}
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="secondary" size="sm" onClick={() => setOpen(false)}><Trans>Cancel</Trans></Button>
           </div>
         </ModalPanel>
       )}

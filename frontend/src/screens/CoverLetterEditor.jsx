@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import ClosedMark from '../ClosedMark'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useToasts, ToastStack } from '../Toast'
@@ -19,9 +21,9 @@ import { fetchRunOutcome, runFailed, runFailureReason, useSettled, useSingleOpen
 const EMPTY = {
   header: { name: '', contact_items: [] },
   recipient: { company: '', manager: '', address: '' },
-  date: '', greeting: 'Dear Hiring Team,', body_paragraphs: [''], closing: 'Sincerely,', signature: '',
+  date: '', greeting: t`Dear Hiring Team,`, body_paragraphs: [''], closing: 'Sincerely,', signature: '',
 }
-const PAGE_FORMATS = [['letter', 'US Letter'], ['a4', 'A4']]
+const PAGE_FORMATS = [['letter', t`US Letter`], ['a4', 'A4']]
 const UI_KEY = 'v2_cl_sections'
 const loadUI = () => { try { return JSON.parse(localStorage.getItem(UI_KEY)) || {} } catch { return {} } }
 
@@ -109,22 +111,22 @@ export default function CoverLetterEditor() {
       setRSource(d.from_persona ? 'persona' : (d.resume_id || ''))
       setRVoice(d.voice || ''); setRLength(d.length || 'standard')
       loaded.current = true
-    }).catch((e) => { if (!dead) setErr(e?.response?.status === 404 ? 'This letter no longer exists.' : 'Couldn’t load this letter — try again.') })
+    }).catch((e) => { if (!dead) setErr(e?.response?.status === 404 ? t`This letter no longer exists.` : t`Couldn’t load this letter — try again.`) })
     return () => { dead = true }
   }, [id])
 
   // Template/paper pickers, Regenerate source list and voice list settle as one; `metaReady`
   // (with doc) gates the preview toolbar so the Template trigger never flashes a raw id. Each keeps its own catch so a failure explains itself instead of leaving a silent empty picker.
   const { ready: metaReady } = useSettled([
-    () => api.get('/cover-letters/templates').then(({ data }) => setTemplates(data || [])).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load the layouts — the picker is empty.' }) }),
-    () => api.get('/resumes', { params: { is_base: true } }).then(({ data }) => setResumes(data || [])).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load your résumés — Regenerate has no source to pick.' }) }),
-    () => api.get('/persona').then(({ data }) => setPersonaAvailable(Object.keys(data?.resume_content || {}).length > 0)).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load your Persona — it will not be offered as a source.' }) }),
+    () => api.get('/cover-letters/templates').then(({ data }) => setTemplates(data || [])).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load the layouts — the picker is empty.` }) }),
+    () => api.get('/resumes', { params: { is_base: true } }).then(({ data }) => setResumes(data || [])).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load your résumés — Regenerate has no source to pick.` }) }),
+    () => api.get('/persona').then(({ data }) => setPersonaAvailable(Object.keys(data?.resume_content || {}).length > 0)).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load your Persona — it will not be offered as a source.` }) }),
     () => api.get('/settings').then(({ data }) => {
       let p = data.cover_letter_voice_presets
       if (typeof p === 'string') { try { p = JSON.parse(p) } catch { p = [] } }
       setPresets(Array.isArray(p) ? p : [])
       setRVoice((v) => v || data.cover_letter_default_voice || '')
-    }).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load the voice presets — the voice picker is empty.' }) }),
+    }).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load the voice presets — the voice picker is empty.` }) }),
   ])
 
   useEffect(() => () => { clearTimeout(saveTimer.current); clearTimeout(pdfTimer.current) }, [])
@@ -143,7 +145,7 @@ export default function CoverLetterEditor() {
     pendingPatch.current = {}
     if (!Object.keys(body).length) return
     try { await api.patch(`/cover-letters/${id}`, body); setSavedAt(new Date().toISOString()); setSaveErr('') }
-    catch (e) { console.error(e); setSaveErr('Could not save — your last edit is not stored.'); pushToast({ kind: 'error', msg: 'Could not save — your last edit is not stored.' }) }
+    catch (e) { console.error(e); setSaveErr(t`Could not save — your last edit is not stored.`); pushToast({ kind: 'error', msg: t`Could not save — your last edit is not stored.` }) }
   }
   // QA F7 / R6-01: a switch sends the merged patch the timer still owes first
   useFlushBeforeSwitch(() => { clearTimeout(saveTimer.current); return sendPending() })
@@ -204,18 +206,18 @@ export default function CoverLetterEditor() {
     } catch (e) {   // a download failure is not a save failure
       console.error(e)
       const reason = await downloadErrorReason(e)
-      pushToast({ kind: 'error', msg: 'Could not download the PDF' + (reason ? ` — ${reason}` : '.') })
+      pushToast({ kind: 'error', msg: t`Could not download the PDF` + (reason ? ` — ${reason}` : '.') })
     }
   }
 
   const remove = () => {
     setMenuOpen(false)
     setConfirm({
-      title: `Delete "${doc?.name}"?`, body: 'This cannot be undone.', label: 'Delete', danger: true,
+      title: t`Delete "${doc?.name}"?`, body: t`This cannot be undone.`, label: t`Delete`, danger: true,
       onConfirm: async () => {
         setConfirm(null)
         try { await api.delete(`/cover-letters/${id}`); window.dispatchEvent(new CustomEvent('jn:counts-changed')); navigate('/cover-letters') }
-        catch (e) { console.error(e); pushToast({ kind: 'error', msg: 'Could not delete this letter.' }) }
+        catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Could not delete this letter.` }) }
       },
     })
   }
@@ -248,8 +250,8 @@ export default function CoverLetterEditor() {
       regenRun.current = started?.run_id || null   // read its status below
     } catch (e) {
       setRegening(false)
-      setErr(e?.response?.data?.detail || 'Regeneration failed')
-      pushToast({ kind: 'error', msg: e?.response?.data?.detail || 'Regeneration failed' })   // visible above the modal scrim
+      setErr(e?.response?.data?.detail || t`Regeneration failed`)
+      pushToast({ kind: 'error', msg: e?.response?.data?.detail || t`Regeneration failed` })   // visible above the modal scrim
     }
   }
 
@@ -271,8 +273,8 @@ export default function CoverLetterEditor() {
           if (runFailed(run)) {
             clearInterval(iv)
             setRegening(false)
-            setErr(`Regeneration failed — ${runFailureReason(run)}`)
-            pushToast({ kind: 'error', msg: `Regeneration failed — ${runFailureReason(run)}` })
+            setErr(t`Regeneration failed — ${runFailureReason(run)}`)
+            pushToast({ kind: 'error', msg: t`Regeneration failed — ${runFailureReason(run)}` })
             return
           }
           // reload FIRST: clearing the interval before a GET that throws left
@@ -310,14 +312,14 @@ export default function CoverLetterEditor() {
 
   const sourceOpts = useMemo(() => {
     const opts = [
-      ...(personaAvailable ? [{ id: 'persona', label: 'Persona (full profile)' }] : []),
+      ...(personaAvailable ? [{ id: 'persona', label: t`Persona (full profile)` }] : []),
       ...resumes.map((r) => ({ id: r.id, label: r.name })),
     ]
     // A letter generated from the Résumé editor may be paired with a tailored copy
     // not in this list (showed "Select a source…" while Regenerate used it) — prepend it if missing.
     const own = doc?.resume_id
     if (own && !doc.from_persona && !opts.some((o) => String(o.id) === String(own))) {
-      opts.unshift({ id: own, label: doc.source_name ? `${doc.source_name} · tailored copy` : 'This letter’s tailored copy' })
+      opts.unshift({ id: own, label: doc.source_name ? `${doc.source_name} · tailored copy` : t`This letter’s tailored copy` })
     }
     return opts
   }, [resumes, personaAvailable, doc])
@@ -328,8 +330,8 @@ export default function CoverLetterEditor() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--muted)', fontSize: 13 }}>
           <span>{err}</span>
           <span style={{ display: 'flex', gap: 14 }}>
-            <Link onClick={() => navigate('/cover-letters')}>‹ Back to cover letters</Link>
-            {!/no longer exists/.test(err) && <Link onClick={() => window.location.reload()}>Try again</Link>}
+            <Link onClick={() => navigate('/cover-letters')}><Trans>‹ Back to cover letters</Trans></Link>
+            {!/no longer exists/.test(err) && <Link onClick={() => window.location.reload()}><Trans>Try again</Trans></Link>}
           </span>
         </div>
       )
@@ -365,7 +367,7 @@ export default function CoverLetterEditor() {
     <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* top bar */}
       <HeaderRow pad="10px 24px" bg="surface" soft align="center">
-        <NavLink onClick={() => navigate('/cover-letters')} style={{ whiteSpace: 'nowrap' }}>‹ Cover Letters</NavLink>
+        <NavLink onClick={() => navigate('/cover-letters')} style={{ whiteSpace: 'nowrap' }}><Trans>‹ Cover Letters</Trans></NavLink>
         <span style={{ color: 'var(--line)' }}>|</span>
         {/* Draft/stage badge is ResumeEditor's Base/Tailored twin — same Tag role, same token read. */}
         <span className={stage ? (STAGE_CLASS[stage] || 'cc-generic') : 'cc-generic'}
@@ -373,7 +375,7 @@ export default function CoverLetterEditor() {
         {/* every v2 screen names itself with an h1 (margin/font reset inline). */}
         <h1 title={doc.name} style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: '20px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 420 }}>{doc.name}</h1>
         <Helper title={saveErr || undefined} style={{ marginLeft: 'auto', flex: '0 1 auto', minWidth: 0, maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...(saveErr ? { color: 'var(--bad)' } : null) }}>
-          {saveErr || (savedAt ? `saved ${ago(savedAt)} · autosaves` : 'autosaves')}
+          {saveErr || (savedAt ? t`saved ${ago(savedAt)} · autosaves` : t`autosaves`)}
         </Helper>
       </HeaderRow>
 
@@ -381,35 +383,35 @@ export default function CoverLetterEditor() {
       <HeaderRow pad="9px 24px" bg="recessed" align="center" style={{ gap: 13 }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
           <span style={{ minWidth: 0, fontSize: 12.5, lineHeight: '18px', fontWeight: 500, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            Written for <span style={{ color: 'var(--text)' }}>{doc.company ? `${doc.company} — ${doc.title}` : doc.name}</span>
+            <Trans>Written for</Trans> <span style={{ color: 'var(--text)' }}>{doc.company ? `${doc.company} — ${doc.title}` : doc.name}</span>
             {doc.job_id && <ClosedMark jobId={doc.job_id} />}
-            {doc.source_name && <><BandRule />from <span onClick={() => doc.resume_id && navigate(`/resumes/${doc.resume_id}`)}
-              title={doc.resume_id ? 'Open the source résumé' : 'Written from your Persona'}
+            {doc.source_name && <><BandRule /><Trans>from</Trans> <span onClick={() => doc.resume_id && navigate(`/resumes/${doc.resume_id}`)}
+              title={doc.resume_id ? t`Open the source résumé` : t`Written from your Persona`}
               style={{ color: 'var(--accent)', cursor: doc.resume_id ? 'pointer' : 'default' }}>{doc.source_name}{doc.resume_id ? ' ↗' : ''}</span></>}
           </span>
           <Helper>{voiceLen}</Helper>
         </div>
-        <Button variant="ai" onClick={() => { setRegenOpen(true); setMenuOpen(false) }} title="Rewrite the letter — pick base résumé, voice and length">
-          {regening
+        <Button variant="ai" onClick={() => { setRegenOpen(true); setMenuOpen(false) }} title={t`Rewrite the letter — pick base résumé, voice and length`}>
+          <Trans>{regening
             ? <Spinner size={11} color="currentColor" />
             : <span style={{ fontSize: 12 }}>↻</span>}
-          Regenerate…
+          Regenerate…</Trans>
         </Button>
         <div style={{ position: 'relative', flex: '0 0 auto' }} onClick={(e) => e.stopPropagation()}>
           <IconButton size={36} on={menuOpen} ariaExpanded={menuOpen} ariaHaspopup="menu"
-            onClick={() => setMenuOpen((v) => !v)} title="More actions">⋯</IconButton>
+            onClick={() => setMenuOpen((v) => !v)} title={t`More actions`}>⋯</IconButton>
           {menuOpen && (
-            <Menu ariaLabel="Letter actions" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 5, width: 224, zIndex: 50 }}>
+            <Menu ariaLabel={t`Letter actions`} style={{ position: 'absolute', top: '100%', right: 0, marginTop: 5, width: 224, zIndex: 50 }}>
               {doc.has_application && (
-                <MenuItem icon="▤" onClick={() => { setMenuOpen(false); navigate('/applications') }}>View application</MenuItem>
+                <MenuItem icon="▤" onClick={() => { setMenuOpen(false); navigate('/applications') }}><Trans>View application</Trans></MenuItem>
               )}
               {doc.job_id && (
-                <MenuItem icon="☰" onClick={() => { setMenuOpen(false); navigate(`/feed?job=${doc.job_id}`) }}>View job in feed</MenuItem>
+                <MenuItem icon="☰" onClick={() => { setMenuOpen(false); navigate(`/feed?job=${doc.job_id}`) }}><Trans>View job in feed</Trans></MenuItem>
               )}
               {doc.job_url && (
-                <MenuItem icon="↗" href={doc.job_url} target="_blank" onClick={() => setMenuOpen(false)}>Open job posting</MenuItem>
+                <MenuItem icon="↗" href={doc.job_url} target="_blank" onClick={() => setMenuOpen(false)}><Trans>Open job posting</Trans></MenuItem>
               )}
-              <MenuItem danger icon="✕" onClick={remove}>Delete letter</MenuItem>
+              <MenuItem danger icon="✕" onClick={remove}><Trans>Delete letter</Trans></MenuItem>
             </Menu>
           )}
         </div>
@@ -419,17 +421,17 @@ export default function CoverLetterEditor() {
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <section className="v2-scroll" style={{ flex: '0 0 47%', borderRight: '1px solid var(--line)', overflow: 'auto', padding: '14px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
 
-          <Card title="Header" open={headOpen} onToggle={() => setHeadOpen((v) => !v)}>
+          <Card title={t`Header`} open={headOpen} onToggle={() => setHeadOpen((v) => !v)}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, paddingTop: 10 }}>
-              <Label>Full name</Label>
-              <Input value={data.header?.name || ''} onChange={(v) => update((d) => { d.header = d.header || {}; d.header.name = v })} ariaLabel="Full name" />
+              <Label><Trans>Full name</Trans></Label>
+              <Input value={data.header?.name || ''} onChange={(v) => update((d) => { d.header = d.header || {}; d.header.name = v })} ariaLabel={t`Full name`} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <Label>Contact items</Label>
+                <Label><Trans>Contact items</Trans></Label>
                 {/* integer line-height: at 1.5 this 10.5px hint is 15.75 tall and
                     pushes every card below onto a half pixel (borders drop out) */}
-                <Helper size="xs" style={{ marginLeft: 'auto' }}>text · link · stub</Helper>
+                <Helper size="xs" style={{ marginLeft: 'auto' }}><Trans>text · link · stub</Trans></Helper>
               </div>
               {(data.header?.contact_items || []).map((ct, i, arr) => {
                 const tracked = ct.url && !String(ct.url).startsWith('mailto:')
@@ -439,17 +441,17 @@ export default function CoverLetterEditor() {
                     <MoveArrows upOff={i === 0} downOff={i === arr.length - 1}
                       onUp={() => update((d) => { const a = d.header.contact_items; [a[i - 1], a[i]] = [a[i], a[i - 1]] })}
                       onDown={() => update((d) => { const a = d.header.contact_items; [a[i + 1], a[i]] = [a[i], a[i + 1]] })} />
-                    <Input value={ct.text || ''} placeholder="Display text" ariaLabel="Contact item text"
+                    <Input value={ct.text || ''} placeholder={t`Display text`} ariaLabel={t`Contact item text`}
                       onChange={(v) => update((d) => { d.header.contact_items[i].text = v })}
                       style={{ flex: 1, minWidth: 0 }} />
                     </div>
                     <div style={{ flex: '55 1 0', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>   {/* url + stub: 55 % */}
-                    <Input value={ct.url || ''} placeholder="URL (optional)" ariaLabel="Contact item URL"
+                    <Input value={ct.url || ''} placeholder={t`URL (optional)`} ariaLabel={t`Contact item URL`}
                       onChange={(v) => update((d) => { d.header.contact_items[i].url = v })}
                       style={{ flex: 1, minWidth: 0 }} />
                     {tracked && (
-                      <Input value={ct.stub || ''} placeholder="id" mono ariaLabel="Tracked link stub"
-                        title="Short stub used in the tracked link, e.g. l, w, gh"
+                      <Input value={ct.stub || ''} placeholder={t`id`} mono ariaLabel={t`Tracked link stub`}
+                        title={t`Short stub used in the tracked link, e.g. l, w, gh`}
                         onChange={(v) => update((d) => { d.header.contact_items[i].stub = v })}
                         style={{ flex: '0 0 34px', padding: '0 6px', textAlign: 'center', minWidth: 0 }} />
                     )}
@@ -458,50 +460,50 @@ export default function CoverLetterEditor() {
                   </div>
                 )
               })}
-              <DashedAdd onClick={() => update((d) => { d.header = d.header || {}; d.header.contact_items = [...(d.header.contact_items || []), { text: '', url: '' }] })}>+ Add contact item</DashedAdd>
+              <DashedAdd onClick={() => update((d) => { d.header = d.header || {}; d.header.contact_items = [...(d.header.contact_items || []), { text: '', url: '' }] })}><Trans>+ Add contact item</Trans></DashedAdd>
             </div>
           </Card>
 
-          <Card title="Recipient" note={[data.recipient?.company, data.date].filter(Boolean).join(' · ')}
+          <Card title={t`Recipient`} note={[data.recipient?.company, data.date].filter(Boolean).join(' · ')}
             open={recipOpen} onToggle={() => setRecipOpen((v) => !v)}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, paddingTop: 10 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
-                <Label>Company</Label>
-                <Input value={data.recipient?.company || ''} onChange={(v) => update((d) => { d.recipient = d.recipient || {}; d.recipient.company = v })} ariaLabel="Company" style={{ minWidth: 0 }} />
+                <Label><Trans>Company</Trans></Label>
+                <Input value={data.recipient?.company || ''} onChange={(v) => update((d) => { d.recipient = d.recipient || {}; d.recipient.company = v })} ariaLabel={t`Company`} style={{ minWidth: 0 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
-                <Label>Date</Label>
-                <Input value={data.date || ''} onChange={(v) => update((d) => { d.date = v })} ariaLabel="Date" style={{ minWidth: 0 }} />
+                <Label><Trans>Date</Trans></Label>
+                <Input value={data.date || ''} onChange={(v) => update((d) => { d.date = v })} ariaLabel={t`Date`} style={{ minWidth: 0 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
-                <Label>Hiring manager</Label>
-                <Input value={data.recipient?.manager || ''} placeholder="Unknown" onChange={(v) => update((d) => { d.recipient = d.recipient || {}; d.recipient.manager = v })} ariaLabel="Hiring manager" style={{ minWidth: 0 }} />
+                <Label><Trans>Hiring manager</Trans></Label>
+                <Input value={data.recipient?.manager || ''} placeholder={t`Unknown`} onChange={(v) => update((d) => { d.recipient = d.recipient || {}; d.recipient.manager = v })} ariaLabel={t`Hiring manager`} style={{ minWidth: 0 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
-                <Label>Address</Label>
-                <Input value={data.recipient?.address || ''} placeholder="—" onChange={(v) => update((d) => { d.recipient = d.recipient || {}; d.recipient.address = v })} ariaLabel="Address" style={{ minWidth: 0 }} />
+                <Label><Trans>Address</Trans></Label>
+                <Input value={data.recipient?.address || ''} placeholder="—" onChange={(v) => update((d) => { d.recipient = d.recipient || {}; d.recipient.address = v })} ariaLabel={t`Address`} style={{ minWidth: 0 }} />
               </div>
             </div>
           </Card>
 
-          <Card title="Letter" note={`${paras.length} paragraph${paras.length === 1 ? '' : 's'}`}
+          <Card title={t`Letter`} note={plural(paras.length, { one: '# paragraph', other: '# paragraphs' })}
             open={letterOpen} onToggle={() => setLetterOpen((v) => !v)}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, paddingTop: 10 }}>
-              <Label>Greeting</Label>
-              <Input value={data.greeting || ''} onChange={(v) => update((d) => { d.greeting = v })} ariaLabel="Greeting" />
+              <Label><Trans>Greeting</Trans></Label>
+              <Input value={data.greeting || ''} onChange={(v) => update((d) => { d.greeting = v })} ariaLabel={t`Greeting`} />
             </div>
             {paras.map((text, i) => (
               <UiCard key={i} style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 10px 0' }}>
                   {/* ui: keep — the ¶ ordinal is drawn in --edge, a dimmer ink than --label-ink, at .1em */}
                   <span style={{ fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--edge)' }}>¶ {i + 1}</span>
-                  <span onClick={() => i > 0 && update((d) => { const a = d.body_paragraphs; [a[i - 1], a[i]] = [a[i], a[i - 1]] })} title="Move up" className={i > 0 ? 'v2-parabtn' : ''}
+                  <span onClick={() => i > 0 && update((d) => { const a = d.body_paragraphs; [a[i - 1], a[i]] = [a[i], a[i - 1]] })} title={t`Move up`} className={i > 0 ? 'v2-parabtn' : ''}
                     style={{ marginLeft: 'auto', width: 20, height: 20, borderRadius: 'var(--radius-mini)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: i === 0 ? 'var(--line-strong)' : 'var(--text-2)', cursor: i === 0 ? 'default' : 'pointer' }}>↑</span>
-                  <span onClick={() => i < paras.length - 1 && update((d) => { const a = d.body_paragraphs; [a[i + 1], a[i]] = [a[i], a[i + 1]] })} title="Move down" className={i < paras.length - 1 ? 'v2-parabtn' : ''}
+                  <span onClick={() => i < paras.length - 1 && update((d) => { const a = d.body_paragraphs; [a[i + 1], a[i]] = [a[i], a[i + 1]] })} title={t`Move down`} className={i < paras.length - 1 ? 'v2-parabtn' : ''}
                     style={{ width: 20, height: 20, borderRadius: 'var(--radius-mini)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: i === paras.length - 1 ? 'var(--line-strong)' : 'var(--text-2)', cursor: i === paras.length - 1 ? 'default' : 'pointer' }}>↓</span>
                   <span onClick={() => undoRemove('Removed paragraph',
                     (d) => { d.body_paragraphs.splice(i, 1) },
-                    (d) => { d.body_paragraphs = d.body_paragraphs || []; d.body_paragraphs.splice(i, 0, text) })} title="Delete paragraph" className="v2-parabtn-bad"
+                    (d) => { d.body_paragraphs = d.body_paragraphs || []; d.body_paragraphs.splice(i, 0, text) })} title={t`Delete paragraph`} className="v2-parabtn-bad"
                     style={{ width: 20, height: 20, borderRadius: 'var(--radius-mini)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--edge)', cursor: 'pointer' }}>✕</span>
                 </div>
                 {/* ui: keep — flowing text in the ¶ card's own box: no border/background, resize:none */}
@@ -509,15 +511,15 @@ export default function CoverLetterEditor() {
                   style={{ margin: '4px 10px 9px', border: 'none', background: 'transparent', fontFamily: 'var(--sans)', fontSize: 12.5, lineHeight: '19px', color: 'var(--text)', outline: 'none', resize: 'none' }} />
               </UiCard>
             ))}
-            <DashedAdd onClick={() => update((d) => { d.body_paragraphs = [...(d.body_paragraphs || []), ''] })} style={{ gap: 7 }}>+ Add paragraph</DashedAdd>
+            <DashedAdd onClick={() => update((d) => { d.body_paragraphs = [...(d.body_paragraphs || []), ''] })} style={{ gap: 7 }}><Trans>+ Add paragraph</Trans></DashedAdd>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
-                <Label>Closing</Label>
-                <Input value={data.closing || ''} onChange={(v) => update((d) => { d.closing = v })} ariaLabel="Closing" style={{ minWidth: 0 }} />
+                <Label><Trans>Closing</Trans></Label>
+                <Input value={data.closing || ''} onChange={(v) => update((d) => { d.closing = v })} ariaLabel={t`Closing`} style={{ minWidth: 0 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
-                <Label>Signature</Label>
-                <Input value={data.signature || ''} onChange={(v) => update((d) => { d.signature = v })} ariaLabel="Signature" style={{ minWidth: 0 }} />
+                <Label><Trans>Signature</Trans></Label>
+                <Input value={data.signature || ''} onChange={(v) => update((d) => { d.signature = v })} ariaLabel={t`Signature`} style={{ minWidth: 0 }} />
               </div>
             </div>
           </Card>
@@ -526,16 +528,16 @@ export default function CoverLetterEditor() {
         {/* preview */}
         <Surface as="section" radius="none" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <HeaderRow pad="8px 20px" align="center" style={{ flexWrap: 'wrap', rowGap: 6, gap: 9 }}>
-            <Label>PDF preview</Label>
+            <Label><Trans>PDF preview</Trans></Label>
             {pdfBusy && <Spinner size={10} color="var(--edge)" />}
 
             {/* Triggers wait for the template list; row height is the Download button's, so
                 nothing moves when they land, and Template never shows a raw id first. */}
             {metaReady && <span style={{ position: 'relative', display: 'flex' }} onClick={(e) => e.stopPropagation()}>
-              <ToolbarTrigger label="Template" value={tplLabel} onClick={() => { setTplOpen((v) => !v); setFmtOpen(false) }}
-                title="Cover letter template" />
+              <ToolbarTrigger label={t`Template`} value={tplLabel} onClick={() => { setTplOpen((v) => !v); setFmtOpen(false) }}
+                title={t`Cover letter template`} />
               {tplOpen && (
-                <Menu role="listbox" ariaLabel="Cover letter template" className="v2-scroll" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 40, width: 210, maxHeight: 300, overflow: 'auto' }}>
+                <Menu role="listbox" ariaLabel={t`Cover letter template`} className="v2-scroll" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 40, width: 210, maxHeight: 300, overflow: 'auto' }}>
                   {templates.map((t) => (
                     <MenuItem key={t.id} role="option" ariaSelected={t.id === template} selected={t.id === template}
                       title={t.description || ''} onClick={() => pickTemplate(t.id)}>{t.name}</MenuItem>
@@ -545,10 +547,10 @@ export default function CoverLetterEditor() {
             </span>}
 
             {metaReady && <span style={{ position: 'relative', display: 'flex' }} onClick={(e) => e.stopPropagation()}>
-              <ToolbarTrigger label="Paper" value={fmtLabel} onClick={() => { setFmtOpen((v) => !v); setTplOpen(false) }}
-                title="Paper size — US Letter or A4" />
+              <ToolbarTrigger label={t`Paper`} value={fmtLabel} onClick={() => { setFmtOpen((v) => !v); setTplOpen(false) }}
+                title={t`Paper size — US Letter or A4`} />
               {fmtOpen && (
-                <Menu role="listbox" ariaLabel="Paper size" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 40, width: 130 }}>
+                <Menu role="listbox" ariaLabel={t`Paper size`} style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 40, width: 130 }}>
                   {PAGE_FORMATS.map(([f, label]) => (
                     <MenuItem key={f} role="option" ariaSelected={f === format} selected={f === format}
                       onClick={() => pickFormat(f)}>{label}</MenuItem>
@@ -560,13 +562,13 @@ export default function CoverLetterEditor() {
             {/* `pdfUrl` is only ever assigned on success, so on a FIRST failure there is
                 no previous version and the pane below reads "Rendering the preview…"
                 while this line claimed one was showing (R4-T2B-08). */}
-            {pdfErr && <span style={{ fontSize: 11, lineHeight: '14px', color: 'var(--bad)', whiteSpace: 'nowrap' }}>{pdfUrl ? 'Preview failed. Showing the previous version' : 'Preview failed — the PDF could not be rendered.'} · <span onClick={() => setPdfNonce((n) => n + 1)} style={{ cursor: 'pointer', borderBottom: '1px dotted currentColor' }}>Retry</span></span>}
-            <Button size="xs" onClick={download} style={{ marginLeft: 'auto' }}>↓ Download PDF</Button>
+            {pdfErr && <span style={{ fontSize: 11, lineHeight: '14px', color: 'var(--bad)', whiteSpace: 'nowrap' }}>{pdfUrl ? t`Preview failed. Showing the previous version` : t`Preview failed — the PDF could not be rendered.`} · <span onClick={() => setPdfNonce((n) => n + 1)} style={{ cursor: 'pointer', borderBottom: '1px dotted currentColor' }}><Trans>Retry</Trans></span></span>}
+            <Button size="xs" onClick={download} style={{ marginLeft: 'auto' }}><Trans>↓ Download PDF</Trans></Button>
           </HeaderRow>
           <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
             {pdfUrl
-              ? <iframe title="cover letter preview" src={`${pdfUrl}#view=FitH`} style={{ width: '100%', height: '100%', border: 'none' }} />
-              : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, color: 'var(--muted)' }}>Rendering the preview…</div>}
+              ? <iframe title={t`cover letter preview`} src={`${pdfUrl}#view=FitH`} style={{ width: '100%', height: '100%', border: 'none' }} />
+              : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, color: 'var(--muted)' }}><Trans>Rendering the preview…</Trans></div>}
           </div>
         </Surface>
       </div>
@@ -574,11 +576,11 @@ export default function CoverLetterEditor() {
       {regenOpen && (
         // A run in flight isn't cancellable, so while `regening` the panel takes
         // no `onClose` at all — no scrim click, no Escape.
-        <ModalPanel width={460} title="Regenerate letter" zIndex={60} onClose={regening ? undefined : () => setRegenOpen(false)} style={{ overflow: 'hidden' }}>
+        <ModalPanel width={460} title={t`Regenerate letter`} zIndex={60} onClose={regening ? undefined : () => setRegenOpen(false)} style={{ overflow: 'hidden' }}>
             <HeaderRow align="stretch" style={{ flexDirection: 'column', gap: 3 }}>
-              <Heading className="v2-dialogtitle">Regenerate letter</Heading>
+              <Heading className="v2-dialogtitle"><Trans>Regenerate letter</Trans></Heading>
               <Helper style={{ textWrap: 'pretty' }}>
-                Rewrites the whole letter for {doc.company || 'this role'} — your edits to this draft are replaced.
+                <Trans>Rewrites the whole letter for {doc.company || t`this role`} — your edits to this draft are replaced.</Trans>
               </Helper>
             </HeaderRow>
             <div style={{ padding: '15px 22px', display: 'flex', flexDirection: 'column', gap: 13 }}>
@@ -591,14 +593,14 @@ export default function CoverLetterEditor() {
                   centred Spinner, so the settled frame is pixel-identical. `Length`
                   needs no hold: LENGTHS is a module constant. */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <Label>From résumé</Label>
+                <Label><Trans>From résumé</Trans></Label>
                 {metaReady
-                  ? <Picker value={rSource} options={sourceOpts} placeholder="Select a source…" onPick={setRSource} />
+                  ? <Picker value={rSource} options={sourceOpts} placeholder={t`Select a source…`} onPick={setRSource} />
                   : <div style={{ height: 33, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spinner size={11} /></div>}
-                <Helper size="xs" style={{ textWrap: 'pretty' }}>Bases and Persona. Switch to use a different set of achievements.</Helper>
+                <Helper size="xs" style={{ textWrap: 'pretty' }}><Trans>Bases and Persona. Switch to use a different set of achievements.</Trans></Helper>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <Label>Voice</Label>
+                <Label><Trans>Voice</Trans></Label>
                 {/* "No voice presets…" is a verdict, not a loading state — the row holds a pill's height until the settle. */}
                 {/* the wrapper stays a plain block: VoicePicker's own row is a
                     wrapping flex, and making its parent a flex container would size
@@ -610,17 +612,17 @@ export default function CoverLetterEditor() {
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <Label>Length</Label>
+                <Label><Trans>Length</Trans></Label>
                 <LengthPicker value={rLength} onPick={setRLength} />
               </div>
             </div>
             <FooterRow bg="page" style={{ flex: '0 0 auto' }}>
-              {err && !regening ? <Helper style={{ color: 'var(--bad)' }}>{err}</Helper> : <Helper>~30 seconds</Helper>}
-              <Button variant="secondary" size="sm" onClick={() => !regening && setRegenOpen(false)} style={{ marginLeft: 'auto' }}>Cancel</Button>
+              {err && !regening ? <Helper style={{ color: 'var(--bad)' }}>{err}</Helper> : <Helper><Trans>~30 seconds</Trans></Helper>}
+              <Button variant="secondary" size="sm" onClick={() => !regening && setRegenOpen(false)} style={{ marginLeft: 'auto' }}><Trans>Cancel</Trans></Button>
               {/* Disabled primary pill is --line on --muted across the three builders — a dimmed accent still reads as live. */}
               <Button variant="ai" size="sm" onClick={regenerate} disabled={regening || !rSource}>
                 {regening && <Spinner color="currentColor" />}
-                {regening ? 'Regenerating…' : 'Regenerate'}
+                {regening ? t`Regenerating…` : t`Regenerate`}
               </Button>
             </FooterRow>
         </ModalPanel>

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { intlLocale } from '../i18n'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
@@ -48,7 +50,7 @@ const fmtSalary = (lo, hi) => {
 // `boards` (useApifyBoards) names the `apify_<board>` sources.
 const srcLabel = (v, boards = []) => apifySourceLabel(boards, v, ' via Apify') || ({
   direct: 'a company scrape', manual: 'the Log application form', jobright: 'Jobright.ai', levels_fyi: 'Levels.fyi',
-  linkedin_personal: 'LinkedIn Personal', linkedin_extension: 'the LinkedIn extension',
+  linkedin_personal: t`LinkedIn Personal`, linkedin_extension: 'the LinkedIn extension',
   extension: 'the extension', freehire: 'freehire.me', caribbeanjobs: 'caribbeanjobs.com', trulyremote: 'trulyremotework.com',
   behance: 'Behance', hollylist: 'hollylist.com', wanacreate: 'wanacreate.art', himalayas: 'himalayas.app', eluta: 'eluta.ca', dribbble: 'Dribbble', artstation: 'ArtStation', workwithindies: 'workwithindies.com',
 }[v] || (v ? v.replace(/^jobspy_/, '').replace(/_/g, ' ') : 'the Job Feed'))
@@ -56,10 +58,10 @@ const srcLabel = (v, boards = []) => apifySourceLabel(boards, v, ' via Apify') |
 // Dots read the shared --stage-* tokens (theme.css), not generic --warn/--good/--bad,
 // so a stage is the same colour here, in the Stats funnel, and on the Sankey nodes.
 const STAGES = [
-  { id: 'applied', label: 'Applied', dot: 'var(--stage-applied)', hint: 'Waiting on a first response' },
-  { id: 'interview', label: 'Interview', dot: 'var(--stage-interview)', hint: 'Interviewing' },
-  { id: 'offer', label: 'Offer', dot: 'var(--stage-offer)', hint: 'Offer received' },
-  { id: 'rejected', label: 'Rejected', dot: 'var(--stage-rejected)', hint: 'Closed — kept in Stats' },
+  { id: 'applied', label: t`Applied`, dot: 'var(--stage-applied)', hint: t`Waiting on a first response` },
+  { id: 'interview', label: t`Interview`, dot: 'var(--stage-interview)', hint: t`Interviewing` },
+  { id: 'offer', label: t`Offer`, dot: 'var(--stage-offer)', hint: t`Offer received` },
+  { id: 'rejected', label: t`Rejected`, dot: 'var(--stage-rejected)', hint: t`Closed — kept in Stats` },
 ]
 const STAGE = Object.fromEntries(STAGES.map((s) => [s.id, s]))
 // a status outside the four stages is closed, so it lists under Rejected
@@ -69,11 +71,11 @@ const groupOf = (status) => (STAGE[status] ? status : 'rejected')
 // stages and go to POST /applications, which writes the job too.
 const LOG_JOB_STATUSES = ['new', 'saved']
 const LOG_STATUSES = [
-  { id: 'new', label: 'New', hint: 'Feed only — decide later' },
-  { id: 'saved', label: 'Saved', hint: 'Feed only — shortlisted' },
+  { id: 'new', label: t`New`, hint: t`Feed only — decide later` },
+  { id: 'saved', label: t`Saved`, hint: t`Feed only — shortlisted` },
   ...STAGES.filter((s) => s.id !== 'rejected'),
 ]
-const SORTS = [['recent', 'Recent activity'], ['oldest', 'Waiting longest'], ['company', 'Company name']]
+const SORTS = [['recent', t`Recent activity`], ['oldest', t`Waiting longest`], ['company', t`Company name`]]
 const isStale = (a) => daysSince(a.updated_at) > 7 && ['applied', 'interview'].includes(a.status)
 
 // where a popover sits; how it looks is `Menu`'s.
@@ -160,8 +162,8 @@ export default function Applications() {
     } catch (e) {
       if (seq !== loadSeq.current) return
       console.error(e)
-      setLoadErr(e?.response?.status ? `The server returned error ${e.response.status}. Try again.${errSuffix(e)}` : (e.message || 'Network error'))
-      pushToast({ kind: 'error', msg: 'Could not load applications' + errSuffix(e) })
+      setLoadErr(e?.response?.status ? t`The server returned error ${e.response.status}. Try again.${errSuffix(e)}` : (e.message || t`Network error`))
+      pushToast({ kind: 'error', msg: t`Could not load applications` + errSuffix(e) })
     }
   }, [pushToast])
   // waits for the one request before drawing anything (an empty pane, never a spinner), via the shared hook.
@@ -177,7 +179,7 @@ export default function Applications() {
   const dropLog = () => { logDirty.current = false; setLogOpen(false) }
   const closeLog = () => {
     if (!logDirty.current) { dropLog(); return }
-    setConfirm({ title: 'Discard this draft?', body: 'Everything typed will be lost.', label: 'Discard', danger: true, onConfirm: () => { setConfirm(null); dropLog() } })
+    setConfirm({ title: t`Discard this draft?`, body: t`Everything typed will be lost.`, label: t`Discard`, danger: true, onConfirm: () => { setConfirm(null); dropLog() } })
   }
   useEffect(() => {
     const onDoc = () => closeAll()
@@ -203,11 +205,11 @@ export default function Applications() {
   // Three states, never "0" by accident: NBSP holds the line's box while the one
   // request is in flight, an em dash says the load failed, numbers mean numbers.
   const countLine = !loaded ? NBSP : loadErr ? DASH
-    : `${shown} application${shown === 1 ? '' : 's'} · ${nInterview} interviewing · ${nOffer} offer${nOffer === 1 ? '' : 's'}`
+    : t`${plural(shown, { one: '# application', other: '# applications' })} · ${nInterview} interviewing · ${plural(nOffer, { one: '# offer', other: '# offers' })}`
       + (nStale ? ` · ${nStale} with no reply for 7+ days` : '')
       + (total > apps.length ? ` · showing ${apps.length}` : '')
 
-  const companyOf = (a) => a.company_canonical || a.company || 'Unknown Company'
+  const companyOf = (a) => a.company_canonical || a.company || t`Unknown Company`
   // live companies (≥1 non-rejected application) first, then a rule, then the closed ones
   const companyOpts = useMemo(() => {
     const m = new Map()
@@ -266,7 +268,7 @@ export default function Applications() {
       setApps((p) => p.map((a) => (a.id === id ? { ...a, ...data } : a)))   // merge the server's canonical row (status_transitions, updated_at, …)
     } catch (e) {
       if (patchSeq.current[id] !== seq) return
-      console.error(e); pushToast({ kind: 'error', msg: 'Could not save that change' + errSuffix(e) }); load()
+      console.error(e); pushToast({ kind: 'error', msg: t`Could not save that change` + errSuffix(e) }); load()
     }
   }
   // autosave: debounce while typing, flush immediately on blur
@@ -279,7 +281,7 @@ export default function Applications() {
       setApps((p) => p.map((a) => (a.id === id ? { ...a, notes: value } : a)))
       api.patch(`/applications/${id}`, { notes: value })
         .then(({ data }) => { if (patchSeq.current[id] === seq) setApps((p) => p.map((a) => (a.id === id ? { ...a, ...data } : a))) })   // the row's age follows the server's updated_at
-        .catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not save notes' + errSuffix(e) }) })
+        .catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not save notes` + errSuffix(e) }) })
     }
     if (now) run(); else { notesPending.current = run; notesTimer.current = setTimeout(run, 700) }
   }, [pushToast])
@@ -296,13 +298,13 @@ export default function Applications() {
     setMenuOpen(false)
     // styled dialog: deleting an application is the most destructive action on this screen.
     setConfirm({
-      title: `Delete the application for “${a.title}”?`,
-      body: 'The job goes back to Saved in the feed. This cannot be undone.',
-      label: 'Delete', danger: true,
+      title: t`Delete the application for “${a.title}”?`,
+      body: t`The job goes back to Saved in the feed. This cannot be undone.`,
+      label: t`Delete`, danger: true,
       onConfirm: async () => {
         setConfirm(null)
-        try { await api.delete(`/applications/${a.id}`); setSel(null); load(null); pushToast({ kind: 'success', msg: 'Application deleted' }); window.dispatchEvent(new CustomEvent('jn:counts-changed')) }
-        catch (e) { console.error(e); pushToast({ kind: 'error', msg: 'Could not delete this application' + errSuffix(e) }) }
+        try { await api.delete(`/applications/${a.id}`); setSel(null); load(null); pushToast({ kind: 'success', msg: t`Application deleted` }); window.dispatchEvent(new CustomEvent('jn:counts-changed')) }
+        catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Could not delete this application` + errSuffix(e) }) }
       },
     })
   }
@@ -331,7 +333,7 @@ export default function Applications() {
     const prev = app.status
     if (!prev || prev === status) return
     patch(app.id, { status })
-    pushToast({ kind: 'undo', msg: `Moved to ${STAGE[status]?.label || status}.`, action: 'Undo',
+    pushToast({ kind: 'undo', msg: t`Moved to ${STAGE[status]?.label || status}.`, action: 'Undo',
       onAction: () => patch(app.id, { status: prev, undo: true }) })
   }
   const bulkUndo = async (prev) => {
@@ -341,8 +343,8 @@ export default function Applications() {
     try {
       for (const [status, ids] of groups) await api.post('/applications/bulk-update', { ids, status, undo: true })
       load(); window.dispatchEvent(new CustomEvent('jn:counts-changed'))
-      pushToast({ kind: 'success', msg: `Restored ${prev.length} application${prev.length === 1 ? '' : 's'}.` })
-    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: `Could not undo ${prev.length} application${prev.length === 1 ? '' : 's'}` + errSuffix(e) }); load() }
+      pushToast({ kind: 'success', msg: plural(prev.length, { one: t`Restored # application.`, other: t`Restored # applications.` }) })
+    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: plural(prev.length, { one: t`Could not undo # application`, other: t`Could not undo # applications` }) + errSuffix(e) }); load() }
   }
   const bulkStatus = async (status) => {
     const moving = selectedRows.filter((a) => a.status !== status)
@@ -357,9 +359,9 @@ export default function Applications() {
     try {
       await api.post('/applications/bulk-update', { ids, status })
       load(); window.dispatchEvent(new CustomEvent('jn:counts-changed'))
-      pushToast({ kind: 'undo', msg: `Moved ${ids.length} to ${STAGE[status].label}.`, action: 'Undo', onAction: () => bulkUndo(prev) })
+      pushToast({ kind: 'undo', msg: t`Moved ${ids.length} to ${STAGE[status].label}.`, action: 'Undo', onAction: () => bulkUndo(prev) })
     } catch (e) {
-      console.error(e); pushToast({ kind: 'error', msg: `Could not move ${ids.length} application${ids.length === 1 ? '' : 's'}` + errSuffix(e) }); load()
+      console.error(e); pushToast({ kind: 'error', msg: plural(ids.length, { one: t`Could not move # application`, other: t`Could not move # applications` }) + errSuffix(e) }); load()
     } finally { setBulkBusy(false) }
   }
 
@@ -375,19 +377,19 @@ export default function Applications() {
       })
       setIntForm(false); setIntWhat(''); setIntWhen(''); setIntWhere(''); setIntPrep('')
       load()   // refresh interviews without forcing selection — the interview endpoints don't return the parent application
-    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: 'Could not add the interview' + errSuffix(e) }) }
+    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Could not add the interview` + errSuffix(e) }) }
     finally { setIntBusy(false) }
   }
   const delInterview = async (iv) => {
     try {
       await api.delete(`/applications/interviews/${iv.id}`); load()
       // no confirm — an undo toast re-creates the interview from the row we still hold
-      pushToast({ kind: 'undo', msg: `Removed “${iv.what || 'Interview'}”`, action: 'Undo', onAction: async () => {
+      pushToast({ kind: 'undo', msg: t`Removed “${iv.what || t`Interview`}”`, action: 'Undo', onAction: async () => {
         try { await api.post(`/applications/${d.id}/interviews`, { what: iv.what, when_at: iv.when_at, where_text: iv.where_text, status: iv.status || 'scheduled', prep: iv.prep }); load() }
-        catch (e) { pushToast({ kind: 'error', msg: 'Could not restore the interview' + errSuffix(e) }) }
+        catch (e) { pushToast({ kind: 'error', msg: t`Could not restore the interview` + errSuffix(e) }) }
       } })
     }
-    catch (e) { console.error(e); pushToast({ kind: 'error', msg: 'Could not remove the interview' + errSuffix(e) }) }
+    catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Could not remove the interview` + errSuffix(e) }) }
   }
   // ISO instant → the wall-clock string <input type="datetime-local"> wants,
   // in the viewer's own zone — the mirror of what addInterview sends.
@@ -414,12 +416,12 @@ export default function Applications() {
         prep: ivDraft.prep.trim() || null,
       })
       setEditIv(null); load()
-    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: 'Could not save the interview' + errSuffix(e) }) }
+    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Could not save the interview` + errSuffix(e) }) }
     finally { setIntBusy(false) }
   }
   const toggleInterview = async (iv) => {
     try { await api.patch(`/applications/interviews/${iv.id}`, { status: iv.status === 'done' ? 'scheduled' : 'done' }); load() }
-    catch (e) { console.error(e); pushToast({ kind: 'error', msg: 'Could not update the interview' + errSuffix(e) }) }
+    catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Could not update the interview` + errSuffix(e) }) }
   }
   const openPrep = async () => {
     if (!d) return
@@ -427,8 +429,8 @@ export default function Applications() {
     try { const { data } = await api.get(`/applications/${d.id}/prep`); setPrep({ text: data.text }) }
     catch (e) {
       console.error(e)
-      setPrep({ text: `Could not build the prep handover: ${e.message}${errSuffix(e)}`, failed: true })
-      pushToast({ kind: 'error', msg: 'Could not build the prep handover' + errSuffix(e) })
+      setPrep({ text: t`Could not build the prep handover: ${e.message}${errSuffix(e)}`, failed: true })
+      pushToast({ kind: 'error', msg: t`Could not build the prep handover` + errSuffix(e) })
     }
   }
   // "Copied ✓" only after the write actually resolved; nothing to copy
@@ -440,20 +442,20 @@ export default function Applications() {
       setCopied(true); timers.current.push(setTimeout(() => setCopied(false), 1800))
     } catch (e) {
       console.error(e)
-      pushToast({ kind: 'error', msg: 'Could not copy — select the text and copy it manually' })
+      pushToast({ kind: 'error', msg: t`Could not copy — select the text and copy it manually` })
     }
   }
 
   // history from real status_transitions + the Gmail timestamp
   const history = useMemo(() => {
     if (!d) return []
-    const h = (d.status_transitions || []).map((t) => ({
-      what: `Moved to ${STAGE[t.to]?.label || t.to}`, at: t.at,
-      dot: STAGE[t.to]?.dot || 'var(--line-strong)',
+    const h = (d.status_transitions || []).map((step) => ({
+      what: t`Moved to ${STAGE[step.to]?.label || step.to}`, at: step.at,
+      dot: STAGE[step.to]?.dot || 'var(--line-strong)',
     }))
-    if (d.last_email_received) h.push({ what: 'Reply detected in Gmail', at: d.last_email_received, dot: 'var(--line-strong)' })
-    if (d.applied_at) h.push({ what: `Applied with ${d.tailored_resume_name || d.cv_version_used || d.best_cv || 'unknown résumé'}`, at: d.applied_at, dot: 'var(--line-strong)' })
-    if (d.discovered_at) h.push({ what: `Discovered via ${srcLabel(d.source, apifyBoards)}`, at: d.discovered_at, dot: 'var(--line-strong)' })
+    if (d.last_email_received) h.push({ what: t`Reply detected in Gmail`, at: d.last_email_received, dot: 'var(--line-strong)' })
+    if (d.applied_at) h.push({ what: t`Applied with ${d.tailored_resume_name || d.cv_version_used || d.best_cv || t`unknown résumé`}`, at: d.applied_at, dot: 'var(--line-strong)' })
+    if (d.discovered_at) h.push({ what: t`Discovered via ${srcLabel(d.source, apifyBoards)}`, at: d.discovered_at, dot: 'var(--line-strong)' })
     return h.sort((a, b) => new Date(b.at) - new Date(a.at))
   }, [d])
 
@@ -462,14 +464,14 @@ export default function Applications() {
       {/* header */}
       <HeaderRow as="header" pad="22px 30px 16px 24px" line="none" align="flex-end" style={{ gap: 18 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-          <PageTitle>Applications</PageTitle>
+          <PageTitle><Trans>Applications</Trans></PageTitle>
           {/* integer line-height: at the inherited 1.5 this span is 19.5px, which
               lands the whole list pane on a half pixel and every row on x.25 */}
           {/* ui: keep — the count line is 13/20px, off the 11.5 helper step; integer line-height keeps the pane on whole pixels */}
           <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{countLine}</span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Button onClick={() => { closeAll(); setLogOpen(true) }}>+ Log application</Button>
+          <Button onClick={() => { closeAll(); setLogOpen(true) }}><Trans>+ Log application</Trans></Button>
         </div>
       </HeaderRow>
 
@@ -479,23 +481,23 @@ export default function Applications() {
         <div className="v2-fieldwrap" style={{ flex: '0 1 210px', minWidth: 0, height: 32, padding: '0 12px', border: '1px solid var(--edge)', background: 'var(--surface)', borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', gap: 7 }}>
           {/* ui: keep — the search field's own ⌕ glyph, on the control's icon scale (like the ▾ carets), not a helper sub-line */}
           <span style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--muted)' }}>⌕</span>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search title or company…"
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t`Search title or company…`}
             style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', outline: 'none', fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--text)' }} />
         </div>
 
         <span style={{ position: 'relative', flex: '0 0 auto', display: 'flex' }} onClick={(e) => e.stopPropagation()}>
           <Pill on={openFlt === 'company' || !!companies.length} ariaExpanded={openFlt === 'company'} ariaHaspopup="menu"
             onClick={() => setOpenFlt(openFlt === 'company' ? null : 'company')}>
-            Company{companies.length ? ` · ${companies.length}` : ''}<span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
+            <Trans>Company{companies.length ? ` · ${companies.length}` : ''}</Trans><span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
           </Pill>
           {openFlt === 'company' && (
-            <Menu ariaLabel="Filter by company" className="v2-scroll" onDismiss={() => setOpenFlt(null)} style={{ ...POPOVER, left: 0, marginTop: 5, width: 240, maxHeight: 340, overflow: 'auto' }}>
+            <Menu ariaLabel={t`Filter by company`} className="v2-scroll" onDismiss={() => setOpenFlt(null)} style={{ ...POPOVER, left: 0, marginTop: 5, width: 240, maxHeight: 340, overflow: 'auto' }}>
               {['live', 'closed'].map((band) => companyOpts[band].map(([name, e], i) => {
                 const on = companies.includes(name)
                 const first = band === 'closed' && i === 0 && companyOpts.live.length > 0
                 return (
                   <MenuItem key={name} ellipsis hint={e.n} hintMono divider={first}
-                    title={band === 'closed' ? 'Every application here is rejected' : undefined}
+                    title={band === 'closed' ? t`Every application here is rejected` : undefined}
                     onClick={() => setCompanies((p) => on ? p.filter((x) => x !== name) : [...p, name])}
                     style={{ ...(band === 'closed' ? { color: 'var(--muted)' } : null), ...(first ? { marginTop: 5, paddingTop: 10 } : null) }}
                     icon={<Check checked={on} />}>
@@ -509,17 +511,17 @@ export default function Applications() {
 
         {/* the Feed's head-row hint, over the list column: this list has no head row
             of its own, so it rides along with the filters */}
-        <span style={{ flex: '0 0 auto', fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.02em', color: 'var(--muted)', whiteSpace: 'nowrap' }}>⇧ range · {PICK_KEY} pick</span>
+        <span style={{ flex: '0 0 auto', fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.02em', color: 'var(--muted)', whiteSpace: 'nowrap' }}><Trans>⇧ range · {PICK_KEY} pick</Trans></span>
 
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          {visible.length !== apps.length && <Helper style={{ whiteSpace: 'nowrap' }}>{visible.length} of {apps.length} shown</Helper>}
+          {visible.length !== apps.length && <Helper style={{ whiteSpace: 'nowrap' }}><Trans>{visible.length} of {apps.length} shown</Trans></Helper>}
           <span style={{ position: 'relative', display: 'flex' }} onClick={(e) => e.stopPropagation()}>
             {/* ui: keep — a menu disclosure trigger (muted 12.5 + value + caret), not a link: opens the Sort menu, carries the trigger's own hover */}
             <div onClick={() => setOpenFlt(openFlt === 'sort' ? null : 'sort')} className="v2-hover-accent-text" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer' }}>
-              Sort<span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{SORTS.find((s) => s[0] === sortBy)?.[1]}</span><span style={{ fontSize: 10 }}>▾</span>
+              <Trans>Sort</Trans><span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{SORTS.find((s) => s[0] === sortBy)?.[1]}</span><span style={{ fontSize: 10 }}>▾</span>
             </div>
             {openFlt === 'sort' && (
-              <Menu ariaLabel="Sort applications" onDismiss={() => setOpenFlt(null)} style={{ ...POPOVER, right: 0, marginTop: 8, width: 190 }}>
+              <Menu ariaLabel={t`Sort applications`} onDismiss={() => setOpenFlt(null)} style={{ ...POPOVER, right: 0, marginTop: 8, width: 190 }}>
                 {SORTS.map(([id, label]) => {
                   const on = sortBy === id
                   return (
@@ -588,14 +590,14 @@ export default function Applications() {
                               when it is actually showing: it HIDES itself with
                               `color:transparent`, so forcing the selection ink onto it
                               unconditionally would reveal a glyph that means "no reply". */}
-                          <span title={a.title || 'Unknown Role'} className="v2-rowink" style={{ flex: '0 1 auto', minWidth: 0, fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: unknownTitle || a.status === 'rejected' ? 'var(--muted)' : 'var(--text)' }}>{a.title || 'Unknown Role'}</span>
+                          <span title={a.title || t`Unknown Role`} className="v2-rowink" style={{ flex: '0 1 auto', minWidth: 0, fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: unknownTitle || a.status === 'rejected' ? 'var(--muted)' : 'var(--text)' }}>{a.title || t`Unknown Role`}</span>
                           {/* lineHeight 1: with the row's inherited `normal` this 10px
                               glyph box was 12px under Public Sans and 11px under Inter */}
-                          <span title="Reply detected in Gmail" className={(a.last_email_received || a.last_email_snippet) ? 'v2-rowink' : undefined} style={{ flex: '0 0 auto', fontSize: 10, lineHeight: 1, color: (a.last_email_received || a.last_email_snippet) ? 'var(--accent)' : 'transparent' }}>✉</span>
+                          <span title={t`Reply detected in Gmail`} className={(a.last_email_received || a.last_email_snippet) ? 'v2-rowink' : undefined} style={{ flex: '0 0 auto', fontSize: 10, lineHeight: 1, color: (a.last_email_received || a.last_email_snippet) ? 'var(--accent)' : 'transparent' }}>✉</span>
                         </div>
-                        <Helper title={companyOf(a)} className="v2-rowink" style={{ color: companyOf(a) === 'Unknown Company' ? 'var(--edge)' : 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{companyOf(a)}</Helper>
+                        <Helper title={companyOf(a)} className="v2-rowink" style={{ color: !(a.company_canonical || a.company) ? 'var(--edge)' : 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{companyOf(a)}</Helper>
                       </div>
-                      <Helper size="xs" mono className="v2-rowink" title={stale ? `No movement for ${daysSince(a.updated_at)} days` : `Last activity ${daysSince(a.updated_at)}d ago`}
+                      <Helper size="xs" mono className="v2-rowink" title={stale ? t`No movement for ${daysSince(a.updated_at)} days` : t`Last activity ${daysSince(a.updated_at)}d ago`}
                         style={{ flex: '0 0 30px', textAlign: 'right', color: stale ? 'var(--warn)' : 'var(--muted)' }}>{daysSince(a.updated_at)}d</Helper>
                     </Row>
                   )
@@ -606,13 +608,13 @@ export default function Applications() {
           {loaded && visible.length === 0 && (loadErr ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '34px 8px' }}>
               {/* ui: keep — the empty-state's 13px --bad headline, off the helper step */}
-              <span style={{ fontSize: 13, color: 'var(--bad)' }}>Couldn’t load your applications</span>
+              <span style={{ fontSize: 13, color: 'var(--bad)' }}><Trans>Couldn’t load your applications</Trans></span>
               <Helper style={{ textAlign: 'center' }}>{loadErr}</Helper>
-              <Link onClick={() => load()} style={{ paddingTop: 2 }}>Try again</Link>
+              <Link onClick={() => load()} style={{ paddingTop: 2 }}><Trans>Try again</Trans></Link>
             </div>
           ) : (
             <div style={{ padding: '34px 8px', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)' }}>
-              {apps.length === 0 ? 'No applications yet — mark a job applied in the Feed, or log one here.' : 'Nothing matches those filters.'}
+              {apps.length === 0 ? t`No applications yet — mark a job applied in the Feed, or log one here.` : t`Nothing matches those filters.`}
             </div>
           ))}
         </div>
@@ -630,7 +632,7 @@ export default function Applications() {
           /* "Select an application." is a verdict about a list that has loaded; while
              it is still loading the same box holds a Spinner instead. Identical box
              either way, so the settled frame does not move. */
-          : <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface)', color: 'var(--muted)', fontSize: 13 }}>{loaded ? 'Select an application.' : <Spinner />}</div>}
+          : <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface)', color: 'var(--muted)', fontSize: 13 }}>{loaded ? t`Select an application.` : <Spinner />}</div>}
 
         {/* Bulk bar — the Feed's, over the list column. It is the split body's LAST
             child on purpose: the list scroller's next sibling has to stay the detail
@@ -640,7 +642,7 @@ export default function Applications() {
           <div style={{ position: 'absolute', left: 0, bottom: 14, width: 472, zIndex: 25, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
             {/* ui: keep — floating bulk bar is a pill-shaped *bar* on --rail with --shadow-pop; no primitive owns a bar */}
             <div className="v2-bulkbar" style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 8px 7px 14px', background: 'var(--rail)', borderRadius: 'var(--radius-control)', boxShadow: 'var(--shadow-pop)' }}>
-              <span style={{ fontSize: 12, color: 'var(--rail-ink)', fontWeight: 600, whiteSpace: 'nowrap' }}>{checked.size} selected</span>
+              <span style={{ fontSize: 12, color: 'var(--rail-ink)', fontWeight: 600, whiteSpace: 'nowrap' }}><Trans>{checked.size} selected</Trans></span>
               <div className="v2-bulksep" style={{ width: 1, height: 16, background: 'var(--on-rail-sep)', margin: '0 3px' }} />
               {STAGES.map((st) => {
                 // a stage every picked row is already in has nothing to do: dimmed and inert,
@@ -650,11 +652,11 @@ export default function Applications() {
                 // ui: keep — RAIL_BTN controls (--rail-ink on --on-rail-line); the Pill tokens are for light surfaces
                 return (
                   <div key={st.id} onClick={done ? undefined : () => bulkStatus(st.id)} className={done ? undefined : 'v2-onrail v2-ctl'}
-                    title={done ? `All selected are already in ${st.label}` : `Move ${n} to ${st.label}`}
+                    title={done ? t`All selected are already in ${st.label}` : t`Move ${n} to ${st.label}`}
                     style={{ ...RAIL_BTN, ...(done ? { opacity: 0.4, cursor: 'default' } : null) }}>{st.label}</div>
                 )
               })}
-              <div onClick={() => setChecked(new Set())} className="v2-onrail" title="Clear the selection" style={{ width: 27, height: 27, borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--on-rail-dim)', cursor: 'pointer' }}>✕</div>
+              <div onClick={() => setChecked(new Set())} className="v2-onrail" title={t`Clear the selection`} style={{ width: 27, height: 27, borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--on-rail-dim)', cursor: 'pointer' }}>✕</div>
             </div>
           </div>
         )}
@@ -684,7 +686,7 @@ function Detail({ d, history, menuOpen, setMenuOpen, onStage, onNotes, onDelete,
                   // separate closure, so each of these arrives as a prop, like canAddInterview.
                   editIv, setEditIv, ivDraft, setIvDraft, openIvEdit, saveInterview,
                   addInterview, canAddInterview, delInterview, toggleInterview, openPrep }) {
-  const meta = [fmtSalary(d.salary_min, d.salary_max), d.location].filter(Boolean).join(' · ') || 'No posting details captured'
+  const meta = [fmtSalary(d.salary_min, d.salary_max), d.location].filter(Boolean).join(' · ') || t`No posting details captured`
   const cv = d.tailored_resume_name || d.cv_version_used || d.best_cv || 'unknown résumé'
   const ivs = d.interviews || []
 
@@ -699,14 +701,14 @@ function Detail({ d, history, menuOpen, setMenuOpen, onStage, onNotes, onDelete,
             </Label>
             {/* ui: keep — serif 23/26px: the detail title's own step, between Heading's 22 and the 30px page title */}
             <span style={{ fontFamily: 'var(--serif)', fontSize: 23, fontWeight: 400, letterSpacing: '-.02em', lineHeight: '26px', textWrap: 'pretty' }}>
-              {d.title || 'Unknown Role'}
+              {d.title || t`Unknown Role`}
               {(d.last_email_received || d.last_email_snippet) &&
-                <span title="Reply detected in Gmail" style={{ marginLeft: 8, fontSize: 13, color: 'var(--accent)', verticalAlign: 'middle' }}>✉</span>}
+                <span title={t`Reply detected in Gmail`} style={{ marginLeft: 8, fontSize: 13, color: 'var(--accent)', verticalAlign: 'middle' }}>✉</span>}
             </span>
             {/* ui: keep — a 12.5/18px sentence, and the résumé link inside it inherits that run; Link's 11.5/500/17px would break the line */}
             <span style={{ fontSize: 12.5, lineHeight: '18px', color: 'var(--muted)' }}>
-              {meta} · applied with <span onClick={() => d.tailored_resume_id && navigate(`/resumes/${d.tailored_resume_id}`)}
-                title={d.tailored_resume_id ? 'Open the tailored résumé' : 'No tailored résumé for this job'}
+              <Trans>{meta} · applied with</Trans> <span onClick={() => d.tailored_resume_id && navigate(`/resumes/${d.tailored_resume_id}`)}
+                title={d.tailored_resume_id ? t`Open the tailored résumé` : t`No tailored résumé for this job`}
                 style={{ color: d.tailored_resume_id ? 'var(--accent)' : 'var(--text-2)', fontWeight: d.tailored_resume_id ? 500 : 400, cursor: d.tailored_resume_id ? 'pointer' : 'default' }}>{cv}{d.tailored_resume_id ? ' ↗' : ''}</span>
             </span>
           </div>
@@ -720,25 +722,25 @@ function Detail({ d, history, menuOpen, setMenuOpen, onStage, onNotes, onDelete,
                 the padding is now sm's 15px rather than ACT_BTN's 14. */}
             {d.has_cached_page && <Button variant="secondary" size="sm"
               {...(__DEMO__ ? { onClick: () => openDemoSnapshot(d.job_id) } : { href: `/api/jobs/${d.job_id}/cached-page`, target: '_blank' })}
-              title="Snapshot of the posting from application day" style={{ height: 30 }}>Cached</Button>}
+              title={t`Snapshot of the posting from application day`} style={{ height: 30 }}><Trans>Cached</Trans></Button>}
             {d.url && <Button variant="secondary" size="sm" href={d.url} target="_blank"
-              title="Open the live posting" style={{ height: 30 }}>Live ↗</Button>}
-            <IconButton size={25} on={menuOpen} hover="v2-bd" title="More actions"
+              title={t`Open the live posting`} style={{ height: 30 }}><Trans>Live ↗</Trans></Button>}
+            <IconButton size={25} on={menuOpen} hover="v2-bd" title={t`More actions`}
               onClick={() => setMenuOpen((v) => !v)} style={{ width: 30, height: 30 }}>⋯</IconButton>
             {menuOpen && (
-              <Menu ariaLabel="Application actions" onDismiss={() => setMenuOpen(false)} style={{ ...POPOVER, right: 0, marginTop: 4, width: 226, textAlign: 'left' }}>
-                {[['☰', 'View job in feed', () => navigate(`/feed?job=${d.job_id}`)],
-                  ...(d.has_cover_letter ? [['✎', 'Open cover letter', () => navigate(`/cover-letters?job=${d.job_id}`)]] : [])].map(([g, label, act]) => (
+              <Menu ariaLabel={t`Application actions`} onDismiss={() => setMenuOpen(false)} style={{ ...POPOVER, right: 0, marginTop: 4, width: 226, textAlign: 'left' }}>
+                {[['☰', t`View job in feed`, () => navigate(`/feed?job=${d.job_id}`)],
+                  ...(d.has_cover_letter ? [['✎', t`Open cover letter`, () => navigate(`/cover-letters?job=${d.job_id}`)]] : [])].map(([g, label, act]) => (
                   <MenuItem key={label} icon={g} onClick={() => { setMenuOpen(false); act() }}>{label}</MenuItem>
                 ))}
-                <MenuItem danger icon="✕" onClick={onDelete}>Delete application</MenuItem>
+                <MenuItem danger icon="✕" onClick={onDelete}><Trans>Delete application</Trans></MenuItem>
               </Menu>
             )}
           </div>
         </div>
 
         {/* stage stepper: Segmented lg cells (h34) with per-stage dot as dotColor; Rejected closes in `bad` tone */}
-        <Segmented size="lg" gap={6} ariaLabel="Application stage" value={d.status} onChange={onStage}
+        <Segmented size="lg" gap={6} ariaLabel={t`Application stage`} value={d.status} onChange={onStage}
           options={STAGES.map((s) => ({ value: s.id, label: s.label, hint: s.hint, dotColor: s.dot, tone: s.id === 'rejected' ? 'bad' : 'accent' }))} />
       </HeaderRow>
 
@@ -748,60 +750,60 @@ function Detail({ d, history, menuOpen, setMenuOpen, onStage, onNotes, onDelete,
 
           {(d.last_email_received || d.last_email_snippet) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <Label>Last email · Gmail detection</Label>
-              <div style={{ padding: '10px 12px', borderLeft: '2px solid var(--accent)', background: 'var(--bg)', borderRadius: '0 8px 8px 0', fontSize: 12.5, fontStyle: 'italic', lineHeight: '19px', color: 'var(--text-2)', textWrap: 'pretty' }}>{d.last_email_snippet ? `“${d.last_email_snippet}”` : 'A reply was detected, but no snippet was stored.'}</div>
+              <Label><Trans>Last email · Gmail detection</Trans></Label>
+              <div style={{ padding: '10px 12px', borderLeft: '2px solid var(--accent)', background: 'var(--bg)', borderRadius: '0 8px 8px 0', fontSize: 12.5, fontStyle: 'italic', lineHeight: '19px', color: 'var(--text-2)', textWrap: 'pretty' }}>{d.last_email_snippet ? `“${d.last_email_snippet}”` : t`A reply was detected, but no snippet was stored.`}</div>
             </div>
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Label>Interviews · {ivs.length}</Label>
+              <Label><Trans>Interviews · {ivs.length}</Trans></Label>
               <Pill size="sm" onClick={openPrep} style={{ marginLeft: 'auto' }}
-                title="Builds one text block with the role, your résumé, the posting and the questions to ask, to paste into any AI chat">
-                <CopyGlyph />Generate prep handover for AI
+                title={t`Builds one text block with the role, your résumé, the posting and the questions to ask, to paste into any AI chat`}>
+                <CopyGlyph /><Trans>Generate prep handover for AI</Trans>
               </Pill>
             </div>
             {ivs.map((iv) => (
               <Card key={iv.id} style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: editIv === iv.id ? 8 : 3, ...(editIv === iv.id ? { borderColor: 'var(--accent)' } : { background: 'var(--bg)' }) }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {/* row text opens the editor; the status chip and ✕ keep their own click behavior */}
-                  <span onClick={() => (editIv === iv.id ? setEditIv(null) : openIvEdit(iv))} title={editIv === iv.id ? 'Close without saving' : 'Edit this interview'} style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}>{iv.what}</span>
+                  <span onClick={() => (editIv === iv.id ? setEditIv(null) : openIvEdit(iv))} title={editIv === iv.id ? t`Close without saving` : t`Edit this interview`} style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}>{iv.what}</span>
                   {/* ui: keep — an uppercase status badge with a background + r99: the `Tag` role, not a Label */}
-                  <span onClick={() => toggleInterview(iv)} title="Toggle scheduled / done" style={{ fontSize: 9.5, letterSpacing: '.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 'var(--radius-control)', cursor: 'pointer', background: iv.status === 'scheduled' ? 'var(--accent-soft)' : 'var(--surface-2)', color: iv.status === 'scheduled' ? 'var(--good)' : 'var(--text-2)' }}>{iv.status}</span>
+                  <span onClick={() => toggleInterview(iv)} title={t`Toggle scheduled / done`} style={{ fontSize: 9.5, letterSpacing: '.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 'var(--radius-control)', cursor: 'pointer', background: iv.status === 'scheduled' ? 'var(--accent-soft)' : 'var(--surface-2)', color: iv.status === 'scheduled' ? 'var(--good)' : 'var(--text-2)' }}>{iv.status}</span>
                   {/* ui: keep — a ✕ with a padded, rounded hover target so the --hover-bad wash reads as a box; RemoveX draws no box */}
-                  <span onClick={() => delInterview(iv)} title="Remove this interview" className="v2-hover-bad" style={{ fontSize: 11, color: 'var(--muted)', cursor: 'pointer', padding: 2, borderRadius: 'var(--radius-inline)' }}>✕</span>
+                  <span onClick={() => delInterview(iv)} title={t`Remove this interview`} className="v2-hover-bad" style={{ fontSize: 11, color: 'var(--muted)', cursor: 'pointer', padding: 2, borderRadius: 'var(--radius-inline)' }}>✕</span>
                 </div>
                 {editIv === iv.id ? (
                   <>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <Label>What</Label>
-                      <Input autoFocus value={ivDraft.what} onChange={(t) => setIvDraft((v) => ({ ...v, what: t }))} placeholder="e.g. System design round" ariaLabel="What" />
+                      <Label><Trans>What</Trans></Label>
+                      <Input autoFocus value={ivDraft.what} onChange={(t) => setIvDraft((v) => ({ ...v, what: t }))} placeholder={t`e.g. System design round`} ariaLabel={t`What`} />
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                        <Label>When</Label>
-                        <Input type="datetime-local" value={ivDraft.when} onChange={(t) => setIvDraft((v) => ({ ...v, when: t }))} ariaLabel="When" style={{ minWidth: 0 }} />
+                        <Label><Trans>When</Trans></Label>
+                        <Input type="datetime-local" value={ivDraft.when} onChange={(t) => setIvDraft((v) => ({ ...v, when: t }))} ariaLabel={t`When`} style={{ minWidth: 0 }} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                        <Label>Where</Label>
-                        <Input value={ivDraft.where} onChange={(t) => setIvDraft((v) => ({ ...v, where: t }))} placeholder="Zoom · Onsite — London" ariaLabel="Where" style={{ minWidth: 0 }} />
+                        <Label><Trans>Where</Trans></Label>
+                        <Input value={ivDraft.where} onChange={(t) => setIvDraft((v) => ({ ...v, where: t }))} placeholder={t`Zoom · Onsite — London`} ariaLabel={t`Where`} style={{ minWidth: 0 }} />
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <Label>Prep note · optional</Label>
-                      <Input value={ivDraft.prep} onChange={(t) => setIvDraft((v) => ({ ...v, prep: t }))} placeholder="Who I'm meeting, what to revise…" ariaLabel="Prep note" />
+                      <Label><Trans>Prep note · optional</Trans></Label>
+                      <Input value={ivDraft.prep} onChange={(t) => setIvDraft((v) => ({ ...v, prep: t }))} placeholder={t`Who I'm meeting, what to revise…`} ariaLabel={t`Prep note`} />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <Helper>Escape cancels</Helper>
-                      <Button variant="secondary" size="xs" onClick={() => setEditIv(null)} style={{ marginLeft: 'auto' }}>Cancel</Button>
-                      <Button size="xs" onClick={saveInterview} busy={intBusy}>{intBusy ? 'Saving…' : 'Save'}</Button>
+                      <Helper><Trans>Escape cancels</Trans></Helper>
+                      <Button variant="secondary" size="xs" onClick={() => setEditIv(null)} style={{ marginLeft: 'auto' }}><Trans>Cancel</Trans></Button>
+                      <Button size="xs" onClick={saveInterview} busy={intBusy}>{intBusy ? t`Saving…` : t`Save`}</Button>
                     </div>
                   </>
                 ) : (
                   <>
                     {/* Helper's onClick (with kb()) replaces a hand-written span here */}
-                    <Helper size="xs" mono onClick={() => openIvEdit(iv)} title="Edit this interview">
-                      {[fmtWhen(iv.when_at), iv.where_text].filter(Boolean).join(' · ') || 'Unscheduled'}
+                    <Helper size="xs" mono onClick={() => openIvEdit(iv)} title={t`Edit this interview`}>
+                      {[fmtWhen(iv.when_at), iv.where_text].filter(Boolean).join(' · ') || t`Unscheduled`}
                     </Helper>
                     {iv.prep && <span onClick={() => openIvEdit(iv)} style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--text-2)', textWrap: 'pretty', cursor: 'pointer' }}>{iv.prep}</span>}
                   </>
@@ -811,47 +813,47 @@ function Detail({ d, history, menuOpen, setMenuOpen, onStage, onNotes, onDelete,
             {intForm ? (
               <Card style={{ display: 'flex', flexDirection: 'column', gap: 8, borderColor: 'var(--accent)', padding: '10px 12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <Label>What</Label>
-                  <Input value={intWhat} onChange={setIntWhat} placeholder="e.g. System design round" ariaLabel="What" />
+                  <Label><Trans>What</Trans></Label>
+                  <Input value={intWhat} onChange={setIntWhat} placeholder={t`e.g. System design round`} ariaLabel={t`What`} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                    <Label>When</Label>
-                    <Input type="datetime-local" value={intWhen} onChange={setIntWhen} ariaLabel="When" style={{ minWidth: 0 }} />
+                    <Label><Trans>When</Trans></Label>
+                    <Input type="datetime-local" value={intWhen} onChange={setIntWhen} ariaLabel={t`When`} style={{ minWidth: 0 }} />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                    <Label>Where</Label>
-                    <Input value={intWhere} onChange={setIntWhere} placeholder="Zoom · Onsite — London" ariaLabel="Where" style={{ minWidth: 0 }} />
+                    <Label><Trans>Where</Trans></Label>
+                    <Input value={intWhere} onChange={setIntWhere} placeholder={t`Zoom · Onsite — London`} ariaLabel={t`Where`} style={{ minWidth: 0 }} />
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <Label>Prep note · optional</Label>
-                  <Input value={intPrep} onChange={setIntPrep} placeholder="Who I'm meeting, what to revise…" ariaLabel="Prep note" />
+                  <Label><Trans>Prep note · optional</Trans></Label>
+                  <Input value={intPrep} onChange={setIntPrep} placeholder={t`Who I'm meeting, what to revise…`} ariaLabel={t`Prep note`} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 7 }}>
-                  <Button variant="secondary" size="xs" onClick={() => { setIntForm(false); setIntWhat(''); setIntWhen(''); setIntWhere(''); setIntPrep('') }}>Cancel</Button>
-                  <Button size="xs" onClick={addInterview} disabled={!canAddInterview}>Add interview</Button>
+                  <Button variant="secondary" size="xs" onClick={() => { setIntForm(false); setIntWhat(''); setIntWhen(''); setIntWhere(''); setIntPrep('') }}><Trans>Cancel</Trans></Button>
+                  <Button size="xs" onClick={addInterview} disabled={!canAddInterview}><Trans>Add interview</Trans></Button>
                 </div>
               </Card>
             ) : (
-              <DashedAdd big onClick={() => setIntForm(true)} style={{ gap: 7 }}>+ Add interview</DashedAdd>
+              <DashedAdd big onClick={() => setIntForm(true)} style={{ gap: 7 }}><Trans>+ Add interview</Trans></DashedAdd>
             )}
           </div>
 
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Label>Notes · autosaves</Label>
+            <Label><Trans>Notes · autosaves</Trans></Label>
             {/* rows={2} keeps the intrinsic height (2×19+13=51) under the 64px floor, so minHeight is what renders.
                 At rows={3} the intrinsic height wins and the floor becomes dead code. */}
             <Textarea key={d.id} defaultValue={d.notes || ''} onChange={(t) => onNotes(t)}
-              onBlur={(e) => onNotes(e.target.value, true)} placeholder="Notes…" ariaLabel="Notes"
+              onBlur={(e) => onNotes(e.target.value, true)} placeholder={t`Notes…`} ariaLabel={t`Notes`}
               rows={2} style={{ minHeight: 64 }} />
           </div>
         </div>
 
         {/* history rail */}
         <div style={{ flex: '1 0 250px', maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 6 }}>   {/* wraps under the content when the pane is narrow */}
-          <Label>History</Label>
+          <Label><Trans>History</Trans></Label>
           {history.map((h, i) => (
             <div key={i} style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -865,7 +867,7 @@ function Detail({ d, history, menuOpen, setMenuOpen, onStage, onNotes, onDelete,
             </div>
           ))}
           {/* ui: keep — the empty rail sits on the history entries' own 12/18px line rhythm (matching 12.5/18px event lines), not the helper step */}
-          {history.length === 0 && <span style={{ fontSize: 12, lineHeight: '18px', color: 'var(--muted)' }}>No history recorded yet.</span>}
+          {history.length === 0 && <span style={{ fontSize: 12, lineHeight: '18px', color: 'var(--muted)' }}><Trans>No history recorded yet.</Trans></span>}
         </div>
       </div>
     </div>
@@ -878,22 +880,22 @@ function PrepModal({ prep, company, copied, onCopy, onClose }) {
   return (
     // escape={false}: this screen closes every overlay from one handler that stands down while
     // a ConfirmDialog is up; a second listener here would close this modal under that confirm.
-    <ModalPanel width={640} title={`Prep handover — ${company}`} onClose={onClose} escape={false} zIndex={60} style={{ maxHeight: 640, overflow: 'hidden' }}>
+    <ModalPanel width={640} title={t`Prep handover — ${company}`} onClose={onClose} escape={false} zIndex={60} style={{ maxHeight: 640, overflow: 'hidden' }}>
         <HeaderRow variant="compact" align="center" style={{ gap: 10 }}>
-          <Heading className="v2-dialogtitle">Prep handover — {company}</Heading>
-          <Helper>paste into the AI of your choice</Helper>
-          <IconButton onClick={onClose} title="Close" style={{ marginLeft: 'auto' }}>✕</IconButton>
+          <Heading className="v2-dialogtitle"><Trans>Prep handover — {company}</Trans></Heading>
+          <Helper><Trans>paste into the AI of your choice</Trans></Helper>
+          <IconButton onClick={onClose} title={t`Close`} style={{ marginLeft: 'auto' }}>✕</IconButton>
         </HeaderRow>
         <div className="v2-scroll" style={{ flex: 1, overflow: 'auto', minHeight: 0, padding: '14px 22px', background: 'var(--bg)' }}>
           <pre style={{ margin: 0, fontFamily: 'var(--mono)', fontSize: 11, lineHeight: '18px', color: 'var(--text-2)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-            {prep === 'loading' ? 'Building the prep handover…' : prep.text}
+            {prep === 'loading' ? t`Building the prep handover…` : prep.text}
           </pre>
         </div>
         <FooterRow variant="compact" bg="page">
-          <Helper>Edit the questions added at the end in Settings → AI</Helper>
-          <Button variant="secondary" size="sm" onClick={onClose} style={{ marginLeft: 'auto' }}>Close</Button>
+          <Helper><Trans>Edit the questions added at the end in Settings → AI</Trans></Helper>
+          <Button variant="secondary" size="sm" onClick={onClose} style={{ marginLeft: 'auto' }}><Trans>Close</Trans></Button>
           <Button size="sm" onClick={onCopy} busy={busy}>
-            <CopyGlyph />{copied ? 'Copied ✓' : 'Copy to clipboard'}
+            <CopyGlyph />{copied ? t`Copied ✓` : t`Copy to clipboard`}
           </Button>
         </FooterRow>
     </ModalPanel>
@@ -918,7 +920,7 @@ function LogModal({ onClose, onSaved, onJobSaved, pushToast, onDirty }) {
 
   // The chips are the modal's only way to attach a résumé; an empty list must not read as
   // "you have no résumés" when the user is just here to log an application.
-  useEffect(() => { api.get('/resumes', { params: { is_base: true } }).then(({ data }) => setResumes(data || [])).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load your résumés — log it now and attach one later.' }) }) }, [pushToast])
+  useEffect(() => { api.get('/resumes', { params: { is_base: true } }).then(({ data }) => setResumes(data || [])).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load your résumés — log it now and attach one later.` }) }) }, [pushToast])
 
   // title/company captured in readUrl's closure at call time were often still empty, so a late
   // response overwrote what the user had typed; read the live draft off a ref, and drop stale responses.
@@ -938,10 +940,10 @@ function LogModal({ onClose, onSaved, onJobSaved, pushToast, onDirty }) {
       if (data.title && !draftRef.current.title.trim()) setTitle(data.title)
       if (data.company && !draftRef.current.company.trim()) setCompany(data.company)
       // an empty field after a refused read is the site's doing, not a parser miss
-      if (data.blocked && !(data.title && data.company)) pushToast({ kind: 'progress', spin: false, msg: 'This site blocks automatic reading. Type the title and company.' })
+      if (data.blocked && !(data.title && data.company)) pushToast({ kind: 'progress', spin: false, msg: t`This site blocks automatic reading. Type the title and company.` })
     } catch (e) {
       if (urlRef.current !== target) return
-      console.error(e); pushToast({ kind: 'error', msg: 'Could not read job details from that URL' + errSuffix(e) })
+      console.error(e); pushToast({ kind: 'error', msg: t`Could not read job details from that URL` + errSuffix(e) })
     } finally {
       if (urlRef.current === target) setReading(false)
     }
@@ -967,7 +969,7 @@ function LogModal({ onClose, onSaved, onJobSaved, pushToast, onDirty }) {
   // saved first either way, because tailoring needs the job id.
   const submit = async (tailorFrom) => {
     if (!title.trim() || !company.trim() || !url.trim()) {
-      pushToast({ kind: 'error', msg: !url.trim() ? 'The posting URL is required — it identifies the job' : 'Title and company are required' })
+      pushToast({ kind: 'error', msg: !url.trim() ? t`The posting URL is required — it identifies the job` : t`Title and company are required` })
       const first = [url, title, company].findIndex((v) => !v.trim()); document.querySelectorAll('input[placeholder]')[first]?.focus()
       return
     }
@@ -978,44 +980,44 @@ function LogModal({ onClose, onSaved, onJobSaved, pushToast, onDirty }) {
         // A failed tailor must not lose the row that is already saved — report it and go on.
         try {
           await api.post('/resumes/tailor', { base_resume_id: tailorFrom.id, job_id: jobId })
-          pushToast({ kind: 'progress', msg: `Tailoring ${tailorFrom.name} for "${title.trim()}"…` })
-        } catch (e) { console.error(e); pushToast({ kind: 'error', msg: 'Saved, but tailoring could not start' + errSuffix(e) }) }
+          pushToast({ kind: 'progress', msg: t`Tailoring ${tailorFrom.name} for "${title.trim()}"…` })
+        } catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Saved, but tailoring could not start` + errSuffix(e) }) }
       }
       done()
     } catch (e) {
       const existing = e.response?.status === 409 ? e.response?.data?.detail?.application_id : null
-      if (existing) { pushToast({ kind: 'progress', msg: 'Already logged — opened the existing application.' }); onSaved(existing); return }
-      pushToast({ kind: 'error', msg: `Could not save this ${isApp ? 'application' : 'job'}` + errSuffix(e) }); setBusy(false)
+      if (existing) { pushToast({ kind: 'progress', msg: t`Already logged — opened the existing application.` }); onSaved(existing); return }
+      pushToast({ kind: 'error', msg: (isApp ? t`Could not save this application` : t`Could not save this job`) + errSuffix(e) }); setBusy(false)
     }
   }
 
   return (
     // escape={false}: as PrepModal — the screen owns Escape for its overlays.
-    <ModalPanel width={520} title={isApp ? 'Log application' : 'Add job to feed'} onClose={onClose} escape={false} zIndex={60} style={{ overflow: 'hidden' }}>
+    <ModalPanel width={520} title={isApp ? t`Log application` : t`Add job to feed`} onClose={onClose} escape={false} zIndex={60} style={{ overflow: 'hidden' }}>
         <HeaderRow align="stretch" style={{ flexDirection: 'column', gap: 3 }}>
-          <Heading className="v2-dialogtitle">{isApp ? 'Log application' : 'Add job to feed'}</Heading>
+          <Heading className="v2-dialogtitle">{isApp ? t`Log application` : t`Add job to feed`}</Heading>
           <Helper style={{ textWrap: 'pretty' }}>{isApp
-            ? 'For applications made outside the app. Jobs marked Applied in the Feed are logged automatically.'
-            : 'Adds the posting to the Job Feed at this status. No application, date or notes are stored.'}</Helper>
+            ? t`For applications made outside the app. Jobs marked Applied in the Feed are logged automatically.`
+            : t`Adds the posting to the Job Feed at this status. No application, date or notes are stored.`}</Helper>
         </HeaderRow>
         <div className="v2-scroll" style={{ padding: '15px 22px', display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 470, overflow: 'auto' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Label>Posting URL{reading ? ' · reading…' : ''}</Label>
+            <Label><Trans>Posting URL{reading ? t` · reading…` : ''}</Trans></Label>
             <Input value={url} onChange={setUrl} onBlur={(e) => readUrl(e.target.value)} mono
-              placeholder="Paste the job URL — title and company are read from it" ariaLabel="Posting URL" />
+              placeholder={t`Paste the job URL — title and company are read from it`} ariaLabel={t`Posting URL`} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
-              <Label>Title</Label>
-              <Input value={title} onChange={setTitle} placeholder="Senior Backend Engineer" ariaLabel="Title" />
+              <Label><Trans>Title</Trans></Label>
+              <Input value={title} onChange={setTitle} placeholder={t`Senior Backend Engineer`} ariaLabel={t`Title`} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
-              <Label>Company</Label>
-              <Input value={company} onChange={setCompany} placeholder="Acme" ariaLabel="Company" />
+              <Label><Trans>Company</Trans></Label>
+              <Input value={company} onChange={setCompany} placeholder={t`Acme`} ariaLabel={t`Company`} />
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Label>{isApp ? 'Applied with' : 'Tailor from'}</Label>
+            <Label>{isApp ? t`Applied with` : t`Tailor from`}</Label>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 5 }}>
               {resumes.map((r) => {
                 const on = cv === r.id
@@ -1024,39 +1026,39 @@ function LogModal({ onClose, onSaved, onJobSaved, pushToast, onDirty }) {
                     <Pill size="sm" on={on} onClick={() => setCv(on ? '' : r.id)}>{r.name}</Pill>
                     {/* the trigger sits opposite its résumé and saves first, since tailoring needs the job id */}
                     <Pill size="sm" disabled={busy} onClick={() => { setCv(r.id); submit(r) }}
-                      title={`Save, then tailor a copy of ${r.name} for this job`}>
-                      <span style={{ color: 'var(--ai)' }}>✦</span>Tailor
+                      title={t`Save, then tailor a copy of ${r.name} for this job`}>
+                      <span style={{ color: 'var(--ai)' }}>✦</span><Trans>Tailor</Trans>
                     </Pill>
                   </div>
                 )
               })}
             </div>
-            <Helper>✦ saves the row first, then tailors a copy of that résumé in the background.</Helper>
+            <Helper><Trans>✦ saves the row first, then tailors a copy of that résumé in the background.</Trans></Helper>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Label>Status</Label>
-            <Segmented value={status} onChange={setStatus} ariaLabel="Status"
+            <Label><Trans>Status</Trans></Label>
+            <Segmented value={status} onChange={setStatus} ariaLabel={t`Status`}
               options={LOG_STATUSES.map((s) => ({ value: s.id, label: s.label, hint: s.hint }))} />
           </div>
           {/* a feed job holds neither of these — the Job row has no date and no notes column */}
           {isApp && (<>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
-              <Label>Applied on</Label>
-              <Input type="date" value={when} onChange={setWhen} ariaLabel="Applied on" />
+              <Label><Trans>Applied on</Trans></Label>
+              <Input type="date" value={when} onChange={setWhen} ariaLabel={t`Applied on`} />
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Label>Notes</Label>
-            <Textarea value={notes} onChange={setNotes} placeholder="Optional — referral, recruiter contact…"
-              ariaLabel="Notes" rows={2} style={{ minHeight: 52 }} />
+            <Label><Trans>Notes</Trans></Label>
+            <Textarea value={notes} onChange={setNotes} placeholder={t`Optional — referral, recruiter contact…`}
+              ariaLabel={t`Notes`} rows={2} style={{ minHeight: 52 }} />
           </div>
           </>)}
         </div>
         <FooterRow bg="page">
-          <Helper>A copy of the posting is saved with the {isApp ? 'application' : 'job'}</Helper>
-          <Button variant="secondary" size="sm" onClick={onClose} style={{ marginLeft: 'auto' }}>Cancel</Button>
-          <Button size="sm" onClick={() => submit(null)} busy={busy}>{busy ? 'Saving…' : (isApp ? 'Save application' : 'Save job')}</Button>
+          <Helper><Trans>A copy of the posting is saved with the {isApp ? t`application` : t`job`}</Trans></Helper>
+          <Button variant="secondary" size="sm" onClick={onClose} style={{ marginLeft: 'auto' }}><Trans>Cancel</Trans></Button>
+          <Button size="sm" onClick={() => submit(null)} busy={busy}>{busy ? t`Saving…` : (isApp ? t`Save application` : t`Save job`)}</Button>
         </FooterRow>
     </ModalPanel>
   )

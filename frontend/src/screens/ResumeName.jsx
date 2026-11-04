@@ -1,4 +1,5 @@
 import React, { useRef } from 'react'
+import { t } from '@lingui/core/macro'
 import { Input } from '../ui'
 
 const TITLE = { margin: 0, fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: '20px', fontWeight: 600, minWidth: 0, maxWidth: 460 }
@@ -10,7 +11,7 @@ export default function ResumeName({ name, editing, onEdit, onDone }) {
   return (
     // every other v2 screen names itself with an h1; the button inside makes the name keyboard-editable
     <h1 style={TITLE}>
-      <button type="button" onClick={onEdit} title={`${name} — click to rename`}
+      <button type="button" onClick={onEdit} title={t`${name} — click to rename`}
         style={{ all: 'unset', display: 'block', cursor: 'text', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 460 }}>
         {name}
       </button>
@@ -24,7 +25,7 @@ function NameField({ name, onDone }) {
   const done = useRef(false)
   const finish = (value) => { if (!done.current) { done.current = true; onDone(value) } }
   return (
-    <Input autoFocus defaultValue={name} ariaLabel="Résumé name" onFocus={(e) => e.target.select()}
+    <Input autoFocus defaultValue={name} ariaLabel={t`Résumé name`} onFocus={(e) => e.target.select()}
       onBlur={(e) => finish(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === 'Enter') { e.preventDefault(); finish(e.currentTarget.value) }

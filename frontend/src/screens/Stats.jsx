@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { intlLocale } from '../i18n'
 import { useLocation } from 'react-router-dom'
 import { ResponsiveContainer, Sankey, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
@@ -30,7 +32,7 @@ const TYPE_CLASS = {
   scrape: 'sm-keyword', h1b: 'sm-lipersonal', cv_score: 'sm-levels',
   email: 'sm-freehire', telegram: 'sm-jobright',
 }
-const TYPE_OPTS = [['', 'All types'], ['scrape', 'Scrape'], ['h1b', 'H-1B'], ['cv_score', 'Résumé score'], ['email', 'Email'], ['telegram', 'Telegram']]
+const TYPE_OPTS = [['', t`All types`], ['scrape', 'Scrape'], ['h1b', 'H-1B'], ['cv_score', t`Résumé score`], ['email', 'Email'], ['telegram', 'Telegram']]
 
 // v2 draws controls as span/div, so spread kb(fn) on one to make it focusable and
 // keyboard-operable; the focus ring is theme.css's `[tabindex="0"]:focus-visible`.
@@ -107,7 +109,7 @@ const LoadMore = ({ onClick, busy }) => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 20px 12px' }}>
     <UiPill size="sm" disabled={!!busy} ariaBusy={!!busy} onClick={onClick}>
       {busy && <Spinner size={9} color="currentColor" />}
-      {busy ? 'Loading…' : 'Load more'}
+      {busy ? t`Loading…` : t`Load more`}
     </UiPill>
   </div>
 )
@@ -185,7 +187,7 @@ export default function Stats() {
     setBest(list[0] || null)
     setFlows(Array.isArray(fl) ? fl : [])
     setCoreErr(anyFailed)
-    if (anyFailed) pushToast({ kind: 'error', msg: 'Some stats failed to load — try Refresh' })
+    if (anyFailed) pushToast({ kind: 'error', msg: t`Some stats failed to load — try Refresh` })
   }, [pushToast])
 
   const loadLive = useCallback(async () => {
@@ -209,7 +211,7 @@ export default function Stats() {
     api.get('/activity-log', { params: { limit: ACT_PAGE, ...(actType && { type: actType }), ...(actQuery.trim() && { company: actQuery.trim() }) } })
       .then(({ data }) => { const rows = data || []; setActivity(rows); setActMore(rows.length >= ACT_PAGE) })
       // A failed reload needs its own toast — otherwise old/empty rows have nothing to explain them.
-      .catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load the activity log' }) })
+      .catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load the activity log` }) })
   }, [actType, actQuery])
 
   // Core figures, the live half and LLM spend settle together as one `ready` flag
@@ -249,7 +251,7 @@ export default function Stats() {
     await Promise.all([loadCore(), loadLive()])
     loadActivity()
     // Behind the Refresh button — a failure that leaves old figures on screen has to say so.
-    api.get('/stats/llm-costs', { params: { days: period, ...(allAccounts && { all_accounts: 1 }) } }).then(({ data }) => setCosts(data)).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not refresh the LLM costs' }) })
+    api.get('/stats/llm-costs', { params: { days: period, ...(allAccounts && { all_accounts: 1 }) } }).then(({ data }) => setCosts(data)).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not refresh the LLM costs` }) })
     setRefreshing(false)
   }
 
@@ -261,13 +263,13 @@ export default function Stats() {
     setTriggering((p) => new Set(p).add(job.id))
     try {
       await api.post(job.trigger_url)
-      pushToast({ kind: 'progress', msg: `${job.name} started.` })
+      pushToast({ kind: 'progress', msg: t`${job.name} started.` })
       loadLive()
       setTimeout(clear, 4000)
     } catch (e) {
       console.error('trigger', e)
       clear()
-      pushToast({ kind: 'error', msg: e.response?.data?.detail === 'scheduled_scrape_running' ? 'The scheduled scrape is running — try again when it finishes.' : e.response?.status === 409 ? `${job.name} is already running.` : `Could not start ${job.name}` + errSuffix(e) })
+      pushToast({ kind: 'error', msg: e.response?.data?.detail === 'scheduled_scrape_running' ? t`The scheduled scrape is running — try again when it finishes.` : e.response?.status === 409 ? `${job.name} is already running.` : t`Could not start ${job.name}` + errSuffix(e) })
     }
   }
 
@@ -283,7 +285,7 @@ export default function Stats() {
       setRunsMore(rows.length >= RUN_PAGE)
     } catch (e) {
       console.error('more runs', e)
-      pushToast({ kind: 'error', msg: 'Could not load more runs' + errSuffix(e) })
+      pushToast({ kind: 'error', msg: t`Could not load more runs` + errSuffix(e) })
     } finally { setMoreBusy(false) }
   }
   const moreActivity = async () => {
@@ -296,7 +298,7 @@ export default function Stats() {
       setActMore(rows.length >= ACT_PAGE)
     } catch (e) {
       console.error('more activity', e)
-      pushToast({ kind: 'error', msg: 'Could not load more activity' + errSuffix(e) })
+      pushToast({ kind: 'error', msg: t`Could not load more activity` + errSuffix(e) })
     } finally { setMoreBusy(false) }
   }
 
@@ -352,10 +354,10 @@ export default function Stats() {
     const rows = [
       // One stage, one colour: funnel rows, Sankey nodes and Applications stage
       // dots all read the same --stage-* tokens (kept in sync across files).
-      { label: 'Applied', count: applied, snapshot: false, color: 'var(--stage-applied)' },
-      { label: 'Interview', ...pick('interview'), color: 'var(--stage-interview)' },
-      { label: 'Offer', ...pick('offer'), color: 'var(--stage-offer)' },
-      { label: 'Rejected', ...pick('rejected'), color: 'var(--stage-rejected)' },
+      { label: t`Applied`, count: applied, snapshot: false, color: 'var(--stage-applied)' },
+      { label: t`Interview`, ...pick('interview'), color: 'var(--stage-interview)' },
+      { label: t`Offer`, ...pick('offer'), color: 'var(--stage-offer)' },
+      { label: t`Rejected`, ...pick('rejected'), color: 'var(--stage-rejected)' },
     ]
     const base = Math.max(1, applied)
     // `frac` is what Meter takes (0–1); the 2% floor keeps a non-zero row visible
@@ -396,9 +398,9 @@ export default function Stats() {
   } : null, ready, !coreErr)
   const subLine = !sub ? (coreErr ? DASH : NBSP) : (
     <>
-      {sub.has ? `Last scrape run ${sub.status === 'failed' ? 'failed ' : ''}${ago(sub.at) || '—'}` : 'No scrape recorded yet'}
-      {sub.failing > 0 && <> · <span style={{ color: 'var(--warn)' }}>{sub.failing} source{sub.failing === 1 ? ' needs' : 's need'} attention</span></>}
-      {sub.spend != null && <> · {money(sub.spend)} on LLM calls {sub.period ? `in ${sub.period}d` : 'all time'}</>}
+      {sub.has ? (sub.status === 'failed' ? t`Last scrape run failed ${ago(sub.at) || '—'}` : t`Last scrape run ${ago(sub.at) || '—'}`) : t`No scrape recorded yet`}
+      {sub.failing > 0 && <> · <span style={{ color: 'var(--warn)' }}>{plural(sub.failing, { one: '# source needs attention', other: '# sources need attention' })}</span></>}
+      {sub.spend != null && <> <Trans>· {money(sub.spend)} on LLM calls {sub.period ? `in ${sub.period}d` : 'all time'}</Trans></>}
     </>
   )
   // Volume, outcomes, scoring and spend already have cards below; the header carries
@@ -414,7 +416,7 @@ export default function Stats() {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <HeaderRow as="header" variant="screen" align="flex-end" style={{ gap: 18 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-          <PageTitle>Stats</PageTitle>
+          <PageTitle><Trans>Stats</Trans></PageTitle>
           {subSpan}
         </div>
       </HeaderRow>
@@ -425,26 +427,26 @@ export default function Stats() {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <HeaderRow as="header" variant="screen" align="flex-end" style={{ gap: 18 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-          <PageTitle>Stats</PageTitle>
+          <PageTitle><Trans>Stats</Trans></PageTitle>
           {subSpan}
         </div>
         {/* Consistency: retry/refresh is a Link here too, matching Companies/Searches/Settings —
             accent 11.5/500 at the canonical 17px line-height. */}
-        <Link onClick={refresh} title="Reload every figure on this page"
+        <Link onClick={refresh} title={t`Reload every figure on this page`}
           style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 7 }}>
-          {refreshing
+          <Trans>{refreshing
             ? <Spinner size={10} />
             : <span style={{ fontSize: 12 }}>↻</span>}
-          Refresh
+          Refresh</Trans>
         </Link>
       </HeaderRow>
       {coreErr && (
         <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 12, padding: '8px 30px', background: 'var(--bad-soft)', borderBottom: '1px solid var(--line)', fontSize: 12.5, lineHeight: '18px', color: 'var(--bad)' }}>
           <GlyphBadge tone="bad" style={{ flex: '0 0 auto' }}>!</GlyphBadge>
-          <span style={{ flex: 1 }}>Some numbers could not be loaded. They show “—” until the backend responds.</span>
+          <span style={{ flex: 1 }}><Trans>Some numbers could not be loaded. They show “—” until the backend responds.</Trans></span>
           {/* Consistency: retry is a Link everywhere else, so it is one here too,
               with the dotted underline as its affordance. */}
-          <Link onClick={refresh} style={{ flex: '0 0 auto', borderBottom: '1px dotted currentColor' }}>Try again</Link>
+          <Link onClick={refresh} style={{ flex: '0 0 auto', borderBottom: '1px dotted currentColor' }}><Trans>Try again</Trans></Link>
         </div>
       )}
 
@@ -453,11 +455,11 @@ export default function Stats() {
         {/* KPI strip */}
         <Card style={{ padding: 0, display: 'flex' }}>
           {[
-            ['Total jobs', int(stats?.total_jobs), '', 'All jobs ever found, excluding ones removed by cleanup'],
-            ['New this week', int(timeline ? weekly.now : null), timeline && weekly.prev ? `${weekly.now - weekly.prev >= 0 ? '+' : ''}${weekly.now - weekly.prev} vs previous period` : '', 'Discovered in the last 7 days'],
-            ['Saved', int(stats?.saved_jobs), '', 'In your feed shortlist'],
+            [t`Total jobs`, int(stats?.total_jobs), '', t`All jobs ever found, excluding ones removed by cleanup`],
+            [t`New this week`, int(timeline ? weekly.now : null), timeline && weekly.prev ? `${weekly.now - weekly.prev >= 0 ? '+' : ''}${weekly.now - weekly.prev} vs previous period` : '', t`Discovered in the last 7 days`],
+            ['Saved', int(stats?.saved_jobs), '', t`In your feed shortlist`],
             ['Applications', int(stats?.total_applications), `${inPlay} open`, 'Open = not rejected'],
-            ['Best open score', bestScore, bestScore === '—' ? '' : (best?.company || ''), 'Highest-scoring posting you haven’t applied to'],
+            [t`Best open score`, bestScore, bestScore === '—' ? '' : (best?.company || ''), t`Highest-scoring posting you haven’t applied to`],
           ].map(([label, value, sub, hint], i, arr) => (
             <div key={label} title={hint} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 11, padding: '14px 20px 10px', borderRight: `1px solid ${i === arr.length - 1 ? 'transparent' : 'var(--line-soft)'}` }}>
               <Label style={{ whiteSpace: 'nowrap' }}>{label}</Label>
@@ -477,7 +479,7 @@ export default function Stats() {
               card made the row jump on toggle. Both get the same 162px inside 230. */}
           <Card style={{ height: 230, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'baseline', gap: 9, lineHeight: '24px' }}>
-              <Heading strong size={17}>Application funnel</Heading>
+              <Heading strong size={17}><Trans>Application funnel</Trans></Heading>
               <span style={{ flex: 1 }} />
               {sankey && (
                 <span style={{ alignSelf: 'center', display: 'flex', gap: 3 }}>
@@ -488,7 +490,7 @@ export default function Stats() {
                 </span>
               )}
             </div>
-            {coreErr && !stats ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--muted)' }}>Unavailable — the request failed</div> : flowView === 'sankey' && sankey ? (
+            {coreErr && !stats ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--muted)' }}><Trans>Unavailable — the request failed</Trans></div> : flowView === 'sankey' && sankey ? (
               <div style={{ flex: 1, minHeight: 0 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <Sankey data={sankey} nodePadding={18} nodeWidth={10} margin={{ top: 4, right: 112, left: 4, bottom: 4 }}
@@ -507,8 +509,8 @@ export default function Stats() {
                     style={{ flex: 1 }} ariaLabel={`${f.label}: ${f.count}`} />
                   <span style={{ flex: '0 0 40px', ...MONO, fontSize: 11.5, lineHeight: '18px', color: 'var(--text)', textAlign: 'right' }}>{f.count}</span>
                   {/* ui: keep — 9.5 is below Helper's 10.5 xs step; 18px line-height baselines it against the 22px funnel bar beside it. */}
-                  {f.snapshot && <span title="No stage history for these applications. They are counted by current status only."
-                    style={{ flex: '0 0 auto', fontSize: 9.5, lineHeight: '18px', color: 'var(--muted)', cursor: 'help' }}>snapshot</span>}
+                  {f.snapshot && <span title={t`No stage history for these applications. They are counted by current status only.`}
+                    style={{ flex: '0 0 auto', fontSize: 9.5, lineHeight: '18px', color: 'var(--muted)', cursor: 'help' }}><Trans>snapshot</Trans></span>}
                 </div>
               ))}
             </div>
@@ -517,9 +519,9 @@ export default function Stats() {
               {/* the card's height is fixed, so the caveat replaces the "bars are
                   relative to Applied" clause rather than adding a third line */}
               <span>{funnel.some((f) => f.snapshot)
-                ? 'Stage rows count every application that reached the stage. Snapshot rows count current status only.'
-                : 'Each row counts applications that reached that stage. Bar length is relative to Applied.'}</span>
-              <span>applied → interview {conv(stats?.total_applications, reached.interview || 0)} · interview → offer {conv(reached.interview || 0, reached.offer || 0)}</span>
+                ? t`Stage rows count every application that reached the stage. Snapshot rows count current status only.`
+                : t`Each row counts applications that reached that stage. Bar length is relative to Applied.`}</span>
+              <span><Trans>applied → interview {conv(stats?.total_applications, reached.interview || 0)} · interview → offer {conv(reached.interview || 0, reached.offer || 0)}</Trans></span>
             </span>
             </div>
             )}
@@ -527,21 +529,21 @@ export default function Stats() {
 
           <Card style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 9, lineHeight: '24px' }}>
-              <Heading strong size={17}>Score distribution</Heading>
-              <Helper style={{ flex: 1 }}>{int(scores?.scored_count)} scored jobs · best résumé per job</Helper>
+              <Heading strong size={17}><Trans>Score distribution</Trans></Heading>
+              <Helper style={{ flex: 1 }}><Trans>{int(scores?.scored_count)} scored jobs · best résumé per job</Trans></Helper>
               {scores?.avg != null && (
                 // lineHeight 1: baseline-aligned head — an 11px span on the row's 24px
                 // line-height rides a font-dependent offset, growing the head 25→27px under alt.
                 <span style={{ fontSize: 11, lineHeight: 1, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
-                  avg {scores.avg}
-                  {scores.tailored_avg != null && <> · <span title={`Average score after tailoring, across the ${scores.tailored_count} jobs with a tailored copy`} style={{ color: 'var(--accent)', cursor: 'help' }}>tailored {scores.tailored_avg}</span></>}
+                  <Trans>avg {scores.avg}
+                  {scores.tailored_avg != null && <> · <span title={t`Average score after tailoring, across the ${scores.tailored_count} jobs with a tailored copy`} style={{ color: 'var(--accent)', cursor: 'help' }}><Trans>tailored {scores.tailored_avg}</Trans></span></>}</Trans>
                 </span>
               )}
             </div>
             <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: 14, minHeight: 118, padding: '0 6px' }}>
-              {buckets.length === 0 && <Helper style={{ alignSelf: 'center', margin: '0 auto' }}>No scored jobs yet.</Helper>}
+              {buckets.length === 0 && <Helper style={{ alignSelf: 'center', margin: '0 auto' }}><Trans>No scored jobs yet.</Trans></Helper>}
               {buckets.map((b) => (
-                <div key={b.range} title={`${b.count} jobs scored ${b.range}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                <div key={b.range} title={t`${b.count} jobs scored ${b.range}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
                   <Mono line={14} tone="base">{b.count}</Mono>
                   <div style={{ width: '100%', height: Math.max(2, Math.round((b.count / maxBucket) * 96)), background: BUCKET_COLOR[b.range] || 'var(--accent)', borderRadius: 'var(--radius-bar) var(--radius-bar) 0 0' }} />
                   {/* ui: keep — an axis tick label under a bar, not body helper text */}
@@ -556,8 +558,8 @@ export default function Stats() {
         <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 12 }}>
           <Card style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
             <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'baseline', gap: 9, lineHeight: '24px' }}>
-              <Heading strong size={17}>New jobs · last 30 days</Heading>
-              <Helper style={{ flex: 1 }}>daily arrivals across all sources</Helper>
+              <Heading strong size={17}><Trans>New jobs · last 30 days</Trans></Heading>
+              <Helper style={{ flex: 1 }}><Trans>daily arrivals across all sources</Trans></Helper>
               {/* --stage-applied is the applied series everywhere else in v2 (swatch solid,
                   as designed); legend swatches follow the strokes below, so "new" is --series-new too. */}
               {[['new', 'var(--series-new)'], ['applied', 'var(--stage-applied)']].map(([l, c]) => (
@@ -568,17 +570,17 @@ export default function Stats() {
                 </span>
               ))}
             </div>
-            {coreErr && !timeline ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--muted)' }}>Unavailable — the request failed</div> : <Spark series={series} peak={peak} />}
+            {coreErr && !timeline ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--muted)' }}><Trans>Unavailable — the request failed</Trans></div> : <Spark series={series} peak={peak} />}
           </Card>
 
           <Card style={{ height: 300, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflow: 'hidden' }}>
             {/* T7-04: one line in every theme — the title never wraps; with the All-accounts
                 switch in a wide-control theme (Win98) "how priced?" gives way first */}
             <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'baseline', gap: 9, lineHeight: '24px', whiteSpace: 'nowrap', minWidth: 0 }}>
-              <Heading strong size={17} style={{ flex: '0 0 auto' }}>LLM costs</Heading>
-              <Helper title="OpenAI and Claude pricing info comes from a fixed table, OpenRouter from its catalog (updated every 12 h), Claude Code, Codex CLI, and Ollama counted as $0. Each call is priced when it is logged."
-                style={{ cursor: 'help', borderBottom: '1px dotted var(--line-strong)', ...(canAll ? { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } : null) }}>how priced?</Helper>
-              {canAll && <Switch on={allAccounts} onChange={setAllAccounts} label="All accounts" ariaLabel="Sum LLM costs across all accounts" style={{ marginLeft: 'auto', alignSelf: 'center' }} />}
+              <Heading strong size={17} style={{ flex: '0 0 auto' }}><Trans>LLM costs</Trans></Heading>
+              <Helper title={t`OpenAI and Claude pricing info comes from a fixed table, OpenRouter from its catalog (updated every 12 h), Claude Code, Codex CLI, and Ollama counted as $0. Each call is priced when it is logged.`}
+                style={{ cursor: 'help', borderBottom: '1px dotted var(--line-strong)', ...(canAll ? { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } : null) }}><Trans>how priced?</Trans></Helper>
+              {canAll && <Switch on={allAccounts} onChange={setAllAccounts} label={t`All accounts`} ariaLabel={t`Sum LLM costs across all accounts`} style={{ marginLeft: 'auto', alignSelf: 'center' }} />}
               <span style={{ ...(canAll ? null : { marginLeft: 'auto' }), alignSelf: 'center', display: 'flex', gap: 3 }}>
                 {PERIODS.map(([id, label]) => {
                   const on = period === id
@@ -588,7 +590,7 @@ export default function Stats() {
             </div>
             <div style={{ display: 'flex', gap: 18 }}>
               {[['Spend', money(costs?.total_cost_usd)], ['Calls', int(costs?.total_calls)],
-                ['Avg / call', costs?.total_calls ? money(costs.total_cost_usd / costs.total_calls) : '—']].map(([l, v]) => (
+                [t`Avg / call`, costs?.total_calls ? money(costs.total_cost_usd / costs.total_calls) : '—']].map(([l, v]) => (
                 <div key={l} style={{ display: 'flex', flexDirection: 'column' }}>
                   <Label>{l}</Label>
                   {/* ui: keep — serif 23/28px figure: not one of Heading's 18/19/22 steps */}
@@ -598,9 +600,9 @@ export default function Stats() {
             </div>
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
               <div className="v2-gutter-head" style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', height: 22, ...COL, fontSize: 9, borderBottom: '1px solid var(--line-strong)' }}>
-                <span style={{ flex: 1.1, minWidth: 0, paddingRight: 8 }}>Purpose</span><span style={{ flex: 1.4, minWidth: 0, paddingRight: 8 }}>Model</span>
-                <span style={{ flex: '0 0 42px', textAlign: 'right' }}>Calls</span><span style={{ flex: '0 0 58px', textAlign: 'right' }}>Cost</span>
-                <span title="Share of calls that reused a cached prompt" style={{ flex: '0 0 44px', textAlign: 'right' }}>Cache</span>
+                <span style={{ flex: 1.1, minWidth: 0, paddingRight: 8 }}><Trans>Purpose</Trans></span><span style={{ flex: 1.4, minWidth: 0, paddingRight: 8 }}><Trans>Model</Trans></span>
+                <span style={{ flex: '0 0 42px', textAlign: 'right' }}><Trans>Calls</Trans></span><span style={{ flex: '0 0 58px', textAlign: 'right' }}><Trans>Cost</Trans></span>
+                <span title={t`Share of calls that reused a cached prompt`} style={{ flex: '0 0 44px', textAlign: 'right' }}><Trans>Cache</Trans></span>
               </div>
               {/* takes whatever the fixed-height card leaves, so switching period
                   (2 rows at 1d, 13 at all-time) can't resize anything */}
@@ -616,10 +618,10 @@ export default function Stats() {
               ))}
               {allAccounts && (costs?.by_account || []).length > 0 && (
                 <Helper style={{ display: 'block', padding: '8px 0 2px' }}>
-                  By account: {costs.by_account.map((a) => `${a.name} ${money(a.cost_usd)}`).join(' · ')}
+                  <Trans>By account: {costs.by_account.map((a) => `${a.name} ${money(a.cost_usd)}`).join(' · ')}</Trans>
                 </Helper>
               )}
-              {!(costs?.by_purpose || []).length && <Helper style={{ display: 'block', padding: '14px 0' }}>No LLM calls in this period.</Helper>}
+              {!(costs?.by_purpose || []).length && <Helper style={{ display: 'block', padding: '14px 0' }}><Trans>No LLM calls in this period.</Trans></Helper>}
               </div>
             </div>
           </Card>
@@ -628,19 +630,19 @@ export default function Stats() {
         {/* schedules */}
         <Card ref={schedRef} style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 9, padding: '14px 20px 10px', lineHeight: '24px' }}>
-            <Heading strong size={17}>Schedules</Heading>
-            <Helper>{schedErr ? 'intervals and crons are in Settings' : `${jobs.length} job${jobs.length === 1 ? '' : 's'} · next run shown in ${TZ_SHORT}, schedule set in UTC · edit intervals in Settings`}</Helper>
+            <Heading strong size={17}><Trans>Schedules</Trans></Heading>
+            <Helper>{schedErr ? t`intervals and crons are in Settings` : t`${plural(jobs.length, { one: '# job', other: '# jobs' })} · next run shown in ${TZ_SHORT}, schedule set in UTC · edit intervals in Settings`}</Helper>
           </div>
           {schedErr ? (
-            <div style={{ padding: '26px 20px 30px', borderTop: '1px solid var(--line-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--muted)' }}>Unavailable — the request failed</div>
+            <div style={{ padding: '26px 20px 30px', borderTop: '1px solid var(--line-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--muted)' }}><Trans>Unavailable — the request failed</Trans></div>
           ) : (<>
           <TableHead height={26} pad="0 20px" top style={{ background: 'transparent' }}>
-            <span style={{ flex: '0 1 250px', minWidth: 0 }}>Job</span>
-            {showId && <span style={{ flex: '0 0 132px' }}>Job ID</span>}
-            {showSched && <span style={{ flex: '0 0 140px' }}>Schedule</span>}
-            {showNext && <span style={{ flex: '0 0 132px' }}>Next run</span>}
-            <span style={{ flex: 1, minWidth: 0 }}>{showStatus ? 'Status' : ''}</span>
-            <span style={{ flex: '0 0 110px', textAlign: 'right' }}>Run</span>
+            <span style={{ flex: '0 1 250px', minWidth: 0 }}><Trans>Job</Trans></span>
+            {showId && <span style={{ flex: '0 0 132px' }}><Trans>Job ID</Trans></span>}
+            {showSched && <span style={{ flex: '0 0 140px' }}><Trans>Schedule</Trans></span>}
+            {showNext && <span style={{ flex: '0 0 132px' }}><Trans>Next run</Trans></span>}
+            <span style={{ flex: 1, minWidth: 0 }}>{showStatus ? t`Status` : ''}</span>
+            <span style={{ flex: '0 0 110px', textAlign: 'right' }}><Trans>Run</Trans></span>
           </TableHead>
           {ordered.map((j) => {
             const running = !!j.running || triggering.has(j.id)
@@ -649,54 +651,54 @@ export default function Stats() {
                 <span title={j.name} style={{ flex: '0 1 250px', minWidth: 0, fontSize: 12.5, lineHeight: '18px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 10 }}>{j.name}</span>
                 {showId && <Mono title={j.id} line={18} tone="muted" code style={{ flex: '0 0 132px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 8 }}>{j.id}</Mono>}
                 {showSched && <span title={j.schedule} style={{ flex: '0 0 140px', fontSize: 11.5, lineHeight: '18px', color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 8 }}>{decodeCron(j.schedule)}</span>}
-                {showNext && <Mono line={18} tone="muted" style={{ flex: '0 0 132px' }}>{running ? 'now' : when(j.next_run)}</Mono>}
+                {showNext && <Mono line={18} tone="muted" style={{ flex: '0 0 132px' }}>{running ? t`now` : when(j.next_run)}</Mono>}
                 <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
                   {showStatus && (running
                     ? <Spinner size={9} />
                     /* ui: keep — 7px scheduler status dot (Dot role, migrates with Tag/Dot) */
                     : <span style={{ flex: '0 0 auto', width: 7, height: 7, borderRadius: 'var(--radius-control)', background: j.pending ? 'var(--warn)' : 'var(--funnel-low)' }} />)}
                   {showStatus && <span style={{ minWidth: 0, fontSize: 11.5, lineHeight: '18px', color: running ? 'var(--accent)' : 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {running ? (j.running?.waiting ? 'Waiting for another scrape' : `Running · ${dur(j.running?.elapsed_seconds || 0)}`) : j.pending ? 'Pending' : 'Scheduled'}
+                    {running ? (j.running?.waiting ? t`Waiting for another scrape` : t`Running · ${dur(j.running?.elapsed_seconds || 0)}`) : j.pending ? t`Pending` : t`Scheduled`}
                   </span>}
                 </span>
                 <span style={{ flex: '0 0 110px', display: 'flex', justifyContent: 'flex-end' }}>
                   {j.trigger_url && j.owner_only && ownerLocked
-                    ? <Helper title={`Only the owner can run ${j.name}`}>Owner only</Helper>
+                    ? <Helper title={t`Only the owner can run ${j.name}`}><Trans>Owner only</Trans></Helper>
                     : j.trigger_url
                     // ui: keep — running-state box (D-13): Pill xs is the role, but the running branch quiets border+ink (--line/--edge) instead of dimming via --disabled-opacity, and its box is pad 0 11 / gap 6 on no ground. The canonical xs paint reproduces none of the three, so this one stays hand-drawn.
                     ? <span onClick={() => !running && trigger(j)} {...kb(() => !running && trigger(j))} aria-disabled={running}
-                        title={running ? `${j.name} is running` : `Run ${j.name} now`} aria-label={running ? `${j.name} is running` : `Run ${j.name} now`}
+                        title={running ? t`${j.name} is running` : t`Run ${j.name} now`} aria-label={running ? t`${j.name} is running` : t`Run ${j.name} now`}
                         className={running ? '' : 'v2-bdc'} style={{ height: 25, padding: '0 11px', border: `1px solid ${running ? 'var(--line)' : 'var(--edge)'}`, borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, lineHeight: 1, color: running ? 'var(--edge)' : 'var(--text-2)', whiteSpace: 'nowrap', cursor: running ? 'default' : 'pointer' }}>
                         {running && <Spinner size={9} color="currentColor" />}
-                        {running ? 'Running…' : 'Run now'}
+                        {running ? t`Running…` : t`Run now`}
                       </span>
                     : <Helper>—</Helper>}
                 </span>
               </TableRow>
             )
           })}
-          {ordered.length === 0 && <Helper style={{ display: 'block', padding: '16px 20px 20px' }}>No scheduled jobs.</Helper>}
+          {ordered.length === 0 && <Helper style={{ display: 'block', padding: '16px 20px 20px' }}><Trans>No scheduled jobs.</Trans></Helper>}
           </>)}
         </Card>
 
         {/* run history / activity log */}
         <Card id="runs" ref={runsCardRef} style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 9, padding: '12px 20px 10px' }}>
-            {[['runs', 'Run history'], ['activity', 'Activity log']].map(([id, label]) => (
+            {[['runs', t`Run history`], ['activity', t`Activity log`]].map(([id, label]) => (
               <span key={id} onClick={() => { setTab(id); setTypeOpen(false) }} {...kb(() => { setTab(id); setTypeOpen(false) })} style={{ ...H, lineHeight: '24px', color: tab === id ? 'var(--text)' : 'var(--muted)', cursor: 'pointer', borderBottom: `2px solid ${tab === id ? 'var(--accent)' : 'transparent'}`, paddingBottom: 2 }}>{label}</span>
             ))}
-            <Helper style={{ flex: 1 }}>{tab === 'runs' ? `last ${runs.length} scheduler and manual runs` : 'every run and change, newest first'}</Helper>
+            <Helper style={{ flex: 1 }}>{tab === 'runs' ? t`last ${runs.length} scheduler and manual runs` : t`every run and change, newest first`}</Helper>
             {tab === 'activity' && (
               <span style={{ alignSelf: 'center', display: 'flex', gap: 6 }}>
                 <span style={{ position: 'relative' }}>
                   <UiPill size="sm" on={!!actType} ariaExpanded={typeOpen} ariaHaspopup="menu"
-                    title="Filter the activity log by type" onClick={() => setTypeOpen((v) => !v)} style={{ gap: 5 }}>
-                    Type{actType ? ' · 1' : ''}<span style={{ fontSize: 9, opacity: 0.6 }}>▾</span>
+                    title={t`Filter the activity log by type`} onClick={() => setTypeOpen((v) => !v)} style={{ gap: 5 }}>
+                    <Trans>Type{actType ? ' · 1' : ''}</Trans><span style={{ fontSize: 9, opacity: 0.6 }}>▾</span>
                   </UiPill>
                   {typeOpen && (
                     <>
                       <span onClick={() => setTypeOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 39 }} />
-                      <Menu ariaLabel="Filter by type" style={{ position: 'absolute', top: '100%', right: 0, zIndex: 40, marginTop: 5, width: 150 }}>
+                      <Menu ariaLabel={t`Filter by type`} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 40, marginTop: 5, width: 150 }}>
                         {TYPE_OPTS.map(([id, label]) => (
                           <MenuItem key={id} selected={actType === id} hint={actType === id ? '✓' : null}
                             onClick={() => { setActType(id); setTypeOpen(false) }}>{label}</MenuItem>
@@ -709,7 +711,7 @@ export default function Stats() {
                 <span className="v2-fieldwrap" style={{ height: 26, width: 140, padding: '0 10px', border: '1px solid var(--edge)', borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   {/* ui: keep — a 10px icon glyph inside the field wrap, not helper text */}
                   <span style={{ fontSize: 10, color: 'var(--muted)' }}>⌕</span>
-                  <input value={actQuery} onChange={(e) => setActQuery(e.target.value)} placeholder="Company…"
+                  <input value={actQuery} onChange={(e) => setActQuery(e.target.value)} placeholder={t`Company…`}
                     style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', outline: 'none', fontFamily: 'var(--sans)', fontSize: 11.5, color: 'var(--text)' }} />
                 </span>
               </span>
@@ -719,8 +721,8 @@ export default function Stats() {
           {tab === 'runs' ? (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <TableHead height={26} pad="0 20px" top style={{ background: 'transparent' }}>
-                <span style={{ flex: '0 0 118px' }}>Time</span><span style={{ flex: '0 0 140px' }}>Job ID</span><span style={{ flex: '0 0 90px' }}>Trigger</span>
-                <span style={{ flex: '0 0 100px' }}>Status</span><span style={{ flex: '0 0 76px' }}>Duration</span><span style={{ flex: 1 }}>Result</span>
+                <span style={{ flex: '0 0 118px' }}><Trans>Time</Trans></span><span style={{ flex: '0 0 140px' }}><Trans>Job ID</Trans></span><span style={{ flex: '0 0 90px' }}><Trans>Trigger</Trans></span>
+                <span style={{ flex: '0 0 100px' }}><Trans>Status</Trans></span><span style={{ flex: '0 0 76px' }}><Trans>Duration</Trans></span><span style={{ flex: 1 }}><Trans>Result</Trans></span>
               </TableHead>
               {runs.map((r) => {
                 const failed = r.status === 'failed'
@@ -737,14 +739,14 @@ export default function Stats() {
                   </TableRow>
                 )
               })}
-              {!runs.length && <Helper style={{ padding: '16px 20px' }}>No runs yet.</Helper>}
+              {!runs.length && <Helper style={{ padding: '16px 20px' }}><Trans>No runs yet.</Trans></Helper>}
               {runsMore && <LoadMore onClick={moreRuns} busy={moreBusy} />}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <TableHead height={26} pad="0 20px" top style={{ background: 'transparent' }}>
-                <span style={{ flex: '0 0 118px' }}>Time</span><span style={{ flex: '0 0 110px' }}>Type</span>
-                <span style={{ flex: 1 }}>Message</span><span style={{ flex: '0 0 130px' }}>Company</span>
+                <span style={{ flex: '0 0 118px' }}><Trans>Time</Trans></span><span style={{ flex: '0 0 110px' }}><Trans>Type</Trans></span>
+                <span style={{ flex: 1 }}><Trans>Message</Trans></span><span style={{ flex: '0 0 130px' }}><Trans>Company</Trans></span>
               </TableHead>
               {activity.map((a) => (
                 <TableRow key={a.id} size="sm">
@@ -757,7 +759,7 @@ export default function Stats() {
                 </TableRow>
               ))}
               {/* An empty log and an over-tight filter are different problems */}
-              {!activity.length && <Helper style={{ padding: '16px 20px' }}>{actType || actQuery.trim() ? 'No activity matches these filters.' : 'No activity recorded yet.'}</Helper>}
+              {!activity.length && <Helper style={{ padding: '16px 20px' }}>{actType || actQuery.trim() ? t`No activity matches these filters.` : t`No activity recorded yet.`}</Helper>}
               {actMore && <LoadMore onClick={moreActivity} busy={moreBusy} />}
             </div>
           )}
@@ -790,7 +792,7 @@ function Spark({ series, peak }) {
           <Line yAxisId="r" type="monotone" dataKey="applied" name="applied" stroke="var(--stage-applied)" strokeWidth={2} strokeDasharray="4 3" dot={false} activeDot={{ r: 3 }} />
         </LineChart>
       </ResponsiveContainer>
-      {peak?.total > 0 && <span style={{ flex: '0 0 auto', alignSelf: 'center', ...MONO, fontSize: 10, lineHeight: '14px', color: 'var(--muted)' }}>peak {peak.total} · {dayLabel(peak.date)}</span>}
+      {peak?.total > 0 && <span style={{ flex: '0 0 auto', alignSelf: 'center', ...MONO, fontSize: 10, lineHeight: '14px', color: 'var(--muted)' }}><Trans>peak {peak.total} · {dayLabel(peak.date)}</Trans></span>}
     </div>
   )
 }

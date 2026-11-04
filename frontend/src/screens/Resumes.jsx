@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import '../theme.css'
@@ -119,17 +121,17 @@ export default function V2Resumes() {
 
   // unified search across bases, live copies, and archived copies
   const results = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    if (!t) return []
+    const needle = q.trim().toLowerCase()
+    if (!needle) return []
     const out = []
     bases.forEach((b) => {
-      if (b.name.toLowerCase().includes(t)) out.push({ id: b.id, kind: 'base', name: b.name, note: `${b.copy_count} cop${b.copy_count === 1 ? 'y' : 'ies'}`, score: b.avg_fit })
+      if (b.name.toLowerCase().includes(needle)) out.push({ id: b.id, kind: 'base', name: b.name, note: plural(b.copy_count, { one: '# copy', other: '# copies' }), score: b.avg_fit })
       ;(b.copies || []).forEach((c) => {
-        if (`${copyLabel(c)} ${c.name}`.toLowerCase().includes(t)) out.push({ id: c.id, kind: 'tailored', name: copyLabel(c), score: c.score })
+        if (`${copyLabel(c)} ${c.name}`.toLowerCase().includes(needle)) out.push({ id: c.id, kind: 'tailored', name: copyLabel(c), score: c.score })
       })
     })
     archived.forEach((c) => {
-      if (`${copyLabel(c)} ${c.name}`.toLowerCase().includes(t)) out.push({ id: c.id, kind: 'archived', name: copyLabel(c), note: c.why, muted: true })
+      if (`${copyLabel(c)} ${c.name}`.toLowerCase().includes(needle)) out.push({ id: c.id, kind: 'archived', name: copyLabel(c), note: c.why, muted: true })
     })
     return out
   }, [q, bases, archived])
@@ -145,13 +147,13 @@ export default function V2Resumes() {
       {/* header */}
       <HeaderRow pad="22px 30px 16px 24px" align="flex-end" style={{ gap: 18 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <PageTitle>Résumés</PageTitle>
-          <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--muted)', ...subStyle }}>{sub ? `${sub.b} base${sub.b === 1 ? '' : 's'} · ${sub.c} tailored cop${sub.c === 1 ? 'y' : 'ies'}, listed under their jobs${sub.a ? ` · ${sub.a} archived` : ''}` : loadErr ? DASH : NBSP}</span>
+          <PageTitle><Trans>Résumés</Trans></PageTitle>
+          <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--muted)', ...subStyle }}>{sub ? t`${plural(sub.b, { one: '# base', other: '# bases' })} · ${plural(sub.c, { one: '# tailored copy', other: '# tailored copies' })}, listed under their jobs` + (sub.a ? t` · ${sub.a} archived` : '') : loadErr ? DASH : NBSP}</span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           <SearchInput variant="underline" width="300px" value={q} onChange={(v) => { setQ(v); setShowArchived(false) }}
-            placeholder="Search bases, copies, archived…" ariaLabel="Search résumés" />
-          <Button onClick={() => setAddOpen(true)}>+ New résumé</Button>
+            placeholder={t`Search bases, copies, archived…`} ariaLabel={t`Search résumés`} />
+          <Button onClick={() => setAddOpen(true)}><Trans>+ New résumé</Trans></Button>
         </div>
       </HeaderRow>
 
@@ -162,17 +164,17 @@ export default function V2Resumes() {
           /* Error state is shown separately, or a 500/401 renders as "No base résumés yet". */
           : loadErr ? (
             <Band interactive={false} style={{ padding: '20px 14px', borderColor: 'var(--bad)', display: 'flex', alignItems: 'center', gap: 12, fontSize: 12.5, color: 'var(--muted)' }}>
-              <span style={{ flex: 1, minWidth: 0 }}>Couldn’t load your résumés. Retry, or check that the backend is running.</span>
-              <Pill size="sm" onClick={() => setReload((n) => n + 1)}>Try again</Pill>
+              <span style={{ flex: 1, minWidth: 0 }}><Trans>Couldn’t load your résumés. Retry, or check that the backend is running.</Trans></span>
+              <Pill size="sm" onClick={() => setReload((n) => n + 1)}><Trans>Try again</Trans></Pill>
             </Band>
           )
           : searching ? (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 2px' }}>
-                <NavLink onClick={() => setQ('')}>‹ Back</NavLink>
-                <Label size="lg">{results.length} {results.length === 1 ? 'match' : 'matches'} — bases, copies, and archived</Label>
+                <NavLink onClick={() => setQ('')}><Trans>‹ Back</Trans></NavLink>
+                <Label size="lg">{plural(results.length, { one: '# match — bases, copies, and archived', other: '# matches — bases, copies, and archived' })}</Label>
               </div>
-              {results.length === 0 ? <Band interactive={false} style={{ padding: '20px 14px', fontSize: 12.5, color: 'var(--muted)' }}>Nothing matches “{q}” — search covers base names, company names, and job titles.</Band>
+              {results.length === 0 ? <Band interactive={false} style={{ padding: '20px 14px', fontSize: 12.5, color: 'var(--muted)' }}><Trans>Nothing matches “{q}” — search covers base names, company names, and job titles.</Trans></Band>
                 : results.slice(0, resLimit).map((r, i) => (
                   <Card key={`${r.kind}-${r.id}-${i}`} onClick={() => openResume(r.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, lineHeight: '20px' }}>
                     {/* ui: keep — uppercase kind badge (bg + r99): the Tag role, not Label */}
@@ -187,14 +189,14 @@ export default function V2Resumes() {
           ) : showArchived ? (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 2px' }}>
-                <NavLink onClick={() => setShowArchived(false)}>‹ Back</NavLink>
-                <Label size="lg">Archived · {archived.length} from rejected or stale applications</Label>
+                <NavLink onClick={() => setShowArchived(false)}><Trans>‹ Back</Trans></NavLink>
+                <Label size="lg"><Trans>Archived · {archived.length} from rejected or stale applications</Trans></Label>
               </div>
-              {archived.length === 0 && <Band interactive={false} style={{ padding: '20px 14px', fontSize: 12.5, color: 'var(--muted)' }}>Nothing archived yet. A copy is archived when its application is rejected or has had no activity for a long time.</Band>}
+              {archived.length === 0 && <Band interactive={false} style={{ padding: '20px 14px', fontSize: 12.5, color: 'var(--muted)' }}><Trans>Nothing archived yet. A copy is archived when its application is rejected or has had no activity for a long time.</Trans></Band>}
               {archived.slice(0, archLimit).map((c) => (
                 <Card key={c.id} onClick={() => openResume(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, lineHeight: '20px' }}>
                   {/* ui: keep — uppercase "archived" badge (bg + r99): the Tag role, not Label */}
-                  <span style={{ flex: '0 0 auto', fontSize: 9.5, lineHeight: '16px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 'var(--radius-control)', background: 'var(--surface-2)', color: 'var(--faint)' }}>archived</span>
+                  <span style={{ flex: '0 0 auto', fontSize: 9.5, lineHeight: '16px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 'var(--radius-control)', background: 'var(--surface-2)', color: 'var(--faint)' }}><Trans>archived</Trans></span>
                   <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--muted)' }}>{copyLabel(c)}</span>
                   <Helper style={{ flex: '0 0 auto' }}>{c.why}</Helper>
                 </Card>
@@ -202,29 +204,29 @@ export default function V2Resumes() {
               {archived.length > archLimit && <ShowMore n={Math.min(PAGE, archived.length - archLimit)} onClick={() => setArchLimit((n) => n + PAGE)} />}
             </>
           ) : bases.length === 0 ? (
-            <div style={{ padding: 50, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>No base résumés yet. Create one to start.</div>
+            <div style={{ padding: 50, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}><Trans>No base résumés yet. Create one to start.</Trans></div>
           ) : (
             <>
               {persona && (
                 <>
-                  <Label style={{ padding: '4px 2px 0' }}>Profile</Label>
-                  <Card onClick={() => navigate('/persona')} title="Open Persona — your full profile" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+                  <Label style={{ padding: '4px 2px 0' }}><Trans>Profile</Trans></Label>
+                  <Card onClick={() => navigate('/persona')} title={t`Open Persona — your full profile`} style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 11 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, lineHeight: '28px' }}>
-                      <Heading strong size={19}>Persona</Heading>
-                      <Helper>{['your full profile', persona.copy_count > 0 ? `${persona.copy_count} recent cop${persona.copy_count === 1 ? 'y' : 'ies'}` : (persona.archived_count > 0 ? 'no recent copies' : 'no copies'), persona.updated_at ? `edited ${timeAgo(persona.updated_at)}` : null].filter(Boolean).join(' · ')}</Helper>
+                      <Heading strong size={19}><Trans>Persona</Trans></Heading>
+                      <Helper>{[t`your full profile`, persona.copy_count > 0 ? plural(persona.copy_count, { one: '# recent copy', other: '# recent copies' }) : (persona.archived_count > 0 ? t`no recent copies` : t`no copies`), persona.updated_at ? t`edited ${timeAgo(persona.updated_at)}` : null].filter(Boolean).join(' · ')}</Helper>
                       {persona.avg_fit != null && (
                         /* ui: keep — serif numeral + nested sans-10 unit; unit needs lineHeight 1 or it inherits the row's 28px line-height and pushes the numeral off (29px, 31px alt). */
-                        <span title="Average fit across copies tailored from Persona (archived included)" style={{ marginLeft: 'auto', fontFamily: 'var(--serif)', fontSize: 17, color: scoreColor(persona.avg_fit) }}>
-                          {persona.avg_fit}<span style={{ fontFamily: 'var(--sans)', fontSize: 10, lineHeight: 1, color: 'var(--muted)' }}> avg fit</span>
+                        <span title={t`Average fit across copies tailored from Persona (archived included)`} style={{ marginLeft: 'auto', fontFamily: 'var(--serif)', fontSize: 17, color: scoreColor(persona.avg_fit) }}>
+                          {persona.avg_fit}<span style={{ fontFamily: 'var(--sans)', fontSize: 10, lineHeight: 1, color: 'var(--muted)' }}> <Trans>avg fit</Trans></span>
                         </span>
                       )}
                     </div>
                     {(persona.copies?.length > 0 || inflight.some((f) => f.baseId === 'persona')) && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        {(persona.copies?.length || 0) > 0 && <Label style={CHIP_LABEL}>Recent copies</Label>}
+                        {(persona.copies?.length || 0) > 0 && <Label style={CHIP_LABEL}><Trans>Recent copies</Trans></Label>}
                         {inflight.filter((f) => f.baseId === 'persona').map((f, k) => (
-                          <Chip key={`pfl${k}`} title="Tailoring in progress — opens when ready" style={{ color: 'var(--muted)' }}>
-                            <Spinner /><span>tailoring…</span>
+                          <Chip key={`pfl${k}`} title={t`Tailoring in progress — opens when ready`} style={{ color: 'var(--muted)' }}>
+                            <Spinner /><span><Trans>tailoring…</Trans></span>
                           </Chip>
                         ))}
                         {(expanded.has('persona') ? (persona.copies || []) : (persona.copies || []).slice(0, 6)).map((c) => (
@@ -232,42 +234,42 @@ export default function V2Resumes() {
                             <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{copyLabel(c)}</span>
                             {c.score != null && <Mono size="sm" style={{ flex: '0 0 auto', color: scoreColor(c.score) }}>{c.score}</Mono>}
                             {/* ui: keep — 6px "unreviewed" dot, not a control */}
-                            {c.fresh && <span title="Has tailoring changes you haven't reviewed" style={{ flex: '0 0 auto', width: 6, height: 6, borderRadius: 'var(--radius-control)', background: 'var(--warn)' }} />}
+                            {c.fresh && <span title={t`Has tailoring changes you haven't reviewed`} style={{ flex: '0 0 auto', width: 6, height: 6, borderRadius: 'var(--radius-control)', background: 'var(--warn)' }} />}
                           </Chip>
                         ))}
                         {(persona.copies?.length || 0) > 6 && (
                           <Link onClick={(e) => { e.stopPropagation(); toggleExpand('persona') }}>
-                            {expanded.has('persona') ? 'show fewer ‹' : `+ ${persona.copies.length - 6} more ›`}
+                            {expanded.has('persona') ? t`show fewer ‹` : t`+ ${persona.copies.length - 6} more ›`}
                           </Link>
                         )}
                       </div>
                     )}
                   </Card>
-                  <Label style={{ padding: '4px 2px 0' }}>Résumés</Label>
+                  <Label style={{ padding: '4px 2px 0' }}><Trans>Résumés</Trans></Label>
                 </>
               )}
               {bases.map((b) => {
                 const copies = b.copies || []
                 const baseInflight = inflight.filter((f) => String(f.baseId) === String(b.id))
                 return (
-                  <Card key={b.id} onClick={() => openResume(b.id)} title={`Open ${b.name} — the base résumé`} style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+                  <Card key={b.id} onClick={() => openResume(b.id)} title={t`Open ${b.name} — the base résumé`} style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 11 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, lineHeight: '28px' }}>
                       <Heading strong size={19} title={b.name} style={{ flex: '0 1 auto', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</Heading>
-                      <Helper>{[b.copy_count > 0 ? `${b.copy_count} recent cop${b.copy_count === 1 ? 'y' : 'ies'}` : (b.archived_count > 0 ? 'no recent copies' : 'no copies'), `edited ${timeAgo(b.updated_at)}`].join(' · ')}</Helper>
+                      <Helper>{[b.copy_count > 0 ? plural(b.copy_count, { one: '# recent copy', other: '# recent copies' }) : (b.archived_count > 0 ? t`no recent copies` : t`no copies`), t`edited ${timeAgo(b.updated_at)}`].join(' · ')}</Helper>
                       {b.avg_fit != null && (
                         /* ui: keep — serif numeral + nested sans-10 unit; unit needs lineHeight 1 or it inherits the row's 28px line-height and pushes the numeral off (29px, 31px alt). */
-                        <span title="Average fit across this base's scored copies (archived included)" style={{ marginLeft: 'auto', fontFamily: 'var(--serif)', fontSize: 17, color: scoreColor(b.avg_fit) }}>
-                          {b.avg_fit}<span style={{ fontFamily: 'var(--sans)', fontSize: 10, lineHeight: 1, color: 'var(--muted)' }}> avg fit</span>
+                        <span title={t`Average fit across this base's scored copies (archived included)`} style={{ marginLeft: 'auto', fontFamily: 'var(--serif)', fontSize: 17, color: scoreColor(b.avg_fit) }}>
+                          {b.avg_fit}<span style={{ fontFamily: 'var(--sans)', fontSize: 10, lineHeight: 1, color: 'var(--muted)' }}> <Trans>avg fit</Trans></span>
                         </span>
                       )}
                     </div>
                     {(copies.length > 0 || baseInflight.length > 0) && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        {copies.length > 0 && <Label style={CHIP_LABEL}>Recent copies</Label>}
+                        {copies.length > 0 && <Label style={CHIP_LABEL}><Trans>Recent copies</Trans></Label>}
                         {baseInflight.map((f, k) => (
-                          <Chip key={`fl${k}`} title="Tailoring in progress — opens when ready" style={{ color: 'var(--muted)', maxWidth: 250 }}>
+                          <Chip key={`fl${k}`} title={t`Tailoring in progress — opens when ready`} style={{ color: 'var(--muted)', maxWidth: 250 }}>
                             <Spinner />
-                            <span>tailoring…</span>
+                            <span><Trans>tailoring…</Trans></span>
                           </Chip>
                         ))}
                         {(expanded.has(b.id) ? copies : copies.slice(0, 6)).map((c) => (
@@ -276,12 +278,12 @@ export default function V2Resumes() {
                             <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{copyLabel(c)}</span>
                             {c.score != null && <Mono size="sm" style={{ flex: '0 0 auto', color: scoreColor(c.score) }}>{c.score}</Mono>}
                             {/* ui: keep — 6px "unreviewed" dot, not a control */}
-                            {c.fresh && <span title="Has tailoring changes you haven't reviewed" style={{ flex: '0 0 auto', width: 6, height: 6, borderRadius: 'var(--radius-control)', background: 'var(--warn)' }} />}
+                            {c.fresh && <span title={t`Has tailoring changes you haven't reviewed`} style={{ flex: '0 0 auto', width: 6, height: 6, borderRadius: 'var(--radius-control)', background: 'var(--warn)' }} />}
                           </Chip>
                         ))}
                         {copies.length > 6 && (
                           <Link onClick={(e) => { e.stopPropagation(); toggleExpand(b.id) }}>
-                            {expanded.has(b.id) ? 'show fewer ‹' : `+ ${copies.length - 6} more ›`}
+                            {expanded.has(b.id) ? t`show fewer ‹` : t`+ ${copies.length - 6} more ›`}
                           </Link>
                         )}
                       </div>
@@ -291,7 +293,7 @@ export default function V2Resumes() {
               })}
               {archived.length > 0 && (
                 <ArchiveBand onClick={() => setShowArchived(true)} action="browse ›">
-                  Archived · {archived.length} cop{archived.length === 1 ? 'y' : 'ies'} from rejected or stale applications
+                  {plural(archived.length, { one: 'Archived · # copy from rejected or stale applications', other: 'Archived · # copies from rejected or stale applications' })}
                 </ArchiveBand>
               )}
             </>
@@ -316,7 +318,7 @@ function AddModal({ onClose, onCreated }) {
     if (!name.trim() || busy) return
     setBusy('create'); setErr('')
     try { const { data } = await api.post('/resumes', { name: name.trim(), is_base: true, json_data: EMPTY }); onCreated(data.id) }
-    catch (e) { setErr(e.response?.data?.detail || 'Create failed'); setBusy('') }
+    catch (e) { setErr(e.response?.data?.detail || t`Create failed`); setBusy('') }
   }
   const importPdf = async (file) => {
     if (!file || busy) return
@@ -333,7 +335,7 @@ function AddModal({ onClose, onCreated }) {
       }
       const { data } = await api.post('/resumes', { name: name.trim() || file.name.replace(/\.pdf$/i, ''), is_base: true, json_data: parsed.json_data || parsed })
       onCreated(data.id)
-    } catch (e) { setErr(e.response?.data?.detail || 'Import failed with no response from the server (request timed out or backend unreachable).'); setBusy('') }
+    } catch (e) { setErr(e.response?.data?.detail || t`Import failed with no response from the server (request timed out or backend unreachable).`); setBusy('') }
   }
 
   const canCreate = !!name.trim() && !busy
@@ -341,11 +343,11 @@ function AddModal({ onClose, onCreated }) {
   return (
     // zIndex 60 kept: this modal opens from the Résumés shelf, under the app's
     // ConfirmDialog (70) and the toast stack (80).
-    <ModalPanel width={420} title="New base résumé" onClose={onClose} zIndex={60} style={{ padding: 22 }}>
-        <Heading size={19} className="v2-dialogtitle" style={{ display: 'block', marginBottom: 4 }}>New base résumé</Heading>
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>Start from scratch, or import an existing PDF to parse.</div>
-        <Input autoFocus value={name} onChange={setName} placeholder="Résumé name (e.g. Backend — Platform v4)"
-          ariaLabel="Résumé name" onKeyDown={(e) => e.key === 'Enter' && createScratch()}
+    <ModalPanel width={420} title={t`New base résumé`} onClose={onClose} zIndex={60} style={{ padding: 22 }}>
+        <Heading size={19} className="v2-dialogtitle" style={{ display: 'block', marginBottom: 4 }}><Trans>New base résumé</Trans></Heading>
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}><Trans>Start from scratch, or import an existing PDF to parse.</Trans></div>
+        <Input autoFocus value={name} onChange={setName} placeholder={t`Résumé name (e.g. Backend — Platform v4)`}
+          ariaLabel={t`Résumé name`} onKeyDown={(e) => e.key === 'Enter' && createScratch()}
           style={{ marginBottom: 14 }} />
         {err && <div style={{ fontSize: 12, color: 'var(--bad)', marginBottom: 10 }}>{err}</div>}
         {/* Round 9 #12d · a classic dialog footer, which is also the shape every
@@ -356,9 +358,9 @@ function AddModal({ onClose, onCreated }) {
             Sizes drop to `sm` so three buttons fit the 420px panel. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           {/* Disabled primary button is --line on --muted — --edge as a fill would read as a second live button. */}
-          <Button size="sm" onClick={createScratch} disabled={!canCreate} style={{ marginLeft: 'auto' }}>{busy === 'create' ? 'Creating…' : 'Create from scratch'}</Button>
-          <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()} disabled={!!busy}>{busy === 'import' ? 'Parsing…' : 'Import PDF…'}</Button>
-          <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={createScratch} disabled={!canCreate} style={{ marginLeft: 'auto' }}>{busy === 'create' ? t`Creating…` : t`Create from scratch`}</Button>
+          <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()} disabled={!!busy}>{busy === 'import' ? t`Parsing…` : t`Import PDF…`}</Button>
+          <Button variant="secondary" size="sm" onClick={onClose}><Trans>Cancel</Trans></Button>
           {/* Clear the file input after every pick — re-picking the same file otherwise fires no change event. */}
           {/* ui: keep — hidden <input type="file">, not a rendered field */}
           <input ref={fileRef} type="file" accept="application/pdf" style={{ display: 'none' }}

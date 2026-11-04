@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import ClosedMark from '../ClosedMark'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../api'
@@ -47,15 +49,15 @@ function computeChanges(base, copy) {
     const be = (base.experience || [])[i] || {}
     const bb = be.bullets || [], cb = ce.bullets || []
     cb.forEach((txt, j) => {
-      if (j < bb.length) { const d = wordDiff(bb[j], txt); if (d) out.push({ key: `exp${i}b${j}`, where: `Experience · ${ce.company || 'role'} · bullet ${j + 1}`, kind: 'modified', path: `experience.${i}.bullets.${j}`, baseText: bb[j], ...d }) }
-      else out.push({ key: `exp${i}nb${j}`, where: `Experience · ${ce.company || 'role'} · new bullet`, kind: 'added', before: '', removed: '', added: txt, after: '', text: txt })
+      if (j < bb.length) { const d = wordDiff(bb[j], txt); if (d) out.push({ key: `exp${i}b${j}`, where: t`Experience · ${ce.company || t`role`} · bullet ${j + 1}`, kind: 'modified', path: `experience.${i}.bullets.${j}`, baseText: bb[j], ...d }) }
+      else out.push({ key: `exp${i}nb${j}`, where: t`Experience · ${ce.company || t`role`} · new bullet`, kind: 'added', before: '', removed: '', added: txt, after: '', text: txt })
     })
-    ;(ce.suggested_bullets || []).forEach((sb, k) => out.push({ key: `exp${i}sb${k}`, where: `Experience · ${ce.company || 'role'} · suggested bullet`, kind: 'suggested', expIdx: i, sbIdx: k, before: '', removed: '', added: sb, after: '', text: sb }))
+    ;(ce.suggested_bullets || []).forEach((sb, k) => out.push({ key: `exp${i}sb${k}`, where: t`Experience · ${ce.company || t`role`} · suggested bullet`, kind: 'suggested', expIdx: i, sbIdx: k, before: '', removed: '', added: sb, after: '', text: sb }))
   })
   const bs = base.skills || {}, cs = copy.skills || {}
   Object.keys(cs).forEach((cat) => {
-    if (!(cat in bs)) out.push({ key: `sk:${cat}`, where: `Skills · ${cat}`, kind: 'added', path: `skills.${cat}`, before: '', removed: '', added: String(cs[cat] || ''), after: '', text: String(cs[cat] || '') })
-    else { const d = wordDiff(String(bs[cat] || ''), String(cs[cat] || '')); if (d) out.push({ key: `sk:${cat}`, where: `Skills · ${cat}`, kind: 'modified', path: `skills.${cat}`, baseText: String(bs[cat] || ''), ...d }) }
+    if (!(cat in bs)) out.push({ key: `sk:${cat}`, where: t`Skills · ${cat}`, kind: 'added', path: `skills.${cat}`, before: '', removed: '', added: String(cs[cat] || ''), after: '', text: String(cs[cat] || '') })
+    else { const d = wordDiff(String(bs[cat] || ''), String(cs[cat] || '')); if (d) out.push({ key: `sk:${cat}`, where: t`Skills · ${cat}`, kind: 'modified', path: `skills.${cat}`, baseText: String(bs[cat] || ''), ...d }) }
   })
   return out
 }
@@ -149,14 +151,14 @@ export default function ResumeEditor() {
           : mine.filter((r) => !r.job_id).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0]
         const run = await fetchRunOutcome(p.runId, 'tailor_resume')
         if (runFailed(run)) {
-          pushToast({ kind: 'error', msg: `Tailoring failed — ${runFailureReason(run)}` })
+          pushToast({ kind: 'error', msg: t`Tailoring failed — ${runFailureReason(run)}` })
           continue
         }
-        const msg = p.company ? `Tailored copy for ${p.company} is ready.` : 'Tailored copy from your pasted description is ready.'
-        if (hit) pushToast({ kind: 'success', msg, action: 'Open ↗', onAction: () => navigate(`/resumes/${hit.id}`) })
-        else if (run) pushToast({ kind: 'success', msg: 'Tailoring finished.', action: 'Résumés ↗', onAction: () => navigate('/resumes') })
+        const msg = p.company ? t`Tailored copy for ${p.company} is ready.` : t`Tailored copy from your pasted description is ready.`
+        if (hit) pushToast({ kind: 'success', msg, action: t`Open ↗`, onAction: () => navigate(`/resumes/${hit.id}`) })
+        else if (run) pushToast({ kind: 'success', msg: t`Tailoring finished.`, action: t`Résumés ↗`, onAction: () => navigate('/resumes') })
         // run unknown and no copy found: say exactly that rather than claim either way
-        else pushToast({ kind: 'progress', spin: false, ttl: 6000, msg: 'Tailoring finished, but the copy could not be located.', action: 'Résumés ↗', onAction: () => navigate('/resumes') })
+        else pushToast({ kind: 'progress', spin: false, ttl: 6000, msg: t`Tailoring finished, but the copy could not be located.`, action: t`Résumés ↗`, onAction: () => navigate('/resumes') })
       }
     }, 3000)
     return () => clearInterval(iv)
@@ -169,10 +171,10 @@ export default function ResumeEditor() {
       track('tailor_started', { from: jobId ? 'job' : 'pasted' })
       // the run_id lets the watcher read the run's real status
       pendingRef.current.push({ scope: `${baseId}:${jobId || 'freeform'}`, runId: started?.run_id || null, jobId: jobId || null, company: company || null, since: Date.now() })
-      pushToast({ kind: 'progress', msg: company ? `Tailoring for ${company}… runs in the background.` : 'Tailoring from a pasted description… runs in the background.' })
+      pushToast({ kind: 'progress', msg: company ? t`Tailoring for ${company}… runs in the background.` : t`Tailoring from a pasted description… runs in the background.` })
     } catch (e) {
-      if (e.response?.status === 409) pushToast({ kind: 'error', msg: 'Already tailoring for that job.' })
-      else pushToast({ kind: 'error', msg: e.response?.data?.detail || 'Tailoring failed to start.' })
+      if (e.response?.status === 409) pushToast({ kind: 'error', msg: t`Already tailoring for that job.` })
+      else pushToast({ kind: 'error', msg: e.response?.data?.detail || t`Tailoring failed to start.` })
     }
   }, [pushToast])
 
@@ -184,16 +186,16 @@ export default function ResumeEditor() {
     try {
       if (mode === 'copy') {
         const { data } = await api.post('/resumes/copy', { base_resume_id: baseId, job_id: doc.job_id })
-        pushToast({ kind: 'success', msg: `Copy created for ${company}.`, action: 'Open ↗', onAction: () => navigate(`/resumes/${data.id}`) })
+        pushToast({ kind: 'success', msg: t`Copy created for ${company}.`, action: t`Open ↗`, onAction: () => navigate(`/resumes/${data.id}`) })
       } else {
         const { data: started } = await api.post('/resumes/tailor', { base_resume_id: baseId, job_id: doc.job_id })
         track('tailor_started', { from: 'job' })
         pendingRef.current.push({ scope: `${baseId}:${doc.job_id}`, runId: started?.run_id || null, jobId: doc.job_id, company, since: Date.now() })
-        pushToast({ kind: 'progress', msg: `Tailoring for ${company}… runs in the background.` })
+        pushToast({ kind: 'progress', msg: t`Tailoring for ${company}… runs in the background.` })
       }
     } catch (e) {
-      if (e.response?.status === 409) pushToast({ kind: 'error', msg: 'Already tailoring for that job.' })
-      else pushToast({ kind: 'error', msg: e.response?.data?.detail || 'Could not start.' })
+      if (e.response?.status === 409) pushToast({ kind: 'error', msg: t`Already tailoring for that job.` })
+      else pushToast({ kind: 'error', msg: e.response?.data?.detail || t`Could not start.` })
     }
   }, [doc, jobData, pushToast, navigate])
 
@@ -222,7 +224,7 @@ export default function ResumeEditor() {
     }).catch((e) => {
       // A missing/deleted/malformed id lands on the shelf silently otherwise, indistinguishable from pressing "‹ Résumés".
       // This screen unmounts, so the message is handed to the shelf instead of pushed here.
-      setFlashToast({ kind: 'error', msg: e.response?.status === 404 ? 'That résumé no longer exists.' : 'Couldn’t load that résumé.' })
+      setFlashToast({ kind: 'error', msg: e.response?.status === 404 ? t`That résumé no longer exists.` : t`Couldn’t load that résumé.` })
       navigate('/resumes')
     })
     return () => { alive = false }
@@ -231,7 +233,7 @@ export default function ResumeEditor() {
   // The preview toolbar's pickers wait on this list so the Template trigger doesn't paint
   // the raw id then rename itself a moment later; pairs with the `!doc` gate below.
   const { ready: tplReady } = useSettled([
-    () => api.get('/resumes/templates').then(({ data }) => setTemplates(data || [])).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load the layouts — the picker is empty.' }) }),
+    () => api.get('/resumes/templates').then(({ data }) => setTemplates(data || [])).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load the layouts — the picker is empty.` }) }),
   ])
 
   // A job-linked tailor chains a score of the new copy (routes_resumes.py reads
@@ -311,7 +313,7 @@ export default function ResumeEditor() {
   }, [jobData, doc, data])
 
   const runScore = useCallback(async (depth) => {
-    if (!doc?.job_id && !freeformJd) { pushToast({ kind: 'error', msg: 'This copy has no job and no saved description to score against.' }); return }
+    if (!doc?.job_id && !freeformJd) { pushToast({ kind: 'error', msg: t`This copy has no job and no saved description to score against.` }); return }
     setHeadMenu(false); setScoring(true)
     // Watches the run (scope `{job}:resume:{resume}`, routes_resumes.py) rather than
     // polling cv_scores.Tailored directly, which would match a re-score's stale value on the first tick.
@@ -320,7 +322,7 @@ export default function ResumeEditor() {
       const { data: started } = await api.post(`/resumes/${id}/score-check`, { depth })
       track('score_run', { depth })
       const runId = started?.run_id || null   // identifies the run below
-      pushToast({ kind: 'progress', msg: `Scoring (${depth}) — runs in the background.` })
+      pushToast({ kind: 'progress', msg: t`Scoring (${depth}) — runs in the background.` })
       const t0 = Date.now()
       let seen = false
       const iv = setInterval(async () => {
@@ -334,15 +336,15 @@ export default function ResumeEditor() {
           // Leaving /monitor/active isn't "it worked" — check run status before reading the score.
           // A failed re-score leaves the previous score on the job, which would otherwise read as a fresh success.
           const run = await fetchRunOutcome(runId, 'score_resume')
-          if (runFailed(run)) { pushToast({ kind: 'error', msg: `Scoring failed — ${runFailureReason(run)}` }); return }
+          if (runFailed(run)) { pushToast({ kind: 'error', msg: t`Scoring failed — ${runFailureReason(run)}` }); return }
           if (!doc.job_id) {
             // the score of a job-less copy lands on the copy itself — merge just that
             // key back so edits made while it ran are not overwritten
             const { data: r } = await api.get(`/resumes/${id}`)
             const sc0 = r?.json_data?._score?.Tailored
             setData((prev) => ({ ...prev, _score: r?.json_data?._score }))
-            if (typeof sc0 === 'number') pushToast({ kind: 'success', msg: `Scored: ${Math.round(sc0)}` })
-            else pushToast({ kind: 'error', msg: 'Scoring finished without a score — try again.' })
+            if (typeof sc0 === 'number') pushToast({ kind: 'success', msg: t`Scored: ${Math.round(sc0)}` })
+            else pushToast({ kind: 'error', msg: t`Scoring finished without a score — try again.` })
             return
           }
           const { data: j } = await api.get(`/jobs/${doc.job_id}`)
@@ -351,28 +353,28 @@ export default function ResumeEditor() {
           const sc = typeof cs['Tailored'] === 'number' ? Math.round(cs['Tailored']) : null
           const others = Object.entries(cs).filter(([k, v]) => k !== 'Tailored' && typeof v === 'number').map(([, v]) => v)
           const b = others.length ? Math.round(Math.max(...others)) : null
-          if (sc == null) pushToast({ kind: 'error', msg: 'Scoring finished without a score — try again.' })
-          else pushToast({ kind: 'success', msg: `Scored: ${sc}${b != null ? ` (${sc - b >= 0 ? '+' : ''}${sc - b} vs base)` : ''}` })
+          if (sc == null) pushToast({ kind: 'error', msg: t`Scoring finished without a score — try again.` })
+          else pushToast({ kind: 'success', msg: (b != null ? t`Scored: ${sc} (${(sc - b >= 0 ? '+' : '') + (sc - b)} vs base)` : t`Scored: ${sc}`) })
         } catch { if (Date.now() - t0 > 90000) { clearInterval(iv); setScoring(false) } }
       }, 3000)
-    } catch (e) { setScoring(false); pushToast({ kind: 'error', msg: e.response?.status === 409 ? 'Already scoring this copy.' : (e.response?.data?.detail || 'Scoring failed to start.') }) }
+    } catch (e) { setScoring(false); pushToast({ kind: 'error', msg: e.response?.status === 409 ? t`Already scoring this copy.` : (e.response?.data?.detail || t`Scoring failed to start.`) }) }
   }, [doc, id, pushToast, freeformJd])
 
   const markApplied = useCallback(async () => {
     if (!doc?.job_id) return
     setHeadMenu(false)
-    try { await api.patch(`/jobs/${doc.job_id}`, { status: 'applied' }); loadJobCtx(); pushToast({ kind: 'success', msg: 'Marked applied.' }) } catch { pushToast({ kind: 'error', msg: 'Could not mark applied.' }) }
+    try { await api.patch(`/jobs/${doc.job_id}`, { status: 'applied' }); loadJobCtx(); pushToast({ kind: 'success', msg: t`Marked applied.` }) } catch { pushToast({ kind: 'error', msg: t`Could not mark applied.` }) }
   }, [doc, loadJobCtx, pushToast])
 
   const deleteResume = useCallback(() => {
     setHeadMenu(false)
     setConfirm({
-      title: `Delete “${doc.name}”?`,
-      body: doc.is_base ? 'Its tailored copies will be removed too.' : undefined,
-      label: 'Delete', danger: true,
+      title: t`Delete “${doc.name}”?`,
+      body: doc.is_base ? t`Its tailored copies will be removed too.` : undefined,
+      label: t`Delete`, danger: true,
       onConfirm: async () => {
         setConfirm(null)
-        try { await api.delete(`/resumes/${id}`); navigate('/resumes') } catch { pushToast({ kind: 'error', msg: 'Delete failed.' }) }
+        try { await api.delete(`/resumes/${id}`); navigate('/resumes') } catch { pushToast({ kind: 'error', msg: t`Delete failed.` }) }
       },
     })
   }, [doc, id, navigate, pushToast])
@@ -388,7 +390,7 @@ export default function ResumeEditor() {
     const setName = (n) => setDoc((d) => (d && String(d.id) === mine ? { ...d, name: n } : d))
     setName(next)
     try { await api.patch(`/resumes/${mine}`, { name: next }); setSavedAt(new Date().toISOString()) }
-    catch (e) { setName(prev); pushToast({ kind: 'error', msg: `Rename failed — ${e.response?.data?.detail || e.message || 'try again'}.` }) }
+    catch (e) { setName(prev); pushToast({ kind: 'error', msg: t`Rename failed — ${e.response?.data?.detail || e.message || t`try again`}.` }) }
   }, [doc, pushToast])
   const startRename = () => { setHeadMenu(false); setRenaming(true) }
 
@@ -398,13 +400,13 @@ export default function ResumeEditor() {
   // something to score against; a copy with neither a job nor a saved description skips straight to the cover letter.
   const stage = useMemo(() => {
     if (!isCopy) return null
-    if (changes.length && !reviewed) return { label: `Review ${changes.length} change${changes.length === 1 ? '' : 's'}`, act: () => setReviewOpen(true) }
+    if (changes.length && !reviewed) return { label: plural(changes.length, { one: t`Review # change`, other: t`Review # changes` }), act: () => setReviewOpen(true) }
     const scoreable = !!doc.job_id || !!freeformJd
-    if (scoreable && scores.tailored == null) return { label: scoring ? 'Scoring…' : 'Score the result', act: () => runScore('full') }
-    if (!coverExists) return { label: '✉ Write cover letter', act: goCover }
-    if (!doc.job_id) return { label: 'Ready ✓', act: null, done: true }
-    if (jobData?.status !== 'applied') return { label: 'Mark applied', act: markApplied }
-    return { label: 'Applied ✓', act: null, done: true }
+    if (scoreable && scores.tailored == null) return { label: scoring ? 'Scoring…' : t`Score the result`, act: () => runScore('full') }
+    if (!coverExists) return { label: t`✉ Write cover letter`, act: goCover }
+    if (!doc.job_id) return { label: t`Ready ✓`, act: null, done: true }
+    if (jobData?.status !== 'applied') return { label: t`Mark applied`, act: markApplied }
+    return { label: t`Applied ✓`, act: null, done: true }
   }, [isCopy, doc, freeformJd, changes.length, reviewed, scores.tailored, scoring, coverExists, jobData, runScore, markApplied]) // eslint-disable-line
 
   // debounced persist
@@ -412,7 +414,7 @@ export default function ResumeEditor() {
   const pendingSave = useRef(null)
   const sendSave = useCallback(async (patch) => {
     try { await api.patch(`/resumes/${id}`, patch); setSavedAt(new Date().toISOString()) }
-    catch (e) { console.error(e); setSavedAt(null); pushToast({ kind: 'error', msg: `Save failed — your last edit is not stored. ${e.response?.data?.detail || e.message || ''}`.trim() }) }
+    catch (e) { console.error(e); setSavedAt(null); pushToast({ kind: 'error', msg: t`Save failed — your last edit is not stored. ${e.response?.data?.detail || e.message || ''}`.trim() }) }
     setSaving(false)
   }, [id])  // eslint-disable-line react-hooks/exhaustive-deps
   const persist = useCallback((patch) => {
@@ -481,7 +483,7 @@ export default function ResumeEditor() {
     onData(d)
     setReviewOpen(false)
     markReviewed(id); setReviewed(true)   // the diff survives; the acknowledgement is what advances the stage
-    pushToast({ kind: 'success', msg: 'Review applied — declined changes restored to base.' })
+    pushToast({ kind: 'success', msg: t`Review applied — declined changes restored to base.` })
   }, [changes, data, id, onData, pushToast])
 
   // ── json_data mutation (mirrors v1 ResumeContentEditor) ────────────────────
@@ -517,12 +519,12 @@ export default function ResumeEditor() {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* top bar */}
       <HeaderRow pad="10px 24px" bg="surface" soft align="center">
-        <NavLink onClick={() => navigate('/resumes')} style={{ whiteSpace: 'nowrap' }}>‹ Résumés</NavLink>
+        <NavLink onClick={() => navigate('/resumes')} style={{ whiteSpace: 'nowrap' }}><Trans>‹ Résumés</Trans></NavLink>
         <span style={{ color: 'var(--line)' }}>|</span>
         {/* ui: keep — Tag-role uppercase badge (bg + r99, not a Label); case/tracking read --label-case/--label-tracking-scale so an alt skin can turn both off */}
-        <span style={{ fontSize: 9.5, letterSpacing: 'calc(.08em * var(--label-tracking-scale))', textTransform: 'var(--label-case)', padding: '2px 7px', borderRadius: 'var(--radius-control)', background: isCopy ? 'var(--ai-soft)' : 'var(--surface-2)', color: isCopy ? 'var(--ai)' : 'var(--muted)' }}>{isCopy ? 'tailored' : 'base'}</span>
+        <span style={{ fontSize: 9.5, letterSpacing: 'calc(.08em * var(--label-tracking-scale))', textTransform: 'var(--label-case)', padding: '2px 7px', borderRadius: 'var(--radius-control)', background: isCopy ? 'var(--ai-soft)' : 'var(--surface-2)', color: isCopy ? 'var(--ai)' : 'var(--muted)' }}>{isCopy ? t`tailored` : t`base`}</span>
         <ResumeName name={doc.name} editing={renaming} onEdit={() => setRenaming(true)} onDone={rename} />
-        <Helper style={{ marginLeft: 'auto' }}>{saving ? 'Saving…' : savedAt ? `saved ${timeAgo(savedAt)} · autosaves` : 'autosaves'}</Helper>
+        <Helper style={{ marginLeft: 'auto' }}>{saving ? t`Saving…` : savedAt ? t`saved ${timeAgo(savedAt)} · autosaves` : t`autosaves`}</Helper>
       </HeaderRow>
 
       {/* sub-band: base vs copy */}
@@ -537,8 +539,8 @@ export default function ResumeEditor() {
             <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, lineHeight: '18px' }}>
               {!ctxReady ? NBSP : <>
               {jobData?.company
-                ? <>Tailored for <span style={{ color: 'var(--text)' }}>{jobData.company}{jobData.title ? ` — ${jobData.title}` : ''}</span><ClosedMark jobId={doc.job_id} /></>
-                : (jobless && freeformJd ? 'Tailored from a pasted description' : 'Tailored copy')}
+                ? <><Trans>Tailored for</Trans> <span style={{ color: 'var(--text)' }}>{jobData.company}{jobData.title ? ` — ${jobData.title}` : ''}</span><ClosedMark jobId={doc.job_id} /></>
+                : (jobless && freeformJd ? t`Tailored from a pasted description` : t`Tailored copy`)}
               {doc.parent_id && (() => {
                 // A freeform copy has no "→" to split on, so the name heuristic returns the
                 // copy's own name; prefer the fetched parent name and use the split only until it lands.
@@ -547,9 +549,9 @@ export default function ResumeEditor() {
                 return (
                   <>
                     <BandRule />
-                    <NavLink onClick={() => navigate(`/resumes/${doc.parent_id}`)} title={`Open the ${baseName} base résumé this was tailored from`} style={{ position: 'relative', top: '1px' }}>
+                    <NavLink onClick={() => navigate(`/resumes/${doc.parent_id}`)} title={t`Open the ${baseName} base résumé this was tailored from`} style={{ position: 'relative', top: '1px' }}>
                       {scores.delta != null && <span style={{ color: dfg, fontWeight: 600 }}>{scores.delta >= 0 ? '+' : ''}{scores.delta} </span>}
-                      <span style={{ color: 'var(--accent)' }}>based on {baseName} ↗</span>
+                      <span style={{ color: 'var(--accent)' }}><Trans>based on {baseName} ↗</Trans></span>
                     </NavLink>
                   </>
                 )
@@ -560,44 +562,44 @@ export default function ResumeEditor() {
               {/* Distinguishes "not scored yet" from "can't be scored" and "job failed to load".
                   Tracer counts are part of the same settle, so the line doesn't grow a tail after the fact. */}
               {!ctxReady ? NBSP : <>
-              {jobErr ? 'Couldn’t load the linked job.'
-                : jobless && !freeformJd ? 'No job or description linked, so this copy can’t be scored.'
-                  : (changes.length && !reviewed ? `${changes.length} reviewable change${changes.length === 1 ? '' : 's'}` : scores.tailored == null ? 'not scored yet' : 'ready')}
-              {tracers.length > 0 && <> · tracked links: {tracers.map((t) => `${t.source_label} ${t.clicks}`).join(' · ')}</>}
+              {jobErr ? t`Couldn’t load the linked job.`
+                : jobless && !freeformJd ? t`No job or description linked, so this copy can’t be scored.`
+                  : (changes.length && !reviewed ? plural(changes.length, { one: '# reviewable change', other: '# reviewable changes' }) : scores.tailored == null ? t`not scored yet` : t`ready`)}
+              {tracers.length > 0 && <> <Trans>· tracked links: {tracers.map((t) => `${t.source_label} ${t.clicks}`).join(' · ')}</Trans></>}
               </>}
             </Helper>
           </div>
           {ctxReady && stage && (
-            <Button onClick={() => stage.act && stage.act()} disabled={stage.done} title={stage.done ? 'All steps done' : 'Next step'}>
+            <Button onClick={() => stage.act && stage.act()} disabled={stage.done} title={stage.done ? t`All steps done` : t`Next step`}>
               {scoring && <Spinner size={11} color="currentColor" />}
               {stage.label}
             </Button>
           )}
           <div style={{ position: 'relative', flex: '0 0 auto' }}>
             <IconButton size={36} on={headMenu} ariaExpanded={headMenu} ariaHaspopup="menu"
-              onClick={() => setHeadMenu((v) => !v)} title="More">⋯</IconButton>
+              onClick={() => setHeadMenu((v) => !v)} title={t`More`}>⋯</IconButton>
             {headMenu && (
               <>
                 <div onClick={() => setHeadMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 44 }} />
-                <Menu ariaLabel="Résumé actions" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 5, zIndex: 45, width: 244 }}>
-                  <MenuHead>This copy</MenuHead>
-                  <MenuItem icon="✦" hint="adds a copy" onClick={() => { setHeadMenu(false); setTailorOpen(true) }}>Re-tailor…</MenuItem>
-                  <MenuItem icon="◎" hint="score only" onClick={() => runScore('light')}>Score again · light</MenuItem>
-                  <MenuItem icon="◎" hint="with report" onClick={() => runScore('full')}>Score again · full</MenuItem>
-                  {changes.length > 0 && <MenuItem icon="≋" hint={`${changes.length} to review`} onClick={() => { setHeadMenu(false); setReviewOpen(true) }}>Review changes</MenuItem>}
-                  <MenuItem icon="✎" onClick={startRename}>Rename</MenuItem>
+                <Menu ariaLabel={t`Résumé actions`} style={{ position: 'absolute', top: '100%', right: 0, marginTop: 5, zIndex: 45, width: 244 }}>
+                  <MenuHead><Trans>This copy</Trans></MenuHead>
+                  <MenuItem icon="✦" hint={t`adds a copy`} onClick={() => { setHeadMenu(false); setTailorOpen(true) }}><Trans>Re-tailor…</Trans></MenuItem>
+                  <MenuItem icon="◎" hint={t`score only`} onClick={() => runScore('light')}><Trans>Score again · light</Trans></MenuItem>
+                  <MenuItem icon="◎" hint={t`with report`} onClick={() => runScore('full')}><Trans>Score again · full</Trans></MenuItem>
+                  {changes.length > 0 && <MenuItem icon="≋" hint={t`${changes.length} to review`} onClick={() => { setHeadMenu(false); setReviewOpen(true) }}><Trans>Review changes</Trans></MenuItem>}
+                  <MenuItem icon="✎" onClick={startRename}><Trans>Rename</Trans></MenuItem>
                   <Rule style={{ margin: '4px 8px' }} />
-                  <MenuHead>Job</MenuHead>
+                  <MenuHead><Trans>Job</Trans></MenuHead>
                   {/* `hint` slots deliberately empty: they read as single-letter
                       shortcuts (the Feed really binds f/j/s/x/e/o), and nothing on
                       this screen implements c/e/a — its only key handlers are
                       Escape and ⌘B inside a bullet (R4-T2B-05). Binding them here
                       is not a one-liner: the editor is a page of text fields, so a
                       bare letter key needs a target/isContentEditable guard first. */}
-                  <MenuItem icon="✉" onClick={goCover}>Cover letter</MenuItem>
-                  {doc.job_id && <MenuItem icon="↗" onClick={() => navigate(`/feed?job=${doc.job_id}`)}>Open in feed</MenuItem>}
-                  {doc.job_id && <MenuItem icon="✓" onClick={markApplied}>Mark applied</MenuItem>}
-                  <MenuItem danger icon="✕" onClick={deleteResume}>Delete copy</MenuItem>
+                  <MenuItem icon="✉" onClick={goCover}><Trans>Cover letter</Trans></MenuItem>
+                  {doc.job_id && <MenuItem icon="↗" onClick={() => navigate(`/feed?job=${doc.job_id}`)}><Trans>Open in feed</Trans></MenuItem>}
+                  {doc.job_id && <MenuItem icon="✓" onClick={markApplied}><Trans>Mark applied</Trans></MenuItem>}
+                  <MenuItem danger icon="✕" onClick={deleteResume}><Trans>Delete copy</Trans></MenuItem>
                 </Menu>
               </>
             )}
@@ -607,21 +609,21 @@ export default function ResumeEditor() {
         <HeaderRow pad="9px 24px" bg="recessed" align="center" style={{ gap: 13, fontSize: 12.5, color: 'var(--text-2)' }}>
           {/* The copy count is part of the context settle; the whole sentence waits on ctxReady
               (not just the count) so it paints once instead of inserting the clause later. */}
-          <span>{!ctxReady ? NBSP : <>Base résumé · {baseCopyCount != null && <><span style={{ color: 'var(--text)', fontWeight: 500 }}>{baseCopyCount} tailored cop{baseCopyCount === 1 ? 'y' : 'ies'}</span> · </>}edits here affect new copies only</>}</span>
-          <Button variant="ai" onClick={() => setTailorOpen(true)} style={{ marginLeft: 'auto' }}>✦ Tailor for a job…</Button>
+          <span>{!ctxReady ? NBSP : <><Trans>Base résumé</Trans> · {baseCopyCount != null && <><span style={{ color: 'var(--text)', fontWeight: 500 }}>{plural(baseCopyCount, { one: '# tailored copy', other: '# tailored copies' })}</span> · </>}<Trans>edits here affect new copies only</Trans></>}</span>
+          <Button variant="ai" onClick={() => setTailorOpen(true)} style={{ marginLeft: 'auto' }}><Trans>✦ Tailor for a job…</Trans></Button>
           {/* Bases get the same ⋯ → Delete as copies (the confirm dialog already warns copies go too).
               Worded "Delete résumé" here since this document is the base and deleting it takes every copy with it. */}
           <div style={{ position: 'relative', flex: '0 0 auto', marginLeft: 8 }}>
             <IconButton size={36} on={headMenu} ariaExpanded={headMenu} ariaHaspopup="menu"
-              onClick={() => setHeadMenu((v) => !v)} title="More">⋯</IconButton>
+              onClick={() => setHeadMenu((v) => !v)} title={t`More`}>⋯</IconButton>
             {headMenu && (
               <>
                 <div onClick={() => setHeadMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 44 }} />
-                <Menu ariaLabel="Résumé actions" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 5, zIndex: 45, width: 244 }}>
-                  <MenuHead>This base</MenuHead>
-                  <MenuItem icon="✦" hint="adds a copy" onClick={() => { setHeadMenu(false); setTailorOpen(true) }}>Tailor for a job…</MenuItem>
-                  <MenuItem icon="✎" onClick={startRename}>Rename</MenuItem>
-                  <MenuItem danger icon="✕" onClick={deleteResume}>Delete résumé</MenuItem>
+                <Menu ariaLabel={t`Résumé actions`} style={{ position: 'absolute', top: '100%', right: 0, marginTop: 5, zIndex: 45, width: 244 }}>
+                  <MenuHead><Trans>This base</Trans></MenuHead>
+                  <MenuItem icon="✦" hint={t`adds a copy`} onClick={() => { setHeadMenu(false); setTailorOpen(true) }}><Trans>Tailor for a job…</Trans></MenuItem>
+                  <MenuItem icon="✎" onClick={startRename}><Trans>Rename</Trans></MenuItem>
+                  <MenuItem danger icon="✕" onClick={deleteResume}><Trans>Delete résumé</Trans></MenuItem>
                 </Menu>
               </>
             )}
@@ -635,7 +637,7 @@ export default function ResumeEditor() {
         <section className="v2-scroll" style={{ flex: '0 0 47%', borderRight: '1px solid var(--line)', overflow: 'auto', padding: '14px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {sectionNames.map((name) => (
             <SectionShell key={name} name={name} count={counts[name]} open={open.has(name)} onToggle={() => toggle(name)}
-              meta={changedSections.has(name) ? <span title="Contains unreviewed tailoring changes" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--warn)' }}>● changed by tailoring</span> : null}>
+              meta={changedSections.has(name) ? <span title={t`Contains unreviewed tailoring changes`} style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--warn)' }}><Trans>● changed by tailoring</Trans></span> : null}>
               <SectionEditor name={name} data={data} setField={setField} mutate={mutate} baseData={baseData} onError={(msg) => pushToast({ kind: 'error', msg })}
                 onRemoved={(msg, undo) => pushToast({ kind: 'undo', msg, action: 'Undo', onAction: undo })} />
             </SectionShell>
@@ -646,37 +648,37 @@ export default function ResumeEditor() {
         <Surface as="section" radius="none" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           {/* wraps rather than overflowing, like the cover-letter editor's identical toolbar */}
           <HeaderRow pad="8px 20px" align="center" style={{ flexWrap: 'wrap', rowGap: 6 }}>
-            <Label>PDF preview</Label>
+            <Label><Trans>PDF preview</Trans></Label>
             {/* template picker — the container swallows its own clicks so the document closer below can't undo the toggle */}
             {/* ui: keep — the two 9px muted ▾ carets below are the PDF-preview toolbar's own paper scale (below Helper's tolerance) */}
             {/* both triggers wait for the template list; the row's height is the Download link's, so nothing moves when they land */}
             {tplReady && <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-              <ToolbarTrigger label="Template" value={tplLabel} line="inherit" title="Résumé template"
+              <ToolbarTrigger label={t`Template`} value={tplLabel} line="inherit" title={t`Résumé template`}
                 onClick={() => { setTplOpen((v) => !v); setFmtOpen(false) }} />
               {tplOpen && (
-                  <Menu role="listbox" ariaLabel="Résumé template" className="v2-scroll" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 5, zIndex: 21, width: 190, maxHeight: 300, overflow: 'auto' }}>
+                  <Menu role="listbox" ariaLabel={t`Résumé template`} className="v2-scroll" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 5, zIndex: 21, width: 190, maxHeight: 300, overflow: 'auto' }}>
                     {templates.map((t) => <MenuItem key={t.id} role="option" ariaSelected={t.id === template} selected={t.id === template} onClick={() => pickTemplate(t.id)}>{t.name}</MenuItem>)}
                   </Menu>
               )}
             </div>}
             {/* format */}
             {tplReady && <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-              <ToolbarTrigger label="Paper" value={format === 'a4' ? 'A4' : 'US Letter'} line="inherit" title="Paper size"
+              <ToolbarTrigger label={t`Paper`} value={format === 'a4' ? 'A4' : 'US Letter'} line="inherit" title={t`Paper size`}
                 onClick={() => { setFmtOpen((v) => !v); setTplOpen(false) }} />
               {fmtOpen && (
-                  <Menu role="listbox" ariaLabel="Paper size" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 5, zIndex: 21, width: 130 }}>
-                    {[['letter', 'US Letter'], ['a4', 'A4']].map(([v, l]) => <MenuItem key={v} role="option" ariaSelected={v === format} selected={v === format} onClick={() => pickFormat(v)}>{l}</MenuItem>)}
+                  <Menu role="listbox" ariaLabel={t`Paper size`} style={{ position: 'absolute', top: '100%', left: 0, marginTop: 5, zIndex: 21, width: 130 }}>
+                    {[['letter', t`US Letter`], ['a4', 'A4']].map(([v, l]) => <MenuItem key={v} role="option" ariaSelected={v === format} selected={v === format} onClick={() => pickFormat(v)}>{l}</MenuItem>)}
                   </Menu>
               )}
             </div>}
             <DownloadMenu id={id} template={template} format={format} beforeDownload={flushSave} onError={(msg) => pushToast({ kind: 'error', msg })} />
           </HeaderRow>
           <Surface radius="none" style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-            {pdfUrl && <iframe title="pdf" src={`${pdfUrl}#view=FitH`} style={{ width: '100%', height: '100%', border: 'none' }} />}
+            {pdfUrl && <iframe title={t`pdf`} src={`${pdfUrl}#view=FitH`} style={{ width: '100%', height: '100%', border: 'none' }} />}
             {pdfErr && !pdfUrl && (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 9, color: 'var(--muted)', fontSize: 12.5 }}>
-                <span>Preview failed — the PDF could not be rendered.</span>
-                <Pill size="sm" onClick={() => setPdfNonce((n) => n + 1)}>Retry</Pill>
+                <span><Trans>Preview failed — the PDF could not be rendered.</Trans></span>
+                <Pill size="sm" onClick={() => setPdfNonce((n) => n + 1)}><Trans>Retry</Trans></Pill>
               </div>
             )}
           </Surface>
@@ -723,19 +725,19 @@ export function DownloadMenu({ id, template, format, onError, beforeDownload }) 
     } catch (e) {
       console.error(e)
       const reason = await downloadErrorReason(e)
-      onError?.((kind === 'docx' ? 'Could not download the Word document' : 'Could not download the PDF') + (reason ? ` — ${reason}` : '.'))
+      onError?.((kind === 'docx' ? t`Could not download the Word document` : t`Could not download the PDF`) + (reason ? ` — ${reason}` : '.'))
     } finally { setBusy(false) }
   }
   // Overrides keep the toolbar's own 29px height and 12px label.
   return (
     <div style={{ position: 'relative', flex: '0 0 auto', marginLeft: 'auto' }}>
       <Button size="sm" busy={busy} ariaHaspopup="menu" ariaExpanded={open} onClick={() => setOpen((v) => !v)}
-        style={{ minWidth: 0, height: 29, gap: 6, fontSize: 12 }}>↓ Download</Button>
+        style={{ minWidth: 0, height: 29, gap: 6, fontSize: 12 }}><Trans>↓ Download</Trans></Button>
       {open && (
-        <Menu ariaLabel="Download résumé" onDismiss={() => setOpen(false)}
+        <Menu ariaLabel={t`Download résumé`} onDismiss={() => setOpen(false)}
           style={{ position: 'absolute', top: '100%', right: 0, marginTop: 5, zIndex: 45, width: 168 }}>
-          <MenuItem hint=".pdf" hintMono onClick={() => download('pdf')}>PDF</MenuItem>
-          <MenuItem hint=".docx" hintMono onClick={() => download('docx')}>Word</MenuItem>
+          <MenuItem hint={t`.pdf`} hintMono onClick={() => download('pdf')}>PDF</MenuItem>
+          <MenuItem hint={t`.docx`} hintMono onClick={() => download('docx')}><Trans>Word</Trans></MenuItem>
         </Menu>
       )}
     </div>
@@ -753,36 +755,36 @@ function RetailorModal({ doc, job, chain, onClose, onRun, pushToast }) {
 
   useEffect(() => {
     // an empty list with a disabled button says nothing about why, so surface load failures via toast
-    api.get('/resumes', { params: { is_base: true } }).then(({ data }) => setBases(data || [])).catch((e) => { console.error(e); pushToast?.({ kind: 'error', msg: 'Could not load your base résumés — there is nothing to re-tailor from.' }) })
-    api.get('/persona').then(({ data }) => setPersona(Object.keys(data?.resume_content || {}).length > 0)).catch((e) => { console.error(e); pushToast?.({ kind: 'error', msg: 'Could not load your Persona — it will not be offered as a source.' }) })
+    api.get('/resumes', { params: { is_base: true } }).then(({ data }) => setBases(data || [])).catch((e) => { console.error(e); pushToast?.({ kind: 'error', msg: t`Could not load your base résumés — there is nothing to re-tailor from.` }) })
+    api.get('/persona').then(({ data }) => setPersona(Object.keys(data?.resume_content || {}).length > 0)).catch((e) => { console.error(e); pushToast?.({ kind: 'error', msg: t`Could not load your Persona — it will not be offered as a source.` }) })
   }, [pushToast])
 
   // /resumes/copy takes a Resume row; the Persona isn't one, so it can only be tailored from, never copied.
   const options = [
-    ...(persona ? [{ id: 'persona', name: 'Persona', note: 'your full profile' }] : []),
-    ...bases.map((b) => ({ id: String(b.id), name: b.name, note: 'base résumé' })),
+    ...(persona ? [{ id: 'persona', name: 'Persona', note: t`your full profile` }] : []),
+    ...bases.map((b) => ({ id: String(b.id), name: b.name, note: t`base résumé` })),
   ]
   const disabled = (id) => mode === 'copy' && id === 'persona'
   const canRun = !!baseId && !disabled(baseId)
 
   const MODES = [
-    ['tailor', '✦ Tailor', 'Rewrites bullets against this job description'],
-    ['copy', 'Copy', 'Exact copy of the base, with its own tracked links'],
+    ['tailor', '✦ Tailor', t`Rewrites bullets against this job description`],
+    ['copy', 'Copy', t`Exact copy of the base, with its own tracked links`],
   ]
 
   return (
     <ChoiceModal
-      title="Re-tailor for this job"
-      sub={<>{job?.company ? `${job.company}${job.title ? ` — ${job.title}` : ''}` : 'the job this copy is for'} · adds a new copy</>}
+      title={t`Re-tailor for this job`}
+      sub={<><Trans>{job?.company ? `${job.company}${job.title ? ` — ${job.title}` : ''}` : t`the job this copy is for`} · adds a new copy</Trans></>}
       subClamp onClose={onClose}
       note={<>
-        <Helper>{mode === 'tailor' ? 'Runs in the background' : 'Instant — no LLM call'}</Helper>
+        <Helper>{mode === 'tailor' ? t`Runs in the background` : t`Instant — no LLM call`}</Helper>
         {mode === 'tailor' && <Helper size="xs" style={{ textWrap: 'pretty' }}>{chainNote(chain)}</Helper>}
       </>}
       action={mode === 'tailor' ? '✦ Re-tailor' : 'Make copy'} actionVariant={mode === 'tailor' ? 'ai' : 'primary'} actionDisabled={!canRun}
       onAction={() => onRun({ mode, baseId })}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <Label>How</Label>
+        <Label><Trans>How</Trans></Label>
         <div style={{ display: 'flex', gap: 7 }}>
           {MODES.map(([id, label, hint]) => (
             <ChoiceCard key={id} on={mode === id} label={label} hint={hint} title={hint} onClick={() => setMode(id)} />
@@ -791,15 +793,15 @@ function RetailorModal({ doc, job, chain, onClose, onRun, pushToast }) {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <Label>From which base</Label>
+        <Label><Trans>From which base</Trans></Label>
         {options.map((o) => (
           <ChoiceRow key={o.id} on={String(baseId) === String(o.id)} disabled={disabled(o.id)}
-            title={disabled(o.id) ? 'Persona is not a résumé, so it can’t be copied. Use Tailor instead.' : undefined}
+            title={disabled(o.id) ? t`Persona is not a résumé, so it can’t be copied. Use Tailor instead.` : undefined}
             label={o.name}
-            hint={String(doc.parent_id || 'persona') === String(o.id) ? 'current base' : o.note}
+            hint={String(doc.parent_id || 'persona') === String(o.id) ? t`current base` : o.note}
             onClick={() => setBaseId(o.id)} />
         ))}
-        {options.length === 0 && <Band interactive={false} style={{ padding: 12 }}><Helper>No base résumés yet.</Helper></Band>}
+        {options.length === 0 && <Band interactive={false} style={{ padding: 12 }}><Helper><Trans>No base résumés yet.</Trans></Helper></Band>}
       </div>
     </ChoiceModal>
   )
@@ -808,8 +810,8 @@ function RetailorModal({ doc, job, chain, onClose, onRun, pushToast }) {
 // The tailor endpoint chains a score of the copy it just made — a second LLM call the
 // modals should mention. Reads the setting that controls it; the control itself stays in Settings › AI.
 const chainNote = (chain) => (chain
-  ? `Also scores the copy afterwards at ${chain} depth · 1 more LLM call · change under Settings › AI`
-  : 'Scoring after tailoring is off')
+  ? t`Also scores the copy afterwards at ${chain} depth · 1 more LLM call · change under Settings › AI`
+  : t`Scoring after tailoring is off`)
 
 // ── tailor modal (job picker + freeform + persona) ───────────────────────────
 function TailorModal({ doc, chain, onClose, onRun, pushToast }) {
@@ -825,7 +827,7 @@ function TailorModal({ doc, chain, onClose, onRun, pushToast }) {
   useEffect(() => {
     api.get('/jobs', { params: { status: 'saved,applied,new', sort_by: 'date', limit: 60, brief: 1 } })
       // empty with no explanation would read as "you have no saved jobs", which may not be true
-      .then(({ data }) => setJobs((data.jobs || data.items || data || []))).catch((e) => { console.error(e); pushToast?.({ kind: 'error', msg: 'Could not load your jobs — paste a description instead.' }) })
+      .then(({ data }) => setJobs((data.jobs || data.items || data || []))).catch((e) => { console.error(e); pushToast?.({ kind: 'error', msg: t`Could not load your jobs — paste a description instead.` }) })
     api.get('/resumes', { params: { is_base: false } })
       .then(({ data }) => setExisting(new Set((data || []).filter((r) => String(r.parent_id) === String(baseId)).map((r) => String(r.job_id))))).catch(() => { /* silent: drives only the “✦ exists” hint on a row */ })
   }, [baseId, pushToast])
@@ -837,8 +839,8 @@ function TailorModal({ doc, chain, onClose, onRun, pushToast }) {
     const nums = Object.values(cs).filter((v) => typeof v === 'number')
     return nums.length ? Math.round(Math.max(...nums)) : null
   }
-  const t = q.trim().toLowerCase()
-  const list = jobs.filter((j) => !t || `${j.title} ${j.company}`.toLowerCase().includes(t))
+  const needle = q.trim().toLowerCase()
+  const list = jobs.filter((j) => !needle || `${j.title} ${j.company}`.toLowerCase().includes(needle))
     .sort((a, b) => (['saved', 'applied'].includes(b.status) ? 1 : 0) - (['saved', 'applied'].includes(a.status) ? 1 : 0))
 
   const canRun = !!(pick || jd.trim())
@@ -848,20 +850,20 @@ function TailorModal({ doc, chain, onClose, onRun, pushToast }) {
   return (
     // bodyGap 12 (not the shell's default 13) is this modal's own spacing.
     <ChoiceModal
-      title={<>Tailor {doc.name} for a job</>}
-      sub="Changes are applied automatically. You can decline any of them afterwards."
+      title={<><Trans>Tailor {doc.name} for a job</Trans></>}
+      sub={t`Changes are applied automatically. You can decline any of them afterwards.`}
       bodyGap={12} onClose={onClose}
       note={<>
-        <Helper>Runs in the background</Helper>
+        <Helper><Trans>Runs in the background</Trans></Helper>
         {/* the chain only fires for a job-linked tailor (routes_resumes.py:
             `if chain_depth and job_id`), so a freeform run says nothing */}
         {pick && <Helper size="xs" style={{ textWrap: 'pretty' }}>{chainNote(chain)}</Helper>}
       </>}
       action="✦ Tailor" actionVariant="ai" actionDisabled={!canRun} onAction={run}>
-      <Check checked={personaBase} onChange={setPersonaBase} label="Tailor from Persona instead of this base" />
+      <Check checked={personaBase} onChange={setPersonaBase} label={t`Tailor from Persona instead of this base`} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <Label>Pick a job · saved and scored first</Label>
-        <Input value={q} onChange={setQ} placeholder="Search jobs…" ariaLabel="Search jobs" />
+        <Label><Trans>Pick a job · saved and scored first</Trans></Label>
+        <Input value={q} onChange={setQ} placeholder={t`Search jobs…`} ariaLabel={t`Search jobs`} />
         {list.slice(0, 40).map((j) => {
           const sc = jobScore(j), has = existing.has(String(j.id))
           return (
@@ -869,17 +871,17 @@ function TailorModal({ doc, chain, onClose, onRun, pushToast }) {
               label={j.title} sub={<>{j.company} · {j.status}</>}
               onClick={() => { setPick(j.id); setJd('') }}
               trail={<>
-                {sc != null && <Mono title="This base's fit on that job" line={16} tone="accent" style={{ flex: '0 0 auto' }}>{sc}</Mono>}
-                {has && <span title="A tailored copy already exists — tailoring again adds another" style={{ flex: '0 0 auto', fontSize: 9, lineHeight: '14px', color: 'var(--warn)' }}>✦ exists</span>}
+                {sc != null && <Mono title={t`This base's fit on that job`} line={16} tone="accent" style={{ flex: '0 0 auto' }}>{sc}</Mono>}
+                {has && <span title={t`A tailored copy already exists — tailoring again adds another`} style={{ flex: '0 0 auto', fontSize: 9, lineHeight: '14px', color: 'var(--warn)' }}><Trans>✦ exists</Trans></span>}
               </>} />
           )
         })}
-        {list.length === 0 && <Band interactive={false} style={{ padding: 12 }}><Helper>No jobs match — paste a description below instead.</Helper></Band>}
+        {list.length === 0 && <Band interactive={false} style={{ padding: 12 }}><Helper><Trans>No jobs match — paste a description below instead.</Trans></Helper></Band>}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <Label>…or a freeform job description</Label>
+        <Label><Trans>…or a freeform job description</Trans></Label>
         <Textarea value={jd} onChange={(v) => { setJd(v); if (v.trim()) setPick(null) }} rows={3}
-          placeholder="Paste a job description. The copy will not be linked to a job in the Feed." ariaLabel="Freeform job description"
+          placeholder={t`Paste a job description. The copy will not be linked to a job in the Feed.`} ariaLabel={t`Freeform job description`}
           style={{ borderStyle: 'dashed' }} />
       </div>
     </ChoiceModal>
@@ -897,20 +899,20 @@ function ReviewModal({ changes, onClose, onApply }) {
   const liveApplied = changes.filter((c) => c.kind !== 'suggested' && !declined[c.key]).length
   const liveSuggested = changes.filter((c) => c.kind === 'suggested' && !declined[c.key]).length
   return (
-    <ModalPanel width="min(920px, 94vw)" title={nSuggested ? 'Tailoring changes' : 'Tailoring changes — already applied'} onClose={onClose} zIndex={60} style={{ height: 'min(760px, 90vh)', overflow: 'hidden' }}>
+    <ModalPanel width="min(920px, 94vw)" title={nSuggested ? t`Tailoring changes` : t`Tailoring changes — already applied`} onClose={onClose} zIndex={60} style={{ height: 'min(760px, 90vh)', overflow: 'hidden' }}>
         <HeaderRow align="center" style={{ gap: 10 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Heading className="v2-dialogtitle">{nSuggested ? 'Tailoring changes' : 'Tailoring changes — already applied'}</Heading>
+            <Heading className="v2-dialogtitle">{nSuggested ? t`Tailoring changes` : t`Tailoring changes — already applied`}</Heading>
             <Helper>
               {nSuggested
-                ? `${nApplied ? 'Applied changes are already in the document — decline any and the base text comes back. ' : ''}Suggested bullets are not in it yet: they are added when you finish reviewing.`
-                : "These changes were applied automatically. Decline any you don't want to restore the base text."}
+                ? (nApplied ? t`Applied changes are already in the document — decline any and the base text comes back. Suggested bullets are not in it yet: they are added when you finish reviewing.` : t`Suggested bullets are not in it yet: they are added when you finish reviewing.`)
+                : t`These changes were applied automatically. Decline any you don't want to restore the base text.`}
             </Helper>
           </div>
-          <IconButton onClick={onClose} title="Close" style={{ marginLeft: 'auto' }}>✕</IconButton>
+          <IconButton onClick={onClose} title={t`Close`} style={{ marginLeft: 'auto' }}>✕</IconButton>
         </HeaderRow>
         <div className="v2-scroll" style={{ flex: 1, overflow: 'auto', padding: '15px 22px', display: 'flex', flexDirection: 'column', gap: 11, minHeight: 0 }}>
-          {changes.length === 0 && <div style={{ padding: 20, fontSize: 12.5, color: 'var(--muted)' }}>No tailoring changes to review.</div>}
+          {changes.length === 0 && <div style={{ padding: 20, fontSize: 12.5, color: 'var(--muted)' }}><Trans>No tailoring changes to review.</Trans></div>}
           {changes.map((c) => {
             const off = !!declined[c.key]
             const pending = c.kind === 'suggested'   // not in json_data yet
@@ -922,11 +924,11 @@ function ReviewModal({ changes, onClose, onApply }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <Label>{c.where}</Label>
                   {/* ui: keep — state badge; dashed --warn-line edge marks a suggestion, not a dashed add-line */}
-                  <span title={pending ? 'Suggested — not in the document or the PDF yet; added when you finish reviewing' : off ? 'Declined — the base text is restored' : 'Already in the document and in the PDF'}
-                    style={{ fontSize: 10, lineHeight: '16px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '1px 7px', borderRadius: 'var(--radius-control)', background: !live ? 'var(--surface-2)' : pending ? 'var(--surface)' : 'var(--accent-soft)', border: `1px ${live && pending ? 'dashed var(--warn-line)' : 'solid transparent'}`, color: !live ? 'var(--muted)' : pending ? 'var(--warn)' : 'var(--accent)', cursor: 'help' }}>{!live ? (pending ? 'dropped' : 'declined') : pending ? 'suggested' : 'applied'}</span>
-                  {live && pending && <Helper size="xs">added when you finish reviewing</Helper>}
+                  <span title={pending ? t`Suggested — not in the document or the PDF yet; added when you finish reviewing` : off ? t`Declined — the base text is restored` : t`Already in the document and in the PDF`}
+                    style={{ fontSize: 10, lineHeight: '16px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '1px 7px', borderRadius: 'var(--radius-control)', background: !live ? 'var(--surface-2)' : pending ? 'var(--surface)' : 'var(--accent-soft)', border: `1px ${live && pending ? 'dashed var(--warn-line)' : 'solid transparent'}`, color: !live ? 'var(--muted)' : pending ? 'var(--warn)' : 'var(--accent)', cursor: 'help' }}>{!live ? (pending ? t`dropped` : t`declined`) : pending ? t`suggested` : t`applied`}</span>
+                  {live && pending && <Helper size="xs"><Trans>added when you finish reviewing</Trans></Helper>}
                   {/* ui: keep — border+ink swing --accent/--warn with the change's state; Pill has no tinted variant */}
-                  <div onClick={() => setDeclined((p) => ({ ...p, [c.key]: !p[c.key] }))} style={{ marginLeft: 'auto', height: 24, padding: '0 12px', borderRadius: 'var(--radius-control)', border: `1px solid ${off ? 'var(--accent)' : 'var(--warn)'}`, color: off ? 'var(--accent)' : 'var(--warn)', fontSize: 11, fontWeight: 500, display: 'flex', alignItems: 'center', cursor: 'pointer' }}>{pending ? (off ? 'Keep it' : 'Drop ↩') : (off ? 'Restore change' : 'Decline ↩')}</div>
+                  <div onClick={() => setDeclined((p) => ({ ...p, [c.key]: !p[c.key] }))} style={{ marginLeft: 'auto', height: 24, padding: '0 12px', borderRadius: 'var(--radius-control)', border: `1px solid ${off ? 'var(--accent)' : 'var(--warn)'}`, color: off ? 'var(--accent)' : 'var(--warn)', fontSize: 11, fontWeight: 500, display: 'flex', alignItems: 'center', cursor: 'pointer' }}>{pending ? (off ? t`Keep it` : t`Drop ↩`) : (off ? t`Restore change` : t`Decline ↩`)}</div>
                 </div>
                 <span style={{ fontSize: 12.5, lineHeight: '20px', color: 'var(--text-2)' }}>
                   {c.before}
@@ -942,9 +944,9 @@ function ReviewModal({ changes, onClose, onApply }) {
         <FooterRow bg="recessed">
           {/* the count line separates what is already in the document from what's only proposed */}
           <Helper>{nSuggested
-            ? `${liveApplied} applied · ${liveSuggested} suggested — added on Done reviewing${nApplied - liveApplied ? ` · ${nApplied - liveApplied} declined` : ''}`
-            : n ? `${n} declined and restored to the base text · the other changes are kept` : `All ${changes.length} change${changes.length === 1 ? '' : 's'} applied · decline one to restore its base text`}</Helper>
-          <Button size="sm" onClick={() => onApply(declined)} style={{ marginLeft: 'auto' }}>Done reviewing</Button>
+            ? (nApplied - liveApplied ? t`${liveApplied} applied · ${liveSuggested} suggested — added on Done reviewing · ${nApplied - liveApplied} declined` : t`${liveApplied} applied · ${liveSuggested} suggested — added on Done reviewing`)
+            : n ? t`${n} declined and restored to the base text · the other changes are kept` : plural(changes.length, { one: t`All # change applied · decline one to restore its base text`, other: t`All # changes applied · decline one to restore its base text` })}</Helper>
+          <Button size="sm" onClick={() => onApply(declined)} style={{ marginLeft: 'auto' }}><Trans>Done reviewing</Trans></Button>
         </FooterRow>
     </ModalPanel>
   )

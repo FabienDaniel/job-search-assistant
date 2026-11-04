@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useToasts, ToastStack } from '../Toast'
 import api from '../api'
@@ -73,7 +75,7 @@ export function Picker({ value, options, placeholder, onPick, width }) {
       {open && <div onClick={(e) => { e.stopPropagation(); setOpen(false) }} style={{ position: 'fixed', inset: 0, zIndex: 39 }} />}
       {open && (
         <Menu role="listbox" className="v2-scroll" style={{ ...POPOVER, width: width || '100%' }}>
-          {options.length === 0 && <div style={{ padding: '7px 9px', fontSize: 12, color: 'var(--muted)' }}>Nothing to pick yet.</div>}
+          {options.length === 0 && <div style={{ padding: '7px 9px', fontSize: 12, color: 'var(--muted)' }}><Trans>Nothing to pick yet.</Trans></div>}
           {/* Round 9: routed through MenuItem. The two lines are one child of the
               row's own label slot, so `alignItems:center` has nothing to fight,
               and the row now reads --menu-item-ink / --menu-item-on-bg / -on-ink
@@ -95,7 +97,7 @@ export function Picker({ value, options, placeholder, onPick, width }) {
 
 // Voice chips + length segments are shared with the editor's Regenerate modal.
 export function VoicePicker({ presets, value, onPick }) {
-  if (!presets.length) return <Helper>No voice presets — add them in Settings → AI.</Helper>
+  if (!presets.length) return <Helper><Trans>No voice presets — add them in Settings → AI.</Trans></Helper>
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
       {presets.map((v) => {
@@ -110,7 +112,7 @@ export function VoicePicker({ presets, value, onPick }) {
 
 export function LengthPicker({ value, onPick }) {
   return (
-    <Segmented size="sm" ariaLabel="Letter length" value={value} onChange={onPick}
+    <Segmented size="sm" ariaLabel={t`Letter length`} value={value} onChange={onPick}
       options={LENGTHS.map(([id, name]) => ({ value: id, label: name }))} />
   )
 }
@@ -148,7 +150,7 @@ export default function CoverLetters() {
       setLetters(data || []); setLoadErr(null)
     } catch (e) {
       console.error(e)
-      setLoadErr(e?.response?.status ? `The server returned error ${e.response.status}. Try again.` : (e.message || 'Network error'))
+      setLoadErr(e?.response?.status ? t`The server returned error ${e.response.status}. Try again.` : (e.message || t`Network error`))
     }
   }, [])
 
@@ -161,20 +163,20 @@ export default function CoverLetters() {
     () => load(),
     // The generate panel is the point of this screen; a disabled button alone doesn't explain
     // why. Same for the job picker and voice list below.
-    () => api.get('/resumes', { params: { is_base: true } }).then(({ data }) => setResumes(mergeKeep(data || []))).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load your résumés — there is nothing to generate from.' }) }),
-    () => api.get('/persona').then(({ data }) => setPersonaAvailable(Object.keys(data?.resume_content || {}).length > 0)).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load your Persona — it will not be offered as a source.' }) }),
+    () => api.get('/resumes', { params: { is_base: true } }).then(({ data }) => setResumes(mergeKeep(data || []))).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load your résumés — there is nothing to generate from.` }) }),
+    () => api.get('/persona').then(({ data }) => setPersonaAvailable(Object.keys(data?.resume_content || {}).length > 0)).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load your Persona — it will not be offered as a source.` }) }),
     // saved AND applied — v1 fetched only saved, so a ?job= from an applied job
     // landed on an id with no matching option and the field rendered blank
     // brief=1: the picker needs title/company/status only; 200 full rows ran to several MB
     () => api.get('/jobs', { params: { status: 'saved,applied', limit: 200, brief: 1 } })   // 200 is the endpoint's cap
-      .then(({ data }) => setJobs(mergeKeep(data.jobs || []))).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load your saved jobs — the job picker is empty.' }) }),
+      .then(({ data }) => setJobs(mergeKeep(data.jobs || []))).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load your saved jobs — the job picker is empty.` }) }),
     () => api.get('/settings').then(({ data }) => {
       let p = data.cover_letter_voice_presets
       if (typeof p === 'string') { try { p = JSON.parse(p) } catch { p = [] } }
       const list = Array.isArray(p) ? p : []
       setPresets(list)
       setGenVoice(data.cover_letter_default_voice || list[0]?.id || '')
-    }).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load the voice presets — the voice picker is empty.' }) }),
+    }).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load the voice presets — the voice picker is empty.` }) }),
   ])
 
   // ?job= / ?resume= deep links (from the Feed, Résumé editor and Applications)
@@ -187,14 +189,14 @@ export default function CoverLetters() {
       // row can't be fetched, the picker silently shows an unmatched id.
       api.get(`/jobs/${j}`).then(({ data }) => {
         setJobs((p) => p.some((x) => x.id === data.id) ? p : [data, ...p])
-      }).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load the linked job — pick it from the list' }) })
+      }).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load the linked job — pick it from the list` }) })
     }
     if (r) {
       setGenResume(r)
       // Same for the résumé half of the deep link.
       api.get(`/resumes/${r}`).then(({ data }) => {
         setResumes((p) => p.some((x) => x.id === data.id) ? p : [data, ...p])
-      }).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: 'Could not load the linked résumé — pick it from the list' }) })
+      }).catch((e) => { console.error(e); pushToast({ kind: 'error', msg: t`Could not load the linked résumé — pick it from the list` }) })
     }
     setSearchParams({}, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -221,10 +223,10 @@ export default function CoverLetters() {
             const run = await fetchRunOutcome(g.run_id, 'generate_cover_letter')
             if (dead) return
             if (runFailed(run)) {
-              const why = `Generation failed — ${runFailureReason(run)}`
+              const why = t`Generation failed — ${runFailureReason(run)}`
               setErr(why); pushToast({ kind: 'error', msg: why })
-            } else if (run) pushToast({ kind: 'success', msg: 'Cover letter ready.' })
-            else pushToast({ kind: 'progress', spin: false, ttl: 6000, msg: 'Generation finished — check the list for the letter.' })
+            } else if (run) pushToast({ kind: 'success', msg: t`Cover letter ready.` })
+            else pushToast({ kind: 'progress', spin: false, ttl: 6000, msg: t`Generation finished — check the list for the letter.` })
           }
         }
       } catch { /* retry next tick */ }
@@ -235,12 +237,12 @@ export default function CoverLetters() {
   }, [load])
 
   const resumeOpts = useMemo(() => [
-    ...(personaAvailable ? [{ id: 'persona', label: 'Persona (full profile)' }] : []),
+    ...(personaAvailable ? [{ id: 'persona', label: t`Persona (full profile)` }] : []),
     ...resumes.map((r) => ({ id: r.id, label: r.name })),
   ], [resumes, personaAvailable])
 
   const jobOpts = useMemo(() => jobs.map((j) => ({
-    id: j.id, label: j.company ? `${j.company} — ${j.title}` : (j.title || 'Untitled role'),
+    id: j.id, label: j.company ? `${j.company} — ${j.title}` : (j.title || t`Untitled role`),
   })), [jobs])
 
   const visible = useMemo(() => {
@@ -265,8 +267,8 @@ export default function CoverLetters() {
   // `!loadErr` — see R4-T2B-03: a failed load must not cache or claim zeroes.
   const { warm: sub, style: subStyle } = useWarm('cover-letters', ready ? { n: letters.length, live } : null, ready, !loadErr)
   const countLine = ready && query.trim()
-    ? `${visible.length} of ${letters.length} letter${letters.length === 1 ? '' : 's'} match · ${live} open application${live === 1 ? '' : 's'}`
-    : sub ? `${sub.n} letter${sub.n === 1 ? '' : 's'} · ${sub.live} live application${sub.live === 1 ? '' : 's'}` : loadErr ? DASH : NBSP
+    ? t`${visible.length} of ${plural(letters.length, { one: '# letter', other: '# letters' })} match · ${plural(live, { one: '# open application', other: '# open applications' })}`
+    : sub ? t`${plural(sub.n, { one: '# letter', other: '# letters' })} · ${plural(sub.live, { one: '# live application', other: '# live applications' })}` : loadErr ? DASH : NBSP
 
   const genJobLabel = jobOpts.find((o) => o.id === genJob)?.label || ''
   const voiceLabel = presets.find((p) => p.id === genVoice)?.label || genVoice
@@ -292,8 +294,8 @@ export default function CoverLetters() {
       // and it stops a second click hitting the same-pair guard
       setGenJob('')
     } catch (e) {
-      setErr(e?.response?.data?.detail || 'Generation failed')
-      pushToast({ kind: 'error', msg: e?.response?.status === 409 ? 'A letter for this résumé and job is already generating.' : `Generation failed${e?.response?.data?.detail ? ' — ' + e.response.data.detail : ''}` })
+      setErr(e?.response?.data?.detail || t`Generation failed`)
+      pushToast({ kind: 'error', msg: e?.response?.status === 409 ? t`A letter for this résumé and job is already generating.` : t`Generation failed${e?.response?.data?.detail ? ' — ' + e.response.data.detail : ''}` })
     }
   }
 
@@ -321,8 +323,8 @@ export default function CoverLetters() {
           <Helper style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</Helper>
         </div>
         {(c.stage || arc) && (
-          <Tag tone="none" title={c.stage ? 'Stage of the linked application' : 'No application yet'}
-            className={STAGE_CLASS[c.stage] || 'cc-generic'}>{c.stage || 'Draft'}</Tag>
+          <Tag tone="none" title={c.stage ? t`Stage of the linked application` : t`No application yet`}
+            className={STAGE_CLASS[c.stage] || 'cc-generic'}>{c.stage || t`Draft`}</Tag>
         )}
         <Helper size="xs" mono style={{ flex: '0 0 40px', textAlign: 'right' }}>{agoShort(c.updated_at)}</Helper>
         <span style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--edge)' }}>›</span>
@@ -334,12 +336,12 @@ export default function CoverLetters() {
     <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <HeaderRow as="header" variant="screen" align="flex-end" style={{ gap: 18 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-          <PageTitle>Cover Letters</PageTitle>
+          <PageTitle><Trans>Cover Letters</Trans></PageTitle>
           <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...subStyle }}>{countLine}</span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
           <SearchInput variant="underline" width="280px" value={query} onChange={setQuery}
-            placeholder="Search letters, companies… " ariaLabel="Search cover letters" />
+            placeholder={t`Search letters, companies… `} ariaLabel={t`Search cover letters`} />
         </div>
       </HeaderRow>
 
@@ -348,36 +350,36 @@ export default function CoverLetters() {
       {ready && <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         {/* generate panel */}
         <div className="v2-scroll" style={{ flex: '0 0 340px', borderRight: '1px solid var(--line)', background: 'var(--bg)', overflow: 'auto', padding: '16px 26px 20px 30px', display: 'flex', flexDirection: 'column', gap: 13, minHeight: 0 }}>
-          <Heading strong={600} size={16}>Generate new</Heading>
+          <Heading strong={600} size={16}><Trans>Generate new</Trans></Heading>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <Label>Your résumé</Label>
-            <Picker value={genResume} options={resumeOpts} placeholder="Select a résumé…" onPick={setGenResume} />
-            <Helper size="xs" style={{ textWrap: 'pretty' }}>Base for achievements and motivation</Helper>
+            <Label><Trans>Your résumé</Trans></Label>
+            <Picker value={genResume} options={resumeOpts} placeholder={t`Select a résumé…`} onPick={setGenResume} />
+            <Helper size="xs" style={{ textWrap: 'pretty' }}><Trans>Base for achievements and motivation</Trans></Helper>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <Label>Target job</Label>
-            <Picker value={genJob} options={jobOpts} placeholder="Select a saved or applied job…" onPick={setGenJob} />
+            <Label><Trans>Target job</Trans></Label>
+            <Picker value={genJob} options={jobOpts} placeholder={t`Select a saved or applied job…`} onPick={setGenJob} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Label>Voice</Label>
+            <Label><Trans>Voice</Trans></Label>
             {/* "No voice presets…" is a real verdict, not a loading state — drawn only once
                 settings have settled. The row keeps a pill's height so the panel doesn't shift. */}
             <div style={{ minHeight: 26 }}>{ready && <VoicePicker presets={presets} value={genVoice} onPick={setGenVoice} />}</div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Label>Length</Label>
+            <Label><Trans>Length</Trans></Label>
             <LengthPicker value={genLength} onPick={setGenLength} />
           </div>
 
           {/* --line on --muted when disabled, like every other primary pill in the three builders — a dimmed accent still reads as live. */}
           <Button variant="ai" onClick={generate} disabled={!canGenerate}
-            title={thisPairRunning ? 'Already writing this one' : (!genResume || !genJob ? 'Pick a résumé and a job first' : 'Write the letter — you can start others while it runs')}>
+            title={thisPairRunning ? t`Already writing this one` : (!genResume || !genJob ? t`Pick a résumé and a job first` : t`Write the letter — you can start others while it runs`)}>
             {thisPairRunning && <Spinner size={10} color="currentColor" />}
-            {thisPairRunning ? 'Generating…' : '✦ Generate cover letter'}
+            {thisPairRunning ? t`Generating…` : t`✦ Generate cover letter`}
           </Button>
           {err && <span style={{ fontSize: 11.5, color: 'var(--bad)', textWrap: 'pretty' }}>{err}</span>}
         </div>
@@ -385,7 +387,7 @@ export default function CoverLetters() {
         {/* list */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--surface)' }}>
           <HeaderRow className="v2-gutter-head" pad="13px 30px 9px" soft align="center" style={{ gap: 9 }}>
-            <Label>All letters</Label>
+            <Label><Trans>All letters</Trans></Label>
             <Mono line={16} tone="faint">{ready ? letters.length + pending.length : NBSP}</Mono>
           </HeaderRow>
 
@@ -399,7 +401,7 @@ export default function CoverLetters() {
                 {/* integer line-height: at 1.5 this 12.5px label makes the row 46.75px tall,
                     dropping 1px borders on alternating rows below */}
                 <span style={{ fontSize: 12.5, lineHeight: '20px', color: 'var(--accent)', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  Generating — {rowLabel(r)}
+                  <Trans>Generating — {rowLabel(r)}</Trans>
                 </span>
                 <Helper style={{ marginLeft: 'auto', flex: '0 0 auto' }}>~30s</Helper>
               </Band>
@@ -408,23 +410,23 @@ export default function CoverLetters() {
             {active.map((c) => row(c, false))}
 
             {archived.length > 0 && (
-              <ArchiveBand onClick={() => { if (!query.trim()) setArchOpen((v) => !v) }} title={query.trim() ? 'Archived letters are shown while you search' : undefined}
+              <ArchiveBand onClick={() => { if (!query.trim()) setArchOpen((v) => !v) }} title={query.trim() ? t`Archived letters are shown while you search` : undefined}
                 style={{ marginTop: 6 }}
                 action={query.trim() ? 'shown while searching' : showArch ? 'hide ⌄' : 'browse ›'}>
-                Archived · {archived.length} letter{archived.length === 1 ? '' : 's'} from rejected applications &amp; skipped jobs
+                {plural(archived.length, { one: 'Archived · # letter from rejected applications & skipped jobs', other: 'Archived · # letters from rejected applications & skipped jobs' })}
               </ArchiveBand>
             )}
             {showArch && archived.map((c) => row(c, true))}
 
             {visible.length === 0 && pending.length === 0 && (loadErr ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '34px 8px' }}>
-                <span style={{ fontSize: 13, color: 'var(--bad)' }}>Couldn’t load your letters</span>
+                <span style={{ fontSize: 13, color: 'var(--bad)' }}><Trans>Couldn’t load your letters</Trans></span>
                 <Helper style={{ textAlign: 'center' }}>{loadErr}</Helper>
-                <Link onClick={() => load()} style={{ paddingTop: 2 }}>Try again</Link>
+                <Link onClick={() => load()} style={{ paddingTop: 2 }}><Trans>Try again</Trans></Link>
               </div>
             ) : (
               <div style={{ padding: '34px 8px', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)' }}>
-                {letters.length === 0 ? 'No cover letters yet — generate one on the left.' : 'Nothing matches that search.'}
+                {letters.length === 0 ? t`No cover letters yet — generate one on the left.` : t`Nothing matches that search.`}
               </div>
             ))}
             </>}
