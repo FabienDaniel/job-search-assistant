@@ -146,7 +146,7 @@ msgstr ".pdf"
 
 #. placeholder {0}: money(sub.spend)
 #. placeholder {1}: sub.period ? t`in ${sub.period}d` : t`all time`
-#: src/screens/Stats.jsx:403
+#: src/screens/Stats.jsx:404
 msgid "· {0} on LLM calls {1}"
 msgstr "· {0} d’appels LLM {1}"
 
@@ -269,7 +269,7 @@ msgid "{0, plural, one {# job score {n} or better} other {# jobs score {n} or be
 msgstr "{0, plural, one {# offre notée {n} ou plus} other {# offres notées {n} ou plus}}"
 
 #. placeholder {0}: jobs.length
-#: src/screens/Stats.jsx:634
+#: src/screens/Stats.jsx:635
 msgid "{0, plural, one {# job} other {# jobs}} · next run shown in {TZ_SHORT}, schedule set in UTC · edit intervals in Settings"
 msgstr "{0, plural, one {# tâche} other {# tâches}} · prochaine exécution affichée en {TZ_SHORT}, planification définie en UTC · intervalles à modifier dans les paramètres"
 
@@ -307,7 +307,7 @@ msgid "{0, plural, one {# reviewable change} other {# reviewable changes}}"
 msgstr "{0, plural, one {# modification à relire} other {# modifications à relire}}"
 
 #. placeholder {0}: sub.failing
-#: src/screens/Stats.jsx:402
+#: src/screens/Stats.jsx:403
 msgid "{0, plural, one {# source needs attention} other {# sources need attention}}"
 msgstr "{0, plural, one {# source à vérifier} other {# sources à vérifier}}"
 
@@ -496,19 +496,19 @@ msgid "{0} found · {kept} kept · {1} removed by title filter"
 msgstr "{0} trouvées · {kept} conservées · {1} retirées par le filtre d’intitulé"
 
 #. placeholder {0}: job.name
-#: src/screens/Stats.jsx:272
+#: src/screens/Stats.jsx:273
 msgid "{0} is already running."
 msgstr "{0} est déjà en cours."
 
 #. placeholder {0}: j.name
-#: src/screens/Stats.jsx:670
-#: src/screens/Stats.jsx:670
+#: src/screens/Stats.jsx:671
+#: src/screens/Stats.jsx:671
 msgid "{0} is running"
 msgstr "{0} en cours"
 
 #. placeholder {0}: b.count
 #. placeholder {1}: b.range
-#: src/screens/Stats.jsx:546
+#: src/screens/Stats.jsx:547
 msgid "{0} jobs scored {1}"
 msgstr "{0} offres notées {1}"
 
@@ -571,7 +571,7 @@ msgid "{0} per board max"
 msgstr "{0} par site au maximum"
 
 #. placeholder {0}: int(scores?.scored_count)
-#: src/screens/Stats.jsx:533
+#: src/screens/Stats.jsx:534
 msgid "{0} scored jobs · best résumé per job"
 msgstr "{0} offres notées · meilleur CV par offre"
 
@@ -602,7 +602,7 @@ msgid "{0} shown · {total} matching"
 msgstr "{0} affichées · {total} correspondantes"
 
 #. placeholder {0}: job.name
-#: src/screens/Stats.jsx:266
+#: src/screens/Stats.jsx:267
 msgid "{0} started."
 msgstr "{0} lancé."
 
@@ -669,7 +669,7 @@ msgstr "{0}{1} · {nRaw} trouvées{2}{3}"
 
 #. placeholder {0}: weekly.now - weekly.prev >= 0 ? '+' : ''
 #. placeholder {1}: weekly.now - weekly.prev
-#: src/screens/Stats.jsx:459
+#: src/screens/Stats.jsx:460
 msgid "{0}{1} vs previous period"
 msgstr "{0}{1} par rapport à la période précédente"
 
@@ -684,7 +684,7 @@ msgstr "{0} j {1} h"
 #: src/screens/JobFeed.jsx:55
 #: src/screens/ResumeEditor.jsx:69
 #: src/screens/Searches.jsx:25
-#: src/screens/Stats.jsx:75
+#: src/screens/Stats.jsx:76
 #: src/Shell.jsx:52
 msgid "{0}d ago"
 msgstr "il y a {0} j"
@@ -701,7 +701,7 @@ msgstr "{0}Les offres proviennent de vos <0>Recherches</0> et <1>Entreprises</1>
 
 #. placeholder {0}: Math.floor(s / 60)
 #. placeholder {1}: Math.round(s % 60)
-#: src/screens/Stats.jsx:68
+#: src/screens/Stats.jsx:69
 msgid "{0}m {1}s"
 msgstr "{0} min {1} s"
 
@@ -711,7 +711,7 @@ msgid "{0}m ago"
 msgstr "il y a {0} min"
 
 #. placeholder {0}: refreshing ? <Spinner size={10} /> : <span style={{ fontSize: 12 }}>↻</span>
-#: src/screens/Stats.jsx:437
+#: src/screens/Stats.jsx:438
 msgid "{0}Refresh"
 msgstr "{0}Actualiser"
 
@@ -721,7 +721,7 @@ msgid "{0}Regenerate…"
 msgstr "{0}Régénérer…"
 
 #. placeholder {0}: Math.round(s)
-#: src/screens/Stats.jsx:68
+#: src/screens/Stats.jsx:69
 msgid "{0}s"
 msgstr "{0} s"
 
@@ -826,13 +826,13 @@ msgstr "{h} h {0} min"
 #: src/screens/ResumeEditor.jsx:68
 #: src/screens/Resumes.jsx:17
 #: src/screens/Searches.jsx:24
-#: src/screens/Stats.jsx:75
+#: src/screens/Stats.jsx:76
 #: src/Shell.jsx:52
 #: src/time.js:11
 msgid "{h}h ago"
 msgstr "il y a {h} h"
 
-#: src/screens/Stats.jsx:461
+#: src/screens/Stats.jsx:462
 msgid "{inPlay} open"
 msgstr "{inPlay} ouvertes"
 
@@ -862,7 +862,7 @@ msgstr "{m} min"
 #: src/screens/Companies.jsx:20
 #: src/screens/ResumeEditor.jsx:67
 #: src/screens/Searches.jsx:22
-#: src/screens/Stats.jsx:73
+#: src/screens/Stats.jsx:74
 #: src/Shell.jsx:50
 #: src/time.js:8
 msgid "{m}m ago"
@@ -1234,11 +1234,11 @@ msgstr "0–100 : en dessous, l’e-mail est signalé pour une vérification ma
 msgid "1 or 2. Run all, one company, one search and the scheduled scrape wait their turn beyond this."
 msgstr "1 ou 2. « Tout lancer », une entreprise, une recherche et le scraping planifié attendent leur tour au-delà."
 
-#: src/screens/Stats.jsx:17
+#: src/screens/Stats.jsx:18
 msgid "1d"
 msgstr "1 j"
 
-#: src/screens/Stats.jsx:17
+#: src/screens/Stats.jsx:18
 msgid "30d"
 msgstr "30 j"
 
@@ -1250,7 +1250,7 @@ msgstr "PIN à 6 chiffres"
 msgid "60 or older"
 msgstr "60 ans ou plus"
 
-#: src/screens/Stats.jsx:17
+#: src/screens/Stats.jsx:18
 msgid "7d"
 msgstr "7 j"
 
@@ -1352,6 +1352,10 @@ msgstr "Couleur du compte"
 msgid "Account name"
 msgstr "Nom du compte"
 
+#: src/serverText.js:6
+msgid "Account not found"
+msgstr "Compte introuvable"
+
 #: src/screens/Settings.jsx:530
 #: src/screens/SettingsAccounts.jsx:464
 #: src/Shell.jsx:169
@@ -1394,7 +1398,7 @@ msgstr "Activer une entreprise"
 msgid "Active"
 msgstr "Active"
 
-#: src/screens/Stats.jsx:687
+#: src/screens/Stats.jsx:688
 msgid "Activity log"
 msgstr "Journal d’activité"
 
@@ -1542,7 +1546,7 @@ msgstr "Recommandations de l’IA"
 msgid "Aliases"
 msgstr "Alias"
 
-#: src/screens/Stats.jsx:17
+#: src/screens/Stats.jsx:18
 msgid "all"
 msgstr "tout"
 
@@ -1556,7 +1560,7 @@ msgstr "Toutes ({0})"
 msgid "All {0}"
 msgstr "Tous ({0})"
 
-#: src/screens/Stats.jsx:583
+#: src/screens/Stats.jsx:584
 msgid "All accounts"
 msgstr "Tous les comptes"
 
@@ -1568,7 +1572,7 @@ msgstr "Toutes les entreprises et recherches sont saines, mais le dernier scrapi
 msgid "All companies and searches healthy · last scrape run {lastSweep}. Click to open Run history."
 msgstr "Toutes les entreprises et recherches sont saines · dernier scraping {lastSweep}. Cliquez pour ouvrir l’historique des exécutions."
 
-#: src/screens/Stats.jsx:458
+#: src/screens/Stats.jsx:459
 msgid "All jobs ever found, excluding ones removed by cleanup"
 msgstr "Toutes les offres trouvées, hors celles retirées par le nettoyage"
 
@@ -1585,11 +1589,11 @@ msgstr "Tous les éléments sélectionnés sont déjà dans {0}"
 msgid "All steps done"
 msgstr "Toutes les étapes sont terminées"
 
-#: src/screens/Stats.jsx:403
+#: src/screens/Stats.jsx:404
 msgid "all time"
 msgstr "depuis le début"
 
-#: src/screens/Stats.jsx:35
+#: src/screens/Stats.jsx:36
 msgid "All types"
 msgstr "Tous les types"
 
@@ -1775,9 +1779,13 @@ msgstr "Actions de candidature"
 msgid "Application deleted"
 msgstr "Candidature supprimée"
 
-#: src/screens/Stats.jsx:482
+#: src/screens/Stats.jsx:483
 msgid "Application funnel"
 msgstr "Entonnoir de candidature"
+
+#: src/serverText.js:7
+msgid "Application not found"
+msgstr "Candidature introuvable"
 
 #: src/screens/JobFeed.jsx:568
 msgid "Application removed"
@@ -1788,7 +1796,7 @@ msgid "Application stage"
 msgstr "Étape de la candidature"
 
 #: src/screens/Applications.jsx:467
-#: src/screens/Stats.jsx:461
+#: src/screens/Stats.jsx:462
 #: src/Shell.jsx:34
 #: src/useTitle.js:13
 msgid "Applications"
@@ -1805,13 +1813,13 @@ msgstr "envoyée"
 #: src/screens/Applications.jsx:61
 #: src/screens/JobFeed.jsx:84
 #: src/screens/JobFeed.jsx:105
-#: src/screens/Stats.jsx:357
+#: src/screens/Stats.jsx:358
 msgid "Applied"
 msgstr "Candidature envoyée"
 
 #. placeholder {0}: conv(stats?.total_applications, reached.interview || 0)
 #. placeholder {1}: conv(reached.interview || 0, reached.offer || 0)
-#: src/screens/Stats.jsx:524
+#: src/screens/Stats.jsx:525
 msgid "applied → interview {0} · interview → offer {1}"
 msgstr "envoyée → entretien {0} · entretien → proposition {1}"
 
@@ -1903,12 +1911,12 @@ msgstr "à :{minute} chaque heure"
 
 #. placeholder {0}: hour.padStart(2, '0')
 #. placeholder {1}: min.padStart(2, '0')
-#: src/screens/Stats.jsx:85
+#: src/screens/Stats.jsx:86
 msgid "at {0}:{1}"
 msgstr "à {0}:{1}"
 
 #. placeholder {0}: hour.padStart(2, '0')
-#: src/screens/Stats.jsx:86
+#: src/screens/Stats.jsx:87
 msgid "at {0}:00"
 msgstr "à {0}:00"
 
@@ -1952,6 +1960,11 @@ msgstr "Détection automatique"
 #: src/screens/Settings.jsx:669
 msgid "Auto-reject · cron"
 msgstr "Rejet automatique · cron"
+
+#: src/serverText.js:49
+#: src/serverText.js:56
+msgid "Auto-reject stale applications"
+msgstr "Rejeter automatiquement les candidatures inactives"
 
 #: src/screens/Settings.jsx:667
 msgid "Auto-reject threshold"
@@ -2019,17 +2032,17 @@ msgid "Average fit across this company's scored roles"
 msgstr "Adéquation moyenne des postes notés de cette entreprise"
 
 #. placeholder {0}: scores.tailored_count
-#: src/screens/Stats.jsx:539
+#: src/screens/Stats.jsx:540
 msgid "Average score after tailoring, across the {0} jobs with a tailored copy"
 msgstr "Score moyen après adaptation, sur les {0} offres ayant une copie adaptée"
 
 #. placeholder {0}: scores.avg
 #. placeholder {1}: scores.tailored_avg != null && <> · <span title={t`Average score after tailoring, across the ${scores.tailored_count} jobs with a tailored copy`} style={{ color: 'var(--accent)', cursor: 'help' }}><Trans>tailored {scores.tailored_avg}</Trans></span></>
-#: src/screens/Stats.jsx:538
+#: src/screens/Stats.jsx:539
 msgid "avg {0}{1}"
 msgstr "moy. {0}{1}"
 
-#: src/screens/Stats.jsx:593
+#: src/screens/Stats.jsx:594
 msgid "Avg / call"
 msgstr "Moy. / appel"
 
@@ -2037,6 +2050,11 @@ msgstr "Moy. / appel"
 #: src/screens/Resumes.jsx:262
 msgid "avg fit"
 msgstr "adéquation moy."
+
+#: src/serverText.js:47
+#: src/serverText.js:54
+msgid "Back up database (pg_dump)"
+msgstr "Sauvegarder la base de données (pg_dump)"
 
 #: src/versionCheck.js:20
 msgid "Backend image out of date"
@@ -2088,7 +2106,7 @@ msgstr "CV de base et Profil. Changez pour utiliser d’autres réalisations."
 msgid "Behance on Remote searches: jobs open to this country, worldwide jobs included."
 msgstr "Behance pour les recherches en télétravail : offres ouvertes à ce pays, offres mondiales comprises."
 
-#: src/screens/Stats.jsx:462
+#: src/screens/Stats.jsx:463
 msgid "Best open score"
 msgstr "Meilleur score ouvert"
 
@@ -2167,11 +2185,11 @@ msgid "Bullets"
 msgstr "Puces"
 
 #. placeholder {0}: costs.by_account.map((a) => `${a.name} ${money(a.cost_usd)}`).join(' · ')
-#: src/screens/Stats.jsx:621
+#: src/screens/Stats.jsx:622
 msgid "By account: {0}"
 msgstr "Par compte : {0}"
 
-#: src/screens/Stats.jsx:605
+#: src/screens/Stats.jsx:606
 msgid "Cache"
 msgstr "Cache"
 
@@ -2188,8 +2206,8 @@ msgstr "En cache"
 msgid "Cached snapshot · captured when you applied"
 msgstr "Instantané en cache · capturé lors de votre candidature"
 
-#: src/screens/Stats.jsx:592
-#: src/screens/Stats.jsx:604
+#: src/screens/Stats.jsx:593
+#: src/screens/Stats.jsx:605
 msgid "Calls"
 msgstr "Appels"
 
@@ -2280,6 +2298,11 @@ msgstr "modifications non relues"
 msgid "Chat ID"
 msgstr "ID de discussion"
 
+#: src/serverText.js:45
+#: src/serverText.js:52
+msgid "Check Gmail for replies"
+msgstr "Rechercher les réponses dans Gmail"
+
 #: src/screens/Settings.jsx:751
 msgid "Check key"
 msgstr "Vérifier la clé"
@@ -2319,6 +2342,11 @@ msgstr "Claude Code (abonnement)"
 #: src/screens/Settings.jsx:555
 msgid "Claude Code token"
 msgstr "Jeton Claude Code"
+
+#: src/serverText.js:48
+#: src/serverText.js:55
+msgid "Clean up stale skipped jobs"
+msgstr "Nettoyer les anciennes offres écartées"
 
 #: src/screens/Settings.jsx:666
 msgid "Cleanup after"
@@ -2487,7 +2515,7 @@ msgstr "Entreprises"
 #: src/screens/CoverLetterEditor.jsx:472
 #: src/screens/ResumeSections.jsx:262
 #: src/screens/Searches.jsx:1093
-#: src/screens/Stats.jsx:749
+#: src/screens/Stats.jsx:750
 msgid "Company"
 msgstr "Entreprise"
 
@@ -2522,7 +2550,11 @@ msgstr "Nom de l’entreprise"
 msgid "Company name is required"
 msgstr "Le nom de l’entreprise est obligatoire"
 
-#: src/screens/Stats.jsx:714
+#: src/serverText.js:8
+msgid "Company not found"
+msgstr "Entreprise introuvable"
+
+#: src/screens/Stats.jsx:715
 msgid "Company…"
 msgstr "Entreprise…"
 
@@ -2691,7 +2723,7 @@ msgstr "Copier dans le presse-papiers"
 msgid "Copy with tracked links"
 msgstr "Copier avec liens suivis"
 
-#: src/screens/Stats.jsx:604
+#: src/screens/Stats.jsx:605
 msgid "Cost"
 msgstr "Coût"
 
@@ -2762,9 +2794,17 @@ msgstr "Impossible de supprimer {0}"
 msgid "Could not delete this application"
 msgstr "Impossible de supprimer cette candidature"
 
+#: src/serverText.js:9
+msgid "Could not delete this company — another record still references it"
+msgstr "Impossible de supprimer cette entreprise : un autre enregistrement y fait encore référence"
+
 #: src/screens/CoverLetterEditor.jsx:220
 msgid "Could not delete this letter."
 msgstr "Impossible de supprimer cette lettre."
+
+#: src/serverText.js:10
+msgid "Could not delete this search — another record still references it"
+msgstr "Impossible de supprimer cette recherche : un autre enregistrement y fait encore référence"
 
 #: src/screens/CoverLetterEditor.jsx:209
 #: src/screens/ResumeEditor.jsx:728
@@ -2780,6 +2820,14 @@ msgstr "Impossible de télécharger le document Word"
 msgid "Could not duplicate “{0}”"
 msgstr "Impossible de dupliquer « {0} »"
 
+#: src/serverText.js:11
+msgid "Could not extract enough text from PDF. It may be image-based."
+msgstr "Impossible d’extraire assez de texte du PDF. Il est peut-être composé d’images."
+
+#: src/serverText.js:62
+msgid "Could not fetch posting: {rest}"
+msgstr "Impossible de récupérer l’offre : {rest}"
+
 #: src/screens/Persona.jsx:468
 msgid "Could not list your résumés"
 msgstr "Impossible de lister vos CV"
@@ -2792,11 +2840,11 @@ msgstr "Impossible de charger les candidatures"
 msgid "Could not load companies"
 msgstr "Impossible de charger les entreprises"
 
-#: src/screens/Stats.jsx:301
+#: src/screens/Stats.jsx:302
 msgid "Could not load more activity"
 msgstr "Impossible de charger plus d’activité"
 
-#: src/screens/Stats.jsx:288
+#: src/screens/Stats.jsx:289
 msgid "Could not load more runs"
 msgstr "Impossible de charger plus d’exécutions"
 
@@ -2804,7 +2852,7 @@ msgstr "Impossible de charger plus d’exécutions"
 msgid "Could not load the accounts — reload the page to try again."
 msgstr "Impossible de charger les comptes : rechargez la page pour réessayer."
 
-#: src/screens/Stats.jsx:214
+#: src/screens/Stats.jsx:215
 msgid "Could not load the activity log"
 msgstr "Impossible de charger le journal d’activité"
 
@@ -2902,7 +2950,7 @@ msgstr "Impossible de joindre le catalogue"
 msgid "Could not read job details from that URL"
 msgstr "Impossible de lire les détails de l’offre depuis cette URL"
 
-#: src/screens/Stats.jsx:254
+#: src/screens/Stats.jsx:255
 msgid "Could not refresh the LLM costs"
 msgstr "Impossible d’actualiser les coûts LLM"
 
@@ -2979,7 +3027,7 @@ msgid "Could not start “{0}”"
 msgstr "Impossible de lancer « {0} »"
 
 #. placeholder {0}: job.name
-#: src/screens/Stats.jsx:272
+#: src/screens/Stats.jsx:273
 msgid "Could not start {0}"
 msgstr "Impossible de lancer {0}"
 
@@ -3208,7 +3256,7 @@ msgstr "PIN actuel de {who}"
 msgid "CV_NAMES_HERE expands to your résumé names"
 msgstr "CV_NAMES_HERE est remplacé par les noms de vos CV"
 
-#: src/screens/Stats.jsx:93
+#: src/screens/Stats.jsx:94
 msgid "Daily {when}"
 msgstr "Tous les jours {when}"
 
@@ -3216,7 +3264,7 @@ msgstr "Tous les jours {when}"
 msgid "Daily 03:00"
 msgstr "Tous les jours à 03:00"
 
-#: src/screens/Stats.jsx:562
+#: src/screens/Stats.jsx:563
 msgid "daily arrivals across all sources"
 msgstr "arrivées quotidiennes, toutes sources confondues"
 
@@ -3243,7 +3291,7 @@ msgstr "Instantané de la base de données."
 msgid "Date"
 msgstr "Date"
 
-#: src/screens/Stats.jsx:91
+#: src/screens/Stats.jsx:92
 msgid "Day {day} {when}"
 msgstr "Jour {day} {when}"
 
@@ -3499,7 +3547,7 @@ msgstr "Déconnecter"
 msgid "Disconnect Gmail?"
 msgstr "Déconnecter Gmail ?"
 
-#: src/screens/Stats.jsx:459
+#: src/screens/Stats.jsx:460
 msgid "Discovered in the last 7 days"
 msgstr "Découvertes ces 7 derniers jours"
 
@@ -3529,6 +3577,10 @@ msgstr "docker compose exec backend python -m backend.scripts.cli_login agy \"<n
 #: src/screens/Settings.jsx:562
 msgid "docker compose exec backend python -m backend.scripts.cli_login codex \"<account name>\""
 msgstr "docker compose exec backend python -m backend.scripts.cli_login codex \"<nom du compte>\""
+
+#: src/serverText.js:12
+msgid "DOCX generation failed"
+msgstr "Échec de la génération du DOCX"
 
 #: src/screens/Settings.jsx:707
 #: src/screens/Settings.jsx:721
@@ -3592,7 +3644,7 @@ msgstr "à lancer"
 msgid "Duplicate"
 msgstr "Dupliquer"
 
-#: src/screens/Stats.jsx:725
+#: src/screens/Stats.jsx:726
 msgid "Duration"
 msgstr "Durée"
 
@@ -3660,7 +3712,7 @@ msgstr "Chaque candidature reçoit son propre lien court pour chaque lien de doc
 msgid "Each board is a separate Apify run"
 msgstr "Chaque site est une exécution Apify distincte"
 
-#: src/screens/Stats.jsx:523
+#: src/screens/Stats.jsx:524
 msgid "Each row counts applications that reached that stage. Bar length is relative to Applied."
 msgstr "Chaque ligne compte les candidatures ayant atteint cette étape. La longueur des barres est relative aux candidatures envoyées."
 
@@ -3741,7 +3793,7 @@ msgstr "Formation"
 
 #: src/screens/Persona.jsx:43
 #: src/screens/Settings.jsx:757
-#: src/screens/Stats.jsx:35
+#: src/screens/Stats.jsx:36
 msgid "Email"
 msgstr "E-mail"
 
@@ -3836,18 +3888,30 @@ msgid "Essentials, once a day from the server: {0}. Yes adds: {1}. Never sent: {
 msgstr "Essentiel, une fois par jour depuis le serveur : {0}. Oui ajoute : {1}. Jamais envoyé : {2} {3}"
 
 #. placeholder {0}: min.slice(2)
-#: src/screens/Stats.jsx:87
+#: src/screens/Stats.jsx:88
 msgid "every {0} min"
 msgstr "toutes les {0} min"
 
 #. placeholder {0}: hour.slice(2)
-#: src/screens/Stats.jsx:88
+#: src/screens/Stats.jsx:89
 msgid "every {0}h"
 msgstr "toutes les {0} h"
 
 #: src/time.js:117
 msgid "every {hourStep} hours"
 msgstr "toutes les {hourStep} heures"
+
+#: src/serverText.js:83
+msgid "Every {minutes} min"
+msgstr "Toutes les {minutes} min"
+
+#: src/serverText.js:82
+msgid "Every {minutes} min (company override)"
+msgstr "Toutes les {minutes} min (réglage de l’entreprise)"
+
+#: src/serverText.js:81
+msgid "Every {minutes} min (search override)"
+msgstr "Toutes les {minutes} min (réglage de la recherche)"
 
 #: src/time.js:114
 msgid "every {minuteStep} minutes"
@@ -3885,7 +3949,7 @@ msgstr "chaque minute"
 msgid "every node, Q&A bank included"
 msgstr "chaque élément, banque de questions-réponses comprise"
 
-#: src/screens/Stats.jsx:690
+#: src/screens/Stats.jsx:691
 msgid "every run and change, newest first"
 msgstr "chaque exécution et modification, les plus récentes d’abord"
 
@@ -3987,6 +4051,10 @@ msgstr "Les requêtes supplémentaires attendent dans une file pour limiter la c
 msgid "Extra sender domains treated as job-related email."
 msgstr "Domaines d’expéditeurs supplémentaires considérés comme liés à l’emploi."
 
+#: src/serverText.js:63
+msgid "Failed to process PDF: {rest}"
+msgstr "Échec du traitement du PDF : {rest}"
+
 #: src/screens/Searches.jsx:1069
 msgid "failed: {e}"
 msgstr "échec : {e}"
@@ -4023,11 +4091,11 @@ msgstr "Remplit vos coordonnées et le contenu de votre CV à partir d’une sou
 msgid "Filter by company"
 msgstr "Filtrer par entreprise"
 
-#: src/screens/Stats.jsx:701
+#: src/screens/Stats.jsx:702
 msgid "Filter by type"
 msgstr "Filtrer par type"
 
-#: src/screens/Stats.jsx:695
+#: src/screens/Stats.jsx:696
 msgid "Filter the activity log by type"
 msgstr "Filtrer le journal d’activité par type"
 
@@ -4058,7 +4126,7 @@ msgstr "adéquation {0}{1}"
 msgid "fit breakdown, requirements and keywords"
 msgstr "détail de l’adéquation, exigences et mots-clés"
 
-#: src/screens/Stats.jsx:486
+#: src/screens/Stats.jsx:487
 msgid "Flow"
 msgstr "Flux"
 
@@ -4094,7 +4162,7 @@ msgstr "Description de poste libre"
 msgid "freehire.me URL · required without a term"
 msgstr "URL freehire.me · obligatoire sans terme"
 
-#: src/screens/Stats.jsx:83
+#: src/screens/Stats.jsx:84
 #: src/time.js:38
 msgid "Fri"
 msgstr "ven."
@@ -4163,7 +4231,7 @@ msgstr "Rapport complet avec mots-clés et exigences"
 msgid "Full-time"
 msgstr "Temps plein"
 
-#: src/screens/Stats.jsx:486
+#: src/screens/Stats.jsx:487
 msgid "Funnel"
 msgstr "Entonnoir"
 
@@ -4394,7 +4462,7 @@ msgstr "Masquer la clé API du tableau de bord"
 msgid "Hide what is sent"
 msgstr "Masquer ce qui est envoyé"
 
-#: src/screens/Stats.jsx:462
+#: src/screens/Stats.jsx:463
 msgid "Highest-scoring posting you haven’t applied to"
 msgstr "Offre la mieux notée à laquelle vous n’avez pas postulé"
 
@@ -4447,7 +4515,7 @@ msgstr "Comment nous avez-vous connus ?"
 msgid "How often scrapes and AI calls succeed or fail (error types only)"
 msgstr "Fréquence de réussite ou d’échec des scrapings et appels IA (types d’erreur uniquement)"
 
-#: src/screens/Stats.jsx:582
+#: src/screens/Stats.jsx:583
 msgid "how priced?"
 msgstr "comment est-ce tarifé ?"
 
@@ -4553,7 +4621,7 @@ msgid "Imported {0, plural, one {# role} other {# roles}} · {1, plural, one {# 
 msgstr "Importé : {0, plural, one {# poste} other {# postes}} · {1, plural, one {# puce} other {# puces}} · {2, plural, one {# groupe de compétences} other {# groupes de compétences}} depuis {label}"
 
 #. placeholder {0}: sub.period
-#: src/screens/Stats.jsx:403
+#: src/screens/Stats.jsx:404
 msgid "in {0}d"
 msgstr "sur {0} j"
 
@@ -4561,7 +4629,7 @@ msgstr "sur {0} j"
 msgid "in {monthList}"
 msgstr "en {monthList}"
 
-#: src/screens/Stats.jsx:460
+#: src/screens/Stats.jsx:461
 msgid "In your feed shortlist"
 msgstr "Dans la présélection de votre fil"
 
@@ -4625,7 +4693,7 @@ msgstr "Intégrations"
 msgid "intern, junior, associate"
 msgstr "stagiaire, junior, associé"
 
-#: src/screens/Stats.jsx:634
+#: src/screens/Stats.jsx:635
 msgid "intervals and crons are in Settings"
 msgstr "les intervalles et crons sont dans les paramètres"
 
@@ -4635,9 +4703,13 @@ msgstr "intervalles en minutes (0 = désactivé) · crons vides = désactivés"
 
 #: src/screens/Applications.jsx:62
 #: src/screens/Applications.jsx:387
-#: src/screens/Stats.jsx:358
+#: src/screens/Stats.jsx:359
 msgid "Interview"
 msgstr "Entretien"
+
+#: src/serverText.js:13
+msgid "Interview not found"
+msgstr "Entretien introuvable"
 
 #: src/screens/Settings.jsx:620
 msgid "Interview prep"
@@ -4653,6 +4725,7 @@ msgid "Interviews · {0}"
 msgstr "Entretiens · {0}"
 
 #: src/LoginModal.jsx:41
+#: src/serverText.js:14
 msgid "Invalid API key"
 msgstr "Clé API non valide"
 
@@ -4689,7 +4762,7 @@ msgstr "offre"
 msgid "Job"
 msgstr "Offre"
 
-#: src/screens/Stats.jsx:640
+#: src/screens/Stats.jsx:641
 msgctxt "background task"
 msgid "Job"
 msgstr "Tâche"
@@ -4703,14 +4776,15 @@ msgstr "Actions sur l’offre"
 msgid "Job cleanup · cron"
 msgstr "Nettoyage des offres · cron"
 
-#: src/screens/Stats.jsx:724
-msgid "Job ID"
-msgstr "ID de l’offre"
-
-#: src/screens/Stats.jsx:641
+#: src/screens/Stats.jsx:642
+#: src/screens/Stats.jsx:725
 msgctxt "background task"
 msgid "Job ID"
 msgstr "ID de la tâche"
+
+#: src/serverText.js:15
+msgid "Job not found"
+msgstr "Offre introuvable"
 
 #: src/TelemetryChoice.jsx:29
 msgid "Job titles, search terms, résumé, letter or persona text, anything typed, keys, the browser or IP, or this install’s address."
@@ -4809,7 +4883,7 @@ msgstr "juin"
 #: src/screens/Resumes.jsx:16
 #: src/screens/Searches.jsx:21
 #: src/screens/SettingsAccounts.jsx:94
-#: src/screens/Stats.jsx:72
+#: src/screens/Stats.jsx:73
 #: src/Shell.jsx:49
 #: src/time.js:7
 msgid "just now"
@@ -4886,7 +4960,7 @@ msgid "Language"
 msgstr "Langue"
 
 #. placeholder {0}: runs.length
-#: src/screens/Stats.jsx:690
+#: src/screens/Stats.jsx:691
 msgid "last {0} scheduler and manual runs"
 msgstr "{0} dernières exécutions planifiées et manuelles"
 
@@ -4921,12 +4995,12 @@ msgid "Last scrape run"
 msgstr "Dernier scraping"
 
 #. placeholder {0}: ago(sub.at) || '—'
-#: src/screens/Stats.jsx:401
+#: src/screens/Stats.jsx:402
 msgid "Last scrape run {0}"
 msgstr "Dernier scraping {0}"
 
 #. placeholder {0}: ago(sub.at) || '—'
-#: src/screens/Stats.jsx:401
+#: src/screens/Stats.jsx:402
 msgid "Last scrape run failed {0}"
 msgstr "Le dernier scraping a échoué {0}"
 
@@ -5029,6 +5103,14 @@ msgstr "Lien{0}"
 msgid "Linked · chat {0}"
 msgstr "Associé · discussion {0}"
 
+#: src/serverText.js:18
+msgid "Linked job has no description or cached page text"
+msgstr "L’offre liée n’a ni description ni texte de page en cache"
+
+#: src/serverText.js:19
+msgid "Linked job not found"
+msgstr "Offre liée introuvable"
+
 #: src/screens/Settings.jsx:1299
 msgid "LinkedIn emailed a PIN."
 msgstr "LinkedIn a envoyé un PIN par e-mail."
@@ -5045,6 +5127,10 @@ msgstr "Extension LinkedIn (capture passive)"
 #: src/screens/Searches.jsx:357
 msgid "LinkedIn ignores it without login. On LinkedIn, Remote only drops the postings that say hybrid or on-site."
 msgstr "LinkedIn l’ignore sans connexion. Sur LinkedIn, Télétravail uniquement écarte les offres indiquant hybride ou sur site."
+
+#: src/serverText.js:17
+msgid "LinkedIn is shared from the account owner; only the owner can refresh the session"
+msgstr "LinkedIn est partagé depuis le compte du propriétaire ; seul le propriétaire peut actualiser la session"
 
 #: src/screens/Applications.jsx:53
 #: src/screens/JobFeed.jsx:99
@@ -5080,9 +5166,17 @@ msgstr "Offre en ligne"
 msgid "LLM classification"
 msgstr "Classification LLM"
 
-#: src/screens/Stats.jsx:580
+#: src/screens/Stats.jsx:581
 msgid "LLM costs"
 msgstr "Coûts LLM"
+
+#: src/serverText.js:64
+msgid "LLM extraction failed: {rest}"
+msgstr "Échec de l’extraction par le LLM : {rest}"
+
+#: src/serverText.js:16
+msgid "LLM returned invalid JSON. Try again or enter data manually."
+msgstr "Le LLM a renvoyé un JSON non valide. Réessayez ou saisissez les données manuellement."
 
 #: src/screens/Settings.jsx:59
 msgid "LM Studio (Local)"
@@ -5092,7 +5186,7 @@ msgstr "LM Studio (local)"
 msgid "LM Studio address"
 msgstr "Adresse de LM Studio"
 
-#: src/screens/Stats.jsx:112
+#: src/screens/Stats.jsx:113
 msgid "Load more"
 msgstr "Charger plus"
 
@@ -5114,7 +5208,7 @@ msgid "Loading more…"
 msgstr "Chargement…"
 
 #: src/screens/JobFeed.jsx:1293
-#: src/screens/Stats.jsx:112
+#: src/screens/Stats.jsx:113
 msgid "Loading…"
 msgstr "Chargement…"
 
@@ -5274,7 +5368,7 @@ msgstr "mai"
 msgid "Member"
 msgstr "Membre"
 
-#: src/screens/Stats.jsx:749
+#: src/screens/Stats.jsx:750
 msgid "Message"
 msgstr "Message"
 
@@ -5320,7 +5414,7 @@ msgstr "Session de test"
 msgid "Mode"
 msgstr "Mode"
 
-#: src/screens/Stats.jsx:603
+#: src/screens/Stats.jsx:604
 msgid "Model"
 msgstr "Modèle"
 
@@ -5358,7 +5452,7 @@ msgstr "Modèle qui classe les réponses Gmail en événements de candidature."
 msgid "Models"
 msgstr "Modèles"
 
-#: src/screens/Stats.jsx:83
+#: src/screens/Stats.jsx:84
 #: src/time.js:38
 msgid "Mon"
 msgstr "lun."
@@ -5367,7 +5461,7 @@ msgstr "lun."
 msgid "Monday"
 msgstr "lundi"
 
-#: src/screens/Stats.jsx:92
+#: src/screens/Stats.jsx:93
 msgid "Month {month} {when}"
 msgstr "Mois {month} {when}"
 
@@ -5451,6 +5545,7 @@ msgid "Name"
 msgstr "Nom"
 
 #: src/screens/Searches.jsx:651
+#: src/serverText.js:42
 msgid "Name is required"
 msgstr "Le nom est obligatoire"
 
@@ -5510,7 +5605,7 @@ msgstr "Nouveau CV de base"
 msgid "New high-scoring jobs and the daily digest are sent to your chat. The digest schedule is under Scheduler."
 msgstr "Les nouvelles offres bien notées et le résumé quotidien sont envoyés dans votre discussion. L’horaire du résumé se trouve dans Planificateur."
 
-#: src/screens/Stats.jsx:561
+#: src/screens/Stats.jsx:562
 msgid "New jobs · last 30 days"
 msgstr "Nouvelles offres · 30 derniers jours"
 
@@ -5552,7 +5647,7 @@ msgstr "Les nouveaux résultats arrivent sans note : notez-les manuellement dep
 msgid "New search"
 msgstr "Nouvelle recherche"
 
-#: src/screens/Stats.jsx:459
+#: src/screens/Stats.jsx:460
 msgid "New this week"
 msgstr "Nouvelles cette semaine"
 
@@ -5568,7 +5663,7 @@ msgstr "Plus récentes d’abord"
 msgid "Next job"
 msgstr "Offre suivante"
 
-#: src/screens/Stats.jsx:643
+#: src/screens/Stats.jsx:644
 msgctxt "table header"
 msgid "Next run"
 msgstr "Prochaine"
@@ -5589,11 +5684,15 @@ msgstr "Étape suivante"
 msgid "No {what} yet"
 msgstr "Pas encore de {what}"
 
-#: src/screens/Stats.jsx:762
+#: src/serverText.js:20
+msgid "No account"
+msgstr "Aucun compte"
+
+#: src/screens/Stats.jsx:763
 msgid "No activity matches these filters."
 msgstr "Aucune activité ne correspond à ces filtres."
 
-#: src/screens/Stats.jsx:762
+#: src/screens/Stats.jsx:763
 msgid "No activity recorded yet."
 msgstr "Aucune activité enregistrée pour l’instant."
 
@@ -5625,6 +5724,10 @@ msgstr "Aucun CV de base pour l’instant. Créez-en un pour commencer."
 #: src/screens/Searches.jsx:164
 msgid "no board"
 msgstr "aucun site"
+
+#: src/serverText.js:22
+msgid "No cached page available"
+msgstr "Aucune page en cache disponible"
 
 #. placeholder {0}: tiers.map((t) => (t === null || t === 'none' || t === 'untiered' ? 'Untiered' : tierLabel(t, { long: true }))).join(', ')
 #: src/screens/Companies.jsx:589
@@ -5689,9 +5792,17 @@ msgstr "Aucune offre ne correspond."
 msgid "No jobs, applications or letters are copied."
 msgstr "Aucune offre, candidature ni lettre n’est copiée."
 
+#: src/serverText.js:23
+msgid "No JobSpy sources configured"
+msgstr "Aucune source JobSpy configurée"
+
 #: src/screens/Settings.jsx:1255
 msgid "No key set. Anyone who can reach this address can use the dashboard."
 msgstr "Aucune clé définie. Toute personne pouvant atteindre cette adresse peut utiliser le tableau de bord."
+
+#: src/serverText.js:24
+msgid "No levels.fyi URL configured"
+msgstr "Aucune URL levels.fyi configurée"
 
 #: src/screens/Searches.jsx:135
 msgid "No levels.fyi URL yet"
@@ -5701,7 +5812,7 @@ msgstr "Pas encore d’URL levels.fyi"
 msgid "No link to the employer's own site yet"
 msgstr "Pas encore de lien vers le site de l’employeur"
 
-#: src/screens/Stats.jsx:624
+#: src/screens/Stats.jsx:625
 msgid "No LLM calls in this period."
 msgstr "Aucun appel LLM sur cette période."
 
@@ -5734,6 +5845,10 @@ msgstr "Aucun lieu"
 msgid "No posting details captured"
 msgstr "Aucun détail de l’offre capturé"
 
+#: src/serverText.js:25
+msgid "No posting URL captured for this job"
+msgstr "Aucune URL d’offre capturée pour ce poste"
+
 #: src/screens/JobFeed.jsx:1825
 msgid "No posting URL captured for this job."
 msgstr "Aucune URL d’offre capturée pour ce poste."
@@ -5755,7 +5870,7 @@ msgstr "Aucun résultat renvoyé."
 msgid "No résumés available."
 msgstr "Aucun CV disponible."
 
-#: src/screens/Stats.jsx:742
+#: src/screens/Stats.jsx:743
 msgid "No runs yet."
 msgstr "Aucune exécution pour l’instant."
 
@@ -5763,11 +5878,11 @@ msgstr "Aucune exécution pour l’instant."
 msgid "No saved answers yet — the extension can add them as you apply."
 msgstr "Aucune réponse enregistrée pour l’instant : l’extension peut en ajouter au fil de vos candidatures."
 
-#: src/screens/Stats.jsx:680
+#: src/screens/Stats.jsx:681
 msgid "No scheduled jobs."
 msgstr "Aucune tâche planifiée."
 
-#: src/screens/Stats.jsx:544
+#: src/screens/Stats.jsx:545
 msgid "No scored jobs yet."
 msgstr "Aucune offre notée pour l’instant."
 
@@ -5775,7 +5890,7 @@ msgstr "Aucune offre notée pour l’instant."
 msgid "No scored roles yet"
 msgstr "Aucun poste noté pour l’instant"
 
-#: src/screens/Stats.jsx:401
+#: src/screens/Stats.jsx:402
 #: src/Shell.jsx:324
 msgid "No scrape recorded yet"
 msgstr "Aucun scraping enregistré pour l’instant"
@@ -5783,6 +5898,10 @@ msgstr "Aucun scraping enregistré pour l’instant"
 #: src/Shell.jsx:328
 msgid "no scrape run recorded yet"
 msgstr "aucun scraping enregistré pour l’instant"
+
+#: src/serverText.js:26
+msgid "No scrape URLs configured"
+msgstr "Aucune URL de scraping configurée"
 
 #: src/screens/Searches.jsx:953
 msgid "No searches yet"
@@ -5796,7 +5915,7 @@ msgstr "Aucun paramètre ne correspond à « {query} »."
 msgid "No sources"
 msgstr "Aucune source"
 
-#: src/screens/Stats.jsx:512
+#: src/screens/Stats.jsx:513
 msgid "No stage history for these applications. They are counted by current status only."
 msgstr "Aucun historique d’étapes pour ces candidatures. Elles sont comptées selon leur statut actuel uniquement."
 
@@ -5852,6 +5971,10 @@ msgstr "Pas encore choisi"
 #: src/screens/Settings.jsx:634
 msgid "Not connected"
 msgstr "Non connecté"
+
+#: src/serverText.js:27
+msgid "Not found"
+msgstr "Introuvable"
 
 #: src/screens/Settings.jsx:701
 msgid "Not linked"
@@ -5961,7 +6084,7 @@ msgid "Nov"
 msgstr "nov."
 
 #: src/screens/SettingsAccounts.jsx:482
-#: src/screens/Stats.jsx:654
+#: src/screens/Stats.jsx:655
 #: src/time.js:15
 msgid "now"
 msgstr "maintenant"
@@ -6005,7 +6128,7 @@ msgid "Off — no push notifications."
 msgstr "Désactivé : pas de notifications push."
 
 #: src/screens/Applications.jsx:63
-#: src/screens/Stats.jsx:359
+#: src/screens/Stats.jsx:360
 msgid "Offer"
 msgstr "Proposition"
 
@@ -6095,12 +6218,20 @@ msgstr "S’applique uniquement au fournisseur API Claude. Si les scores semblen
 msgid "Only jobs scoring at or above this trigger an instant alert."
 msgstr "Seules les offres dont le score atteint ce seuil déclenchent une alerte immédiate."
 
+#: src/serverText.js:28
+msgid "Only PDF files are accepted"
+msgstr "Seuls les fichiers PDF sont acceptés"
+
+#: src/serverText.js:29
+msgid "Only the account owner can change section policies"
+msgstr "Seul le propriétaire du compte peut modifier les règles des sections"
+
 #: src/screens/SettingsAccounts.jsx:65
 msgid "Only the owner can do that."
 msgstr "Seul le propriétaire peut faire cela."
 
 #. placeholder {0}: j.name
-#: src/screens/Stats.jsx:666
+#: src/screens/Stats.jsx:667
 msgid "Only the owner can run {0}"
 msgstr "Seul le propriétaire peut lancer {0}"
 
@@ -6129,7 +6260,7 @@ msgstr "Ouvrir {0} pages carrières"
 msgid "Open ↗"
 msgstr "Ouvrir ↗"
 
-#: src/screens/Stats.jsx:461
+#: src/screens/Stats.jsx:462
 msgid "Open = not rejected"
 msgstr "Ouverte = non rejetée"
 
@@ -6210,7 +6341,7 @@ msgstr "Ouvrir le CV source"
 msgid "Open the tailored résumé"
 msgstr "Ouvrir le CV adapté"
 
-#: src/screens/Stats.jsx:581
+#: src/screens/Stats.jsx:582
 msgid "OpenAI and Claude pricing info comes from a fixed table, OpenRouter from its catalog (updated every 12 h), Claude Code, Codex CLI, and Ollama counted as $0. Each call is priced when it is logged."
 msgstr "Les tarifs d’OpenAI et Claude proviennent d’une table fixe, ceux d’OpenRouter de son catalogue (mis à jour toutes les 12 h) ; Claude Code, Codex CLI et Ollama comptent pour 0 $. Chaque appel est tarifé au moment de son enregistrement."
 
@@ -6285,7 +6416,7 @@ msgid "Owner"
 msgstr "Propriétaire"
 
 #: src/screens/SettingsAccounts.jsx:655
-#: src/screens/Stats.jsx:666
+#: src/screens/Stats.jsx:667
 msgid "Owner only"
 msgstr "Propriétaire uniquement"
 
@@ -6418,18 +6549,26 @@ msgstr "en pause : donc non comptée"
 msgid "pdf"
 msgstr "pdf"
 
+#: src/serverText.js:65
+msgid "PDF generation failed: {rest}"
+msgstr "Échec de la génération du PDF : {rest}"
+
 #: src/screens/CoverLetterEditor.jsx:531
 #: src/screens/ResumeEditor.jsx:651
 msgid "PDF preview"
 msgstr "Aperçu du PDF"
 
+#: src/serverText.js:30
+msgid "PDF too large (max 10 MB)"
+msgstr "PDF trop volumineux (10 Mo maximum)"
+
 #. placeholder {0}: peak.total
 #. placeholder {1}: dayLabel(peak.date)
-#: src/screens/Stats.jsx:795
+#: src/screens/Stats.jsx:796
 msgid "peak {0} · {1}"
 msgstr "pic {0} · {1}"
 
-#: src/screens/Stats.jsx:661
+#: src/screens/Stats.jsx:662
 msgid "Pending"
 msgstr "En attente"
 
@@ -6493,6 +6632,7 @@ msgid "Pick an account · 1–{0} on the keyboard"
 msgstr "Choisissez un compte · 1–{0} au clavier"
 
 #: src/screens/SettingsAccounts.jsx:76
+#: src/serverText.js:21
 msgid "Pick an account first — there is no account to link this chat to."
 msgstr "Choisissez d’abord un compte : aucun compte auquel associer cette discussion."
 
@@ -6606,9 +6746,17 @@ msgstr "Offre · notes"
 msgid "posting body text check was skipped"
 msgstr "la vérification du texte de l’offre a été ignorée"
 
+#: src/serverText.js:31
+msgid "Posting is rendered client-side — needs the extension"
+msgstr "L’offre est générée côté navigateur : l’extension est nécessaire"
+
 #: src/screens/Settings.jsx:624
 msgid "Posting only"
 msgstr "Offre uniquement"
+
+#: src/serverText.js:32
+msgid "Posting returned no content"
+msgstr "L’offre n’a renvoyé aucun contenu"
 
 #: src/screens/Applications.jsx:1007
 msgid "Posting URL"
@@ -6733,7 +6881,7 @@ msgstr "Publications"
 msgid "Purges expired postings."
 msgstr "Supprime les offres expirées."
 
-#: src/screens/Stats.jsx:603
+#: src/screens/Stats.jsx:604
 msgid "Purpose"
 msgstr "Objet"
 
@@ -6901,7 +7049,7 @@ msgid "Registration failed"
 msgstr "Échec de l’enregistrement"
 
 #: src/screens/Applications.jsx:64
-#: src/screens/Stats.jsx:360
+#: src/screens/Stats.jsx:361
 msgid "Rejected"
 msgstr "Rejetée"
 
@@ -6917,7 +7065,7 @@ msgstr "Recharger"
 msgid "Reload as {who}"
 msgstr "Recharger en tant que {who}"
 
-#: src/screens/Stats.jsx:435
+#: src/screens/Stats.jsx:436
 msgid "Reload every figure on this page"
 msgstr "Recharger tous les chiffres de cette page"
 
@@ -7164,7 +7312,7 @@ msgstr "Rétablir la valeur par défaut"
 msgid "Restore change"
 msgstr "Restaurer la modification"
 
-#: src/screens/Stats.jsx:725
+#: src/screens/Stats.jsx:726
 msgid "Result"
 msgstr "Résultat"
 
@@ -7212,6 +7360,14 @@ msgstr "Les liens des CV et lettres deviennent des liens courts sur votre domain
 msgid "Résumé content"
 msgstr "Contenu du CV"
 
+#: src/serverText.js:33
+msgid "Resume has insufficient text for scoring"
+msgstr "Le CV ne contient pas assez de texte pour la notation"
+
+#: src/serverText.js:34
+msgid "Resume has no linked job or saved job description"
+msgstr "Le CV n’a ni offre liée ni description de poste enregistrée"
+
 #: src/screens/Searches.jsx:884
 msgid "Resume importing captured jobs"
 msgstr "Reprendre l’import des offres capturées"
@@ -7229,11 +7385,15 @@ msgstr "Nom du CV"
 msgid "Résumé name (e.g. Backend — Platform v4)"
 msgstr "Nom du CV (par ex. Backend — Plateforme v4)"
 
+#: src/serverText.js:35
+msgid "Resume not found"
+msgstr "CV introuvable"
+
 #: src/screens/Settings.jsx:624
 msgid "Résumé only"
 msgstr "CV uniquement"
 
-#: src/screens/Stats.jsx:35
+#: src/screens/Stats.jsx:36
 msgid "Résumé score"
 msgstr "Score du CV"
 
@@ -7339,13 +7499,13 @@ msgstr "Ordre des lignes"
 
 #: src/screens/Companies.jsx:554
 #: src/screens/Searches.jsx:898
-#: src/screens/Stats.jsx:645
+#: src/screens/Stats.jsx:646
 msgid "Run"
 msgstr "Lancer"
 
 #. placeholder {0}: j.name
-#: src/screens/Stats.jsx:670
-#: src/screens/Stats.jsx:670
+#: src/screens/Stats.jsx:671
+#: src/screens/Stats.jsx:671
 msgid "Run {0} now"
 msgstr "Lancer {0} maintenant"
 
@@ -7371,7 +7531,7 @@ msgstr "Lancer la sauvegarde"
 msgid "Run claude setup-token once in a terminal signed in to your Claude subscription and paste the token it prints."
 msgstr "Exécutez une fois claude setup-token dans un terminal connecté à votre abonnement Claude, puis collez le jeton affiché."
 
-#: src/screens/Stats.jsx:687
+#: src/screens/Stats.jsx:688
 msgid "Run history"
 msgstr "Historique des exécutions"
 
@@ -7387,7 +7547,11 @@ msgstr "Intervalle d’exécution · min"
 msgid "Run interval in minutes"
 msgstr "Intervalle d’exécution en minutes"
 
-#: src/screens/Stats.jsx:673
+#: src/serverText.js:36
+msgid "Run not found"
+msgstr "Exécution introuvable"
+
+#: src/screens/Stats.jsx:674
 msgid "Run now"
 msgstr "Lancer maintenant"
 
@@ -7410,7 +7574,7 @@ msgid "Running"
 msgstr "En cours"
 
 #. placeholder {0}: dur(j.running?.elapsed_seconds || 0)
-#: src/screens/Stats.jsx:661
+#: src/screens/Stats.jsx:662
 msgid "Running · {0}"
 msgstr "En cours · {0}"
 
@@ -7419,7 +7583,7 @@ msgid "running now. Results appear in the Job Feed as they are found."
 msgstr "en cours. Les résultats apparaissent dans le fil au fur et à mesure."
 
 #: src/screens/Settings.jsx:1241
-#: src/screens/Stats.jsx:673
+#: src/screens/Stats.jsx:674
 msgid "Running…"
 msgstr "En cours…"
 
@@ -7493,7 +7657,7 @@ msgstr "Même poste, autre ville"
 msgid "Same role, new posting"
 msgstr "Même poste, nouvelle offre"
 
-#: src/screens/Stats.jsx:83
+#: src/screens/Stats.jsx:84
 #: src/time.js:38
 msgid "Sat"
 msgstr "sam."
@@ -7565,7 +7729,7 @@ msgstr "Enregistrer, puis adapter une copie de {0} pour cette offre"
 msgid "Saved"
 msgstr "Enregistrée"
 
-#: src/screens/Stats.jsx:460
+#: src/screens/Stats.jsx:461
 msgctxt "stat card, number of jobs"
 msgid "Saved"
 msgstr "Enregistrées"
@@ -7620,11 +7784,11 @@ msgstr "L’enregistrement actualise le cookie de session pour que les iframes c
 msgid "Saving…"
 msgstr "Enregistrement…"
 
-#: src/screens/Stats.jsx:642
+#: src/screens/Stats.jsx:643
 msgid "Schedule"
 msgstr "Planification"
 
-#: src/screens/Stats.jsx:661
+#: src/screens/Stats.jsx:662
 msgid "Scheduled"
 msgstr "Planifiée"
 
@@ -7636,7 +7800,7 @@ msgstr "Le scraping planifié est désactivé : lancez une recherche ou une ent
 msgid "Scheduler"
 msgstr "Planificateur"
 
-#: src/screens/Stats.jsx:633
+#: src/screens/Stats.jsx:634
 msgid "Schedules"
 msgstr "Planifications"
 
@@ -7686,7 +7850,7 @@ msgstr "Notez au niveau complet pour voir le rapport"
 msgid "Score breakdown"
 msgstr "Détail du score"
 
-#: src/screens/Stats.jsx:532
+#: src/screens/Stats.jsx:533
 msgid "Score distribution"
 msgstr "Répartition des scores"
 
@@ -7835,13 +7999,18 @@ msgstr "Grille de notation"
 msgid "Scoring…"
 msgstr "Notation…"
 
-#: src/screens/Stats.jsx:35
+#: src/screens/Stats.jsx:36
 msgid "Scrape"
 msgstr "Scraping"
 
 #: src/screens/Settings.jsx:662
 msgid "Scrape all companies"
 msgstr "Analyser toutes les entreprises"
+
+#: src/serverText.js:44
+#: src/serverText.js:51
+msgid "Scrape all searches & companies"
+msgstr "Analyser toutes les recherches et entreprises"
 
 #: src/screens/Companies.jsx:748
 #: src/screens/Companies.jsx:749
@@ -7919,6 +8088,10 @@ msgstr "Rechercher lettres, entreprises…"
 #: src/screens/Companies.jsx:436
 msgid "Search name, alias, URL or ATS…"
 msgstr "Rechercher nom, alias, URL ou ATS…"
+
+#: src/serverText.js:37
+msgid "Search not found"
+msgstr "Recherche introuvable"
 
 #: src/screens/JobFeed.jsx:1117
 msgid "Search places"
@@ -8025,10 +8198,24 @@ msgstr "Sélectionner une plage"
 msgid "Select…"
 msgstr "Sélectionner…"
 
+#: src/serverText.js:38
+msgid "Send a resume_id, or upload a PDF file"
+msgstr "Envoyez un resume_id ou importez un fichier PDF"
+
+#: src/serverText.js:46
+#: src/serverText.js:53
+msgid "Send daily Telegram digest"
+msgstr "Envoyer le résumé quotidien sur Telegram"
+
 #. placeholder {0}: account.name
 #: src/screens/SettingsAccounts.jsx:354
 msgid "Send it as the X-Account-Token header, with the install key as X-API-Key, to act as {0}. Valid for a year; a PIN change ends it."
 msgstr "Envoyez-le dans l’en-tête X-Account-Token, avec la clé d’installation dans X-API-Key, pour agir en tant que {0}. Valable un an ; un changement de PIN y met fin."
+
+#: src/serverText.js:50
+#: src/serverText.js:57
+msgid "Send telemetry (what Settings › Telemetry allows)"
+msgstr "Envoyer la télémétrie (selon Paramètres › Télémétrie)"
 
 #: src/screens/Settings.jsx:712
 msgid "Send test message"
@@ -8127,7 +8314,7 @@ msgstr "Les paramètres ne sont pas encore chargés"
 msgid "Sexual orientation"
 msgstr "Orientation sexuelle"
 
-#: src/screens/Stats.jsx:605
+#: src/screens/Stats.jsx:606
 msgid "Share of calls that reused a cached prompt"
 msgstr "Part des appels ayant réutilisé un prompt en cache"
 
@@ -8290,7 +8477,7 @@ msgstr "« {0} » écartée"
 msgid "Skipped in "
 msgstr "Écartée dans"
 
-#: src/screens/Stats.jsx:513
+#: src/screens/Stats.jsx:514
 msgid "snapshot"
 msgstr "instantané"
 
@@ -8302,11 +8489,11 @@ msgstr "Instantané de l’offre au jour de la candidature"
 msgid "socks5://127.0.0.1:9050"
 msgstr "socks5://127.0.0.1:9050"
 
-#: src/screens/Stats.jsx:446
+#: src/screens/Stats.jsx:447
 msgid "Some numbers could not be loaded. They show “—” until the backend responds."
 msgstr "Certains chiffres n’ont pas pu être chargés. Ils affichent « — » jusqu’à ce que le backend réponde."
 
-#: src/screens/Stats.jsx:190
+#: src/screens/Stats.jsx:191
 msgid "Some stats failed to load — try Refresh"
 msgstr "Certaines statistiques n’ont pas été chargées : essayez Actualiser"
 
@@ -8337,7 +8524,7 @@ msgstr "Source{0}"
 msgid "Sources"
 msgstr "Sources"
 
-#: src/screens/Stats.jsx:592
+#: src/screens/Stats.jsx:593
 msgid "Spend"
 msgstr "Dépenses"
 
@@ -8345,7 +8532,7 @@ msgstr "Dépenses"
 msgid "Stage of the linked application"
 msgstr "Étape de la candidature liée"
 
-#: src/screens/Stats.jsx:522
+#: src/screens/Stats.jsx:523
 msgid "Stage rows count every application that reached the stage. Snapshot rows count current status only."
 msgstr "Les lignes d’étape comptent toutes les candidatures ayant atteint l’étape. Les lignes d’instantané comptent le statut actuel uniquement."
 
@@ -8373,8 +8560,8 @@ msgstr "Démarre en pause : reprenez-la depuis sa carte quand les sites vous co
 msgid "State"
 msgstr "État/Région"
 
-#: src/screens/Stats.jsx:419
-#: src/screens/Stats.jsx:430
+#: src/screens/Stats.jsx:420
+#: src/screens/Stats.jsx:431
 #: src/Shell.jsx:40
 #: src/useTitle.js:17
 msgid "Stats"
@@ -8386,8 +8573,8 @@ msgstr "Statistiques"
 #: src/screens/Companies.jsx:994
 #: src/screens/JobFeed.jsx:1673
 #: src/screens/Searches.jsx:1098
-#: src/screens/Stats.jsx:644
-#: src/screens/Stats.jsx:725
+#: src/screens/Stats.jsx:645
+#: src/screens/Stats.jsx:726
 msgid "Status"
 msgstr "Statut"
 
@@ -8447,7 +8634,7 @@ msgstr "Les puces suggérées n’y sont pas encore : elles sont ajoutées à l
 msgid "Suggested by tailoring. Kept unless you decline it in Review."
 msgstr "Suggérée par l’adaptation. Conservée sauf si vous la refusez lors de la relecture."
 
-#: src/screens/Stats.jsx:583
+#: src/screens/Stats.jsx:584
 msgid "Sum LLM costs across all accounts"
 msgstr "Additionner les coûts LLM de tous les comptes"
 
@@ -8460,8 +8647,8 @@ msgstr "Résumé"
 msgid "Summary of new high-fit jobs."
 msgstr "Résumé des nouvelles offres à forte adéquation."
 
-#: src/screens/Stats.jsx:83
-#: src/screens/Stats.jsx:83
+#: src/screens/Stats.jsx:84
+#: src/screens/Stats.jsx:84
 #: src/time.js:38
 msgid "Sun"
 msgstr "dim."
@@ -8540,7 +8727,7 @@ msgid "Tailored"
 msgstr "Adaptée"
 
 #. placeholder {0}: scores.tailored_avg
-#: src/screens/Stats.jsx:539
+#: src/screens/Stats.jsx:540
 msgid "tailored {0}"
 msgstr "adapté {0}"
 
@@ -8718,6 +8905,10 @@ msgstr "Exécution de test : {0}"
 #: src/screens/Searches.jsx:727
 msgid "Test run expired or not found"
 msgstr "Exécution de test expirée ou introuvable"
+
+#: src/serverText.js:39
+msgid "Test run not found"
+msgstr "Exécution de test introuvable"
 
 #: src/screens/Companies.jsx:795
 msgid "Test scrape"
@@ -8956,7 +9147,7 @@ msgid "The scheduled scrape is running — try again when it finishes"
 msgstr "Le scraping planifié est en cours : réessayez à sa fin"
 
 #: src/screens/SettingsAccounts.jsx:70
-#: src/screens/Stats.jsx:272
+#: src/screens/Stats.jsx:273
 msgid "The scheduled scrape is running — try again when it finishes."
 msgstr "Le scraping planifié est en cours : réessayez à sa fin."
 
@@ -9006,6 +9197,10 @@ msgstr "Thème"
 #: src/screens/ResumeEditor.jsx:909
 msgid "These changes were applied automatically. Decline any you don't want to restore the base text."
 msgstr "Ces modifications ont été appliquées automatiquement. Refusez celles dont vous ne voulez pas pour restaurer le texte de base."
+
+#: src/serverText.js:66
+msgid "These settings are managed by the account owner: {rest}"
+msgstr "Ces paramètres sont gérés par le propriétaire du compte : {rest}"
 
 #: src/screens/SettingsAccounts.jsx:26
 msgid "they ride the same scrapes"
@@ -9083,7 +9278,7 @@ msgstr "Cet onglet a basculé sur {who}"
 msgid "This tab was switched to another account — reload it."
 msgstr "Cet onglet a basculé sur un autre compte : rechargez-le."
 
-#: src/screens/Stats.jsx:83
+#: src/screens/Stats.jsx:84
 #: src/time.js:38
 msgid "Thu"
 msgstr "jeu."
@@ -9105,8 +9300,8 @@ msgstr "Niveau {letter}"
 msgid "Tier A first, untiered last"
 msgstr "Niveau A d’abord, sans niveau en dernier"
 
-#: src/screens/Stats.jsx:724
-#: src/screens/Stats.jsx:748
+#: src/screens/Stats.jsx:725
+#: src/screens/Stats.jsx:749
 msgid "Time"
 msgstr "Heure"
 
@@ -9171,6 +9366,10 @@ msgstr "Ton 2 : ½ vers Editorial"
 msgid "Tone 3 — ¾ toward Editorial"
 msgstr "Ton 3 : ¾ vers Editorial"
 
+#: src/serverText.js:40
+msgid "Too many failed attempts"
+msgstr "Trop de tentatives échouées"
+
 #. placeholder {0}: f.retryAfter
 #: src/screens/SettingsAccounts.jsx:82
 msgid "Too many tries — wait {0}s."
@@ -9192,7 +9391,7 @@ msgstr "Classement par postes ouverts · les entreprises choisies restent en tê
 msgid "Top score"
 msgstr "Meilleur score"
 
-#: src/screens/Stats.jsx:458
+#: src/screens/Stats.jsx:459
 msgid "Total jobs"
 msgstr "Total des offres"
 
@@ -9213,7 +9412,7 @@ msgstr "liens suivis : des liens courts qui enregistrent leur ouverture par un 
 msgid "Transgender?"
 msgstr "Transgenre ?"
 
-#: src/screens/Stats.jsx:724
+#: src/screens/Stats.jsx:725
 msgid "Trigger"
 msgstr "Déclencheur"
 
@@ -9231,11 +9430,11 @@ msgstr "réessayez"
 #: src/screens/Searches.jsx:948
 #: src/screens/Settings.jsx:888
 #: src/screens/Settings.jsx:931
-#: src/screens/Stats.jsx:449
+#: src/screens/Stats.jsx:450
 msgid "Try again"
 msgstr "Réessayer"
 
-#: src/screens/Stats.jsx:83
+#: src/screens/Stats.jsx:84
 #: src/time.js:38
 msgid "Tue"
 msgstr "mar."
@@ -9248,7 +9447,7 @@ msgstr "mardi"
 msgid "Two or more"
 msgstr "Deux ou plus"
 
-#: src/screens/Stats.jsx:748
+#: src/screens/Stats.jsx:749
 msgid "Type"
 msgstr "Type"
 
@@ -9284,7 +9483,7 @@ msgid "Type to search {0} places…"
 msgstr "Saisissez pour rechercher parmi {0} lieux…"
 
 #. placeholder {0}: actType ? ' · 1' : ''
-#: src/screens/Stats.jsx:696
+#: src/screens/Stats.jsx:697
 msgid "Type{0}"
 msgstr "Type{0}"
 
@@ -9292,9 +9491,9 @@ msgstr "Type{0}"
 msgid "U.S. citizen"
 msgstr "Citoyen(ne) américain(e)"
 
-#: src/screens/Stats.jsx:493
-#: src/screens/Stats.jsx:573
-#: src/screens/Stats.jsx:637
+#: src/screens/Stats.jsx:494
+#: src/screens/Stats.jsx:574
+#: src/screens/Stats.jsx:638
 msgid "Unavailable — the request failed"
 msgstr "Indisponible : la requête a échoué"
 
@@ -9395,6 +9594,10 @@ msgstr "Poste sans intitulé"
 #: src/screens/ResumeSections.jsx:211
 msgid "URL (optional)"
 msgstr "URL (facultative)"
+
+#: src/serverText.js:41
+msgid "URL not allowed"
+msgstr "URL non autorisée"
 
 #: src/screens/Settings.jsx:743
 msgid "URL style"
@@ -9512,7 +9715,7 @@ msgstr "Attendre l’élément"
 msgid "Waiting"
 msgstr "En attente"
 
-#: src/screens/Stats.jsx:661
+#: src/screens/Stats.jsx:662
 msgid "Waiting for another scrape"
 msgstr "En attente d’un autre scraping"
 
@@ -9549,7 +9752,7 @@ msgstr "Webhook enregistré"
 msgid "Webhook secret"
 msgstr "Secret du webhook"
 
-#: src/screens/Stats.jsx:83
+#: src/screens/Stats.jsx:84
 #: src/time.js:38
 msgid "Wed"
 msgstr "mer."

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { t, plural } from '@lingui/core/macro'
 import { Trans } from '@lingui/react/macro'
 import { intlLocale } from '../i18n'
+import { serverText } from '../serverText'
 import { useLocation } from 'react-router-dom'
 import { ResponsiveContainer, Sankey, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 import api from '../api'
@@ -76,7 +77,7 @@ const ago = (iso) => {
 }
 // Turn a 5-field cron into English; anything else (including "Every 90 min") passes through.
 const decodeCron = (expr) => {
-  if (!expr || expr.includes('Every')) return expr || '—'
+  if (!expr || expr.includes('Every')) return serverText(expr) || '—'
   const p = expr.trim().split(/\s+/)
   if (p.length !== 5) return expr
   const [min, hour, day, month, dow] = p
@@ -648,7 +649,7 @@ export default function Stats() {
             const running = !!j.running || triggering.has(j.id)
             return (
               <TableRow key={j.id} height={38}>
-                <span title={j.name} style={{ flex: '0 1 250px', minWidth: 0, fontSize: 12.5, lineHeight: '18px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 10 }}>{j.name}</span>
+                <span title={serverText(j.name)} style={{ flex: '0 1 250px', minWidth: 0, fontSize: 12.5, lineHeight: '18px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 10 }}>{serverText(j.name)}</span>
                 {showId && <Mono title={j.id} line={18} tone="muted" code style={{ flex: '0 0 132px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 8 }}>{j.id}</Mono>}
                 {showSched && <span title={j.schedule} style={{ flex: '0 0 140px', fontSize: 11.5, lineHeight: '18px', color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 8 }}>{decodeCron(j.schedule)}</span>}
                 {showNext && <Mono line={18} tone="muted" style={{ flex: '0 0 132px' }}>{running ? t`now` : when(j.next_run)}</Mono>}
@@ -721,7 +722,7 @@ export default function Stats() {
           {tab === 'runs' ? (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <TableHead height={26} pad="0 20px" top style={{ background: 'transparent' }}>
-                <span style={{ flex: '0 0 118px' }}><Trans>Time</Trans></span><span style={{ flex: '0 0 140px' }}><Trans>Job ID</Trans></span><span style={{ flex: '0 0 90px' }}><Trans>Trigger</Trans></span>
+                <span style={{ flex: '0 0 118px' }}><Trans>Time</Trans></span><span style={{ flex: '0 0 140px' }}>{t({ message: 'Job ID', context: 'background task' })}</span><span style={{ flex: '0 0 90px' }}><Trans>Trigger</Trans></span>
                 <span style={{ flex: '0 0 100px' }}><Trans>Status</Trans></span><span style={{ flex: '0 0 76px' }}><Trans>Duration</Trans></span><span style={{ flex: 1 }}><Trans>Result</Trans></span>
               </TableHead>
               {runs.map((r) => {
