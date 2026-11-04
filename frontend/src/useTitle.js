@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { t } from '@lingui/core/macro'
 import { useLocation } from 'react-router-dom'
 
 const APP = 'JobNavigator'
@@ -6,17 +7,17 @@ const APP = 'JobNavigator'
 // Longest prefix wins, so /resumes/:id falls back to "Résumé" until the
 // editor loads and names the actual document.
 const ROUTES = [
-  ['/feed', 'Jobs'],
-  ['/searches', 'Searches'],
-  ['/companies', 'Companies'],
-  ['/applications', 'Applications'],
-  ['/resumes', 'Résumés'],
-  ['/cover-letters', 'Cover Letters'],
-  ['/persona', 'Persona'],
-  ['/stats', 'Stats'],
-  ['/settings', 'Settings'],
-  ['/toasts', 'Toast lab'],
-  ['/', 'Jobs'],
+  ['/feed', t`Jobs`],
+  ['/searches', t`Searches`],
+  ['/companies', t`Companies`],
+  ['/applications', t`Applications`],
+  ['/resumes', t`Résumés`],
+  ['/cover-letters', t`Cover Letters`],
+  ['/persona', t`Persona`],
+  ['/stats', t`Stats`],
+  ['/settings', t`Settings`],
+  ['/toasts', t`Toast lab`],
+  ['/', t`Jobs`],
 ]
 
 export const titleFor = (path) => {

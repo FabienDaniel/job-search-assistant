@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import api, { authFailure } from './api'
 import { Avatar, Card, Heading, Helper, ModalPanel, NavLink, PinPad, Spinner } from './ui'
 import { useTheme, themeAttrs } from './theme'
@@ -39,7 +41,7 @@ export default function AccountPicker({ account: initial = null, required = fals
     let live = true
     api.get('/auth/accounts')
       .then(({ data }) => { if (live) { setAccounts(Array.isArray(data) ? data : []); setLoadErr('') } })
-      .catch(() => { if (live) { setAccounts([]); setLoadErr('Could not load the accounts — reload the page to try again.') } })
+      .catch(() => { if (live) { setAccounts([]); setLoadErr(t`Could not load the accounts — reload the page to try again.`) } })
     return () => { live = false }
   }, [reloadKey])
 
@@ -47,15 +49,15 @@ export default function AccountPicker({ account: initial = null, required = fals
     const f = authFailure(err)
     if (f?.kind === 'pin_required') { setTarget(acc); setError(''); setCooldown(0); setAttempt((n) => n + 1); return }
     if (f?.kind === 'wrong_pin') {
-      setError(f.triesLeft != null ? `Wrong PIN · ${f.triesLeft} ${f.triesLeft === 1 ? 'try' : 'tries'} left` : 'Wrong PIN')
+      setError(f.triesLeft != null ? plural(f.triesLeft, { one: 'Wrong PIN · # try left', other: 'Wrong PIN · # tries left' }) : t`Wrong PIN`)
       setCooldown(0); setAttempt((n) => n + 1); return
     }
     if (f?.kind === 'pin_cooldown') { setTarget(acc); setError(''); setCooldown(f.retryAfter); setAttempt((n) => n + 1); return }
     if (err?.response?.status === 404) {
       // R6-04: the account is gone — back to a fresh grid
       setTarget(null); setReloadKey((n) => n + 1)
-      setError('That account no longer exists.')
-    } else setError('Could not switch — try again.')
+      setError(t`That account no longer exists.`)
+    } else setError(t`Could not switch — try again.`)
     setAttempt((n) => n + 1)
   }, [])
 
@@ -103,18 +105,18 @@ export default function AccountPicker({ account: initial = null, required = fals
   const onEscape = initial ? (dismissable ? onClose : undefined) : (target ? back : (dismissable ? onClose : undefined))
 
   const pinHint = target && target.role !== 'owner' && owner?.has_pin
-    ? `Enter ${target.name}'s PIN, or ${owner.name}'s`
-    : target ? `Enter ${target.name}'s PIN` : ''
+    ? t`Enter ${target.name}'s PIN, or ${owner.name}'s`
+    : target ? t`Enter ${target.name}'s PIN` : ''
 
   return (
-    <ModalPanel width={target ? 380 : 560} title={target ? 'Enter PIN' : 'Choose an account'} zIndex={9999}
+    <ModalPanel width={target ? 380 : 560} title={target ? t`Enter PIN` : t`Choose an account`} zIndex={9999}
       onClose={onEscape} escapeCapture trapFocus labelledBy={done ? undefined : (target ? 'jn-picker-pin-title' : 'jn-picker-title')}
       scrimProps={{ className: 'jn-v2', ...themeAttrs(look) }}
       style={{ padding: '26px 26px 22px', gap: 18 }}>
       {done ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '18px 0' }}>
           <Avatar name={done.name} color={done.color} size={44} />
-          <Heading size={19}>Switching to {done.name}…</Heading>
+          <Heading size={19}><Trans>Switching to {done.name}…</Trans></Heading>
         </div>
       ) : target ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }} data-testid="pin-step">
@@ -125,18 +127,18 @@ export default function AccountPicker({ account: initial = null, required = fals
           </div>
           <PinPad onComplete={submitPin} busy={pinBusy} error={error} hint={pinHint}
             cooldown={cooldown} resetKey={attempt} onCooldownEnd={() => setCooldown(0)}
-            ariaLabel={`${target.name}'s PIN`} style={{ marginTop: 4 }} />
+            ariaLabel={t`${target.name}'s PIN`} style={{ marginTop: 4 }} />
           {(!initial || dismissable) && (
-            <NavLink onClick={initial ? onClose : back}>{initial ? 'Cancel' : '‹ Other accounts'}</NavLink>
+            <NavLink onClick={initial ? onClose : back}>{initial ? t`Cancel` : t`‹ Other accounts`}</NavLink>
           )}
         </div>
       ) : (
         <>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             {/* ui: keep — the picker's wordmark-sized title matches the sign-in overlay's serif 23/28px */}
-            <span id="jn-picker-title" style={{ fontFamily: 'var(--serif)', fontSize: 23, fontWeight: 400, letterSpacing: '-.02em', lineHeight: '28px' }}>Who&rsquo;s job hunting?</span>
+            <span id="jn-picker-title" style={{ fontFamily: 'var(--serif)', fontSize: 23, fontWeight: 400, letterSpacing: '-.02em', lineHeight: '28px' }}><Trans>Who&rsquo;s job hunting?</Trans></span>
             <Helper>
-              {accounts && accounts.length > 1 ? `Pick an account · 1–${Math.min(5, accounts.length)} on the keyboard` : ' '}
+              {accounts && accounts.length > 1 ? t`Pick an account · 1–${Math.min(5, accounts.length)} on the keyboard` : ' '}
             </Helper>
           </div>
           {accounts === null ? (
@@ -152,7 +154,7 @@ export default function AccountPicker({ account: initial = null, required = fals
                     <span style={{ height: 16, display: 'flex', alignItems: 'center' }}>
                       {busyId === a.id
                         ? <Spinner size={11} />
-                        : <Helper size="xs">{roleLabel(a)}{a.has_pin ? ' · PIN' : ''}</Helper>}
+                        : <Helper size="xs">{roleLabel(a)}{a.has_pin ? t` · PIN` : ''}</Helper>}
                     </span>
                   </Card>
                 </div>
@@ -161,7 +163,7 @@ export default function AccountPicker({ account: initial = null, required = fals
           )}
           {(error || loadErr) && <Helper style={{ color: 'var(--bad)', textAlign: 'center' }}>{error || loadErr}</Helper>}
           <div style={{ display: 'flex', justifyContent: 'center' }}><LanguageSelect width="180px" /></div>
-          {dismissable && <div style={{ display: 'flex', justifyContent: 'center' }}><NavLink onClick={onClose}>Cancel</NavLink></div>}
+          {dismissable && <div style={{ display: 'flex', justifyContent: 'center' }}><NavLink onClick={onClose}><Trans>Cancel</Trans></NavLink></div>}
         </>
       )}
     </ModalPanel>

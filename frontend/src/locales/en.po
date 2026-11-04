@@ -7,6 +7,41 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: en\n"
 
+#: src/AccountPicker.jsx:157
+#: src/Shell.jsx:182
+msgid " · PIN"
+msgstr " · PIN"
+
+#: src/AccountPicker.jsx:132
+msgid "‹ Other accounts"
+msgstr "‹ Other accounts"
+
+#. placeholder {0}: f.triesLeft
+#: src/AccountPicker.jsx:52
+msgid "{0, plural, one {Wrong PIN · # try left} other {Wrong PIN · # tries left}}"
+msgstr "{0, plural, one {Wrong PIN · # try left} other {Wrong PIN · # tries left}}"
+
+#. placeholder {0}: open ? '▾' : '▸'
+#: src/TelemetryChoice.jsx:91
+msgid "{0} What is sent?"
+msgstr "{0} What is sent?"
+
+#. placeholder {0}: me.name
+#. placeholder {1}: roleLabel(me)
+#: src/Shell.jsx:156
+msgid "{0}, {1} — switch account"
+msgstr "{0}, {1} — switch account"
+
+#. placeholder {0}: target.name
+#: src/AccountPicker.jsx:130
+msgid "{0}'s PIN"
+msgstr "{0}'s PIN"
+
+#. placeholder {0}: i + 1
+#: src/ui.jsx:1289
+msgid "{ariaLabel} digit {0}"
+msgstr "{ariaLabel} digit {0}"
+
 #: src/time.js:118
 msgid "{base} at :{minute}"
 msgstr "{base} at :{minute}"
@@ -18,6 +53,10 @@ msgstr "{d}d"
 #: src/time.js:11
 msgid "{d}d ago"
 msgstr "{d}d ago"
+
+#: src/Shell.jsx:321
+msgid "{failing, plural, one {# source needs attention} other {# sources need attention}}"
+msgstr "{failing, plural, one {# source needs attention} other {# sources need attention}}"
 
 #: src/time.js:19
 msgid "{h}h"
@@ -35,13 +74,75 @@ msgstr "{m}m"
 msgid "{m}m ago"
 msgstr "{m}m ago"
 
+#: src/Shell.jsx:191
+msgid "{MAX_ACCOUNTS} max"
+msgstr "{MAX_ACCOUNTS} max"
+
 #: src/time.js:48
 msgid "{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}"
 msgstr "{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}"
 
+#: src/Shell.jsx:334
+msgid "{nC, plural, one {# company} other {# companies}} and {nS, plural, one {# search} other {# searches}} need attention. Click to open Run history."
+msgstr "{nC, plural, one {# company} other {# companies}} and {nS, plural, one {# search} other {# searches}} need attention. Click to open Run history."
+
+#: src/ui.jsx:1168
+msgid "Account"
+msgstr "Account"
+
 #: src/AccountChanged.jsx:26
 msgid "Account changed"
 msgstr "Account changed"
+
+#: src/Shell.jsx:169
+msgid "Accounts"
+msgstr "Accounts"
+
+#: src/NewUiModal.jsx:25
+msgid "Accounts: up to five people share one install, each with their own jobs, résumés, applications and settings, behind an optional PIN. Scraping is shared, so a board both of you follow is fetched once. Add someone in Settings › Accounts."
+msgstr "Accounts: up to five people share one install, each with their own jobs, résumés, applications and settings, behind an optional PIN. Scraping is shared, so a board both of you follow is fetched once. Add someone in Settings › Accounts."
+
+#: src/TelemetryChoice.jsx:26
+msgid "Actions such as saving a job, running a search or exporting a résumé (no text)"
+msgstr "Actions such as saving a job, running a search or exporting a résumé (no text)"
+
+#: src/WelcomeModal.jsx:15
+msgid "Activate a company"
+msgstr "Activate a company"
+
+#: src/Shell.jsx:191
+msgid "Add account — the limit is {MAX_ACCOUNTS} accounts"
+msgstr "Add account — the limit is {MAX_ACCOUNTS} accounts"
+
+#: src/Shell.jsx:191
+#: src/Shell.jsx:192
+msgid "Add account…"
+msgstr "Add account…"
+
+#: src/Shell.jsx:336
+msgid "All companies and searches are healthy, but the last scrape run failed {lastSweep}. Click to open Run history."
+msgstr "All companies and searches are healthy, but the last scrape run failed {lastSweep}. Click to open Run history."
+
+#: src/Shell.jsx:337
+msgid "All companies and searches healthy · last scrape run {lastSweep}. Click to open Run history."
+msgstr "All companies and searches healthy · last scrape run {lastSweep}. Click to open Run history."
+
+#: src/TelemetryChoice.jsx:86
+#: src/TelemetryChoice.jsx:122
+msgid "Allow anonymous telemetry"
+msgstr "Allow anonymous telemetry"
+
+#: src/TelemetryChoice.jsx:83
+msgid "Allow anonymous telemetry?"
+msgstr "Allow anonymous telemetry?"
+
+#: src/TelemetryChoice.jsx:50
+msgid "Also sent with Yes, as the app is used"
+msgstr "Also sent with Yes, as the app is used"
+
+#: src/theme.js:44
+msgid "Alt — cool slate"
+msgstr "Alt — cool slate"
 
 #: src/time.js:156
 msgid "and on {weekdayList}"
@@ -58,6 +159,20 @@ msgstr "Another tab switched this browser to {who}. Nothing more is saved from t
 #: src/LoginModal.jsx:70
 msgid "API key"
 msgstr "API key"
+
+#. placeholder {0}: MODE_LABEL[mode] || mode
+#: src/theme.js:168
+msgid "Appearance: {0} — click to switch"
+msgstr "Appearance: {0} — click to switch"
+
+#: src/Shell.jsx:34
+#: src/useTitle.js:13
+msgid "Applications"
+msgstr "Applications"
+
+#: src/Shell.jsx:33
+msgid "Apply"
+msgstr "Apply"
 
 #: src/time.js:40
 msgid "Apr"
@@ -88,6 +203,134 @@ msgstr "at minute {minuteTxt} of hour {hourTxt}"
 msgid "Aug"
 msgstr "Aug"
 
+#: src/versionCheck.js:20
+msgid "Backend image out of date"
+msgstr "Backend image out of date"
+
+#: src/Shell.jsx:317
+msgid "Backend unreachable"
+msgstr "Backend unreachable"
+
+#: src/linkKinds.js:9
+msgid "Board link"
+msgstr "Board link"
+
+#: src/WelcomeModal.jsx:14
+msgid "Build your résumé + Persona"
+msgstr "Build your résumé + Persona"
+
+#: src/AccountPicker.jsx:132
+#: src/AccountPicker.jsx:166
+#: src/ConfirmDialog.jsx:26
+#: src/ConfirmDialog.jsx:54
+#: src/CopyFrom.jsx:86
+msgid "Cancel"
+msgstr "Cancel"
+
+#: src/AccountPicker.jsx:112
+msgid "Choose an account"
+msgstr "Choose an account"
+
+#: src/NewUiModal.jsx:48
+#: src/ui.jsx:2222
+#: src/ui.jsx:2222
+#: src/WelcomeModal.jsx:41
+msgid "Close"
+msgstr "Close"
+
+#: src/linkKinds.js:24
+msgid "Closed posting"
+msgstr "Closed posting"
+
+#: src/Shell.jsx:446
+msgid "Collapse"
+msgstr "Collapse"
+
+#: src/Shell.jsx:445
+msgid "Collapse to icons"
+msgstr "Collapse to icons"
+
+#: src/Shell.jsx:420
+msgid "Coming in the redesign"
+msgstr "Coming in the redesign"
+
+#: src/Shell.jsx:31
+#: src/useTitle.js:12
+msgid "Companies"
+msgstr "Companies"
+
+#: src/WelcomeModal.jsx:16
+msgid "Configure a search"
+msgstr "Configure a search"
+
+#: src/ConfirmDialog.jsx:27
+msgid "Confirm"
+msgstr "Confirm"
+
+#: src/ConfirmDialog.jsx:53
+msgid "Copied ✓"
+msgstr "Copied ✓"
+
+#: src/CopyFrom.jsx:15
+msgid "Copies the careers URLs and filters. No jobs or notes. Pick the résumés to score against afterwards."
+msgstr "Copies the careers URLs and filters. No jobs or notes. Pick the résumés to score against afterwards."
+
+#: src/CopyFrom.jsx:20
+msgid "Copies the search settings. It runs at the next scheduled pass; an Apify search is copied paused, because each run bills the account."
+msgstr "Copies the search settings. It runs at the next scheduled pass; an Apify search is copied paused, because each run bills the account."
+
+#: src/ConfirmDialog.jsx:53
+msgid "Copy"
+msgstr "Copy"
+
+#. placeholder {0}: i.name
+#: src/CopyFrom.jsx:72
+msgid "Copy {0}"
+msgstr "Copy {0}"
+
+#: src/CopyFrom.jsx:14
+msgid "Copy a company from…"
+msgstr "Copy a company from…"
+
+#: src/CopyFrom.jsx:19
+msgid "Copy a search from…"
+msgstr "Copy a search from…"
+
+#: src/CopyFrom.jsx:100
+msgid "Copy from…"
+msgstr "Copy from…"
+
+#. placeholder {0}: k.noun
+#: src/CopyFrom.jsx:51
+msgid "Could not copy this {0}"
+msgstr "Could not copy this {0}"
+
+#: src/AccountPicker.jsx:44
+msgid "Could not load the accounts — reload the page to try again."
+msgstr "Could not load the accounts — reload the page to try again."
+
+#: src/CopyFrom.jsx:38
+msgid "Could not load the other accounts' {kind}"
+msgstr "Could not load the other accounts' {kind}"
+
+#: src/AccountPicker.jsx:60
+msgid "Could not switch — try again."
+msgstr "Could not switch — try again."
+
+#. placeholder {0}: a.name
+#: src/Shell.jsx:116
+msgid "Could not switch to {0}"
+msgstr "Could not switch to {0}"
+
+#: src/Shell.jsx:36
+#: src/useTitle.js:15
+msgid "Cover Letters"
+msgstr "Cover Letters"
+
+#: src/Shell.jsx:184
+msgid "Current account"
+msgstr "Current account"
+
 #: src/time.js:226
 msgid "Daily 03:00"
 msgstr "Daily 03:00"
@@ -100,9 +343,56 @@ msgstr "daily at {clock}"
 msgid "Dec"
 msgstr "Dec"
 
+#: src/linkKinds.js:8
+msgid "Direct"
+msgstr "Direct"
+
+#: src/WelcomeModal.jsx:14
+msgid "Edit a base résumé and fill Persona (contact, work auth) so jobs score against your profile."
+msgstr "Edit a base résumé and fill Persona (contact, work auth) so jobs score against your profile."
+
+#: src/theme.js:43
+msgid "Editorial — original board tones"
+msgstr "Editorial — original board tones"
+
+#: src/WelcomeModal.jsx:16
+msgid "Enable a keyword search or LinkedIn Personal to discover jobs from boards."
+msgstr "Enable a keyword search or LinkedIn Personal to discover jobs from boards."
+
+#: src/WelcomeModal.jsx:15
+msgid "Enable a seeded company or add your own to start scraping."
+msgstr "Enable a seeded company or add your own to start scraping."
+
+#. placeholder {0}: target.name
+#: src/AccountPicker.jsx:109
+msgid "Enter {0}'s PIN"
+msgstr "Enter {0}'s PIN"
+
+#. placeholder {0}: target.name
+#. placeholder {1}: owner.name
+#: src/AccountPicker.jsx:108
+msgid "Enter {0}'s PIN, or {1}'s"
+msgstr "Enter {0}'s PIN, or {1}'s"
+
+#: src/AccountPicker.jsx:112
+msgid "Enter PIN"
+msgstr "Enter PIN"
+
 #: src/LoginModal.jsx:65
 msgid "Enter your dashboard API key — you can view or change it later in Settings."
 msgstr "Enter your dashboard API key — you can view or change it later in Settings."
+
+#: src/TelemetryChoice.jsx:14
+msgid "Essentials — scraper and AI health only"
+msgstr "Essentials — scraper and AI health only"
+
+#. placeholder {0}: SENT.essentials.join('; ')
+#. placeholder {1}: SENT.full.join('; ')
+#. placeholder {2}: SENT.never
+#. placeholder {3}: SENT.off
+#: src/TelemetryChoice.jsx:33
+msgid "Essentials, once a day from the server: {0}. Yes adds: {1}. Never sent: {2} {3}"
+msgstr "Essentials, once a day from the server: {0}. Yes adds: {1}. Never sent: {2} {3}"
 
 #: src/time.js:117
 msgid "every {hourStep} hours"
@@ -132,9 +422,29 @@ msgstr "every hour"
 msgid "every minute"
 msgstr "every minute"
 
+#: src/NewUiModal.jsx:26
+msgid "Everything you know, rebuilt: Jobs, Companies, Applications, Résumés, Cover Letters, Persona, Stats, Settings."
+msgstr "Everything you know, rebuilt: Jobs, Companies, Applications, Résumés, Cover Letters, Persona, Stats, Settings."
+
+#: src/Shell.jsx:445
+msgid "Expand navigation"
+msgstr "Expand navigation"
+
 #: src/time.js:40
 msgid "Feb"
 msgstr "Feb"
+
+#: src/Shell.jsx:28
+msgid "Find"
+msgstr "Find"
+
+#: src/ui.jsx:1683
+msgid "fit"
+msgstr "fit"
+
+#: src/WelcomeModal.jsx:44
+msgid "Four steps to set up automatic searching."
+msgstr "Four steps to set up automatic searching."
 
 #: src/time.js:38
 msgid "Fri"
@@ -144,6 +454,22 @@ msgstr "Fri"
 msgid "Friday"
 msgstr "Friday"
 
+#: src/sourceBlocks.js:11
+msgid "Google usually returns a JavaScript check page instead of job data, and this scraper cannot read that page."
+msgstr "Google usually returns a JavaScript check page instead of job data, and this scraper cannot read that page."
+
+#: src/NewUiModal.jsx:62
+msgid "Got it"
+msgstr "Got it"
+
+#: src/theme.js:39
+msgid "Green Paper"
+msgstr "Green Paper"
+
+#: src/TelemetryChoice.jsx:78
+msgid "Help improve JobNavigator"
+msgstr "Help improve JobNavigator"
+
 #: src/LoginModal.jsx:79
 msgid "hide"
 msgstr "hide"
@@ -152,6 +478,10 @@ msgstr "hide"
 msgid "Hide API key"
 msgstr "Hide API key"
 
+#: src/TelemetryChoice.jsx:90
+msgid "Hide what is sent"
+msgstr "Hide what is sent"
+
 #: src/time.js:224
 msgid "Hourly"
 msgstr "Hourly"
@@ -159,6 +489,10 @@ msgstr "Hourly"
 #: src/time.js:115
 msgid "hourly at :{minute}"
 msgstr "hourly at :{minute}"
+
+#: src/TelemetryChoice.jsx:21
+msgid "How often scrapes and AI calls succeed or fail (error types only)"
+msgstr "How often scrapes and AI calls succeed or fail (error types only)"
 
 #: src/LoginModal.jsx:89
 msgid "If no API key is set yet, leave this blank and sign in. You can add a key later in Settings › Advanced."
@@ -175,6 +509,16 @@ msgstr "Invalid API key"
 #: src/time.js:40
 msgid "Jan"
 msgstr "Jan"
+
+#: src/TelemetryChoice.jsx:29
+msgid "Job titles, search terms, résumé, letter or persona text, anything typed, keys, the browser or IP, or this install’s address."
+msgstr "Job titles, search terms, résumé, letter or persona text, anything typed, keys, the browser or IP, or this install’s address."
+
+#: src/Shell.jsx:29
+#: src/useTitle.js:10
+#: src/useTitle.js:20
+msgid "Jobs"
+msgstr "Jobs"
 
 #: src/time.js:40
 msgid "Jul"
@@ -201,13 +545,33 @@ msgstr "Loading dashboard…"
 msgid "Login failed: {reason}"
 msgstr "Login failed: {reason}"
 
+#. placeholder {0}: job.open_reason || t`the posting is gone`
+#. placeholder {1}: ago(job.open_checked_at)
+#: src/linkKinds.js:24
+msgid "Looks closed: {0} · checked {1} · click to check again"
+msgstr "Looks closed: {0} · checked {1} · click to check again"
+
+#: src/Shell.jsx:193
+msgid "Manage accounts"
+msgstr "Manage accounts"
+
 #: src/time.js:40
 msgid "Mar"
 msgstr "Mar"
 
+#: src/ui.jsx:2219
+#: src/ui.jsx:2219
+msgid "Maximize"
+msgstr "Maximize"
+
 #: src/time.js:40
 msgid "May"
 msgstr "May"
+
+#: src/ui.jsx:2209
+#: src/ui.jsx:2209
+msgid "Minimize"
+msgstr "Minimize"
 
 #: src/time.js:38
 msgid "Mon"
@@ -224,6 +588,42 @@ msgstr "Monthly 1st 08:00"
 #: src/time.js:133
 msgid "monthly on the {day} {at}"
 msgstr "monthly on the {day} {at}"
+
+#: src/ui.jsx:1965
+msgid "Move down"
+msgstr "Move down"
+
+#: src/ui.jsx:1964
+msgid "Move up"
+msgstr "Move up"
+
+#: src/Shell.jsx:374
+msgid "needs attention"
+msgstr "needs attention"
+
+#: src/Shell.jsx:416
+msgid "Needs attention"
+msgstr "Needs attention"
+
+#: src/TelemetryChoice.jsx:53
+msgid "Never sent"
+msgstr "Never sent"
+
+#: src/ui.jsx:1772
+msgid "No fit"
+msgstr "No fit"
+
+#: src/linkKinds.js:9
+msgid "No link to the employer's own site yet"
+msgstr "No link to the employer's own site yet"
+
+#: src/Shell.jsx:324
+msgid "No scrape recorded yet"
+msgstr "No scrape recorded yet"
+
+#: src/ui.jsx:612
+msgid "Nothing to pick yet."
+msgstr "Nothing to pick yet."
 
 #: src/time.js:40
 msgid "Nov"
@@ -245,6 +645,10 @@ msgstr "of every month"
 msgid "Off"
 msgstr "Off"
 
+#: src/sourceBlocks.js:7
+msgid "Often blocked"
+msgstr "Often blocked"
+
 #: src/time.js:156
 msgid "on {weekdayList}"
 msgstr "on {weekdayList}"
@@ -257,6 +661,32 @@ msgstr "on day {dayTxt}"
 msgid "on days {dayTxt}"
 msgstr "on days {dayTxt}"
 
+#: src/NewUiModal.jsx:29
+msgid "OpenRouter and live model search, the freehire.me source, Persona import from a résumé or PDF, a cron helper for schedules."
+msgstr "OpenRouter and live model search, the freehire.me source, Persona import from a résumé or PDF, a cron helper for schedules."
+
+#: src/Shell.jsx:39
+#: src/useTitle.js:16
+msgid "Persona"
+msgstr "Persona"
+
+#: src/NewUiModal.jsx:28
+msgid "Pick a look in Settings › Display: Paper, Green Paper, Stone, V1 Style or Windows 98, light or dark."
+msgstr "Pick a look in Settings › Display: Paper, Green Paper, Stone, V1 Style or Windows 98, light or dark."
+
+#. placeholder {0}: Math.min(5, accounts.length)
+#: src/AccountPicker.jsx:141
+msgid "Pick an account · 1–{0} on the keyboard"
+msgstr "Pick an account · 1–{0} on the keyboard"
+
+#: src/WelcomeModal.jsx:13
+msgid "Pick your LLM provider and add its key — Anthropic, OpenAI, Ollama or OpenRouter."
+msgstr "Pick your LLM provider and add its key — Anthropic, OpenAI, Ollama or OpenRouter."
+
+#: src/NewUiModal.jsx:61
+msgid "Read the release notes"
+msgstr "Read the release notes"
+
 #: src/AccountChanged.jsx:34
 msgid "Reload"
 msgstr "Reload"
@@ -264,6 +694,19 @@ msgstr "Reload"
 #: src/AccountChanged.jsx:34
 msgid "Reload as {who}"
 msgstr "Reload as {who}"
+
+#: src/Shell.jsx:35
+#: src/useTitle.js:14
+msgid "Résumés"
+msgstr "Résumés"
+
+#: src/TelemetryChoice.jsx:22
+msgid "Rough activity counts"
+msgstr "Rough activity counts"
+
+#: src/versionCheck.js:12
+msgid "Run `docker compose pull && docker compose up -d`, or `docker compose up --build -d`."
+msgstr "Run `docker compose pull && docker compose up -d`, or `docker compose up --build -d`."
 
 #: src/time.js:38
 msgid "Sat"
@@ -273,13 +716,52 @@ msgstr "Sat"
 msgid "Saturday"
 msgstr "Saturday"
 
+#: src/TelemetryChoice.jsx:97
+msgid "Save"
+msgstr "Save"
+
+#: src/Shell.jsx:323
+msgid "Scraper healthy · {healthAgo}"
+msgstr "Scraper healthy · {healthAgo}"
+
+#: src/Shell.jsx:323
+msgid "Scraper run failed · {healthAgo}"
+msgstr "Scraper run failed · {healthAgo}"
+
+#: src/Shell.jsx:30
+#: src/useTitle.js:11
+msgid "Searches"
+msgstr "Searches"
+
+#: src/ui.jsx:599
+msgid "Select…"
+msgstr "Select…"
+
+#: src/TelemetryChoice.jsx:47
+msgid "Sent once a day, from the server"
+msgstr "Sent once a day, from the server"
+
 #: src/time.js:40
 msgid "Sep"
 msgstr "Sep"
 
+#: src/WelcomeModal.jsx:13
+msgid "Set up AI scoring"
+msgstr "Set up AI scoring"
+
+#: src/Shell.jsx:41
+#: src/Shell.jsx:193
+#: src/useTitle.js:18
+msgid "Settings"
+msgstr "Settings"
+
 #: src/LoginModal.jsx:79
 msgid "show"
 msgstr "show"
+
+#: src/ui.jsx:2466
+msgid "Show {n} more"
+msgstr "Show {n} more"
 
 #: src/LoginModal.jsx:78
 msgid "Show API key"
@@ -299,6 +781,15 @@ msgstr "Signed in"
 msgid "Signing in…"
 msgstr "Signing in…"
 
+#: src/WelcomeModal.jsx:65
+msgid "Start with Settings →"
+msgstr "Start with Settings →"
+
+#: src/Shell.jsx:40
+#: src/useTitle.js:17
+msgid "Stats"
+msgstr "Stats"
+
 #: src/time.js:38
 msgid "Sun"
 msgstr "Sun"
@@ -307,9 +798,80 @@ msgstr "Sun"
 msgid "Sunday"
 msgstr "Sunday"
 
+#: src/Shell.jsx:156
+#: src/Shell.jsx:171
+msgid "Switch account"
+msgstr "Switch account"
+
+#. placeholder {0}: note.name
+#: src/Shell.jsx:102
+msgid "Switched to {0}"
+msgstr "Switched to {0}"
+
+#. placeholder {0}: done.name
+#: src/AccountPicker.jsx:119
+msgid "Switching to {0}…"
+msgstr "Switching to {0}…"
+
+#: src/sourceBlocks.js:24
+msgid "Terms: Behance, Hollylist and Wana Create publish these APIs for their own sites, not for other clients, and Behance challenges automated visitors. ArtStation and Work With Indies forbid scraping in their terms. Reading them may break their terms of use. Use at your own risk; see LEGAL_DISCLAIMER.md."
+msgstr "Terms: Behance, Hollylist and Wana Create publish these APIs for their own sites, not for other clients, and Behance challenges automated visitors. ArtStation and Work With Indies forbid scraping in their terms. Reading them may break their terms of use. Use at your own risk; see LEGAL_DISCLAIMER.md."
+
+#: src/sourceBlocks.js:23
+msgid "Terms: caribbeanjobs.com challenges automated visitors, so scraping it may break its terms of use. Use at your own risk; see LEGAL_DISCLAIMER.md."
+msgstr "Terms: caribbeanjobs.com challenges automated visitors, so scraping it may break its terms of use. Use at your own risk; see LEGAL_DISCLAIMER.md."
+
+#: src/sourceBlocks.js:26
+msgid "Terms: Eluta’s robots.txt disallows its RSS search and its terms forbid storing its content, so reading it may break its terms of use. Use at your own risk; see LEGAL_DISCLAIMER.md."
+msgstr "Terms: Eluta’s robots.txt disallows its RSS search and its terms forbid storing its content, so reading it may break its terms of use. Use at your own risk; see LEGAL_DISCLAIMER.md."
+
+#: src/sourceBlocks.js:25
+msgid "Terms: Himalayas allows its public API on condition that applicants go through its job link and the job is credited to Himalayas. The job keeps that link and shows Himalayas as its source. See LEGAL_DISCLAIMER.md."
+msgstr "Terms: Himalayas allows its public API on condition that applicants go through its job link and the job is credited to Himalayas. The job keeps that link and shows Himalayas as its source. See LEGAL_DISCLAIMER.md."
+
+#: src/AccountPicker.jsx:59
+msgid "That account no longer exists."
+msgstr "That account no longer exists."
+
+#: src/TelemetryChoice.jsx:27
+msgid "The address of a job board whose scrape fails (e.g. nvidia.wd5.myworkdayjobs.com, which can name the company)"
+msgstr "The address of a job board whose scrape fails (e.g. nvidia.wd5.myworkdayjobs.com, which can name the company)"
+
+#: src/versionCheck.js:21
+msgid "The backend image does not match the code. {FIX}"
+msgstr "The backend image does not match the code. {FIX}"
+
+#: src/Shell.jsx:330
+msgid "The dashboard could not reach the backend. Nothing below is live — check that the server is running."
+msgstr "The dashboard could not reach the backend. Nothing below is live — check that the server is running."
+
+#: src/versionCheck.js:30
+msgid "The dashboard is v{frontend} but the backend is v{backend}. {FIX}"
+msgstr "The dashboard is v{frontend} but the backend is v{backend}. {FIX}"
+
+#: src/NewUiModal.jsx:27
+msgid "The extension, redesigned: AI-assisted answers to application questions and structured autofill of ATS forms from your Persona."
+msgstr "The extension, redesigned: AI-assisted answers to application questions and structured autofill of ATS forms from your Persona."
+
 #: src/screens/Settings.jsx:543
 msgid "The language of the app’s screens. Saved in this browser."
 msgstr "The language of the app’s screens. Saved in this browser."
+
+#: src/CopyFrom.jsx:64
+msgid "The other accounts have no {kind} to copy."
+msgstr "The other accounts have no {kind} to copy."
+
+#: src/linkKinds.js:24
+msgid "the posting is gone"
+msgstr "the posting is gone"
+
+#: src/TelemetryChoice.jsx:19
+msgid "The version and the number of accounts"
+msgstr "The version and the number of accounts"
+
+#: src/TelemetryChoice.jsx:11
+msgid "This data is collected to improve JobNavigator and to show which parts need maintaining first, as time for maintenance is limited."
+msgstr "This data is collected to improve JobNavigator and to show which parts need maintaining first, as time for maintenance is limited."
 
 #: src/AccountChanged.jsx:29
 msgid "This tab was switched to {who}"
@@ -322,6 +884,30 @@ msgstr "Thu"
 #: src/time.js:37
 msgid "Thursday"
 msgstr "Thursday"
+
+#: src/TelemetryChoice.jsx:30
+msgid "To turn telemetry off completely, set JN_TELEMETRY=off in .env."
+msgstr "To turn telemetry off completely, set JN_TELEMETRY=off in .env."
+
+#: src/useTitle.js:19
+msgid "Toast lab"
+msgstr "Toast lab"
+
+#: src/theme.js:40
+msgid "Tone 1 — ¼ toward Editorial"
+msgstr "Tone 1 — ¼ toward Editorial"
+
+#: src/theme.js:41
+msgid "Tone 2 — ½ toward Editorial"
+msgstr "Tone 2 — ½ toward Editorial"
+
+#: src/theme.js:42
+msgid "Tone 3 — ¾ toward Editorial"
+msgstr "Tone 3 — ¾ toward Editorial"
+
+#: src/ui.jsx:1276
+msgid "Too many tries · try again in {left}s"
+msgstr "Too many tries · try again in {left}s"
 
 #: src/time.js:38
 msgid "Tue"
@@ -338,6 +924,14 @@ msgstr "Unexpected response from server"
 #: src/LoginModal.jsx:40
 msgid "unknown error"
 msgstr "unknown error"
+
+#: src/theme.js:46
+msgid "V1 Style"
+msgstr "V1 Style"
+
+#: src/versionCheck.js:29
+msgid "Version mismatch"
+msgstr "Version mismatch"
 
 #: src/time.js:38
 msgid "Wed"
@@ -362,3 +956,67 @@ msgstr "weekends {at}"
 #: src/time.js:228
 msgid "Weekly Monday 08:00"
 msgstr "Weekly Monday 08:00"
+
+#: src/WelcomeModal.jsx:32
+#: src/WelcomeModal.jsx:39
+msgid "Welcome to JobNavigator"
+msgstr "Welcome to JobNavigator"
+
+#: src/NewUiModal.jsx:41
+#: src/NewUiModal.jsx:47
+msgid "Welcome to the new JobNavigator"
+msgstr "Welcome to the new JobNavigator"
+
+#: src/TelemetryChoice.jsx:90
+msgid "What is sent?"
+msgstr "What is sent?"
+
+#: src/TelemetryChoice.jsx:25
+msgid "Which screens are opened (no ids)"
+msgstr "Which screens are opened (no ids)"
+
+#: src/TelemetryChoice.jsx:20
+msgid "Which search types, job boards and AI providers are in use"
+msgstr "Which search types, job boards and AI providers are in use"
+
+#: src/AccountPicker.jsx:139
+msgid "Who’s job hunting?"
+msgstr "Who’s job hunting?"
+
+#: src/theme.js:47
+msgid "Windows 98"
+msgstr "Windows 98"
+
+#: src/AccountPicker.jsx:52
+msgid "Wrong PIN"
+msgstr "Wrong PIN"
+
+#: src/TelemetryChoice.jsx:13
+msgid "Yes — health and how the app is used"
+msgstr "Yes — health and how the app is used"
+
+#: src/Shell.jsx:38
+msgid "You"
+msgstr "You"
+
+#. placeholder {0}: k.noun
+#. placeholder {1}: i.name
+#: src/CopyFrom.jsx:72
+msgid "You already have a {0} named {1}"
+msgstr "You already have a {0} named {1}"
+
+#: src/CopyFrom.jsx:78
+msgid "You have it"
+msgstr "You have it"
+
+#: src/ui.jsx:1892
+msgid "Zoom {zoom}% · double-click to reset · hide in Settings"
+msgstr "Zoom {zoom}% · double-click to reset · hide in Settings"
+
+#: src/ui.jsx:1899
+msgid "Zoom in"
+msgstr "Zoom in"
+
+#: src/ui.jsx:1900
+msgid "Zoom out"
+msgstr "Zoom out"

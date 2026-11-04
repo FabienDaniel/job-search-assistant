@@ -1,4 +1,6 @@
 import React from 'react'
+import { t } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { Button, FooterRow, Heading, Helper, IconButton, Link, ModalPanel } from './ui'
 import { useTheme, themeAttrs } from './theme'
 import './theme.css'
@@ -20,11 +22,11 @@ export const RELEASE_NOTES_URL = 'https://github.com/vesaias/JobNavigator/blob/m
 const TITLE_ID = 'jn-newui-title'
 
 const POINTS = [
-  'Accounts: up to five people share one install, each with their own jobs, résumés, applications and settings, behind an optional PIN. Scraping is shared, so a board both of you follow is fetched once. Add someone in Settings › Accounts.',
-  'Everything you know, rebuilt: Jobs, Companies, Applications, Résumés, Cover Letters, Persona, Stats, Settings.',
-  'The extension, redesigned: AI-assisted answers to application questions and structured autofill of ATS forms from your Persona.',
-  'Pick a look in Settings › Display: Paper, Green Paper, Stone, V1 Style or Windows 98, light or dark.',
-  'OpenRouter and live model search, the freehire.me source, Persona import from a résumé or PDF, a cron helper for schedules.',
+  t`Accounts: up to five people share one install, each with their own jobs, résumés, applications and settings, behind an optional PIN. Scraping is shared, so a board both of you follow is fetched once. Add someone in Settings › Accounts.`,
+  t`Everything you know, rebuilt: Jobs, Companies, Applications, Résumés, Cover Letters, Persona, Stats, Settings.`,
+  t`The extension, redesigned: AI-assisted answers to application questions and structured autofill of ATS forms from your Persona.`,
+  t`Pick a look in Settings › Display: Paper, Green Paper, Stone, V1 Style or Windows 98, light or dark.`,
+  t`OpenRouter and live model search, the freehire.me source, Persona import from a résumé or PDF, a cron helper for schedules.`,
 ]
 
 export default function NewUiModal({ onClose }) {
@@ -36,14 +38,14 @@ export default function NewUiModal({ onClose }) {
     // Same contract as WelcomeModal: scrim click and Escape both close, and the
     // Escape listener is registered in the CAPTURE phase because this overlay
     // mounts above a screen that already claimed the key (R4-E2E-01).
-    <ModalPanel width={460} title="Welcome to the new JobNavigator" onClose={onClose} escapeCapture zIndex={9998}
+    <ModalPanel width={460} title={t`Welcome to the new JobNavigator`} onClose={onClose} escapeCapture zIndex={9998}
       labelledBy={TITLE_ID}
       scrimProps={{ className: 'jn-v2', ...themeAttrs(look) }}
       scrimStyle={{ padding: 16 }}
       style={{ maxWidth: '100%', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '20px 24px 4px' }}>
-        <Heading size={19} id={TITLE_ID}>Welcome to the new JobNavigator</Heading>
-        <IconButton title="Close" onClick={onClose} style={{ marginLeft: 'auto' }}>✕</IconButton>
+        <Heading size={19} id={TITLE_ID}><Trans>Welcome to the new JobNavigator</Trans></Heading>
+        <IconButton title={t`Close`} onClick={onClose} style={{ marginLeft: 'auto' }}>✕</IconButton>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '10px 24px 18px' }}>
@@ -56,8 +58,8 @@ export default function NewUiModal({ onClose }) {
       </div>
 
       <FooterRow pad="12px 24px" soft bg="page">
-        <Link href={RELEASE_NOTES_URL} target="_blank">Read the release notes</Link>
-        <Button size="xs" onClick={onClose} style={{ marginLeft: 'auto' }}>Got it</Button>
+        <Link href={RELEASE_NOTES_URL} target="_blank"><Trans>Read the release notes</Trans></Link>
+        <Button size="xs" onClick={onClose} style={{ marginLeft: 'auto' }}><Trans>Got it</Trans></Button>
       </FooterRow>
     </ModalPanel>
   )

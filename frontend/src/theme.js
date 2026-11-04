@@ -13,6 +13,7 @@
 // Each .jn-v2 root mirrors the same two attributes via themeAttrs() — never read localStorage directly in a component.
 
 import { useSyncExternalStore } from 'react'
+import { t } from '@lingui/core/macro'
 
 const APPEARANCE_KEY = 'jobnavigator_appearance'
 const THEME_KEY = 'jobnavigator_theme'
@@ -35,15 +36,15 @@ export const MODE_OPTIONS = MODES.map((m) => [m, MODE_LABEL[m]])
 // so a stored `cobalt` keeps painting while the row reads "Stone".
 export const THEME_LABEL = {
   default: 'Paper',
-  board: 'Green Paper',
-  tone1: 'Tone 1 — ¼ toward Editorial',
-  tone2: 'Tone 2 — ½ toward Editorial',
-  tone3: 'Tone 3 — ¾ toward Editorial',
-  editorial: 'Editorial — original board tones',
-  alt: 'Alt — cool slate',
+  board: t`Green Paper`,
+  tone1: t`Tone 1 — ¼ toward Editorial`,
+  tone2: t`Tone 2 — ½ toward Editorial`,
+  tone3: t`Tone 3 — ¾ toward Editorial`,
+  editorial: t`Editorial — original board tones`,
+  alt: t`Alt — cool slate`,
   cobalt: 'Stone',
-  saas: 'V1 Style',
-  win98: 'Windows 98',
+  saas: t`V1 Style`,
+  win98: t`Windows 98`,
 }
 /** Options for the Settings picker: the shipped five, plus `current` when it is one of the hidden stops, so the box never reads blank on a machine that stored one. */
 export const themeOptions = (current) =>
@@ -164,7 +165,7 @@ export function useTheme() {
 export const themeAttrs = (s) => ({ 'data-appearance': s.resolved, 'data-theme': s.theme })
 
 /** Rail tooltip: "Appearance: Dark — click to switch". */
-export const appearanceTitle = (mode) => `Appearance: ${MODE_LABEL[mode] || mode} — click to switch`
+export const appearanceTitle = (mode) => t`Appearance: ${MODE_LABEL[mode] || mode} — click to switch`
 
 // The boot script already stamped <html>; re-stamping here costs nothing and
 // covers the case where localStorage was unreadable at boot but readable now.

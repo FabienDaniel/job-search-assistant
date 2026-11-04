@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Newspaper, Search, Building2, Send, FileUser, Mail,
@@ -23,20 +25,20 @@ import './theme.css'
 // labels fade, so both never show at once. Warnings survive collapse as an
 // amber dot beside the icon since the label/count are gone.
 const GROUPS = [
-  { label: 'Find', items: [
-    { to: '/feed', label: 'Jobs', ready: true, countKey: 'jobs', Icon: Newspaper },
-    { to: '/searches', label: 'Searches', ready: true, countKey: 'searches', Icon: Search, warnKey: 'searches' },
-    { to: '/companies', label: 'Companies', ready: true, countKey: 'companies', Icon: Building2, warnKey: 'companies' },
+  { label: t`Find`, items: [
+    { to: '/feed', label: t`Jobs`, ready: true, countKey: 'jobs', Icon: Newspaper },
+    { to: '/searches', label: t`Searches`, ready: true, countKey: 'searches', Icon: Search, warnKey: 'searches' },
+    { to: '/companies', label: t`Companies`, ready: true, countKey: 'companies', Icon: Building2, warnKey: 'companies' },
   ]},
-  { label: 'Apply', items: [
-    { to: '/applications', label: 'Applications', ready: true, countKey: 'apps', Icon: Send },
-    { to: '/resumes', label: 'Résumés', ready: true, countKey: 'resumes', Icon: FileUser },
-    { to: '/cover-letters', label: 'Cover Letters', ready: true, countKey: 'letters', Icon: Mail },
+  { label: t`Apply`, items: [
+    { to: '/applications', label: t`Applications`, ready: true, countKey: 'apps', Icon: Send },
+    { to: '/resumes', label: t`Résumés`, ready: true, countKey: 'resumes', Icon: FileUser },
+    { to: '/cover-letters', label: t`Cover Letters`, ready: true, countKey: 'letters', Icon: Mail },
   ]},
-  { label: 'You', items: [
-    { to: '/persona', label: 'Persona', ready: true, Icon: Fingerprint },
-    { to: '/stats', label: 'Stats', ready: true, Icon: ChartLine },
-    { to: '/settings', label: 'Settings', ready: true, Icon: SettingsIcon },
+  { label: t`You`, items: [
+    { to: '/persona', label: t`Persona`, ready: true, Icon: Fingerprint },
+    { to: '/stats', label: t`Stats`, ready: true, Icon: ChartLine },
+    { to: '/settings', label: t`Settings`, ready: true, Icon: SettingsIcon },
     // API docs link lives in the Settings footer instead
   ]},
 ]
@@ -97,7 +99,7 @@ function AccountSwitcher({ open }) {
   useEffect(() => {
     if (!multi) return
     const note = takeSwitchedNote()
-    if (note) push({ kind: 'success', msg: `Switched to ${note.name}` })
+    if (note) push({ kind: 'success', msg: t`Switched to ${note.name}` })
   }, [multi, push])
 
   const switchTo = useCallback(async (a) => {
@@ -111,7 +113,7 @@ function AccountSwitcher({ open }) {
     } catch (err) {
       const f = authFailure(err)
       if (f && ['pin_required', 'wrong_pin', 'pin_cooldown'].includes(f.kind)) openPicker(a)
-      else if (!f) push({ kind: 'error', msg: `Could not switch to ${a.name}` })
+      else if (!f) push({ kind: 'error', msg: t`Could not switch to ${a.name}` })
       setBusy(false)
     }
   }, [me, busy, push])
@@ -151,7 +153,7 @@ function AccountSwitcher({ open }) {
   return (
     <div className="v2-railfoot v2-railacct" style={{ flex: '0 0 auto', padding: open ? '6px 8px' : '6px 0', borderTop: '1px solid var(--rail-line)', transition: 'padding .32s ease' }}>
       <div ref={trig} onClick={toggle} {...kb(toggle)} aria-haspopup="menu" aria-expanded={menu ? 'true' : 'false'}
-        aria-label={`${me.name}, ${roleLabel(me)} — switch account`} title={open ? 'Switch account' : `${me.name} · ${roleLabel(me)}`}
+        aria-label={t`${me.name}, ${roleLabel(me)} — switch account`} title={open ? t`Switch account` : `${me.name} · ${roleLabel(me)}`}
         data-account-switcher="" className="v2-navdark"
         style={{ display: 'flex', alignItems: 'center', justifyContent: open ? 'flex-start' : 'center', gap: 9, height: 36, padding: open ? '0 8px' : 0, cursor: 'pointer', whiteSpace: 'nowrap', color: 'var(--rail-dim)', opacity: busy ? 0.6 : 1 }}>
         <Avatar name={me.name} color={me.color} size={22} />
@@ -164,9 +166,9 @@ function AccountSwitcher({ open }) {
         {open && <span aria-hidden="true" style={{ flex: '0 0 auto', fontSize: 9, color: 'var(--rail-dim)' }}>{menu ? '▾' : '▴'}</span>}
       </div>
       {menu && (
-        <Menu ariaLabel="Accounts" onDismiss={() => setMenu(null)}
+        <Menu ariaLabel={t`Accounts`} onDismiss={() => setMenu(null)}
           style={{ position: 'fixed', left: menu.left, bottom: menu.bottom, width: MENU_W, zIndex: 60, whiteSpace: 'normal' }}>
-          <MenuHead>Switch account</MenuHead>
+          <MenuHead><Trans>Switch account</Trans></MenuHead>
           {accounts.map((a, i) => {
             const cur = a.id === me.id
             return (
@@ -177,18 +179,18 @@ function AccountSwitcher({ open }) {
                   <Avatar name={a.name} color={a.color} size={20} />
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                     <span style={{ lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
-                    <Helper size="xs">{roleLabel(a)}{a.has_pin ? ' · PIN' : ''}</Helper>
+                    <Helper size="xs">{roleLabel(a)}{a.has_pin ? t` · PIN` : ''}</Helper>
                   </span>
-                  {cur && <CheckGlyph size={11} title="Current account" />}
+                  {cur && <CheckGlyph size={11} title={t`Current account`} />}
                 </span>
               </MenuItem>
             )
           })}
           {/* R6-11: at the cap the item stays visible, disabled, and says why */}
           {owner && (full
-            ? <MenuItem icon="+" divider disabled hint={`${MAX_ACCOUNTS} max`} ariaLabel={`Add account — the limit is ${MAX_ACCOUNTS} accounts`}>Add account…</MenuItem>
-            : <MenuItem icon="+" divider onClick={() => go('/settings#add-account')}>Add account…</MenuItem>)}
-          <MenuItem icon="⚙" divider={!owner} hint="Settings" onClick={() => go('/settings#accounts')}>Manage accounts</MenuItem>
+            ? <MenuItem icon="+" divider disabled hint={t`${MAX_ACCOUNTS} max`} ariaLabel={t`Add account — the limit is ${MAX_ACCOUNTS} accounts`}><Trans>Add account…</Trans></MenuItem>
+            : <MenuItem icon="+" divider onClick={() => go('/settings#add-account')}><Trans>Add account…</Trans></MenuItem>)}
+          <MenuItem icon="⚙" divider={!owner} hint={t`Settings`} onClick={() => go('/settings#accounts')}><Trans>Manage accounts</Trans></MenuItem>
         </Menu>
       )}
       {toasts.length > 0 && <ToastStack toasts={toasts} onClose={dismiss} />}
@@ -310,28 +312,29 @@ export default function Shell() {
   const healthy = !down && !versionWarn && failing === 0 && health?.status !== 'failed'
   // rail gives this line ~166px at 11.5px; unhealthy variant drops the
   // timestamp rather than ellipsing away the part that matters
+  const healthAgo = ago(health?.finished_at || health?.started_at) || '—'
   const healthText = down
-    ? 'Backend unreachable'
+    ? t`Backend unreachable`
     : versionWarn
     ? versionWarn.short
     : failing
-      ? `${failing} source${failing === 1 ? ' needs' : 's need'} attention`
+      ? plural(failing, { one: '# source needs attention', other: '# sources need attention' })
       : health
-        ? `Scraper ${health.status === 'failed' ? 'run failed' : 'healthy'} · ${ago(health.finished_at || health.started_at) || '—'}`
-        : 'No scrape recorded yet'
+        ? (health.status === 'failed' ? t`Scraper run failed · ${healthAgo}` : t`Scraper healthy · ${healthAgo}`)
+        : t`No scrape recorded yet`
   // label merges both signals into one number; tooltip names them separately
   const nC = warn.companies || 0
   const nS = warn.searches || 0
   const lastSweep = health ? (ago(health.finished_at || health.started_at) || '—') : 'no scrape run recorded yet'
   const healthTip = down
-    ? 'The dashboard could not reach the backend. Nothing below is live — check that the server is running.'
+    ? t`The dashboard could not reach the backend. Nothing below is live — check that the server is running.`
     : versionWarn
     ? versionWarn.message
     : failing
-    ? `${nC} compan${nC === 1 ? 'y' : 'ies'} and ${nS} search${nS === 1 ? '' : 'es'} need attention. Click to open Run history.`
+    ? t`${plural(nC, { one: '# company', other: '# companies' })} and ${plural(nS, { one: '# search', other: '# searches' })} need attention. Click to open Run history.`
     : health?.status === 'failed'
-      ? `All companies and searches are healthy, but the last scrape run failed ${lastSweep}. Click to open Run history.`
-      : `All companies and searches healthy · last scrape run ${lastSweep}. Click to open Run history.`
+      ? t`All companies and searches are healthy, but the last scrape run failed ${lastSweep}. Click to open Run history.`
+      : t`All companies and searches healthy · last scrape run ${lastSweep}. Click to open Run history.`
 
   const W = open ? 206 : 50
   const padX = open ? 20 : 13
@@ -368,7 +371,7 @@ export default function Shell() {
                 const count = it.countKey != null ? counts[it.countKey] : undefined
                 const warned = it.warnKey ? (warn[it.warnKey] || 0) > 0 : false
                 const { Icon } = it
-                const tip = open ? undefined : `${it.label}${count != null ? ` · ${count}` : ''}${warned ? ' · needs attention' : ''}`
+                const tip = open ? undefined : `${it.label}${count != null ? ` · ${count}` : ''}${warned ? ` · ${t`needs attention`}` : ''}`
                 const base = {
                   position: 'relative', display: 'flex', alignItems: 'center', height: 34,
                   // the 3px left border is inside the 50px column, so collapsed
@@ -410,11 +413,11 @@ export default function Shell() {
                         --rail-accent, so nothing about the default theme moves. */}
                     {it.countKey != null && <span style={{ flex: '0 0 auto', minWidth: open ? 18 : 0, width: open ? undefined : 0, textAlign: 'right', overflow: 'hidden', fontFamily: 'var(--mono)', fontSize: 11, color: active ? 'var(--rail-count-active)' : 'var(--rail-dim)', opacity: open ? (fade ? .6 : 1) : 0, transform: 'translateY(var(--count-shift))', transition: 'opacity .15s' }}>{count != null ? count : ''}</span>}
                     {/* ui: keep — 5px "needs attention" rail dot, not a control */}
-                    {!open && warned && <span title="Needs attention" style={{ position: 'absolute', top: 8, left: 'calc(50% + 5px)', width: 5, height: 5, borderRadius: 'var(--radius-control)', background: 'var(--warn)' }} />}
+                    {!open && warned && <span title={t`Needs attention`} style={{ position: 'absolute', top: 8, left: 'calc(50% + 5px)', width: 5, height: 5, borderRadius: 'var(--radius-control)', background: 'var(--warn)' }} />}
                   </>
                 )
                 if (it.external) return <a key={it.to} href={it.to} target="_blank" rel="noopener noreferrer" title={tip} className="v2-navdark v2-railitem" style={{ ...base, color: 'var(--rail-text)' }}>{inner}</a>
-                if (!it.ready) return <div key={it.to} title={tip || 'Coming in the redesign'} className="v2-railitem" style={{ ...base, color: 'var(--rail-dim)', cursor: 'default' }}>{inner}</div>
+                if (!it.ready) return <div key={it.to} title={tip || t`Coming in the redesign`} className="v2-railitem" style={{ ...base, color: 'var(--rail-dim)', cursor: 'default' }}>{inner}</div>
                 return <NavLink key={it.to} to={it.to} title={tip} className="v2-navdark v2-railitem" style={{ ...base, color: active ? 'var(--rail-active-ink)' : 'var(--rail-text)' }}>{inner}</NavLink>
               })}
             </div>
@@ -439,8 +442,8 @@ export default function Shell() {
         </div>
 
         <div className="v2-railfoot" style={{ display: 'flex', alignItems: 'center', height: 34, padding: `0 12px 0 ${padX}px`, borderTop: '1px solid var(--rail-line)', whiteSpace: 'nowrap', transition: 'padding .32s ease' }}>
-          <span onClick={toggleRail} title={open ? 'Collapse to icons' : 'Expand navigation'} className="v2-navdark" style={{ flex: '0 0 24px', fontSize: 13, color: 'var(--rail-dim)', cursor: 'pointer', display: 'flex', justifyContent: open ? 'flex-start' : 'center' }}>{open ? '‹' : '›'}</span>
-          <span onClick={toggleRail} className="v2-navdark" style={{ flex: 1, fontSize: 12, lineHeight: '18px', color: 'var(--rail-dim)', cursor: 'pointer', opacity: open ? 1 : 0, transition: 'opacity .2s' }}>Collapse</span>
+          <span onClick={toggleRail} title={open ? t`Collapse to icons` : t`Expand navigation`} className="v2-navdark" style={{ flex: '0 0 24px', fontSize: 13, color: 'var(--rail-dim)', cursor: 'pointer', display: 'flex', justifyContent: open ? 'flex-start' : 'center' }}>{open ? '‹' : '›'}</span>
+          <span onClick={toggleRail} className="v2-navdark" style={{ flex: 1, fontSize: 12, lineHeight: '18px', color: 'var(--rail-dim)', cursor: 'pointer', opacity: open ? 1 : 0, transition: 'opacity .2s' }}><Trans>Collapse</Trans></span>
           {/* ui: keep — rail-dark theme toggle (--rail-dim ink, v2-navdark + v2-appearancebtn rail hovers); IconButton reads the light-surface tokens */}
           <span onClick={cycleLook} title={appearanceTip} className="v2-navdark v2-appearancebtn" style={{ flex: '0 0 auto', width: 26, height: 26, borderRadius: 'var(--radius-control)', display: open ? 'flex' : 'none', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--rail-dim)', cursor: 'pointer' }}>{MODE_ICON[look.mode]}</span>
         </div>

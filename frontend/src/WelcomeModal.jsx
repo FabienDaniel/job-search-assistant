@@ -1,4 +1,6 @@
 import React from 'react'
+import { t } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { useNavigate } from 'react-router-dom'
 import { Settings as SettingsIcon, FileUser, Building2, Search } from 'lucide-react'
 import { Button, FooterRow, GlyphBadge, Helper, ModalPanel } from './ui'
@@ -8,10 +10,10 @@ import './theme.css'
 // First-run overlay. Each step is a link to the screen it names, so they
 // stay clickable and hover.
 const STEPS = [
-  [SettingsIcon, 'Set up AI scoring', 'Pick your LLM provider and add its key — Anthropic, OpenAI, Ollama or OpenRouter.', 'settings'],
-  [FileUser, 'Build your résumé + Persona', 'Edit a base résumé and fill Persona (contact, work auth) so jobs score against your profile.', 'resumes'],
-  [Building2, 'Activate a company', 'Enable a seeded company or add your own to start scraping.', 'companies'],
-  [Search, 'Configure a search', 'Enable a keyword search or LinkedIn Personal to discover jobs from boards.', 'searches'],
+  [SettingsIcon, t`Set up AI scoring`, t`Pick your LLM provider and add its key — Anthropic, OpenAI, Ollama or OpenRouter.`, 'settings'],
+  [FileUser, t`Build your résumé + Persona`, t`Edit a base résumé and fill Persona (contact, work auth) so jobs score against your profile.`, 'resumes'],
+  [Building2, t`Activate a company`, t`Enable a seeded company or add your own to start scraping.`, 'companies'],
+  [Search, t`Configure a search`, t`Enable a keyword search or LinkedIn Personal to discover jobs from boards.`, 'searches'],
 ]
 
 export default function WelcomeModal({ onClose }) {
@@ -27,19 +29,19 @@ export default function WelcomeModal({ onClose }) {
     // `escapeCapture`: this overlay mounts outside the shell, so the screen behind
     // it registers its Escape listener first — capture phase is how the topmost
     // overlay keeps the key (R4-E2E-01).
-    <ModalPanel width={420} title="Welcome to JobNavigator" onClose={onClose} escapeCapture zIndex={9998}
+    <ModalPanel width={420} title={t`Welcome to JobNavigator`} onClose={onClose} escapeCapture zIndex={9998}
       scrimProps={{ className: 'jn-v2', ...themeAttrs(look) }}
       scrimStyle={{ padding: 16 }}
       style={{ maxWidth: '100%', overflow: 'hidden' }}>
       <div style={{ padding: '22px 24px 6px', display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'baseline' }}>
           {/* ui: keep — the welcome title is serif 21/26px; the Heading scale is 18/19/22 */}
-          <span className="v2-dialogtitle" style={{ fontFamily: 'var(--serif)', fontSize: 21, fontWeight: 400, letterSpacing: '-.02em', lineHeight: '26px' }}>Welcome to JobNavigator</span>
+          <span className="v2-dialogtitle" style={{ fontFamily: 'var(--serif)', fontSize: 21, fontWeight: 400, letterSpacing: '-.02em', lineHeight: '26px' }}><Trans>Welcome to JobNavigator</Trans></span>
           {/* ui: keep — the modal's own ✕: muted 13 sitting on the title's 26px line box; IconButton is a 26px round box */}
-          <span onClick={onClose} className="v2-hover-accent-text" role="button" aria-label="Close"
+          <span onClick={onClose} className="v2-hover-accent-text" role="button" aria-label={t`Close`}
             style={{ marginLeft: 'auto', fontSize: 13, lineHeight: '26px', color: 'var(--muted)', cursor: 'pointer' }}>✕</span>
         </div>
-        <span style={{ fontSize: 12.5, lineHeight: '18px', color: 'var(--muted)' }}>Four steps to set up automatic searching.</span>
+        <span style={{ fontSize: 12.5, lineHeight: '18px', color: 'var(--muted)' }}><Trans>Four steps to set up automatic searching.</Trans></span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 24px 18px' }}>
@@ -60,7 +62,7 @@ export default function WelcomeModal({ onClose }) {
       {/* `gap="normal"` is the initial value, not a zero: this bar holds one
           button and has never reserved a gap. */}
       <FooterRow pad="12px 24px" soft bg="page" gap="normal">
-        <Button size="xs" onClick={() => go('settings')} style={{ marginLeft: 'auto' }}>Start with Settings →</Button>
+        <Button size="xs" onClick={() => go('settings')} style={{ marginLeft: 'auto' }}><Trans>Start with Settings →</Trans></Button>
       </FooterRow>
     </ModalPanel>
   )
