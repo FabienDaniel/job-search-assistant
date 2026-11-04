@@ -1,6 +1,9 @@
 import { defineConfig } from '@lingui/cli'
+import { formatter } from '@lingui/format-po'
 
 export default defineConfig({
+  // No line numbers: otherwise any edit that moves code would make the catalogs look stale in CI.
+  format: formatter({ lineNumbers: false }),
   sourceLocale: 'en',
   locales: ['en', 'fr'],
   fallbackLocales: { default: 'en' },

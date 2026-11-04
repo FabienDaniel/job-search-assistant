@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "i18n:extract": "lingui extract --clean"
+    "i18n:extract": "lingui extract --clean",
+    "i18n:check": "lingui compile --strict"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@lingui/babel-plugin-lingui-macro": "^6.12.0",
     "@lingui/cli": "^6.12.0",
+    "@lingui/format-po": "^6.12.0",
     "@lingui/vite-plugin": "^6.12.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.1.0",
