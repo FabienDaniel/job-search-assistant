@@ -471,16 +471,19 @@ function ConfigForm({ d, set }) {
             <Helper size="xs"><Trans>0 follows the global schedule from Settings</Trans></Helper>
           </div>
         ) : <div />}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Label><Trans>Import rules</Trans></Label>
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6, minHeight: 31 }}>
-            <Check checked={d.exclude_active_companies} label={t`Skip my active companies`}
-              title={t`Leaves out jobs from companies you scrape (active in Companies, aliases included): their own careers page already brings those in`}
-              onChange={(v) => set({ exclude_active_companies: v })} />
-            {m === 'jobright' && <Check checked={d.require_salary} label={t`Require salary`} title={t`Drop results without a listed salary`}
-              onChange={(v) => set({ require_salary: v })} />}
+        {/* A manual Save to Job Feed keeps its job even at an active company: the click is a choice made for that job. */}
+        {m !== 'extension' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <Label><Trans>Import rules</Trans></Label>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6, minHeight: 31 }}>
+              <Check checked={d.exclude_active_companies} label={t`Skip my active companies`}
+                title={t`Leaves out jobs from companies you scrape (active in Companies, aliases included): their own careers page already brings those in`}
+                onChange={(v) => set({ exclude_active_companies: v })} />
+              {m === 'jobright' && <Check checked={d.require_salary} label={t`Require salary`} title={t`Drop results without a listed salary`}
+                onChange={(v) => set({ require_salary: v })} />}
+            </div>
           </div>
-        </div>
+        ) : <div />}
       </div>
     </>
   )

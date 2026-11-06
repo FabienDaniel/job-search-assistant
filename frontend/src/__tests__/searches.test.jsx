@@ -257,3 +257,25 @@ describe('Direct-link rate · Searches', () => {
     expect(screen.queryByText(/33% direct links/)).toBeNull()
   })
 })
+
+describe('Skip my active companies · Searches', () => {
+  beforeEach(() => { vi.clearAllMocks(); sessionStorage.clear() })
+
+  const open = async (search) => {
+    mockApi([{ ...SEARCH, ...search }])
+    renderScreen()
+    fireEvent.click(await screen.findByText(search.name))
+    await screen.findByText('Save changes')
+  }
+
+  it('the manual Save to Job Feed search has no such option: each save keeps its job', async () => {
+    await open({ id: 'e1', name: 'Extension', search_mode: 'extension', sources: [] })
+    expect(screen.queryByText('Skip my active companies')).toBeNull()
+    expect(screen.queryByText('Import rules')).toBeNull()
+  })
+
+  it('the LinkedIn capture search keeps it', async () => {
+    await open({ id: 'e2', name: 'Extension LI', search_mode: 'linkedin_extension', sources: [] })
+    expect(screen.getByText('Skip my active companies')).toBeTruthy()
+  })
+})
