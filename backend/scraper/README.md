@@ -176,6 +176,7 @@ One posting reaches the app through many links: the company's board, LinkedIn, J
 | `_shared/browser.py` | Playwright lifecycle (`_get_browser`, `_new_page`, `_close_page`) and stealth settings |
 | `_shared/urls.py` | Strict hostname matching (`host_matches`), path matching, apply-link cleanup |
 | `_shared/html_text.py` | HTML descriptions to plain text |
+| `_shared/page_cache.py` | Fetches a job's posting page (HTTP, then Playwright for thin pages) and stores it as clean HTML and text for the reader view, scoring and tailoring. Refuses unsafe URLs and bot walls |
 | `_shared/errors.py` | `BoardNotFoundError` and `raise_if_board_gone` |
 | `_shared/employer_text.py` | Replaces a board's summary with the employer's own description |
 | `_shared/levels_jobs.py` | Reads a levels.fyi job from its page's `__NEXT_DATA__` |
@@ -206,7 +207,7 @@ Use the `test_db` or `api_client` fixture in any test that touches the database.
 These are places where scraping logic lives outside this package, or where the package depends on layers above it.
 
 - **Previews filter with their own code.** `company_pages.preview`, `jobspy.preview` and `levelsfyi.preview` re-implement the filter layers to report a reason per row, instead of calling `_shared/filters.py`. The JobSpy one uses pandas and parses `body_exclusion_phrases` by hand.
-- **Posting-page fetcher in a route.** `api/routes_applications._cache_job_page`, `_fetch_with_playwright` and `_extract_clean_content` fetch and clean posting pages. `analyzer/cv_scorer.py` and `api/routes_jobs.py` import them from there. `routes_applications.extract_posting` and its helpers parse posting URLs in the same file.
+- **Posting-URL parsing in a route.** `api/routes_applications.extract_posting` and its helpers (`_company_from_url`, `_known_posting`) read a posting's title and company from its URL inside the API layer.
 - **Duplicated filters.** `api/routes_jobs.save_from_extension` has its own copy of the title and company filters.
 - **LinkedIn session outside the package.** `backend/refresh_linkedin_session.py` logs in to LinkedIn and is imported by `_shared/linkedin_lookup.py`. The LinkedIn cookie paths are in `accounts/credentials.py`.
 - **Smaller items.** `backend/countries.py` is the Indeed and JobSpy country vocabulary. `main.trigger_backfill_descriptions` loops over the private `_fetch_job_description`. Scrape summaries and health rules are in `scheduler.py` (`_format_scrape_summary`, `check_scrape_health`). `models/db.get_existing_external_ids` is only used by sources. `targets.now_utc` has no callers.

@@ -30,15 +30,15 @@ async def test_cache_job_page_populates_cache_error_on_playwright_failure(monkey
 
     from sqlalchemy.orm import sessionmaker
     TestSession = sessionmaker(bind=test_db.get_bind())
-    monkeypatch.setattr("backend.api.routes_applications.SessionLocal", TestSession, raising=False)
+    monkeypatch.setattr("backend.scraper._shared.page_cache.SessionLocal", TestSession, raising=False)
 
     async def broken_fetch(*a, **kw):
         raise RuntimeError("browser connection refused")
 
     for attr in ("_fetch_with_playwright", "_cache_with_playwright", "_playwright_fetch"):
-        if hasattr(__import__("backend.api.routes_applications", fromlist=[""]), attr):
+        if hasattr(__import__("backend.scraper._shared.page_cache", fromlist=[""]), attr):
             monkeypatch.setattr(
-                f"backend.api.routes_applications.{attr}",
+                f"backend.scraper._shared.page_cache.{attr}",
                 broken_fetch,
                 raising=False,
             )
@@ -59,7 +59,7 @@ async def test_cache_job_page_populates_cache_error_on_playwright_failure(monkey
     client.__aexit__ = AsyncMock(return_value=False)
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: client)
 
-    from backend.api.routes_applications import _cache_job_page
+    from backend.scraper._shared.page_cache import _cache_job_page
     try:
         await _cache_job_page(str(job.id), job.url)
     except Exception:

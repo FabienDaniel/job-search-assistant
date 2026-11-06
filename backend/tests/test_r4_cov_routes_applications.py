@@ -1,9 +1,10 @@
 """R4-T6 · line coverage for the branches of `backend/api/routes_applications.py`
 the contract pass (T1) never reached.
 
-T1 drove the CRUD surface. What stayed dark was the page-caching machinery
-(`_extract_clean_content`, `_fetch_with_playwright`, `_cache_job_page` and each
-of its five failure arms), the posting-URL reader (`_company_from_url`,
+T1 drove the CRUD surface. What stayed dark was the page-caching machinery in
+`backend/scraper/_shared/page_cache.py` (`_extract_clean_content`,
+`_fetch_with_playwright`, `_cache_job_page` and each of its five failure arms),
+the posting-URL reader (`_company_from_url`,
 `_is_ats_brand`, `_title_slug`, `_decode_entities`, `POST /extract`), the
 interview `when_at` re-parse, and the whole `GET /{id}/prep` bundle.
 
@@ -16,7 +17,7 @@ import pytest
 
 # Bound BEFORE `_no_outbound` replaces the module attribute with a no-op, so the
 # real coroutine is still reachable from these tests.
-from backend.api.routes_applications import _cache_job_page as real_cache_job_page
+from backend.scraper._shared.page_cache import _cache_job_page as real_cache_job_page
 
 from backend.tests.r4_support import (  # noqa: F401
     client, _clear_running_state, _no_outbound, assert_clean,
@@ -96,7 +97,7 @@ def _make_app(db, **job_kw):
 # ── _extract_clean_content ───────────────────────────────────────────────────
 
 def test_extract_clean_content_drops_chrome_and_controls():
-    from backend.api.routes_applications import _extract_clean_content
+    from backend.scraper._shared.page_cache import _extract_clean_content
     html = ("<html><body><nav>menu</nav><script>x=1</script><style>a{}</style>"
             "<form><input><button>Apply</button></form>"
             "<p>Real body text</p><footer>legal</footer></body></html>")
@@ -107,7 +108,7 @@ def test_extract_clean_content_drops_chrome_and_controls():
 
 
 def test_extract_clean_content_drops_hidden_nodes():
-    from backend.api.routes_applications import _extract_clean_content
+    from backend.scraper._shared.page_cache import _extract_clean_content
     html = ('<body><p aria-hidden="true">hidden a</p>'
             '<p style="display: none">hidden b</p><p>visible</p></body>')
     _, text = _extract_clean_content(html)
@@ -116,14 +117,14 @@ def test_extract_clean_content_drops_hidden_nodes():
 
 
 def test_extract_clean_content_unwraps_unknown_tags_but_keeps_their_text():
-    from backend.api.routes_applications import _extract_clean_content
+    from backend.scraper._shared.page_cache import _extract_clean_content
     clean, text = _extract_clean_content("<body><marquee>kept text</marquee></body>")
     assert "kept text" in text
     assert "marquee" not in clean
 
 
 def test_extract_clean_content_keeps_only_href_on_links():
-    from backend.api.routes_applications import _extract_clean_content
+    from backend.scraper._shared.page_cache import _extract_clean_content
     clean, _ = _extract_clean_content(
         '<body><a href="/apply" class="btn" onclick="go()">Apply here</a>'
         '<a name="anchor">bare</a></body>')
@@ -133,13 +134,13 @@ def test_extract_clean_content_keeps_only_href_on_links():
 
 
 def test_extract_clean_content_strips_attributes_from_kept_tags():
-    from backend.api.routes_applications import _extract_clean_content
+    from backend.scraper._shared.page_cache import _extract_clean_content
     clean, _ = _extract_clean_content('<body><p id="x" data-y="z">text</p></body>')
     assert "<p>text</p>" in clean
 
 
 def test_extract_clean_content_collapses_break_runs_and_empty_divs():
-    from backend.api.routes_applications import _extract_clean_content
+    from backend.scraper._shared.page_cache import _extract_clean_content
     clean, _ = _extract_clean_content(
         "<body>a<br><br><br><br>b<div></div><div></div><div></div>c</body>")
     assert clean.count("<br") <= 2
@@ -147,13 +148,13 @@ def test_extract_clean_content_collapses_break_runs_and_empty_divs():
 
 
 def test_extract_clean_content_without_a_body_uses_the_whole_soup():
-    from backend.api.routes_applications import _extract_clean_content
+    from backend.scraper._shared.page_cache import _extract_clean_content
     clean, text = _extract_clean_content("<p>fragment only</p>")
     assert "fragment only" in text and "fragment only" in clean
 
 
 def test_extract_clean_content_caps_the_text_at_fifty_thousand_chars():
-    from backend.api.routes_applications import _extract_clean_content
+    from backend.scraper._shared.page_cache import _extract_clean_content
     _, text = _extract_clean_content("<body><p>" + ("word " * 40000) + "</p></body>")
     assert len(text) == 50_000
 
@@ -165,7 +166,7 @@ async def test_fetch_with_playwright_revalidates_the_url_before_launching(monkey
     """The SSRF gate runs first: a rejected URL never opens a browser."""
     from backend.scraper._shared.url_safety import UnsafeURLError
     import backend.scraper._shared.browser as br
-    from backend.api.routes_applications import _fetch_with_playwright
+    from backend.scraper._shared.page_cache import _fetch_with_playwright
     _patch_url_safety(monkeypatch, gate=UnsafeURLError("link-local"))
     opened = []
     monkeypatch.setattr(br, "_get_browser",
@@ -179,7 +180,7 @@ async def test_fetch_with_playwright_revalidates_the_url_before_launching(monkey
 async def test_fetch_with_playwright_returns_the_rendered_content(monkeypatch):
     """Happy path: the page is closed, then the browser, then the driver."""
     import backend.scraper._shared.browser as br
-    from backend.api.routes_applications import _fetch_with_playwright
+    from backend.scraper._shared.page_cache import _fetch_with_playwright
     _patch_url_safety(monkeypatch, gate=True)
     order = []
 
@@ -251,7 +252,7 @@ async def test_cache_job_page_records_an_unsafe_url(test_db, monkeypatch):
 async def test_cache_job_page_records_an_unsafe_redirect_and_does_not_fall_back(test_db, monkeypatch):
     """A redirect into a private range must not be retried with Playwright."""
     from backend.scraper._shared.url_safety import UnsafeURLError
-    import backend.api.routes_applications as ra
+    import backend.scraper._shared.page_cache as ra
     _patch_url_safety(monkeypatch, gate=True, safe_get=UnsafeURLError("redirect to 10.0.0.1"))
     tried = []
     monkeypatch.setattr(ra, "_fetch_with_playwright", lambda url: tried.append(url))
@@ -277,7 +278,7 @@ async def test_cache_job_page_stores_a_good_fetch_and_clears_a_stale_error(test_
 
 @pytest.mark.asyncio
 async def test_cache_job_page_falls_back_to_playwright_when_httpx_fails(test_db, monkeypatch):
-    import backend.api.routes_applications as ra
+    import backend.scraper._shared.page_cache as ra
     _patch_url_safety(monkeypatch, gate=True, safe_get=RuntimeError("403 Forbidden"))
 
     async def _pw(url):
@@ -294,7 +295,7 @@ async def test_cache_job_page_falls_back_to_playwright_when_httpx_fails(test_db,
 @pytest.mark.asyncio
 async def test_cache_job_page_falls_back_on_thin_html_too(test_db, monkeypatch):
     """A 200 that renders almost nothing is treated as a miss, not a success."""
-    import backend.api.routes_applications as ra
+    import backend.scraper._shared.page_cache as ra
     _patch_url_safety(monkeypatch, gate=True,
                       safe_get=_Resp(text="<html><body><div id=root></div></body></html>"))
 
@@ -315,7 +316,7 @@ _CHALLENGE_HTML = ("<html><head><title>Just a moment...</title></head><body>"
 @pytest.mark.asyncio
 async def test_cache_job_page_never_stores_a_bot_wall(test_db, monkeypatch):
     """The cached text is tailoring's last-resort JD, so a challenge page must not land there."""
-    import backend.api.routes_applications as ra
+    import backend.scraper._shared.page_cache as ra
     _patch_url_safety(monkeypatch, gate=True, safe_get=_Resp(text=_CHALLENGE_HTML))
     tried = []
 
@@ -334,7 +335,7 @@ async def test_cache_job_page_never_stores_a_bot_wall(test_db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_cache_job_page_records_a_playwright_failure(test_db, monkeypatch):
-    import backend.api.routes_applications as ra
+    import backend.scraper._shared.page_cache as ra
     _patch_url_safety(monkeypatch, gate=True, safe_get=RuntimeError("connection reset"))
 
     async def _pw(url):
@@ -351,7 +352,7 @@ async def test_cache_job_page_records_a_playwright_failure(test_db, monkeypatch)
 @pytest.mark.asyncio
 async def test_cache_job_page_records_no_usable_content(test_db, monkeypatch):
     """Both fetchers succeeded but the page carries no text worth keeping."""
-    import backend.api.routes_applications as ra
+    import backend.scraper._shared.page_cache as ra
     _patch_url_safety(monkeypatch, gate=True, safe_get=_Resp(text="<html><body>hi</body></html>"))
 
     async def _pw(url):
@@ -367,7 +368,7 @@ async def test_cache_job_page_records_no_usable_content(test_db, monkeypatch):
 @pytest.mark.asyncio
 async def test_cache_job_page_records_an_unexpected_failure(test_db, monkeypatch):
     """An exception outside the fetch arms still lands in `cache_error`."""
-    import backend.api.routes_applications as ra
+    import backend.scraper._shared.page_cache as ra
     _patch_url_safety(monkeypatch, gate=True, safe_get=_Resp(text=_GOOD_HTML))
 
     def _boom(raw):
@@ -403,7 +404,7 @@ async def test_cache_job_page_rolls_back_when_recording_an_unsafe_redirect_fails
 
 @pytest.mark.asyncio
 async def test_cache_job_page_rolls_back_when_recording_no_content_fails(test_db, monkeypatch):
-    import backend.api.routes_applications as ra
+    import backend.scraper._shared.page_cache as ra
     job = make_job(test_db)
     _patch_url_safety(monkeypatch, gate=True, safe_get=_Resp(text="<html><body>hi</body></html>"))
 
@@ -418,7 +419,7 @@ async def test_cache_job_page_rolls_back_when_recording_no_content_fails(test_db
 
 @pytest.mark.asyncio
 async def test_cache_job_page_rolls_back_when_recording_an_unexpected_failure_fails(test_db, monkeypatch):
-    import backend.api.routes_applications as ra
+    import backend.scraper._shared.page_cache as ra
     job = make_job(test_db)
     _patch_url_safety(monkeypatch, gate=True, safe_get=_Resp(text=_GOOD_HTML))
 

@@ -134,9 +134,10 @@ def _no_outbound(monkeypatch):
 
     import backend.api.routes_applications as ra
     import backend.api.routes_companies as rc
+    import backend.scraper._shared.page_cache as page_cache
     import backend.analyzer.h1b_checker as h1b
 
-    monkeypatch.setattr(ra, "_cache_job_page", _noop, raising=False)
+    monkeypatch.setattr(page_cache, "_cache_job_page", _noop)
     monkeypatch.setattr(ra, "_fetch_and_store_description", _noop, raising=False)
     monkeypatch.setattr(rc, "_fire_h1b_async", _noop, raising=False)
     monkeypatch.setattr(h1b, "fetch_h1b_for_company_id", _noop, raising=False)

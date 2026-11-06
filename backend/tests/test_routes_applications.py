@@ -21,7 +21,7 @@ def _stub_background_tasks(monkeypatch):
     async def _noop_cache(*a, **kw):
         return None
     monkeypatch.setattr(
-        "backend.api.routes_applications._cache_job_page",
+        "backend.scraper._shared.page_cache._cache_job_page",
         _noop_cache,
         raising=False,
     )

@@ -973,7 +973,8 @@ def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session
 
     # The enrichment the hand-logged application path runs: without it the first
     # score, tailor or cover letter pays for the fetch.
-    from backend.api.routes_applications import _cache_job_page, _fetch_and_store_description
+    from backend.api.routes_applications import _fetch_and_store_description
+    from backend.scraper._shared.page_cache import _cache_job_page
     background_tasks.add_task(_cache_job_page, str(job.id), url)
     background_tasks.add_task(_fetch_and_store_description, str(job.id), url)
 
@@ -1105,7 +1106,7 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
 
     if updates.get("status") == "applied":
         if job_link(job) and not job.has_cached_page:
-            from backend.api.routes_applications import _cache_job_page
+            from backend.scraper._shared.page_cache import _cache_job_page
             background_tasks.add_task(_cache_job_page, str(job.id), job_link(job))
 
         from backend.models.db import Application
@@ -1150,7 +1151,7 @@ def cache_applied_jobs(background_tasks: BackgroundTasks, db: Session = Depends(
     ).all()
 
     for job in jobs:
-        from backend.api.routes_applications import _cache_job_page
+        from backend.scraper._shared.page_cache import _cache_job_page
         background_tasks.add_task(_cache_job_page, str(job.id), job_link(job))
 
     return {"queued": len(jobs)}
@@ -1258,7 +1259,7 @@ async def get_live_page(job_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No posting URL captured for this job")
 
     from backend.scraper._shared.url_safety import safe_get, UnsafeURLError
-    from backend.api.routes_applications import _extract_clean_content
+    from backend.scraper._shared.page_cache import _extract_clean_content
     try:
         resp = await safe_get(job_link(job), timeout=20, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",

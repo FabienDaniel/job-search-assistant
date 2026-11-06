@@ -319,7 +319,7 @@ async def _fetch_job_text(job_id, url: str) -> str | None:
         return await _levels_text(job_id, url)
     logger.info(f"Job {job_id}: no text available, fetching live page")
     try:
-        from backend.api.routes_applications import _cache_job_page
+        from backend.scraper._shared.page_cache import _cache_job_page
         await _cache_job_page(str(job_id), url)
     except Exception as e:
         logger.warning(f"Job {job_id}: live page fetch failed: {e}")
