@@ -3,6 +3,8 @@
 //
 // HOW TO USE
 //   import { Button, Pill, Input, Card, Helper } from './ui'
+import { t } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 //   <Button onClick={save} busy={saving}>Save</Button>
 //   <Pill on={filterOn} size="sm" onClick={toggle}>Remote</Pill>
 //
@@ -489,7 +491,7 @@ export function Textarea({ value, defaultValue, onChange, placeholder, rows = 3,
 // Both take the accent on focus from theme.css — no ring either way. The boxed
 // variant matches Input/Select's 32px box; the underline variant is a visually
 // different control with its own 36.
-export function SearchInput({ value, onChange, placeholder = 'Search…', variant = 'boxed', width, invalid, ariaLabel, style, className }) {
+export function SearchInput({ value, onChange, placeholder = t`Search…`, variant = 'boxed', width, invalid, ariaLabel, style, className }) {
   const under = variant === 'underline'
   const field = under
     ? {
@@ -594,7 +596,7 @@ export function Select({ value, options = [], onPick, width, mono, placeholder, 
           // LINE BOX, not the ink, and win98's fallback faces reserve more room
           // under the baseline than this label's ink uses (theme.css, round 12).
           transform: 'translateY(var(--select-label-shift))',
-        }}>{cur ? cur[1] : (placeholder || 'Select…')}</span>
+        }}>{cur ? cur[1] : (placeholder || t`Select…`)}</span>
         <span aria-hidden="true" style={{ flex: '0 0 auto', fontSize: 'var(--t-9)', color: 'var(--icon-btn-ink)' }}>▾</span>
       </div>
       {open && (
@@ -607,7 +609,7 @@ export function Select({ value, options = [], onPick, width, mono, placeholder, 
         }}>
           {options.length === 0 ? (
             <div style={{ padding: '7px 9px', fontSize: 'var(--t-11-5)', lineHeight: '16px', color: 'var(--helper-ink)' }}>
-              {emptyText || 'Nothing to pick yet.'}
+              {emptyText || t`Nothing to pick yet.`}
             </div>
           ) : options.map((o) => {
             const sel = String(o[0]) === String(value ?? '')
@@ -1163,7 +1165,7 @@ export function Avatar({ name, color, size = 22, title, style, className }) {
   const fill = HEX6.test(c) ? c : ''
   const swatch = fill ? ACCOUNT_SWATCHES.indexOf(fill) : -1
   return (
-    <span role="img" aria-label={title || name || 'Account'} title={title}
+    <span role="img" aria-label={title || name || t`Account`} title={title}
       className={cx('v2-avatar', className)} data-swatch={swatch >= 0 ? String(swatch) : undefined}
       style={{
         flex: '0 0 auto', width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -1271,8 +1273,8 @@ export function PinPad({
   }
 
   const msg = cooling
-    ? `Too many tries · try again in ${left}s`
-    : error || (busy ? 'Checking…' : hint || '')
+    ? t`Too many tries · try again in ${left}s`
+    : error || (busy ? t`Checking…` : hint || '')
   const bad = cooling || !!error
   return (
     <div className={className} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, ...style }}>
@@ -1284,7 +1286,7 @@ export function PinPad({
               value={d} onChange={onChange(i)} onKeyDown={onKeyDown(i)} onPaste={onPaste(i)}
               onFocus={(e) => { try { e.target.select() } catch { /* jsdom */ } }}
               readOnly={!!busy} disabled={cooling}
-              aria-label={`${ariaLabel} digit ${i + 1}`} aria-invalid={bad ? 'true' : undefined} aria-describedby={msgId}
+              aria-label={t`${ariaLabel} digit ${i + 1}`} aria-invalid={bad ? 'true' : undefined} aria-describedby={msgId}
               className="v2-inset" style={{ ...PIN_CELL, opacity: cooling ? 0.6 : 1 }} />
           ))}
         </div>
@@ -1678,7 +1680,7 @@ function ScorePill({ value, busy, size }) {   // the tile paints from --sc-*, no
           <span style={{
             fontFamily: 'var(--font-body)', fontSize: 'var(--t-9)', fontWeight: 'var(--weight-semibold)',
             letterSpacing: '.08em', textTransform: 'uppercase', opacity: 0.7, marginTop: 2,
-          }}>fit</span>
+          }}><Trans>fit</Trans></span>
         </>
       )}
     </span>
@@ -1767,7 +1769,7 @@ function ScoreAscii({ value, busy, ink, size }) {
 const SCORE_VARIANT = { pill: ScorePill, bar: ScoreBar, ascii: ScoreAscii }
 // `variant` is an override for the gallery, which shows all four side by side;
 // every real call site leaves it out and takes the theme's own.
-export function ScoreRing({ value, size = 'md', weight, tone, label = 'No fit', busy, variant, title, ariaLabel, children, style, className }) {
+export function ScoreRing({ value, size = 'md', weight, tone, label = t`No fit`, busy, variant, title, ariaLabel, children, style, className }) {
   const z = typeof size === 'number' ? { ...RING_SIZE.md, box: size } : (RING_SIZE[size] || RING_SIZE.md)
   const t = RING_TONE[tone || scoreTone(value)] || RING_TONE.neutral
   const themeVariant = useThemeVar('--ring-variant', 'ring')
@@ -1887,15 +1889,15 @@ export function ZoomFloater({ zoom = 100, onIn, onOut, onReset, style, className
   }
   return (
     <div className={cx('v2-zoomfloat', className)}
-      title={`Zoom ${zoom}% · double-click to reset · hide in Settings`}
+      title={t`Zoom ${zoom}% · double-click to reset · hide in Settings`}
       onDoubleClick={(e) => { e.stopPropagation(); onReset && onReset(e) }}
       style={{
         display: 'inline-flex', flexDirection: 'column', gap: 1, padding: 3,
         borderRadius: 'var(--radius-control)', background: 'var(--rail)', color: 'var(--rail-text)',
         boxShadow: 'var(--shadow-pop)', opacity: 0.55, ...style,
       }}>
-      {glyph('Zoom in', '+', zoom >= ZOOM_MAX, onIn)}
-      {glyph('Zoom out', '−', zoom <= ZOOM_MIN, onOut)}
+      {glyph(t`Zoom in`, '+', zoom >= ZOOM_MAX, onIn)}
+      {glyph(t`Zoom out`, '−', zoom <= ZOOM_MIN, onOut)}
     </div>
   )
 }
@@ -1939,11 +1941,11 @@ export function NavLink({ pad, onClick, title, ariaLabel, children, style, class
 // RemoveLink is the worded form ("Remove role") that closes a card; RemoveX the
 // glyph a single row carries. Both are muted at rest and swing to --hover-bad-*
 // on hover (`v2-hover-bad` washes the box, `v2-hover-bad-text` the ink).
-export const RemoveLink = ({ onClick, children = 'Remove' }) => (
+export const RemoveLink = ({ onClick, children = t`Remove` }) => (
   <span {...act(onClick, false)} className="v2-hover-bad v2-hover-bad-text"
     style={{ fontSize: 'var(--t-11-5)', lineHeight: '17px', color: 'var(--helper-ink)', cursor: 'pointer', whiteSpace: 'nowrap' }}>{children}</span>
 )
-export const RemoveX = ({ onClick, title = 'Remove', size = 11, lh }) => (
+export const RemoveX = ({ onClick, title = t`Remove`, size = 11, lh }) => (
   <span {...act(onClick, false)} title={title} aria-label={title} className="v2-hover-bad v2-hover-bad-text"
     style={{ flex: '0 0 auto', color: 'var(--helper-ink)', fontSize: size, cursor: 'pointer', lineHeight: lh }}>✕</span>
 )
@@ -1959,8 +1961,8 @@ export function MoveArrows({ onUp, onDown, upOff, downOff, style, className }) {
       flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: 1,
       color: 'var(--helper-ink)', fontSize: 8, ...style,
     }}>
-      {arrow(onUp, upOff, 'Move up', '▲')}
-      {arrow(onDown, downOff, 'Move down', '▼')}
+      {arrow(onUp, upOff, t`Move up`, '▲')}
+      {arrow(onDown, downOff, t`Move down`, '▼')}
     </span>
   )
 }
@@ -2204,7 +2206,7 @@ export function HeaderRow({
       }}>
         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</span>
         <span style={{ marginLeft: 'auto', flex: '0 0 auto', display: 'flex', gap: 2 }}>
-          <span className="v2-raised" aria-label="Minimize" aria-disabled="true" title="Minimize"
+          <span className="v2-raised" aria-label={t`Minimize`} aria-disabled="true" title={t`Minimize`}
             style={{ ...glyphBox, backgroundImage: TITLE_GLYPH.min, backgroundSize: '9px 3px', backgroundPosition: 'bottom 4px left 5px', cursor: 'default' }} />
           {/* The □ and × sat a pixel down-and-right of the optical box the _ holds.
               Glyph centres in the 20x18 button were: _ (9x3 at bottom 4 / left 5)
@@ -2214,10 +2216,10 @@ export function HeaderRow({
               and × at x10/y8.5. The glyph is the background of the button itself,
               so the disabled pair moves with it — there is no second drawing for
               the greyed state, only the #808080 fill baked into min/max. */}
-          <span className="v2-raised" aria-label="Maximize" aria-disabled="true" title="Maximize"
+          <span className="v2-raised" aria-label={t`Maximize`} aria-disabled="true" title={t`Maximize`}
             style={{ ...glyphBox, backgroundImage: TITLE_GLYPH.max, backgroundSize: '13px 13px', backgroundPosition: 'top 2px left 3px', cursor: 'default' }} />
           <span className="v2-raised"
-            {...(onClose ? { ...act(onClose, false), title: 'Close', 'aria-label': 'Close' } : { 'aria-hidden': 'true' })}
+            {...(onClose ? { ...act(onClose, false), title: t`Close`, 'aria-label': t`Close` } : { 'aria-hidden': 'true' })}
             style={{
               ...glyphBox, marginLeft: 2,
               backgroundImage: TITLE_GLYPH.close, backgroundSize: '12px 11px', backgroundPosition: 'top 3px left 4px',
@@ -2461,7 +2463,7 @@ export function ShowMore({ n, onClick, label, style, className }) {
         height: 26, padding: '0 13px', border: '1px solid var(--pill-border)',
         borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', gap: 6,
         fontSize: 'var(--t-11-5)', color: 'var(--pill-ink)', cursor: 'pointer',
-      }}>{label || `Show ${n} more`}</span>
+      }}>{label || t`Show ${n} more`}</span>
     </div>
   )
 }
@@ -2557,7 +2559,7 @@ export function ChoiceRow({
 // `note` is the footer's left column — a fragment of Helpers, not a string.
 export function ChoiceModal({
   width = 480, title, sub, subClamp, labelledBy, note,
-  cancel = 'Cancel', action, actionVariant, actionDisabled, actionBusy, onAction,
+  cancel = t`Cancel`, action, actionVariant, actionDisabled, actionBusy, onAction,
   bodyGap = 13, bodyMax = 460, onClose, zIndex = 60, children, style, className,
 }) {
   // Round 7 #4: where a themed caption bar exists, the modal's NAME lives there

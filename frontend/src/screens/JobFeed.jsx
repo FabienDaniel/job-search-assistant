@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import api from '../api'
 import { useToasts, ToastStack } from '../Toast'
@@ -48,9 +50,9 @@ const timeAgo = (s) => {
   if (!s) return ''
   const diff = Date.now() - new Date(s).getTime()
   const h = Math.floor(diff / 3600000)
-  if (h < 1) return 'just now'
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+  if (h < 1) return t`just now`
+  if (h < 24) return t`${h}h ago`
+  return t`${Math.floor(h / 24)}d ago`
 }
 const isToday = (s) => s && (Date.now() - new Date(s).getTime()) < 86400000
 const scoreEntries = (j) => Object.entries(j.cv_scores || {}).filter(([, v]) => typeof v === 'number')
@@ -63,26 +65,26 @@ const fmtSalary = (min, max) => {
   return min && max && min !== max ? `${f(min)} - ${f(max)}` : f(min || max)
 }
 const H1B = {
-  likely: { label: 'H-1B Likely', c: 'var(--good)' },
-  possible: { label: 'H-1B Possible', c: 'var(--muted)' },
-  unlikely: { label: 'H-1B Unlikely', c: 'var(--warn)' },
-  unknown: { label: 'H-1B Unknown', c: 'var(--muted)' },
+  likely: { label: t`H-1B Likely`, c: 'var(--good)' },
+  possible: { label: t`H-1B Possible`, c: 'var(--muted)' },
+  unlikely: { label: t`H-1B Unlikely`, c: 'var(--warn)' },
+  unknown: { label: t`H-1B Unknown`, c: 'var(--muted)' },
 }
 // A posting carries a set, so it may show more than one. Nothing is drawn when
 // no source resolved it — an absent badge means "unknown", never "on-site".
 const ARRANGEMENT = [
-  ['remote', 'Remote', 'var(--good)'],
-  ['hybrid', 'Hybrid', 'var(--accent)'],
-  ['onsite', 'On-site', 'var(--muted)'],
+  ['remote', t`Remote`, 'var(--good)'],
+  ['hybrid', t`Hybrid`, 'var(--accent)'],
+  ['onsite', t`On-site`, 'var(--muted)'],
 ]
 const arrangementsOf = (j) => ARRANGEMENT.filter(([key]) => j[`arr_${key}`])
-const ARRANGEMENT_LABEL = { remote: 'Remote', hybrid: 'Hybrid', onsite: 'On-site', unknown: 'Not stated' }
+const ARRANGEMENT_LABEL = { remote: t`Remote`, hybrid: t`Hybrid`, onsite: t`On-site`, unknown: t`Not stated` }
 
 const BADGE = {
-  applied: { label: 'Applied', bd: 'var(--accent)', bg: 'var(--accent-soft)', fg: 'var(--accent)' },
-  saved: { label: 'Saved', bd: 'var(--warn)', bg: 'var(--warn-soft)', fg: 'var(--warn)' },
-  skip: { label: 'Skipped', bd: 'var(--line)', bg: 'transparent', fg: 'var(--muted)' },
-  ignored: { label: 'Ignored', bd: 'var(--line)', bg: 'transparent', fg: 'var(--muted)' },
+  applied: { label: t`Applied`, bd: 'var(--accent)', bg: 'var(--accent-soft)', fg: 'var(--accent)' },
+  saved: { label: t`Saved`, bd: 'var(--warn)', bg: 'var(--warn-soft)', fg: 'var(--warn)' },
+  skip: { label: t`Skipped`, bd: 'var(--line)', bg: 'transparent', fg: 'var(--muted)' },
+  ignored: { label: t`Ignored`, bd: 'var(--line)', bg: 'transparent', fg: 'var(--muted)' },
 }
 // ui: keep — the bulk bar's on-rail controls: --rail-ink on an --on-rail-line
 // hairline, drawn over the dark --rail bar. Pill and Button paint for light
@@ -93,21 +95,22 @@ const RAIL_BTN = {
   display: 'flex', alignItems: 'center', fontSize: 11.5, lineHeight: 'var(--ctl-line)', color: 'var(--rail-ink)', cursor: 'pointer',
 }
 const SOURCE_LABELS = {
-  direct: 'Direct', extension: 'Extension', jobspy_linkedin: 'LinkedIn', jobspy_indeed: 'Indeed',
-  jobspy_zip_recruiter: 'ZipRecruiter', jobspy_google: 'Google', levels_fyi: 'Levels', linkedin_personal: 'LinkedIn Personal',
-  linkedin_extension: 'LinkedIn Extension', jobright: 'Jobright', freehire: 'FreeHire', caribbeanjobs: 'CaribbeanJobs', trulyremote: 'TrulyRemoteWork', behance: 'Behance', hollylist: 'Hollylist', wanacreate: 'Wana Create', himalayas: 'Himalayas', eluta: 'Eluta', dribbble: 'Dribbble', artstation: 'ArtStation', workwithindies: 'Work With Indies', playwright_url: 'Company careers', playwright_direct: 'Career page',
+  direct: t`Direct`, extension: t`Extension`, jobspy_linkedin: 'LinkedIn', jobspy_indeed: 'Indeed',
+  jobspy_zip_recruiter: 'ZipRecruiter', jobspy_google: 'Google', levels_fyi: 'Levels', linkedin_personal: t`LinkedIn Personal`,
+  linkedin_extension: t`LinkedIn Extension`, jobright: 'Jobright', freehire: 'FreeHire', caribbeanjobs: 'CaribbeanJobs', trulyremote: 'TrulyRemoteWork', behance: 'Behance', hollylist: 'Hollylist', wanacreate: t`Wana Create`, himalayas: 'Himalayas', eluta: 'Eluta', dribbble: 'Dribbble', artstation: 'ArtStation', workwithindies: t`Work With Indies`, playwright_url: t`Company careers`, playwright_direct: t`Career page`,
 }
 // `boards` (useApifyBoards) names the `apify_<board>` sources.
 const srcLabel = (s, boards = []) => SOURCE_LABELS[s] || apifySourceLabel(boards, s) || s || ''
 // `duplicate`: a copy of a posting the feed already has (posting_links.py); the posting lists it under "Also on".
-const STATUS_OPTS = [['new', 'New'], ['saved', 'Saved'], ['applied', 'Applied'], ['skip', 'Skip'], ['ignored', 'Ignored']]
-const SORT_OPTS = [['score', 'Top score'], ['date', 'Newest first'], ['salary', 'Salary, high to low'], ['company', 'Company A–Z']]
+const STATUS_OPTS = [['new', t`New`], ['saved', t`Saved`], ['applied', t`Applied`], ['skip', t`Skip`], ['ignored', t`Ignored`]]
+const SORT_OPTS = [['score', t`Top score`], ['date', t`Newest first`], ['salary', t`Salary, high to low`], ['company', t`Company A–Z`]]
 // "45 minutes", "1 hour", "2 hours 30 minutes" — the scrape interval in the never-scraped empty state
 const everyText = (min) => {
   const m = Math.round(min), h = Math.floor(m / 60), r = m % 60
-  const part = (n, u) => `${n} ${u}${n === 1 ? '' : 's'}`
-  if (!h) return part(r, 'minute')
-  return r ? `${part(h, 'hour')} ${part(r, 'minute')}` : part(h, 'hour')
+  const minutes = plural(r, { one: '# minute', other: '# minutes' })
+  const hours = plural(h, { one: '# hour', other: '# hours' })
+  if (!h) return minutes
+  return r ? `${hours} ${minutes}` : hours
 }
 const DEFAULTS = { status: ['new'], company: [], source: [], h1b_verdict: [], location: [], arrangement: [], link_kind: [], open_state: [], min_score: '', min_salary: '', max_salary: '' }
 
@@ -133,7 +136,7 @@ function Drop({ label, active, open, onToggle, children, width = 216, trigger, o
         <Pill on={active} onClick={onToggle} ariaExpanded={open} ariaHaspopup="menu">
           {label}
           {active && onClear
-            ? <span onClick={(e) => { e.stopPropagation(); onClear() }} title="Clear" style={{ fontSize: 11, opacity: 0.7 }}>✕</span>
+            ? <span onClick={(e) => { e.stopPropagation(); onClear() }} title={t`Clear`} style={{ fontSize: 11, opacity: 0.7 }}>✕</span>
             : <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>}
         </Pill>
       )}
@@ -159,7 +162,7 @@ function Check({ on, label, count, onClick }) {
 
 // pick modifier: ⌘ on macOS, Ctrl elsewhere (matches rowClick's metaKey||ctrlKey).
 // Shared with the Applications list, which carries the same selection gestures.
-const SHORTCUTS = [['j / f / ↓', 'Next job'], ['k / g / ↑', 'Previous job'], ['s', 'Save / unsave'], ['x', 'Skip'], ['a', 'Mark applied'], ['e / o', 'Open posting'], ['r', 'Rescore'], ['t', 'Tailor résumé'], ['c', 'Cover letter'], ['Esc', 'Close menus'], [`${PICK_KEY}-click`, 'Select'], ['Shift-click', 'Select range']]
+const SHORTCUTS = [['j / f / ↓', t`Next job`], ['k / g / ↑', t`Previous job`], ['s', t`Save / unsave`], ['x', t`Skip`], ['a', t`Mark applied`], ['e / o', t`Open posting`], ['r', t`Rescore`], ['t', t`Tailor résumé`], ['c', t`Cover letter`], [t`Esc`, t`Close menus`], [t`${PICK_KEY}-click`, t`Select`], [t`Shift-click`, t`Select range`]]
 
 // ── component ────────────────────────────────────────────────────────────
 export default function V2JobFeed() {
@@ -425,7 +428,7 @@ export default function V2JobFeed() {
     } catch (e) {
       console.error('v2 feed load failed', e)
       setLoadError(true)
-      if (e?.response?.status !== 401) pushToast({ kind: 'error', msg: "Couldn't load jobs" })   // a 401 opens the shell's login modal instead
+      if (e?.response?.status !== 401) pushToast({ kind: 'error', msg: t`Couldn't load jobs` })   // a 401 opens the shell's login modal instead
     }
     setLoading(false)
     setFirstLoaded(true)   // the header's `total` is real from here on
@@ -545,7 +548,7 @@ export default function V2JobFeed() {
     // Report the outcome so callers only announce success once the PATCH lands; the body is handed back too —
     // an "applied" PATCH reports the Application/Company it created, which Undo needs.
     try { const { data } = await api.patch(`/jobs/${job.id}`, changes); refreshStats(); return data || true }
-    catch (e) { console.error(e); pushToast({ kind: 'error', msg: `Couldn't update "${job.title}"` }); fetchJobs(); return false }
+    catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Couldn't update "${job.title}"` }); fetchJobs(); return false }
   }, [patchLocal, fetchJobs, refreshStats, pushToast])
   const watchForScore = useCallback((id) => {
     if (id && !scoreWatchRef.current.some((w) => w.id === id)) scoreWatchRef.current = [...scoreWatchRef.current, { id, until: Date.now() + 90000 }]
@@ -553,7 +556,7 @@ export default function V2JobFeed() {
   // "Applied" is compound — the PATCH also creates an Application and, for an unknown company, a Company row.
   // `created` carries those ids so Undo can delete them; an already-applied/known-company job reports nothing.
   const showUndo = useCallback((job, prevStatus, prevSaved, msg, created) => {
-    pushToast({ kind: 'undo', msg, action: 'Undo', onAction: async () => {
+    pushToast({ kind: 'undo', msg, action: t`Undo`, onAction: async () => {
       try {
         // the application first: DELETE releases its job back to `saved`, so the
         // status PATCH has to be the last word on the job's status
@@ -562,14 +565,14 @@ export default function V2JobFeed() {
         await api.patch(`/jobs/${job.id}`, { status: prevStatus, saved: prevSaved })
         fetchJobs(); refreshStats()
         if (created?.appId || created?.coId) {
-          pushToast({ kind: 'success', msg: 'Application removed' })
+          pushToast({ kind: 'success', msg: t`Application removed` })
           window.dispatchEvent(new CustomEvent('jn:counts-changed'))
         }
-      } catch (e) { console.error(e); pushToast({ kind: 'error', msg: `Couldn't undo that — "${job.title}" is unchanged` }); fetchJobs() }
+      } catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Couldn't undo that — "${job.title}" is unchanged` }); fetchJobs() }
     } })
   }, [pushToast, fetchJobs, refreshStats])
-  const saveJob = async (j) => { const willSave = !j.saved, ps = j.status, pv = j.saved; if (willSave && scoredCount(j) === 0) watchForScore(j.id); if (await patchRemote(j, { saved: willSave, status: willSave ? 'saved' : 'new' })) { showUndo(j, ps, pv, `${willSave ? 'Saved' : 'Unsaved'} "${j.title}"`); if (willSave) track('job_saved') } }
-  const skipJob = async (j) => { const ps = j.status, pv = j.saved; if (await patchRemote(j, { status: 'skip' })) { showUndo(j, ps, pv, `Skipped "${j.title}"`); track('job_skipped') } }
+  const saveJob = async (j) => { const willSave = !j.saved, ps = j.status, pv = j.saved; if (willSave && scoredCount(j) === 0) watchForScore(j.id); if (await patchRemote(j, { saved: willSave, status: willSave ? 'saved' : 'new' })) { showUndo(j, ps, pv, `${willSave ? t`Saved` : t`Unsaved`} "${j.title}"`); if (willSave) track('job_saved') } }
+  const skipJob = async (j) => { const ps = j.status, pv = j.saved; if (await patchRemote(j, { status: 'skip' })) { showUndo(j, ps, pv, t`Skipped "${j.title}"`); track('job_skipped') } }
   const opened = (j) => track('job_opened', { link_kind: j?.link_kind || 'none' })
   const applyJob = async (j) => {
     const ps = j.status, pv = j.saved
@@ -578,7 +581,7 @@ export default function V2JobFeed() {
     // only ids this very PATCH created — never a pre-existing row
     const created = { appId: res.created_application_id || null, coId: res.created_company_id || null }
     if (created.appId || created.coId) window.dispatchEvent(new CustomEvent('jn:counts-changed'))
-    showUndo(j, ps, pv, `Applied to "${j.title}"`, created)
+    showUndo(j, ps, pv, t`Applied to "${j.title}"`, created)
   }
   // "Ignore {company} everywhere" — add to the global company-exclude setting
   // (matches classic ignoreCompany) and drop every job from that company now.
@@ -588,9 +591,9 @@ export default function V2JobFeed() {
     const n = jobsRef.current.filter((x) => (x.company || '').toLowerCase() === name.toLowerCase()).length
     // edits a global scraper setting, so confirm first with the styled dialog (not window.confirm) and say what happened
     setConfirm({
-      title: `Ignore “${name}” everywhere?`,
-      body: `This hides ${n} job${n === 1 ? '' : 's'} and skips the company in all future scrapes. You can undo this in Settings → Global exclude.`,
-      label: 'Ignore everywhere', danger: true,
+      title: t`Ignore “${name}” everywhere?`,
+      body: t`This hides ${plural(n, { one: '# job', other: '# jobs' })} and skips the company in all future scrapes. You can undo this in Settings → Global exclude.`,
+      label: t`Ignore everywhere`, danger: true,
       onConfirm: () => { setConfirm(null); doIgnoreCompany(name, n) },
     })
   }, [])
@@ -603,8 +606,8 @@ export default function V2JobFeed() {
       if (!cur.some((c) => c.toLowerCase() === name.toLowerCase())) {
         await api.patch('/settings', { company_exclude_global: [...cur, name] })
       }
-      pushToast({ kind: 'success', msg: `Ignoring "${name}" — ${n} job${n === 1 ? '' : 's'} hidden` })
-    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: `Couldn't ignore "${name}"` }); fetchJobs() }
+      pushToast({ kind: 'success', msg: t`Ignoring "${name}" — ${plural(n, { one: '# job', other: '# jobs' })} hidden` })
+    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: t`Couldn't ignore "${name}"` }); fetchJobs() }
   }, [fetchJobs, pushToast])
   // One optimistic write for "this job now has a run in flight": both the plain
   // in_flight list the card reads and the in_flight_detail the band and tabs
@@ -623,11 +626,11 @@ export default function V2JobFeed() {
   }, [])
   const scoreJob = useCallback((job) => {
     pendingRef.current[job.id] = { title: job.title, company: job.company }
-    pushToast({ kind: 'progress', msg: `Scoring "${job.title}"…` })
+    pushToast({ kind: 'progress', msg: t`Scoring "${job.title}"…` })
     // the one-click path sends no cv_ids, so the run covers every base résumé
     api.post(`/analyze/${job.id}?depth=${defaultDepth}`, {}).then(() => {
       markFlight(job.id, ANALYZE, { resume_names: resumes.map((r) => r.name).filter(Boolean), depth: defaultDepth })
-    }).catch((e) => { delete pendingRef.current[job.id]; pushToast({ kind: 'error', msg: `Scoring failed for "${job.title}"${detailSuffix(e)}` }); console.error(e) })
+    }).catch((e) => { delete pendingRef.current[job.id]; pushToast({ kind: 'error', msg: t`Scoring failed for "${job.title}"${detailSuffix(e)}` }); console.error(e) })
   }, [pushToast, defaultDepth, resumes, markFlight])
 
   // rescoreJob holds { label, jobs:[...] } — one job or a bulk set
@@ -638,7 +641,7 @@ export default function V2JobFeed() {
     try {
       const [rz, st] = await Promise.all([api.get('/resumes?is_base=true'), api.get('/settings')])
       const opts = (rz.data || []).map((r) => ({ id: r.id, name: r.name, note: 'base' }))
-      if (personaAvailable) opts.push({ id: 'persona', name: 'Persona', note: 'from Persona' })
+      if (personaAvailable) opts.push({ id: 'persona', name: 'Persona', note: t`from Persona` })
       setRescoreOpts(opts)
       const def = st.data?.default_resume_id
       setRescoreSel(def && opts.some((o) => o.id === def) ? [def] : opts.map((o) => o.id))
@@ -646,20 +649,20 @@ export default function V2JobFeed() {
       setDefaultDepth(depth)
       setRescoreDepth(preferDepth || depth)
     // this list IS the modal — an empty body with a dead Score button would explain nothing
-    } catch (e) { console.error(e); setRescoreOpts([]); setRescoreSel([]); pushToast({ kind: 'error', msg: 'Could not load your résumés — nothing to score against.' }) }
+    } catch (e) { console.error(e); setRescoreOpts([]); setRescoreSel([]); pushToast({ kind: 'error', msg: t`Could not load your résumés — nothing to score against.` }) }
   }, [personaAvailable, defaultDepth, pushToast])
-  const openRescore = useCallback((job, preferDepth) => { setRescoreJob({ verb: scoredCount(job) > 0 ? 'Rescore' : 'Score', title: job.title, company: job.company, jobs: [job] }); loadRescoreOpts(preferDepth) }, [loadRescoreOpts])
+  const openRescore = useCallback((job, preferDepth) => { setRescoreJob({ verb: scoredCount(job) > 0 ? t`Rescore` : t`Score`, title: job.title, company: job.company, jobs: [job] }); loadRescoreOpts(preferDepth) }, [loadRescoreOpts])
   const runRescore = useCallback(async () => {
     const target = rescoreJob
     if (!target || !rescoreSel.length) return
     const list = target.jobs || []
     setRescoreJob(null)
-    if (list.length > 1) pushToast({ kind: 'progress', msg: `Scoring ${list.length} jobs…` })
+    if (list.length > 1) pushToast({ kind: 'progress', msg: t`Scoring ${list.length} jobs…` })
     // the names the picker just ticked — the future cv_scores keys, so the band
     // can say "Scoring 2 résumés" and the tabs can ghost the ones with no report
     const names = rescoreOpts.filter((o) => rescoreSel.includes(o.id)).map((o) => o.name).filter(Boolean)
     for (const job of list) {
-      if (list.length === 1) { pendingRef.current[job.id] = { title: job.title, company: job.company }; pushToast({ kind: 'progress', msg: `Scoring "${job.title}"…` }) }
+      if (list.length === 1) { pendingRef.current[job.id] = { title: job.title, company: job.company }; pushToast({ kind: 'progress', msg: t`Scoring "${job.title}"…` }) }
       try {
         await api.post(`/analyze/${job.id}?depth=${rescoreDepth}`, { cv_ids: rescoreSel })
         markFlight(job.id, ANALYZE, { resume_names: names, depth: rescoreDepth })
@@ -677,11 +680,11 @@ export default function V2JobFeed() {
         if (mode === 'copy') { const { data } = await api.post('/resumes/copy', { base_resume_id: baseId, job_id: job.id }); if (list.length === 1) navigate(`/resumes/${data.id}`) }
         else {
           pendingRef.current[job.id] = { title: job.title, company: job.company, op: 'tailor' }
-          pushToast({ kind: 'progress', msg: `Tailoring for "${job.title}"…` })
+          pushToast({ kind: 'progress', msg: t`Tailoring for "${job.title}"…` })
           await api.post('/resumes/tailor', { base_resume_id: baseId, job_id: job.id })
           markFlight(job.id, TAILOR, { base_name: baseName, replaces: !!job.tailored_resume_id })
         }
-      } catch (e) { delete pendingRef.current[job.id]; pushToast({ kind: 'error', msg: `${mode === 'copy' ? 'Copy' : 'Tailor'} failed for "${job.title}"${detailSuffix(e)}` }); console.error(`${mode} failed`, e.response?.data?.detail || e.message) }
+      } catch (e) { delete pendingRef.current[job.id]; pushToast({ kind: 'error', msg: (mode === 'copy' ? t`Copy failed for "${job.title}"${detailSuffix(e)}` : t`Tailor failed for "${job.title}"${detailSuffix(e)}`) }); console.error(`${mode} failed`, e.response?.data?.detail || e.message) }
     }
     setChecked(new Set())
   }, [pushToast, resumes, markFlight, navigate])
@@ -714,7 +717,7 @@ export default function V2JobFeed() {
       const { data } = await api.get('/jobs/unscored-ids')
       const ids = data.ids || []
       if (!ids.length) return
-      setRescoreJob({ verb: 'Score', title: `${ids.length} unscored job${ids.length === 1 ? '' : 's'}`, company: '', jobs: ids.map((id) => ({ id })) })
+      setRescoreJob({ verb: t`Score`, title: plural(ids.length, { one: '# unscored job', other: '# unscored jobs' }), company: '', jobs: ids.map((id) => ({ id })) })
     } catch (e) { console.error(e) }
   }, [loadRescoreOpts])
 
@@ -739,8 +742,8 @@ export default function V2JobFeed() {
     try {
       for (const g of groups.values()) await api.post('/jobs/bulk-update', { job_ids: g.ids, updates: g.updates })
       fetchJobs(); refreshStats()
-      pushToast({ kind: 'success', msg: `Restored ${prev.length} job${prev.length === 1 ? '' : 's'}.` })
-    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: `Could not undo ${prev.length} job${prev.length === 1 ? '' : 's'}` }) }
+      pushToast({ kind: 'success', msg: plural(prev.length, { one: 'Restored # job.', other: 'Restored # jobs.' }) })
+    } catch (e) { console.error(e); pushToast({ kind: 'error', msg: plural(prev.length, { one: 'Could not undo # job', other: 'Could not undo # jobs' }) }) }
   }
   const bulkStatus = async (status) => {
     const ids = [...checked]; if (!ids.length) return
@@ -752,8 +755,8 @@ export default function V2JobFeed() {
     // the server response only reconciles now, a failure reloads.
     setChecked(new Set())
     patchLocalMany(ids, updates)
-    try { await api.post('/jobs/bulk-update', { job_ids: ids, updates }); refreshStats(); pushToast({ kind: 'undo', msg: `${status === 'saved' ? 'Saved' : 'Skipped'} ${ids.length} job${ids.length === 1 ? '' : 's'}.`, action: 'Undo', onAction: () => bulkUndo(prev) }) }
-    catch (e) { console.error(e); pushToast({ kind: 'error', msg: `Could not update ${ids.length} job${ids.length === 1 ? '' : 's'}${e?.response?.data?.detail ? ' — ' + e.response.data.detail : ''}` }); fetchJobs() }   // the optimistic write did not stick — take the server's list back
+    try { await api.post('/jobs/bulk-update', { job_ids: ids, updates }); refreshStats(); pushToast({ kind: 'undo', msg: (status === 'saved' ? plural(ids.length, { one: 'Saved # job.', other: 'Saved # jobs.' }) : plural(ids.length, { one: 'Skipped # job.', other: 'Skipped # jobs.' })), action: t`Undo`, onAction: () => bulkUndo(prev) }) }
+    catch (e) { console.error(e); pushToast({ kind: 'error', msg: plural(ids.length, { one: 'Could not update # job', other: 'Could not update # jobs' }) + (e?.response?.data?.detail ? ' — ' + e.response.data.detail : '') }); fetchJobs() }   // the optimistic write did not stick — take the server's list back
   }
   // the bulk bar's Score opens the same résumé + depth picker as `r`; scored rows in the
   // selection are rescored too, and the title says how many so nothing is re-run blind
@@ -762,7 +765,7 @@ export default function V2JobFeed() {
     if (!list.length) return
     const scored = list.filter((j) => scoredCount(j) > 0).length
     const n = list.length
-    setRescoreJob({ verb: scored === n ? 'Rescore' : 'Score', title: `${n} selected job${n === 1 ? '' : 's'}`, company: scored && scored < n ? `${scored} already scored` : '', jobs: list })
+    setRescoreJob({ verb: scored === n ? t`Rescore` : t`Score`, title: plural(n, { one: '# selected job', other: '# selected jobs' }), company: scored && scored < n ? t`${scored} already scored` : '', jobs: list })
     loadRescoreOpts()
     setChecked(new Set())
   }
@@ -913,7 +916,7 @@ export default function V2JobFeed() {
       if (pinnedRef.current !== jid) return
       pinnedRef.current = null; deadPinRef.current = true   // don't fall through to an unrelated job
       setSel(-1); setDetail(null)                           // the sync effect below then drops ?job= from the URL
-      pushToast({ kind: 'error', msg: 'That job no longer exists' })
+      pushToast({ kind: 'error', msg: t`That job no longer exists` })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
@@ -998,8 +1001,8 @@ export default function V2JobFeed() {
               const rid = ok && meta.op === 'tailor' ? fresh?.tailored_resume_id : null
               pushToast({
                 kind: ok ? 'success' : 'error',
-                msg: `${meta.op === 'tailor' ? (ok ? 'Tailored' : 'Tailoring failed for') : (ok ? 'Scored' : 'Scoring failed for')} "${meta.title}"${meta.company ? ` at ${meta.company}` : ''}`,
-                ...(rid ? { action: 'Open ↗', onAction: () => navigate(`/resumes/${rid}`) } : {}),
+                msg: `${meta.op === 'tailor' ? (ok ? t`Tailored` : t`Tailoring failed for`) : (ok ? t`Scored` : t`Scoring failed for`)} "${meta.title}"${meta.company ? ` at ${meta.company}` : ''}`,
+                ...(rid ? { action: t`Open ↗`, onAction: () => navigate(`/resumes/${rid}`) } : {}),
               })
               delete pendingRef.current[id]
             }
@@ -1030,7 +1033,7 @@ export default function V2JobFeed() {
   // the verdict is the fact the line carries; the LCA count is the evidence
   // behind it, so it moves into the title instead of a second clause
   const visaText = d && d.h1b_verdict && d.h1b_verdict !== 'unknown' ? (H1B[d.h1b_verdict] || H1B.unknown).label : ''
-  const visaTitle = d ? (d.h1b_company_lca_count ? `Based on ${d.h1b_company_lca_count} H-1B filings` : 'No H-1B filings on record') : ''
+  const visaTitle = d ? (d.h1b_company_lca_count ? t`Based on ${d.h1b_company_lca_count} H-1B filings` : t`No H-1B filings on record`) : ''
   const visaCol = d ? (d.h1b_verdict === 'likely' ? 'var(--good)' : d.h1b_verdict === 'unlikely' ? 'var(--warn)' : 'var(--muted)') : ''
 
   // ── detail report derivation ──
@@ -1063,7 +1066,7 @@ export default function V2JobFeed() {
   // The report only *covers* the posting while the top is standing. Collapsed, the whole band is
   // display:none, so a still-set `reportOpen` must not keep hiding the posting too.
   const reportCovers = reportShown && !anaCollapsed
-  const anaHint = anaCollapsed ? 'Show job details & analysis' : 'Hide job details & analysis — posting only'
+  const anaHint = anaCollapsed ? t`Show job details & analysis` : t`Hide job details & analysis — posting only`
   const dCached = cachedAvail   // hoisted above the frame effects, which need it too
   // T7-08: no job in any status under the other (default, empty) filters = never scraped into
   const neverScraped = facetsOk && !dSearch && !searchId
@@ -1076,12 +1079,12 @@ export default function V2JobFeed() {
       {/* header */}
       <HeaderRow as="header" pad="22px 30px 16px 24px" line="none" align="flex-end" style={{ gap: 18 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <PageTitle>Jobs</PageTitle>
-          <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--muted)', ...headStyle }}>{head ? `${head.total} open roles · ${head.arrived} arrived today · ${head.unscored} not yet scored` : loadError ? DASH : NBSP}</span>
+          <PageTitle><Trans>Jobs</Trans></PageTitle>
+          <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--muted)', ...headStyle }}>{head ? t`${head.total} open roles · ${head.arrived} arrived today · ${head.unscored} not yet scored` : loadError ? DASH : NBSP}</span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           {head && head.unscored > 0 && cannotScore && <Helper style={headStyle}>{NO_BASES_HINT}</Helper>}
-          {head && head.unscored > 0 && <Button variant="ai" disabled={cannotScore} onClick={cannotScore ? undefined : openRescoreBulk} title={cannotScore ? NO_BASES_HINT : 'Pick résumés + depth, then score every unscored job'} style={headStyle}>Score {head.unscored} unscored jobs</Button>}
+          {head && head.unscored > 0 && <Button variant="ai" disabled={cannotScore} onClick={cannotScore ? undefined : openRescoreBulk} title={cannotScore ? NO_BASES_HINT : t`Pick résumés + depth, then score every unscored job`} style={headStyle}><Trans>Score {head.unscored} unscored jobs</Trans></Button>}
         </div>
       </HeaderRow>
 
@@ -1089,30 +1092,30 @@ export default function V2JobFeed() {
       <HeaderRow pad="0 30px 14px 24px" align="center" style={{ flexWrap: 'wrap', gap: 9, rowGap: 8 }}>
         {/* the clear ✕ rides in this relative wrapper, over SearchInput's box */}
         <div style={{ position: 'relative', flex: '0 0 auto', marginRight: 3, display: 'flex', alignItems: 'center' }}>
-          <SearchInput width="226px" value={search} onChange={setSearch} placeholder="Search titles…" ariaLabel="Search job titles" />
-          {search && <span onClick={() => setSearch('')} title="Clear search" className="v2-x" style={{ position: 'absolute', right: 8, width: 18, height: 18, borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--muted)', cursor: 'pointer' }}>✕</span>}
+          <SearchInput width="226px" value={search} onChange={setSearch} placeholder={t`Search titles…`} ariaLabel={t`Search job titles`} />
+          {search && <span onClick={() => setSearch('')} title={t`Clear search`} className="v2-x" style={{ position: 'absolute', right: 8, width: 18, height: 18, borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--muted)', cursor: 'pointer' }}>✕</span>}
         </div>
         {searchId && (
           <Pill on onClick={() => { setSearchId(''); setSearchParams({}, { replace: true }) }}
-            title="Showing only jobs from this saved search — click to clear">
-            from “{searchName}”<span style={{ fontSize: 11, opacity: 0.7 }}>✕</span>
+            title={t`Showing only jobs from this saved search — click to clear`}>
+            <Trans>from “{searchName}”</Trans><span style={{ fontSize: 11, opacity: 0.7 }}>✕</span>
           </Pill>
         )}
-        <Drop label={`Source${filters.source.length ? ` · ${filters.source.length}` : ''}`} active={filters.source.length > 0} onClear={() => setF({ source: [] })} open={menu === 'source'} onToggle={() => setMenu(menu === 'source' ? null : 'source')}>
+        <Drop label={t`Source${filters.source.length ? ` · ${filters.source.length}` : ''}`} active={filters.source.length > 0} onClear={() => setF({ source: [] })} open={menu === 'source'} onToggle={() => setMenu(menu === 'source' ? null : 'source')}>
           {/* warm-started: the option list is the cached one until the facets settle,
               so an early click on Source is not an empty menu */}
-          {facetSources.length ? facetSources.map((s) => <Check key={s} on={filters.source.includes(s)} label={srcLabel(s, apifyBoards)} count={facetSourceCounts[s]} onClick={() => togF('source', s)} />) : <div style={{ padding: 8, fontSize: 12, color: 'var(--muted)' }}>No sources</div>}
+          {facetSources.length ? facetSources.map((s) => <Check key={s} on={filters.source.includes(s)} label={srcLabel(s, apifyBoards)} count={facetSourceCounts[s]} onClick={() => togF('source', s)} />) : <div style={{ padding: 8, fontSize: 12, color: 'var(--muted)' }}><Trans>No sources</Trans></div>}
         </Drop>
-        <Drop label={`Work${filters.arrangement.length ? ` · ${filters.arrangement.length}` : ''}`} active={filters.arrangement.length > 0} onClear={() => setF({ arrangement: [] })} open={menu === 'arrangement'} onToggle={() => setMenu(menu === 'arrangement' ? null : 'arrangement')} width={214}>
+        <Drop label={t`Work${filters.arrangement.length ? ` · ${filters.arrangement.length}` : ''}`} active={filters.arrangement.length > 0} onClear={() => setF({ arrangement: [] })} open={menu === 'arrangement'} onToggle={() => setMenu(menu === 'arrangement' ? null : 'arrangement')} width={214}>
           {['remote', 'hybrid', 'onsite', 'unknown'].map((key) => (
             <Check key={key} on={filters.arrangement.includes(key)} label={ARRANGEMENT_LABEL[key]}
               count={arrangementCounts[key]} onClick={() => togF('arrangement', key)} />
           ))}
-          <Helper size="xs" style={{ padding: '6px 8px 2px' }}>A posting offered two ways is counted under both</Helper>
+          <Helper size="xs" style={{ padding: '6px 8px 2px' }}><Trans>A posting offered two ways is counted under both</Trans></Helper>
         </Drop>
-        <Drop label={`Location${filters.location.length ? ` · ${filters.location.length}` : ''}`} active={filters.location.length > 0} onClear={() => setF({ location: [] })} open={menu === 'location'} onToggle={() => setMenu(menu === 'location' ? null : 'location')} width={262}>
-          <Input autoFocus value={locationQuery} onChange={setLocationQuery} ariaLabel="Search places"
-            placeholder={`Type to search ${locationList.length} places…`} style={{ margin: '0 6px 6px', width: 'calc(100% - 12px)', paddingLeft: 12 }} />
+        <Drop label={t`Location${filters.location.length ? ` · ${filters.location.length}` : ''}`} active={filters.location.length > 0} onClear={() => setF({ location: [] })} open={menu === 'location'} onToggle={() => setMenu(menu === 'location' ? null : 'location')} width={262}>
+          <Input autoFocus value={locationQuery} onChange={setLocationQuery} ariaLabel={t`Search places`}
+            placeholder={t`Type to search ${locationList.length} places…`} style={{ margin: '0 6px 6px', width: 'calc(100% - 12px)', paddingLeft: 12 }} />
           {(() => {
             const q = locationQuery.trim().toLowerCase()
             // A search keeps the parents of a matching child, so a city never
@@ -1134,14 +1137,14 @@ export default function V2JobFeed() {
                     {x.level === 0 ? x.name : x.name.split(',')[0]}
                   </MenuItem>
                 ))}
-                <Helper size="xs" style={{ padding: '6px 8px 2px' }}>Picking a country or province keeps everything under it</Helper>
+                <Helper size="xs" style={{ padding: '6px 8px 2px' }}><Trans>Picking a country or province keeps everything under it</Trans></Helper>
               </>
-            ) : <div style={{ padding: 8, fontSize: 12, color: 'var(--muted)' }}>No places</div>
+            ) : <div style={{ padding: 8, fontSize: 12, color: 'var(--muted)' }}><Trans>No places</Trans></div>
           })()}
         </Drop>
-        <Drop label={`Company${filters.company.length ? ` · ${filters.company.length}` : ''}`} active={filters.company.length > 0} onClear={() => setF({ company: [] })} open={menu === 'company'} onToggle={() => setMenu(menu === 'company' ? null : 'company')} width={248}>
-          <Input autoFocus value={companyQuery} onChange={setCompanyQuery} ariaLabel="Search companies"
-            placeholder={`Type to search ${companyList.length} companies…`} style={{ margin: '0 6px 6px', width: 'calc(100% - 12px)', paddingLeft: 12 }} />
+        <Drop label={t`Company${filters.company.length ? ` · ${filters.company.length}` : ''}`} active={filters.company.length > 0} onClear={() => setF({ company: [] })} open={menu === 'company'} onToggle={() => setMenu(menu === 'company' ? null : 'company')} width={248}>
+          <Input autoFocus value={companyQuery} onChange={setCompanyQuery} ariaLabel={t`Search companies`}
+            placeholder={t`Type to search ${companyList.length} companies…`} style={{ margin: '0 6px 6px', width: 'calc(100% - 12px)', paddingLeft: 12 }} />
           {(() => {
             const q = companyQuery.trim().toLowerCase()
             const list = companyList.filter((c) => filters.company.includes(c.name) || c.name.toLowerCase().includes(q))
@@ -1155,53 +1158,53 @@ export default function V2JobFeed() {
                     {c.name}
                   </MenuItem>
                 ))}
-                <Helper size="xs" style={{ padding: '6px 8px 2px' }}>Top by open roles · picked companies pin to the top</Helper>
+                <Helper size="xs" style={{ padding: '6px 8px 2px' }}><Trans>Top by open roles · picked companies pin to the top</Trans></Helper>
               </>
-            ) : <div style={{ padding: '6px 8px', fontSize: 12, color: 'var(--muted)' }}>No matches</div>
+            ) : <div style={{ padding: '6px 8px', fontSize: 12, color: 'var(--muted)' }}><Trans>No matches</Trans></div>
           })()}
         </Drop>
         <Drop label={`H-1B${filters.h1b_verdict.length ? ` · ${filters.h1b_verdict.length}` : ''}`} active={filters.h1b_verdict.length > 0} onClear={() => setF({ h1b_verdict: [] })} open={menu === 'h1b'} onToggle={() => setMenu(menu === 'h1b' ? null : 'h1b')} width={196}>
           {['likely', 'possible', 'unlikely', 'unknown'].filter((v) => facetVerdicts.includes(v)).map((v) => <Check key={v} on={filters.h1b_verdict.includes(v)} label={H1B[v].label.replace('H-1B ', '')} count={facetVerdictCounts[v]} onClick={() => togF('h1b_verdict', v)} />)}
         </Drop>
         {/* whether the job reaches the employer's own site (linkKinds.js) */}
-        <Drop label={`Link${filters.link_kind.length ? ` · ${filters.link_kind.length}` : ''}`} active={filters.link_kind.length > 0} onClear={() => setF({ link_kind: [] })} open={menu === 'link'} onToggle={() => setMenu(menu === 'link' ? null : 'link')} width={196}>
+        <Drop label={t`Link${filters.link_kind.length ? ` · ${filters.link_kind.length}` : ''}`} active={filters.link_kind.length > 0} onClear={() => setF({ link_kind: [] })} open={menu === 'link'} onToggle={() => setMenu(menu === 'link' ? null : 'link')} width={196}>
           {LINK_KINDS.map((k) => <Check key={k.key} on={filters.link_kind.includes(k.key)} label={k.label} count={k.kinds.reduce((n, kind) => n + (linkKindCounts[kind] ?? 0), 0)} onClick={() => togF('link_kind', k.key)} />)}
         </Drop>
-        <Drop inset label={filters.min_score !== '' ? `Score ≥ ${filters.min_score}` : 'Score ≥'} active={filters.min_score !== ''} onClear={() => setF({ min_score: '' })} open={menu === 'score'} onToggle={() => setMenu(menu === 'score' ? null : 'score')} width={234}>
+        <Drop inset label={filters.min_score !== '' ? t`Score ≥ ${filters.min_score}` : t`Score ≥`} active={filters.min_score !== ''} onClear={() => setF({ min_score: '' })} open={menu === 'score'} onToggle={() => setMenu(menu === 'score' ? null : 'score')} width={234}>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             {/* each preset carries what it would leave, counted over the other active filters */}
-            {[70, 80, 90].map((n) => <Pill key={n} size="sm" on={filters.min_score === String(n)} onClick={() => setF({ min_score: String(n) })} style={{ flex: 1 }} title={`${scoreBands[String(n)] ?? 0} job${(scoreBands[String(n)] ?? 0) === 1 ? '' : 's'} score ${n} or better`}>{n}<span style={{ fontSize: 10.5, opacity: 0.55 }}>{scoreBands[String(n)] ?? 0}</span></Pill>)}
+            {[70, 80, 90].map((n) => <Pill key={n} size="sm" on={filters.min_score === String(n)} onClick={() => setF({ min_score: String(n) })} style={{ flex: 1 }} title={plural(scoreBands[String(n)] ?? 0, { one: `# job score ${n} or better`, other: `# jobs score ${n} or better` })}>{n}<span style={{ fontSize: 10.5, opacity: 0.55 }}>{scoreBands[String(n)] ?? 0}</span></Pill>)}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <Helper>or at least</Helper>
+            <Helper><Trans>or at least</Trans></Helper>
             <Input type="number" mono value={numDraft.min_score} onChange={(v) => setNum('min_score', v)}
-              ariaLabel="Minimum score" style={{ flex: 1, minWidth: 0 }} />
+              ariaLabel={t`Minimum score`} style={{ flex: 1, minWidth: 0 }} />
           </div>
-          <Helper size="xs" style={{ marginTop: 8 }}>Also hides unscored jobs</Helper>
+          <Helper size="xs" style={{ marginTop: 8 }}><Trans>Also hides unscored jobs</Trans></Helper>
         </Drop>
-        <Drop inset label={filters.min_salary && filters.max_salary ? `$${filters.min_salary}K–$${filters.max_salary}K` : filters.min_salary ? `Salary ≥ $${filters.min_salary}K` : filters.max_salary ? `Salary ≤ $${filters.max_salary}K` : 'Salary'} active={!!(filters.min_salary || filters.max_salary)} onClear={() => setF({ min_salary: '', max_salary: '' })} open={menu === 'salary'} onToggle={() => setMenu(menu === 'salary' ? null : 'salary')} width={288}>
+        <Drop inset label={filters.min_salary && filters.max_salary ? `$${filters.min_salary}K–$${filters.max_salary}K` : filters.min_salary ? t`Salary ≥ $${filters.min_salary}K` : filters.max_salary ? t`Salary ≤ $${filters.max_salary}K` : t`Salary`} active={!!(filters.min_salary || filters.max_salary)} onClear={() => setF({ min_salary: '', max_salary: '' })} open={menu === 'salary'} onToggle={() => setMenu(menu === 'salary' ? null : 'salary')} width={288}>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             {[150, 180, 220].map((n) => <Pill key={n} size="sm" on={filters.min_salary === String(n)} onClick={() => setF({ min_salary: String(n) })} style={{ flex: 1 }}>${n}K</Pill>)}
           </div>
           {/* both ends of the range: `max_salary` was already in DEFAULTS, in the
               trigger label and in the query params, but had no field to set it */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <Helper>min</Helper>
+            <Helper><Trans>min</Trans></Helper>
             <Input type="number" mono placeholder="$K" value={numDraft.min_salary} onChange={(v) => setNum('min_salary', v)}
-              ariaLabel="Minimum salary in thousands" style={{ flex: 1, minWidth: 0 }} />
-            <Helper>max</Helper>
+              ariaLabel={t`Minimum salary in thousands`} style={{ flex: 1, minWidth: 0 }} />
+            <Helper><Trans>max</Trans></Helper>
             <Input type="number" mono placeholder="$K" value={numDraft.max_salary} onChange={(v) => setNum('max_salary', v)}
-              ariaLabel="Maximum salary in thousands" style={{ flex: 1, minWidth: 0 }} />
+              ariaLabel={t`Maximum salary in thousands`} style={{ flex: 1, minWidth: 0 }} />
           </div>
-          <Helper size="xs" style={{ marginTop: 8 }}>Also hides jobs without a listed salary</Helper>
+          <Helper size="xs" style={{ marginTop: 8 }}><Trans>Also hides jobs without a listed salary</Trans></Helper>
         </Drop>
         <Drop width={170} active open={menu === 'status'} onToggle={() => setMenu(menu === 'status' ? null : 'status')}
-          trigger={(t) => {
+          trigger={(toggle) => {
             const statusActive = filters.status.length > 0   // like every other filter: a pick is on (green), nothing picked reads "Any" in the plain pill
             return (
-              <Pill on={statusActive} onClick={t} ariaExpanded={menu === 'status'} ariaHaspopup="menu">
-                Status · {filters.status.map((s) => STATUS_OPTS.find((o) => o[0] === s)?.[1]).join(', ') || 'Any'}
-                {statusActive ? <span onClick={(e) => { e.stopPropagation(); setF({ status: [] }) }} style={{ opacity: 0.6 }}>✕</span> : <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>}
+              <Pill on={statusActive} onClick={toggle} ariaExpanded={menu === 'status'} ariaHaspopup="menu">
+                <Trans>Status · {filters.status.map((s) => STATUS_OPTS.find((o) => o[0] === s)?.[1]).join(', ') || t`Any`}
+                {statusActive ? <span onClick={(e) => { e.stopPropagation(); setF({ status: [] }) }} style={{ opacity: 0.6 }}>✕</span> : <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>}</Trans>
               </Pill>
             )
           }}>
@@ -1209,13 +1212,13 @@ export default function V2JobFeed() {
         </Drop>
         {/* the last menu, once a check has found a closed posting (still_open.py) */}
         {((openCounts.closed ?? 0) > 0 || filters.open_state.length > 0) && (
-          <Drop label={`Posting${filters.open_state.length ? ` · ${filters.open_state.length}` : ''}`} active={filters.open_state.length > 0} onClear={() => setF({ open_state: [] })} open={menu === 'posting'} onToggle={() => setMenu(menu === 'posting' ? null : 'posting')} width={170}>
-            {[['open', 'Open'], ['closed', 'Closed']].map(([v, label]) => <Check key={v} on={filters.open_state.includes(v)} label={label} count={openCounts[v] ?? 0} onClick={() => togF('open_state', v)} />)}
+          <Drop label={t`Posting${filters.open_state.length ? ` · ${filters.open_state.length}` : ''}`} active={filters.open_state.length > 0} onClear={() => setF({ open_state: [] })} open={menu === 'posting'} onToggle={() => setMenu(menu === 'posting' ? null : 'posting')} width={170}>
+            {[['open', t`Open`], ['closed', t`Closed`]].map(([v, label]) => <Check key={v} on={filters.open_state.includes(v)} label={label} count={openCounts[v] ?? 0} onClick={() => togF('open_state', v)} />)}
           </Drop>
         )}
         <div style={{ marginLeft: 'auto', flex: '0 0 auto' }}>
           <Drop width={172} open={menu === 'sort'} onToggle={() => setMenu(menu === 'sort' ? null : 'sort')}
-            trigger={(t) => /* ui: keep — the Sort control is a text trigger (muted 12.5 + bold value + caret), not a Pill or a Link */ <div onClick={t} className="v2-hover-accent-text" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer' }}>Sort<span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{SORT_OPTS.find((o) => o[0] === sortBy)?.[1]}</span><span style={{ fontSize: 10 }}>▾</span></div>}>
+            trigger={(toggle) => /* ui: keep — the Sort control is a text trigger (muted 12.5 + bold value + caret), not a Pill or a Link */ <div onClick={toggle} className="v2-hover-accent-text" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--muted)', cursor: 'pointer' }}><Trans>Sort</Trans><span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{SORT_OPTS.find((o) => o[0] === sortBy)?.[1]}</span><span style={{ fontSize: 10 }}>▾</span></div>}>
             {SORT_OPTS.map(([v, label]) => (
               <MenuItem key={v} selected={sortBy === v} hint={sortBy === v ? '✓' : null}
                 onClick={() => { setSortBy(v); setMenu(null); setSel(0) }}>{label}</MenuItem>
@@ -1239,22 +1242,22 @@ export default function V2JobFeed() {
             well, so the rows have something to lift off on hover (round-6 addendum). */}
         <section style={{ position: 'relative', width: 472, flex: '0 1 472px', minWidth: 340, borderRight: '1px solid var(--line)', background: 'var(--list-well)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div style={{ position: 'relative', padding: '12px 14px 8px 24px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--muted)' }}>
-            <UICheck checked={allChecked} indeterminate={someChecked && !allChecked} ariaLabel="Select all shown" title="Select all shown" style={{ flex: '0 0 auto' }}
+            <UICheck checked={allChecked} indeterminate={someChecked && !allChecked} ariaLabel={t`Select all shown`} title={t`Select all shown`} style={{ flex: '0 0 auto' }}
               onChange={() => setChecked(allChecked ? new Set() : new Set(jobs.map((j) => j.id)))} />
             {/* the count line keeps its box until the first page answers */}
-            <span style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>{!firstLoaded ? NBSP : loadError ? DASH : `${jobs.length} shown · ${total} matching`}</span>
+            <span style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>{!firstLoaded ? NBSP : loadError ? DASH : t`${jobs.length} shown · ${total} matching`}</span>
             <div style={{ marginLeft: 'auto', flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.02em' }}>⇧ range · {PICK_KEY} pick</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.02em' }}><Trans>⇧ range · {PICK_KEY} pick</Trans></span>
               {/* ui: keep — 10px glyph vs the box's 9.5; the paint is the primitive's outline tone (D-14) */}
-              <GlyphBadge tone="outline" onClick={() => setShortcutsOpen((v) => !v)} title="Keyboard shortcuts"
+              <GlyphBadge tone="outline" onClick={() => setShortcutsOpen((v) => !v)} title={t`Keyboard shortcuts`}
                 style={{ fontSize: 'var(--t-10)' }}>?</GlyphBadge>
             </div>
             {shortcutsOpen && (
               <>
                 <div onClick={() => setShortcutsOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 34 }} />
-                <Menu role="group" ariaLabel="Keyboard shortcuts" style={{ position: 'absolute', top: '100%', right: 14, zIndex: 35, marginTop: 4, width: 214, padding: 10, gap: 0 }}>
+                <Menu role="group" ariaLabel={t`Keyboard shortcuts`} style={{ position: 'absolute', top: '100%', right: 14, zIndex: 35, marginTop: 4, width: 214, padding: 10, gap: 0 }}>
                   {/* ui: keep — MenuHead role: the head of a <Menu> popover, not a filter-bar eyebrow */}
-                  <div style={{ fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Keyboard</div>
+                  <div style={{ fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}><Trans>Keyboard</Trans></div>
                   {SHORTCUTS.map(([k, desc]) => (
                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '3px 0', fontSize: 12 }}>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{k}</span>
@@ -1269,17 +1272,17 @@ export default function V2JobFeed() {
           {checked.size > 0 && (
             // ui: keep — floating bulk bar is a pill-shaped *bar* on --rail with --shadow-pop; no primitive owns a bar
             <div className="v2-bulkbar" style={{ position: 'absolute', left: '50%', bottom: 14, transform: 'translateX(-50%)', zIndex: 25, display: 'flex', alignItems: 'center', gap: 6, padding: '7px 8px 7px 14px', background: 'var(--rail)', borderRadius: 'var(--radius-control)', boxShadow: 'var(--shadow-pop)' }}>
-              <span style={{ fontSize: 12, color: 'var(--rail-ink)', fontWeight: 600, whiteSpace: 'nowrap' }}>{checked.size} selected</span>
+              <span style={{ fontSize: 12, color: 'var(--rail-ink)', fontWeight: 600, whiteSpace: 'nowrap' }}><Trans>{checked.size} selected</Trans></span>
               <div className="v2-bulksep" style={{ width: 1, height: 16, background: 'var(--on-rail-sep)', margin: '0 3px' }} />
               {/* the one filled control on the bulk bar: --btn-on-rail-shadow is
                   --btn-shadow everywhere but a theme whose accent IS its rail colour,
                   which prepends an --on-rail-line ring so the button has an edge. */}
-              <Button size="xs" onClick={() => bulkStatus('saved')} style={{ boxShadow: 'var(--btn-on-rail-shadow)' }}>Save</Button>
+              <Button size="xs" onClick={() => bulkStatus('saved')} style={{ boxShadow: 'var(--btn-on-rail-shadow)' }}><Trans>Save</Trans></Button>
               {/* ui: keep — RAIL_BTN controls (--rail-ink on --on-rail-line); the Pill tokens are for light surfaces */}
-              <div onClick={() => bulkStatus('skip')} className="v2-onrail v2-ctl" style={RAIL_BTN}>Skip</div>
+              <div onClick={() => bulkStatus('skip')} className="v2-onrail v2-ctl" style={RAIL_BTN}><Trans>Skip</Trans></div>
               {/* ui: keep — RAIL_BTN, as above */}
-              <div onClick={bulkScore} className="v2-onrail v2-ctl" style={RAIL_BTN}>Score</div>
-              <div onClick={() => setPicker({ mode: 'tailor', jobs: jobs.filter((j) => checked.has(j.id)) })} className="v2-onrail v2-ctl" style={{ ...RAIL_BTN, gap: 5 }}><span style={{ color: 'var(--rail-accent)' }}>✦</span>Tailor</div>
+              <div onClick={bulkScore} className="v2-onrail v2-ctl" style={RAIL_BTN}><Trans>Score</Trans></div>
+              <div onClick={() => setPicker({ mode: 'tailor', jobs: jobs.filter((j) => checked.has(j.id)) })} className="v2-onrail v2-ctl" style={{ ...RAIL_BTN, gap: 5 }}><span style={{ color: 'var(--rail-accent)' }}>✦</span><Trans>Tailor</Trans></div>
               <div onClick={() => setChecked(new Set())} className="v2-onrail" style={{ width: 27, height: 27, borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--on-rail-dim)', cursor: 'pointer' }}>✕</div>
             </div>
           )}
@@ -1287,26 +1290,26 @@ export default function V2JobFeed() {
           <div ref={listRef} onScroll={onListScroll} className="v2-scroll" style={{ flex: 1, overflow: 'auto', padding: '0 8px 12px', display: 'flex', flexDirection: 'column', userSelect: 'none', WebkitUserSelect: 'none' }}>
             {/* no "Loading…" on the FIRST paint — the list keeps its box and fills in once; a later reload
                 (a filter change) is an explicit action and keeps its line. */}
-            {loading ? (firstLoaded ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Loading…</div> : null)
+            {loading ? (firstLoaded ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}><Trans>Loading…</Trans></div> : null)
               // ui: keep — the "Try again" link runs inline inside a 13px sentence; Link's 11.5/500 would break the run
-              : loadError ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Couldn't load jobs · <span onClick={fetchJobs} style={{ color: 'var(--accent)', cursor: 'pointer' }}>Try again</span></div>
+              : loadError ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}><Trans>Couldn't load jobs ·</Trans> <span onClick={fetchJobs} style={{ color: 'var(--accent)', cursor: 'pointer' }}><Trans>Try again</Trans></span></div>
               : jobs.length === 0 ? (
                   (!filters.status.length && !filters.company.length && !filters.source.length && !filters.h1b_verdict.length && !filters.link_kind.length && filters.min_score === '' && !filters.min_salary && !dSearch && !searchId)
                     ? <div style={{ padding: '48px 40px', textAlign: 'center', color: 'var(--muted)', fontSize: 13, lineHeight: '20px' }}>   {/* first-run / nothing open */}
-                        <Heading style={{ display: 'block', marginBottom: 6 }}>No open roles yet</Heading>
-                        Jobs come from <a href="/searches" onClick={(e) => { e.preventDefault(); navigate('/searches') }}>Searches</a> and <a href="/companies" onClick={(e) => { e.preventDefault(); navigate('/companies') }}>Companies</a>. Activate one, or change the Status filter to include skipped and applied jobs.
+                        <Heading style={{ display: 'block', marginBottom: 6 }}><Trans>No open roles yet</Trans></Heading>
+                        <Trans>Jobs come from <a href="/searches" onClick={(e) => { e.preventDefault(); navigate('/searches') }}>Searches</a> and <a href="/companies" onClick={(e) => { e.preventDefault(); navigate('/companies') }}>Companies</a>. Activate one, or change the Status filter to include skipped and applied jobs.</Trans>
                       </div>
                     // T7-08: an account with no jobs at all (a brand-new member) under the default
                     // Status·New filter has nothing to clear — it has not been scraped into yet
                     : (neverScraped
                       ? <div data-empty="never-scraped" style={{ padding: '48px 40px', textAlign: 'center', color: 'var(--muted)', fontSize: 13, lineHeight: '20px' }}>
-                          <Heading style={{ display: 'block', marginBottom: 6 }}>Nothing scraped yet</Heading>
-                          {scrapeEvery > 0
-                            ? `Your first scrape runs within ${everyText(scrapeEvery)}. `
-                            : 'Scheduled scraping is off — run a search or a company by hand. '}
-                          Jobs come from your <a href="/searches" onClick={(e) => { e.preventDefault(); navigate('/searches') }}>Searches</a> and <a href="/companies" onClick={(e) => { e.preventDefault(); navigate('/companies') }}>Companies</a>.
+                          <Heading style={{ display: 'block', marginBottom: 6 }}><Trans>Nothing scraped yet</Trans></Heading>
+                          <Trans>{scrapeEvery > 0
+                            ? t`Your first scrape runs within ${everyText(scrapeEvery)}. `
+                            : t`Scheduled scraping is off — run a search or a company by hand. `}
+                          Jobs come from your <a href="/searches" onClick={(e) => { e.preventDefault(); navigate('/searches') }}>Searches</a> and <a href="/companies" onClick={(e) => { e.preventDefault(); navigate('/companies') }}>Companies</a>.</Trans>
                         </div>
-                      : <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13, lineHeight: '20px' }}>No jobs match.<br /><Link onClick={() => { setFilters(DEFAULTS); setSearch(''); setSearchId('') }}>Clear filters</Link></div>))
+                      : <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13, lineHeight: '20px' }}><Trans>No jobs match.</Trans><br /><Link onClick={() => { setFilters(DEFAULTS); setSearch(''); setSearchId('') }}><Trans>Clear filters</Trans></Link></div>))
               : jobs.map((j, i) => {
                 const score = bestScore(j), nsc = scoredCount(j)
                 const badge = BADGE[j.status]
@@ -1334,17 +1337,17 @@ export default function V2JobFeed() {
                             {/* --ring-count-shift is `-2px` in the base blocks — the literal this
                                 line carried — so only win98 moves the counter (round 9 #3: its
                                 ascii mark is two short rows, and the badge sat on the bar). */}
-                            {nsc > 1 && <div title={`${nsc} résumé reports`} style={{ position: 'absolute', right: -3, bottom: 'var(--ring-count-shift)', minWidth: 16, height: 16, padding: '0 3px', borderRadius: 'var(--radius-control)', background: 'var(--surface)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--text-2)' }}>{nsc}</div>}
+                            {nsc > 1 && <div title={t`${nsc} résumé reports`} style={{ position: 'absolute', right: -3, bottom: 'var(--ring-count-shift)', minWidth: 16, height: 16, padding: '0 3px', borderRadius: 'var(--radius-control)', background: 'var(--surface)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--text-2)' }}>{nsc}</div>}
                           </ScoreRing>
                         ) : run ? (
                           // the busy state matches the ring it replaces — same 44px box, same 37.5px arc
-                          <ScoreRing busy size="md" title="Scoring…">
+                          <ScoreRing busy size="md" title={t`Scoring…`}>
                             {/* ui: keep — 8px accent ··· marker inside the running ring, not a label */}
                             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--accent)' }}>···</div>
                           </ScoreRing>
                         ) : (
                           /* ui: keep — 8.5px dashed uppercase micro-badge filling the 34px score slot (position:absolute inset 0) */
-                          <div className="v2-bdc" onClick={(e) => { e.stopPropagation(); scoreJob(j) }} title={defaultDepth === 'full' ? 'Score this role — full (score + keywords + report)' : 'Score this role — light (score only). Change the default in Settings › Scoring, or press r to pick.'} style={{ position: 'absolute', inset: 0, border: '1px dashed var(--edge)', borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8.5, fontWeight: 600, letterSpacing: '.09em', textTransform: 'var(--label-case)', color: 'var(--muted)', cursor: 'pointer' }}>Score</div>
+                          <div className="v2-bdc" onClick={(e) => { e.stopPropagation(); scoreJob(j) }} title={defaultDepth === 'full' ? t`Score this role — full (score + keywords + report)` : t`Score this role — light (score only). Change the default in Settings › Scoring, or press r to pick.`} style={{ position: 'absolute', inset: 0, border: '1px dashed var(--edge)', borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8.5, fontWeight: 600, letterSpacing: '.09em', textTransform: 'var(--label-case)', color: 'var(--muted)', cursor: 'pointer' }}><Trans>Score</Trans></div>
                         )}
                         {/* ui: keep — 9px ring underneath, plus a 2px --surface knock-out ring so it reads over the disc */}
                         {on && <GlyphBadge style={{ position: 'absolute', left: -4, top: -3, border: '2px solid var(--surface)', fontSize: 'var(--t-9)' }}>✓</GlyphBadge>}
@@ -1364,7 +1367,7 @@ export default function V2JobFeed() {
                               copy a re-tailor replaces is about to change under the click. */}
                           {fa.tailoring
                             ? <span title={tailorMarkTitle(fa)} style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, margin: '-2px -2px -2px 0', color: 'var(--ai)' }}><Spinner size={11} color="currentColor" /></span>
-                            : !j.tailored_resume_id ? null : <a href={`/resumes/${j.tailored_resume_id}`} className="v2-rowink" onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/resumes/${j.tailored_resume_id}`) }} title="Open tailored résumé" style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, margin: '-2px -2px -2px 0', fontSize: 14, lineHeight: 1, color: 'var(--ai)' }}>✦</a>}
+                            : !j.tailored_resume_id ? null : <a href={`/resumes/${j.tailored_resume_id}`} className="v2-rowink" onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/resumes/${j.tailored_resume_id}`) }} title={t`Open tailored résumé`} style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, margin: '-2px -2px -2px 0', fontSize: 14, lineHeight: 1, color: 'var(--ai)' }}>✦</a>}
                           {/* ui: keep — status badge with background + border + r99: Tag role, not a Label */}
                           {badge && <span style={{ flex: '0 0 auto', fontSize: 9.5, fontWeight: 600, letterSpacing: '.1em', textTransform: 'uppercase', padding: '2px 7px', lineHeight: '14px', borderRadius: 'var(--radius-control)', border: `1px solid ${badge.bd}`, background: badge.bg, color: badge.fg }}>{badge.label}</span>}
                         </div>
@@ -1396,9 +1399,9 @@ export default function V2JobFeed() {
                     <div className="v2-rail-col" style={{ position: 'relative', flex: '0 0 27px', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--line-soft)' }} onClick={(e) => e.stopPropagation()}>
                       {/* ui: keep — v2-rail-cell glyph cells (♥ / ✕ / ⋯); rail text is out of scope for this step */}
                       {/* the heart carries the saved state itself, so the control the user clicked answers immediately */}
-                      <div className="v2-rail-save v2-rail-cell" title={j.saved ? 'Unsave (s)' : 'Save (s)'} onClick={() => saveJob(j)} style={{ flex: 1, fontSize: 11, color: j.saved ? 'var(--accent)' : 'var(--text-2)', borderBottom: '1px solid var(--line-soft)' }}>♥</div>
-                      <div className="v2-rail-skip v2-rail-cell" title="Skip (x)" onClick={() => skipJob(j)} style={{ flex: 1, fontSize: 11, color: 'var(--muted)', borderBottom: '1px solid var(--line-soft)' }}>✕</div>
-                      <div className="v2-rail-copy v2-rail-cell" title="More" onClick={(ev) => {
+                      <div className="v2-rail-save v2-rail-cell" title={j.saved ? t`Unsave (s)` : t`Save (s)`} onClick={() => saveJob(j)} style={{ flex: 1, fontSize: 11, color: j.saved ? 'var(--accent)' : 'var(--text-2)', borderBottom: '1px solid var(--line-soft)' }}>♥</div>
+                      <div className="v2-rail-skip v2-rail-cell" title={t`Skip (x)`} onClick={() => skipJob(j)} style={{ flex: 1, fontSize: 11, color: 'var(--muted)', borderBottom: '1px solid var(--line-soft)' }}>✕</div>
+                      <div className="v2-rail-copy v2-rail-cell" title={t`More`} onClick={(ev) => {
                         if (rowMenu?.id === j.id) { setRowMenu(null); return }
                         const r = ev.currentTarget.getBoundingClientRect()
                         const up = r.bottom + 236 > window.innerHeight
@@ -1407,13 +1410,13 @@ export default function V2JobFeed() {
                       {rowMenu?.id === j.id && (
                         <>
                           <div onClick={() => setRowMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 59 }} />
-                          <Menu ariaLabel="Job actions" style={{ position: 'fixed', left: rowMenu.left, top: rowMenu.top, bottom: rowMenu.bottom, zIndex: 60, width: 228 }}>
-                            {[['Mark applied', 'a', () => applyJob(j)], ['Tailor résumé', 't', () => setPicker({ mode: 'tailor', jobs: [j] })], ['Rescore', 'r', () => openRescore(j)], [__DEMO__ ? 'Open posting ↗ · original may have expired' : 'Open posting ↗', 'e', () => openLink(j) && window.open(openLink(j), '_blank', 'noopener,noreferrer')]].map(([label, key, act]) => (
+                          <Menu ariaLabel={t`Job actions`} style={{ position: 'fixed', left: rowMenu.left, top: rowMenu.top, bottom: rowMenu.bottom, zIndex: 60, width: 228 }}>
+                            {[[t`Mark applied`, 'a', () => applyJob(j)], [t`Tailor résumé`, 't', () => setPicker({ mode: 'tailor', jobs: [j] })], [t`Rescore`, 'r', () => openRescore(j)], [__DEMO__ ? t`Open posting ↗ · original may have expired` : t`Open posting ↗`, 'e', () => openLink(j) && window.open(openLink(j), '_blank', 'noopener,noreferrer')]].map(([label, key, act]) => (
                               <MenuItem key={label} hint={key} hintMono onClick={() => { setRowMenu(null); act() }}
-                                style={label === 'Tailor résumé' ? { fontWeight: 600 } : undefined}>{label}</MenuItem>
+                                style={key === 't' ? { fontWeight: 600 } : undefined}>{label}</MenuItem>
                             ))}
                             <MenuItem danger onClick={() => { setRowMenu(null); ignoreCompany(j) }}
-                              style={{ display: j.company ? 'flex' : 'none' }}>Ignore {j.company} everywhere</MenuItem>
+                              style={{ display: j.company ? 'flex' : 'none' }}><Trans>Ignore {j.company} everywhere</Trans></MenuItem>
                           </Menu>
                         </>
                       )}
@@ -1421,14 +1424,14 @@ export default function V2JobFeed() {
                   </Row>
                 )
               })}
-            {loadingMore && <Helper style={{ padding: '14px 0', textAlign: 'center' }}>Loading more…</Helper>}
-            {!loadingMore && !hasMore && jobs.length > 0 && <Helper style={{ padding: '14px 0 6px', textAlign: 'center' }}>End of the list · {total} job{total === 1 ? '' : 's'}</Helper>}
+            {loadingMore && <Helper style={{ padding: '14px 0', textAlign: 'center' }}><Trans>Loading more…</Trans></Helper>}
+            {!loadingMore && !hasMore && jobs.length > 0 && <Helper style={{ padding: '14px 0 6px', textAlign: 'center' }}>{plural(total, { one: 'End of the list · # job', other: 'End of the list · # jobs' })}</Helper>}
           </div>
         </section>
 
         {/* detail */}
         <section style={{ position: 'relative', flex: '1 0 420px', minWidth: 0, display: 'flex', flexDirection: 'column', background: 'var(--surface)', minHeight: 0 }}>
-          {!d ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>Select a job.</div> : (
+          {!d ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}><Trans>Select a job.</Trans></div> : (
             <>
               {/* ui: keep — 12px hit area FLOATING over the pane top (absolute, z-20, no bg/border) holding a bare 52x4 handle; not a Row/Button/SectionHead */}
               <div {...kb(toggleAna)} onClick={toggleAna} aria-expanded={!anaCollapsed} title={anaHint} className="v2-grab"
@@ -1469,14 +1472,14 @@ export default function V2JobFeed() {
                           // where else this posting was found; each copy opens its own listing
                           // a copy from this job's own source is the same posting or role under another
                           // link: named by its city when that differs, else "another link"
-                          d.also_on?.length > 0 && <span key="also" style={{ whiteSpace: 'nowrap' }}>Also listed:{' '}
-                            {d.also_on.map((a, i) => <React.Fragment key={a.url}>{i ? '; ' : ''}<Link href={a.url} target="_blank" title={a.url} style={{ fontSize: 'inherit', lineHeight: 'inherit' }}>{a.source !== d.source ? srcLabel(a.source, apifyBoards) : (a.location && a.location !== d.location ? a.location : 'another link')}</Link></React.Fragment>)}
+                          d.also_on?.length > 0 && <span key="also" style={{ whiteSpace: 'nowrap' }}><Trans>Also listed:{' '}
+                            {d.also_on.map((a, i) => <React.Fragment key={a.url}>{i ? '; ' : ''}<Link href={a.url} target="_blank" title={a.url} style={{ fontSize: 'inherit', lineHeight: 'inherit' }}>{a.source !== d.source ? srcLabel(a.source, apifyBoards) : (a.location && a.location !== d.location ? a.location : t`another link`)}</Link></React.Fragment>)}</Trans>
                           </span>,
                           // the same role, skipped elsewhere: shown again because this place may fit
-                          d.same_role_skipped && <span key="skipped" style={{ whiteSpace: 'nowrap' }}>Skipped in{' '}
-                            <Link onClick={() => setSearchParams(p => { p.set('job', d.same_role_skipped.id); return p })} title="The same role, which you skipped in another place" style={{ fontSize: 'inherit', lineHeight: 'inherit' }}>{d.same_role_skipped.location || 'another place'}</Link></span>,
+                          d.same_role_skipped && <span key="skipped" style={{ whiteSpace: 'nowrap' }}><Trans>Skipped in{' '}</Trans>
+                            <Link onClick={() => setSearchParams(p => { p.set('job', d.same_role_skipped.id); return p })} title={t`The same role, which you skipped in another place`} style={{ fontSize: 'inherit', lineHeight: 'inherit' }}>{d.same_role_skipped.location || t`another place`}</Link></span>,
                           // a copy links back to its original (backend posting_links.py: link | city | repost)
-                          d.copy_of && <span key="copy" style={{ whiteSpace: 'nowrap' }}><Link onClick={() => setSearchParams((p) => { p.set('job', d.copy_of.id); return p })} title="Open the original posting" style={{ fontSize: 'inherit', lineHeight: 'inherit' }}>{d.copy_kind === 'city' ? `Same role in ${d.copy_of.location || 'another city'}` : d.copy_kind === 'repost' ? 'Reposted: see the earlier posting' : 'Copy of a posting in your feed'} ↗</Link></span>,
+                          d.copy_of && <span key="copy" style={{ whiteSpace: 'nowrap' }}><Link onClick={() => setSearchParams((p) => { p.set('job', d.copy_of.id); return p })} title={t`Open the original posting`} style={{ fontSize: 'inherit', lineHeight: 'inherit' }}>{d.copy_kind === 'city' ? t`Same role in ${d.copy_of.location || t`another city`}` : d.copy_kind === 'repost' ? t`Reposted: see the earlier posting` : t`Copy of a posting in your feed`} ↗</Link></span>,
                         ].filter(Boolean).flatMap((el, i) => i ? [<span key={`sep${i}`} style={{ color: 'var(--line)' }}>|</span>, el] : [el])}
                       </div>
                     ) : <Helper style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[d.company, fmtSalary(d.salary_min, d.salary_max), d.location, visaText, srcLabel(d.source, apifyBoards), timeAgo(d.discovered_at)].filter(Boolean).join(' · ')}</Helper>}
@@ -1490,7 +1493,7 @@ export default function V2JobFeed() {
                     {/* the employer's own posting when there is one (linkKinds.js openLink), else the job's link */}
                     {closedTag(d) && <span title={closedTag(d).title} onClick={() => setRecheck((n) => n + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--dot-bad)', cursor: 'pointer' }}><Dot tone="bad" />{closedTag(d).text}</span>}
                     {linkTag(d) && <Tag title={linkTag(d).title}>{linkTag(d).text}</Tag>}
-                    {openLink(d) && <Button variant="secondary" size="sm" href={openLink(d)} target="_blank" title={openLink(d)} onClick={() => opened(d)} style={{ height: headOpen ? 36 : 30 }}>Open ↗</Button>}
+                    {openLink(d) && <Button variant="secondary" size="sm" href={openLink(d)} target="_blank" title={openLink(d)} onClick={() => opened(d)} style={{ height: headOpen ? 36 : 30 }}><Trans>Open ↗</Trans></Button>}
                     {/* Routed through Button (not hand-drawn) so it reads --btn-shadow/--btn-weight/--btn-primary-bg/-ink
                         and the hover/pressed rules; the style override only restores height/padding/line-height, which track the collapsing header. */}
                     {/* while a tailor runs the button says so and does nothing: `disabled`
@@ -1498,33 +1501,33 @@ export default function V2JobFeed() {
                         rather than "working", so it dims in place at .55 instead. */}
                     <Button variant="ai" size="sm" title={dAct.tailoring ? tailorMarkTitle(dAct) : undefined}
                       onClick={dAct.tailoring ? () => {} : () => d.tailored_resume_id ? openTailored(d) : setPicker({ mode: 'tailor', jobs: [d] })}
-                      style={{ height: headOpen ? 36 : 30, padding: '0 19px', lineHeight: 'inherit', opacity: dAct.tailoring ? 0.55 : 1, cursor: dAct.tailoring ? 'default' : undefined }}>{dAct.tailoring ? '✦ Tailoring…' : d.tailored_resume_id ? '✦ Open tailored ↗' : 'Tailor résumé'}</Button>
+                      style={{ height: headOpen ? 36 : 30, padding: '0 19px', lineHeight: 'inherit', opacity: dAct.tailoring ? 0.55 : 1, cursor: dAct.tailoring ? 'default' : undefined }}>{dAct.tailoring ? t`✦ Tailoring…` : d.tailored_resume_id ? t`✦ Open tailored ↗` : t`Tailor résumé`}</Button>
                     <div style={{ position: 'relative', flex: '0 0 auto' }}>
                       {/* Round 9: IconButton's bordered 36, with a width/height
                           override so the square still tracks the collapsing header
                           (36/30). `on` is the open-menu state, which is the same
                           --pill-on-* trio this row drew by hand. */}
-                      <IconButton size={36} on={headMenu} title="More actions" hover="v2-act"
+                      <IconButton size={36} on={headMenu} title={t`More actions`} hover="v2-act"
                         onClick={(e) => { e.stopPropagation(); setHeadMenu((v) => !v) }}
                         style={{ width: headOpen ? 36 : 30, height: headOpen ? 36 : 30 }}>⋯</IconButton>
                       {headMenu && (
                         <>
                           <div onClick={() => setHeadMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 44 }} />
-                          <Menu ariaLabel="Job actions" style={{ position: 'absolute', top: '100%', right: 0, zIndex: 45, marginTop: 5, width: 236 }}>
+                          <Menu ariaLabel={t`Job actions`} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 45, marginTop: 5, width: 236 }}>
                             {[
                               // hidden while a tailor is already running: it would queue a second
                               // run against the copy this one is about to write
-                              ...(d.tailored_resume_id && !dAct.tailoring ? [['✦ Re-tailor résumé', 't', () => setPicker({ mode: 'tailor', jobs: [d] }), true]] : []),
-                              ['Mark applied', 'a', () => applyJob(d)],
-                              ['Rescore', 'r', () => openRescore(d)],
-                              ['Cover letter ↗', 'c', () => navigate(`/cover-letters?job=${d.id}`)],
-                              ['Copy résumé with tracked links', '', () => setPicker({ mode: 'copy', jobs: [d] })],
+                              ...(d.tailored_resume_id && !dAct.tailoring ? [[t`✦ Re-tailor résumé`, 't', () => setPicker({ mode: 'tailor', jobs: [d] }), true]] : []),
+                              [t`Mark applied`, 'a', () => applyJob(d)],
+                              [t`Rescore`, 'r', () => openRescore(d)],
+                              [t`Cover letter ↗`, 'c', () => navigate(`/cover-letters?job=${d.id}`)],
+                              [t`Copy résumé with tracked links`, '', () => setPicker({ mode: 'copy', jobs: [d] })],
                             ].map(([label, key, act, bold]) => (
                               <MenuItem key={label} hint={key} hintMono onClick={() => { setHeadMenu(false); act() }}
                                 style={bold ? { color: 'var(--text)', fontWeight: 600 } : undefined}>{label}</MenuItem>
                             ))}
                             <MenuItem danger onClick={() => { setHeadMenu(false); ignoreCompany(d) }}
-                              style={{ display: d.company ? 'flex' : 'none' }}>Ignore {d.company} everywhere</MenuItem>
+                              style={{ display: d.company ? 'flex' : 'none' }}><Trans>Ignore {d.company} everywhere</Trans></MenuItem>
                           </Menu>
                         </>
                       )}
@@ -1544,15 +1547,15 @@ export default function V2JobFeed() {
                     <span style={{ flex: '0 0 auto', width: 19, textAlign: 'center', color: 'var(--muted)', fontSize: 11 }}>{hasReport ? (reportShown ? '⌄' : '›') : ''}</span>
                     <ScoreRing value={best?.score} size="sm" style={{ marginLeft: -4 }} />
                     <span title={best?.name} style={{ flex: '0 1 auto', minWidth: 0, maxWidth: 220, fontSize: 12.5, color: 'var(--text-2)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{best?.tailored ? '✦ ' : ''}{best?.name}</span>
-                    {bandCov != null && <><Rule vertical tone="line" /><span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{bandCov}% keywords</span></>}
-                    {bandReq.length > 0 && <><Rule vertical tone="line" /><span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bandMet} of {bandReq.length} requirements met</span></>}
+                    {bandCov != null && <><Rule vertical tone="line" /><span style={{ fontSize: 12.5, color: 'var(--muted)' }}><Trans>{bandCov}% keywords</Trans></span></>}
+                    {bandReq.length > 0 && <><Rule vertical tone="line" /><span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><Trans>{bandMet} of {bandReq.length} requirements met</Trans></span></>}
                     <Rule vertical tone="line" style={{ marginLeft: 'auto' }} />
                     {hasReport
-                      ? <span style={{ flex: '0 0 auto', fontSize: 12.5, color: 'var(--muted)' }}>{reports.length} report{reports.length === 1 ? '' : 's'}</span>
+                      ? <span style={{ flex: '0 0 auto', fontSize: 12.5, color: 'var(--muted)' }}>{plural(reports.length, { one: '# report', other: '# reports' })}</span>
                       // a Light score has no report to open — say so on the band line, leave the posting below it
                       : <>
-                          <span style={{ flex: '0 0 auto', fontSize: 12.5, color: 'var(--muted)' }}>Score at full depth to see the report</span>
-                          <Button variant="ai" size="xs" onClick={(e) => { e.stopPropagation(); openRescore(d, 'full') }} style={{ flex: '0 0 auto' }}>Full report</Button>
+                          <span style={{ flex: '0 0 auto', fontSize: 12.5, color: 'var(--muted)' }}><Trans>Score at full depth to see the report</Trans></span>
+                          <Button variant="ai" size="xs" onClick={(e) => { e.stopPropagation(); openRescore(d, 'full') }} style={{ flex: '0 0 auto' }}><Trans>Full report</Trans></Button>
                         </>}
                     {/* activity: the run rides at the END of the band the report already owns,
                         behind its own hairline. Accent while scoring (or both), --ai when only
@@ -1585,13 +1588,13 @@ export default function V2JobFeed() {
                         {/* ghosts: a résumé in the run with no report yet. Dashed and muted so the
                             strip already shows what is coming; the real tab replaces it on landing. */}
                         {dGhosts.map((g) => (
-                          <div key={g.key} title={g.tailored ? `Tailoring · ${g.label}` : `${g.label} · scoring`} style={{ padding: '7px 0', marginRight: 22, maxWidth: 230, fontSize: 12.5, color: 'var(--muted)', borderBottom: '2px dashed var(--line)', marginBottom: -1, cursor: 'default', display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                          <div key={g.key} title={g.tailored ? t`Tailoring · ${g.label}` : t`${g.label} · scoring`} style={{ padding: '7px 0', marginRight: 22, maxWidth: 230, fontSize: 12.5, color: 'var(--muted)', borderBottom: '2px dashed var(--line)', marginBottom: -1, cursor: 'default', display: 'flex', alignItems: 'baseline', gap: 6 }}>
                             {g.tailored && <span style={{ fontSize: 10, color: 'var(--ai)' }}>✦</span>}
                             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.label}</span>
                             <Spinner size={10} color={g.tailored ? 'var(--ai)' : 'var(--accent)'} />
                           </div>
                         ))}
-                        <NavLink pad="7px 0" onClick={() => openRescore(d)} style={{ marginLeft: 'auto', color: 'var(--muted)' }}>+ Rescore</NavLink>
+                        <NavLink pad="7px 0" onClick={() => openRescore(d)} style={{ marginLeft: 'auto', color: 'var(--muted)' }}><Trans>+ Rescore</Trans></NavLink>
                       </HeaderRow>
                       {/* body */}
                       <div className="v2-scroll" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '14px 30px 18px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1602,7 +1605,7 @@ export default function V2JobFeed() {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: breakdownOpen ? 11 : 0 }}>
                             <SectionHead boxed caret="end" open={breakdownOpen} onToggle={() => setBreakdownOpen((v) => !v)}
                               style={{ gap: 8, margin: '-2px -4px' }}>
-                              <Label>Score breakdown</Label>
+                              <Label><Trans>Score breakdown</Trans></Label>
                               <Rule style={{ flex: 1, minWidth: 0 }} />
                             </SectionHead>
                             {breakdownOpen && (
@@ -1629,7 +1632,7 @@ export default function V2JobFeed() {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: keywordOpen ? 6 : 0 }}>
                             <SectionHead boxed caret="end" open={keywordOpen} onToggle={() => setKeywordOpen((v) => !v)}
                               style={{ gap: 8, margin: '-2px -4px' }}>
-                              <Label>Keyword coverage</Label>
+                              <Label><Trans>Keyword coverage</Trans></Label>
                               <Rule style={{ flex: 1, minWidth: 8 }} />
                               <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: coverage >= 75 ? 'var(--good)' : coverage >= 50 ? 'var(--warn)' : 'var(--bad)' }}>{coverage}%</span>
                             </SectionHead>
@@ -1637,8 +1640,8 @@ export default function V2JobFeed() {
                               <>
                                 <Meter value={coverage / 100} height={4} tone={coverage >= 75 ? 'good' : coverage >= 50 ? 'warn' : 'bad'} />
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 3 }}>
-                                  <Helper>{(rpt.matched_keywords || []).length} matched · {(rpt.missing_keywords || []).length} missing</Helper>
-                                  {(rpt.matched_keywords || []).length > 0 && <Link onClick={() => setShowMatched((v) => !v)}>{showMatched ? 'Hide matched' : 'Show matched'}</Link>}
+                                  <Helper><Trans>{(rpt.matched_keywords || []).length} matched · {(rpt.missing_keywords || []).length} missing</Trans></Helper>
+                                  {(rpt.matched_keywords || []).length > 0 && <Link onClick={() => setShowMatched((v) => !v)}>{showMatched ? t`Hide matched` : t`Show matched`}</Link>}
                                 </div>
                                 {/* ui: keep — mono keyword tags (Tag role), not controls */}
                                 {showMatched && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, paddingTop: 2 }}>{(rpt.matched_keywords || []).map((w, k) => <span key={k} style={{ fontFamily: 'var(--mono)', fontSize: 10.5, padding: '3px 7px', borderRadius: 'var(--radius-control)', background: 'var(--accent-soft)', color: 'var(--good)' }}>{w}</span>)}</div>}
@@ -1654,20 +1657,20 @@ export default function V2JobFeed() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                               <SectionHead boxed caret="end" open={reqOpen} onToggle={() => setReqOpen((v) => !v)}
                                 style={{ gap: 11, flex: '1 1 auto', minWidth: 0, margin: '-2px -4px' }}>
-                                <Label>Requirement mapping</Label>
-                                <Helper>{reqMet} of {reqRows.length} met</Helper>
+                                <Label><Trans>Requirement mapping</Trans></Label>
+                                <Helper><Trans>{reqMet} of {reqRows.length} met</Trans></Helper>
                               </SectionHead>
                               {reqOpen && (
                                 // ui: keep — two-cell segmented filter track: one shared border run, overflow hidden, toggle cells not Pills
                                 <div style={{ marginLeft: 'auto', display: 'flex', border: '1px solid var(--edge)', borderRadius: 'var(--radius-control)', overflow: 'hidden' }}>
-                                  {[['all', `All ${reqRows.length}`], ['gaps', `Gaps ${reqRows.length - reqMet}`]].map(([id, label]) => <div key={id} onClick={() => setReqFilter(id)} style={{ height: 24, padding: '0 11px', display: 'flex', alignItems: 'center', fontSize: 11.5, cursor: 'pointer', background: reqFilter === id ? 'var(--accent)' : 'transparent', color: reqFilter === id ? 'var(--accent-ink)' : 'var(--text-2)' }}>{label}</div>)}
+                                  {[['all', t`All ${reqRows.length}`], ['gaps', t`Gaps ${reqRows.length - reqMet}`]].map(([id, label]) => <div key={id} onClick={() => setReqFilter(id)} style={{ height: 24, padding: '0 11px', display: 'flex', alignItems: 'center', fontSize: 11.5, cursor: 'pointer', background: reqFilter === id ? 'var(--accent)' : 'transparent', color: reqFilter === id ? 'var(--accent-ink)' : 'var(--text-2)' }}>{label}</div>)}
                                 </div>
                               )}
                             </div>
                             {reqOpen && (
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <TableHead height="auto" pad="0 0 6px" style={{ gap: 14, alignItems: 'flex-start', background: 'transparent' }}>
-                              <span style={{ flex: 1.05 }}>Requirement</span><span style={{ flex: 1.1 }}>Résumé match</span><span style={{ flex: '0 0 34px', textAlign: 'center' }}>Status</span>
+                              <span style={{ flex: 1.05 }}><Trans>Requirement</Trans></span><span style={{ flex: 1.1 }}><Trans>Résumé match</Trans></span><span style={{ flex: '0 0 34px', textAlign: 'center' }}><Trans>Status</Trans></span>
                             </TableHead>
                             {reqRows.filter((r) => reqFilter === 'all' || !r.matched).map((r, k) => (
                               // `align="normal"`: a wrapped requirement must not centre against its one-line verdict.
@@ -1686,18 +1689,18 @@ export default function V2JobFeed() {
                         {(rpt?.hard_blockers || []).length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '11px 13px', border: '1px solid var(--bad)', borderRadius: 'var(--radius-cell)' }}>
                             {/* ui: keep — --bad 10/600 uppercase: neither the ink nor the weight Label carries */}
-                            <span style={{ fontSize: 10, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--bad)', fontWeight: 600 }}>Hard blockers</span>
+                            <span style={{ fontSize: 10, letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--bad)', fontWeight: 600 }}><Trans>Hard blockers</Trans></span>
                             {(rpt.hard_blockers || []).map((b, k) => <div key={k} style={{ display: 'flex', gap: 9, fontSize: 12.5, lineHeight: '18px', color: 'var(--text-2)' }}><span style={{ color: 'var(--bad)' }}>!</span><span>{b}</span></div>)}
                           </div>
                         )}
                         {rpt?.ats_tip && (
                           <Card style={{ display: 'flex', gap: 11, padding: '12px 14px', background: 'var(--surface-2)' }}>
-                            <Label style={{ flex: '0 0 auto', paddingTop: 2 }}>ATS tip</Label>
+                            <Label style={{ flex: '0 0 auto', paddingTop: 2 }}><Trans>ATS tip</Trans></Label>
                             <span style={{ flex: 1, fontSize: 12.5, lineHeight: '18px', color: 'var(--text-2)' }}>{rpt.ats_tip}</span>
                           </Card>
                         )}
                         {(d.fit_gaps || []).length > 0 && !reqRows.length && <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{(d.fit_gaps || []).map((g, k) => <div key={k} style={{ display: 'flex', gap: 8, fontSize: 12.5, color: 'var(--text-2)' }}><span style={{ flex: '0 0 auto', color: 'var(--bad)', display: 'flex', alignItems: 'center' }}><CrossGlyph /></span><span>{g}</span></div>)}</div>}
-                        {!rpt && !(d.fit_gaps || []).length && !(d.fit_strengths || []).length && <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>This report was scored at Light depth — rescore at Full depth for the keyword and requirement breakdown.</span>}
+                        {!rpt && !(d.fit_gaps || []).length && !(d.fit_strengths || []).length && <span style={{ fontSize: 12.5, color: 'var(--muted)' }}><Trans>This report was scored at Light depth — rescore at Full depth for the keyword and requirement breakdown.</Trans></span>}
                       </div>
                     </div>
                   )}
@@ -1710,13 +1713,13 @@ export default function V2JobFeed() {
               {!dScored && !running && !anaCollapsed && (
                 <div style={{ flex: '0 0 auto', borderBottom: '1px solid var(--line)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 30px 8px 4px' }}>
                   <span style={{ flex: '0 0 auto', width: 19 }} />
-                  <ScoreRing value={null} size="sm" label="No fit" style={{ marginLeft: -4 }} />
+                  <ScoreRing value={null} size="sm" label={t`No fit`} style={{ marginLeft: -4 }} />
                   <div style={{ flex: 1, minWidth: 0, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)' }}>Not scored yet</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)' }}><Trans>Not scored yet</Trans></span>
                     {cannotScore && <span style={{ color: 'var(--muted)' }}>{' · '}{NO_BASES_HINT}</span>}
                     {!cannotScore && <>
-                    <span style={{ color: 'var(--muted)' }}>{' '}Score against your résumés for the </span>
-                    <span style={{ color: 'var(--accent)' }}>fit breakdown, requirements and keywords</span>
+                    <span style={{ color: 'var(--muted)' }}><Trans>{' '}Score against your résumés for the</Trans> </span>
+                    <span style={{ color: 'var(--accent)' }}><Trans>fit breakdown, requirements and keywords</Trans></span>
                     </>}
                   </div>
                   {/* nothing scored yet, but a tailor is out: the same trailing item the
@@ -1730,7 +1733,7 @@ export default function V2JobFeed() {
                       </div>
                     </>
                   )}
-                  <Button variant="ai" size="xs" disabled={cannotScore} title={cannotScore ? NO_BASES_HINT : undefined} onClick={cannotScore ? undefined : () => openRescore(d)}>Score this role</Button>
+                  <Button variant="ai" size="xs" disabled={cannotScore} title={cannotScore ? NO_BASES_HINT : undefined} onClick={cannotScore ? undefined : () => openRescore(d)}><Trans>Score this role</Trans></Button>
                 </div>
               )}
               {/* the takeover, and ONLY here: no score at all and a scoring run in flight.
@@ -1741,8 +1744,8 @@ export default function V2JobFeed() {
                   {/* the band's busy ring is the same primitive as the row's, so the two loading states can't drift apart */}
                   <ScoreRing busy size="sm" style={{ marginLeft: -4 }} />
                   <div style={{ flex: 1, minWidth: 0, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)' }}>Scoring in progress</span>
-                    <span style={{ color: 'var(--muted)' }}>{' '}This continues in the background if you navigate away.</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)' }}><Trans>Scoring in progress</Trans></span>
+                    <span style={{ color: 'var(--muted)' }}><Trans>{' '}This continues in the background if you navigate away.</Trans></span>
                   </div>
                 </div>
               )}
@@ -1754,10 +1757,10 @@ export default function V2JobFeed() {
                   <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     {dCached && !__DEMO__ && (
                       <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 30px', borderBottom: '1px solid var(--line)', background: 'var(--surface-2)' }}>
-                        <span style={{ fontSize: 12, color: viewCached ? 'var(--accent)' : 'var(--muted)' }}>{viewCached ? 'Cached snapshot · captured when you applied' : 'Live posting'}</span>
-                        <Segmented variant="inset" ariaLabel="Posting view" value={viewCached ? 'cached' : 'live'}
+                        <span style={{ fontSize: 12, color: viewCached ? 'var(--accent)' : 'var(--muted)' }}>{viewCached ? t`Cached snapshot · captured when you applied` : t`Live posting`}</span>
+                        <Segmented variant="inset" ariaLabel={t`Posting view`} value={viewCached ? 'cached' : 'live'}
                           onChange={(v) => setViewCached(v === 'cached')} style={{ marginLeft: 'auto' }}
-                          options={[{ value: 'live', label: 'Live' }, { value: 'cached', label: 'Cached' }]} />
+                          options={[{ value: 'live', label: t`Live` }, { value: 'cached', label: t`Cached` }]} />
                       </div>
                     )}
                     {viewCached && dCached ? (
@@ -1768,7 +1771,7 @@ export default function V2JobFeed() {
                       /* the wrapper is the viewport and the clip: the frame inside it grows by
                          1/zoom and scales back down, so the wrapper's box never moves */
                       <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
-                        <iframe title="cached" srcDoc={cachedHtml || '<p style="padding:16px;font-family:sans-serif">Loading cached snapshot…</p>'} sandbox="allow-popups allow-forms" referrerPolicy="no-referrer" style={{ position: 'absolute', top: 0, left: 0, border: 'none', background: 'var(--iframe-bg)', ...zoomStyle }} />
+                        <iframe title={t`cached`} srcDoc={cachedHtml || '<p style="padding:16px;font-family:sans-serif">Loading cached snapshot…</p>'} sandbox="allow-popups allow-forms" referrerPolicy="no-referrer" style={{ position: 'absolute', top: 0, left: 0, border: 'none', background: 'var(--iframe-bg)', ...zoomStyle }} />
                         {zoomFloater && (
                           <ZoomFloater zoom={postZoom} onIn={() => zoomTo(postZoom + 10)} onOut={() => zoomTo(postZoom - 10)}
                             onReset={() => zoomTo(100)} style={{ position: 'absolute', right: 30, top: 14, zIndex: 6 }} />
@@ -1784,7 +1787,7 @@ export default function V2JobFeed() {
                             blocked by their own framing headers either way (R4-T5-02). */}
                         {/* same wrapper-clips-the-scaled-frame pattern as the cached branch */}
                         <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
-                          <iframe key={`${frameJobId}|${frameSrc}`} title="posting" src={frameSrc}
+                          <iframe key={`${frameJobId}|${frameSrc}`} title={t`posting`} src={frameSrc}
                             onLoad={() => settleFrame(frameJobId)} onError={() => settleFrame(frameJobId)}
                             sandbox="allow-scripts allow-popups allow-forms allow-same-origin"
                             style={{ position: 'absolute', top: 0, left: 0, border: 'none', background: 'var(--iframe-bg)', ...zoomStyle }} />
@@ -1796,7 +1799,7 @@ export default function V2JobFeed() {
                         {frameLoadId === frameJobId && (
                           <div style={{ position: 'absolute', inset: 0, background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                             <Spinner size={12} />
-                            <Helper>{`Loading ${hostOf(frameSrc).replace(/^www\./, '')} …`}</Helper>
+                            <Helper>{t`Loading ${hostOf(frameSrc).replace(/^www\./, '')} …`}</Helper>
                           </div>
                         )}
                       </div>
@@ -1806,20 +1809,20 @@ export default function V2JobFeed() {
                         <div style={{ maxWidth: '44ch', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 11, textAlign: 'center' }}>
                           {/* ui: keep — dashed 44px warning glyph, not an add-line */}
                           <div style={{ width: 44, height: 44, border: '1px dashed var(--edge)', borderRadius: 'var(--radius-control)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: 'var(--muted)' }}>▲</div>
-                          <Heading>This page can't be shown here</Heading>
-                          <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-2)' }}>{d.company} does not allow its page to be shown inside another site. {dCached ? 'You applied to this role, so a cached snapshot is available.' : 'Open it in a new tab, or install the Navigator extension, which removes that restriction.'}</span>
+                          <Heading><Trans>This page can't be shown here</Trans></Heading>
+                          <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-2)' }}><Trans>{d.company} does not allow its page to be shown inside another site. {dCached ? t`You applied to this role, so a cached snapshot is available.` : t`Open it in a new tab, or install the Navigator extension, which removes that restriction.`}</Trans></span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
                             {/* round 9: `Button href` renders the real anchor this
                                 needed, on the primary button's own paint (which is
                                 the --accent / --accent-ink pair it drew by hand) */}
-                            <Button size="sm" href={openLink(d)} target="_blank" style={{ height: 34 }}>Open in new tab ↗{__DEMO__ ? ' · original may have expired' : ''}</Button>
+                            <Button size="sm" href={openLink(d)} target="_blank" style={{ height: 34 }}><Trans>Open in new tab ↗{__DEMO__ ? t` · original may have expired` : ''}</Trans></Button>
                             {/* ui: keep — h34 to match the native anchor it sits beside (which stays inline) */}
-                            {dCached && <Button variant="secondary" size="sm" hover="v2-act" onClick={() => setViewCached(true)} style={{ height: 34 }}>View cached snapshot</Button>}
+                            {dCached && <Button variant="secondary" size="sm" hover="v2-act" onClick={() => setViewCached(true)} style={{ height: 34 }}><Trans>View cached snapshot</Trans></Button>}
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>No posting URL captured for this job.</div>
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}><Trans>No posting URL captured for this job.</Trans></div>
                     )}
                   </div>
                 </div>
@@ -1835,27 +1838,27 @@ export default function V2JobFeed() {
         return (
           // escape={false}: the Feed closes every overlay from one handler that
           // stands down while a ConfirmDialog is up.
-          <ModalPanel width={436} title={`${cvMode === 'tailor' ? 'Tailor résumé' : 'Copy résumé'} — ${single ? single.title : `${picker.jobs.length} selected roles`}`} onClose={() => setPicker(null)} escape={false} zIndex={60} style={{ overflow: 'hidden' }}>
+          <ModalPanel width={436} title={`${cvMode === 'tailor' ? t`Tailor résumé` : t`Copy résumé`} — ${single ? single.title : t`${picker.jobs.length} selected roles`}`} onClose={() => setPicker(null)} escape={false} zIndex={60} style={{ overflow: 'hidden' }}>
               {/* header */}
               <HeaderRow align="stretch" pad="20px 24px 16px" style={{ flexDirection: 'column', gap: 5 }}>
-                <Label>{cvMode === 'tailor' ? 'Tailor résumé' : 'Copy résumé with tracked links'}</Label>
-                <Heading size={19} className="v2-dialogtitle">{single ? single.title : `${picker.jobs.length} selected roles`}</Heading>
+                <Label>{cvMode === 'tailor' ? t`Tailor résumé` : t`Copy résumé with tracked links`}</Label>
+                <Heading size={19} className="v2-dialogtitle">{single ? single.title : t`${picker.jobs.length} selected roles`}</Heading>
                 {single?.company && <span style={{ fontSize: 12.5, color: 'var(--text-2)' }}>{single.company}</span>}
               </HeaderRow>
               {/* existing-copy banner */}
               {existing && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 24px', background: 'var(--accent-soft)', borderBottom: '1px solid var(--line)', fontSize: 12.5, color: 'var(--text-2)' }}>
                   <span style={{ flex: '0 0 auto', color: 'var(--ai)' }}>✦</span>
-                  <span style={{ flex: 1, minWidth: 0 }}>A tailored copy already exists for this job.</span>
-                  <Link onClick={() => { setPicker(null); openTailored(single) }} style={{ flex: '0 0 auto' }}>Open it ↗</Link>
+                  <span style={{ flex: 1, minWidth: 0 }}><Trans>A tailored copy already exists for this job.</Trans></span>
+                  <Link onClick={() => { setPicker(null); openTailored(single) }} style={{ flex: '0 0 auto' }}><Trans>Open it ↗</Trans></Link>
                 </div>
               )}
               {/* body */}
               <div style={{ padding: '18px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <Label>Method</Label>
+                  <Label><Trans>Method</Trans></Label>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {[['tailor', '✦ Tailor with AI', 'Rewrites bullets to match the posting · uses the LLM', undefined], ['copy', <><CopyGlyph />Copy with tracked links</>, 'Exact duplicate with tracked links · instant', 'tracked links — short links that record when a recruiter opens them']].map(([m, label, help, tip]) => {
+                    {[['tailor', t`✦ Tailor with AI`, t`Rewrites bullets to match the posting · uses the LLM`, undefined], ['copy', <><CopyGlyph /><Trans>Copy with tracked links</Trans></>, t`Exact duplicate with tracked links · instant`, t`tracked links — short links that record when a recruiter opens them`]].map(([m, label, help, tip]) => {
                       const on = cvMode === m
                       return (
                         <div key={m} onClick={() => pickMethod(m)} title={tip} style={{ flex: 1, padding: '10px 12px', border: `1px solid ${on ? 'var(--accent)' : 'var(--edge)'}`, background: on ? 'var(--accent-soft)' : 'transparent', borderRadius: 'var(--radius-cell)', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1867,8 +1870,8 @@ export default function V2JobFeed() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <Label>Base résumé</Label>
-                  {cvBases.length === 0 ? <span style={{ fontSize: 13, color: 'var(--muted)' }}>No base résumés found.</span>
+                  <Label><Trans>Base résumé</Trans></Label>
+                  {cvBases.length === 0 ? <span style={{ fontSize: 13, color: 'var(--muted)' }}><Trans>No base résumés found.</Trans></span>
                     : cvBases.map((r) => {
                       const on = cvBase === r.id
                       return (
@@ -1877,7 +1880,7 @@ export default function V2JobFeed() {
                           {/* ui: keep — radio indicator, not a status dot */}
                           <span style={{ flex: '0 0 auto', width: 15, height: 15, borderRadius: 'var(--radius-control)', border: `1px solid ${on ? 'var(--accent)' : 'var(--edge)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ width: 7, height: 7, borderRadius: 'var(--radius-control)', background: on ? 'var(--accent)' : 'transparent' }} /></span>
                           <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
-                          {r.id === 'persona' && <Helper style={{ flex: '0 0 auto' }}>from Persona</Helper>}
+                          {r.id === 'persona' && <Helper style={{ flex: '0 0 auto' }}><Trans>from Persona</Trans></Helper>}
                         </div>
                       )
                     })}
@@ -1885,9 +1888,9 @@ export default function V2JobFeed() {
               </div>
               {/* footer */}
               <FooterRow variant="wide">
-                <Helper>{cvMode === 'tailor' ? 'Runs the LLM on the résumé' : 'Instant · no LLM cost'}</Helper>
-                <Button variant="secondary" size="sm" onClick={() => setPicker(null)} style={{ marginLeft: 'auto' }}>Cancel</Button>
-                <Button variant={cvMode === 'tailor' ? 'ai' : 'primary'} size="sm" onClick={() => runResume(cvMode, picker.jobs, cvBase)} disabled={cvBase == null}>{cvMode === 'tailor' ? 'Tailor résumé' : 'Create copy'}</Button>
+                <Helper>{cvMode === 'tailor' ? t`Runs the LLM on the résumé` : t`Instant · no LLM cost`}</Helper>
+                <Button variant="secondary" size="sm" onClick={() => setPicker(null)} style={{ marginLeft: 'auto' }}><Trans>Cancel</Trans></Button>
+                <Button variant={cvMode === 'tailor' ? 'ai' : 'primary'} size="sm" onClick={() => runResume(cvMode, picker.jobs, cvBase)} disabled={cvBase == null}>{cvMode === 'tailor' ? t`Tailor résumé` : t`Create copy`}</Button>
               </FooterRow>
           </ModalPanel>
         )
@@ -1896,10 +1899,10 @@ export default function V2JobFeed() {
       {/* rescore modal — pick résumés + depth */}
       {rescoreJob && (
         // escape={false}: as the picker above — the screen owns Escape.
-        <ModalPanel width={436} title={`${rescoreJob.verb} against résumés — ${rescoreJob.title}`} onClose={() => setRescoreJob(null)} escape={false} zIndex={60} style={{ overflow: 'hidden' }}>
+        <ModalPanel width={436} title={t`${rescoreJob.verb} against résumés — ${rescoreJob.title}`} onClose={() => setRescoreJob(null)} escape={false} zIndex={60} style={{ overflow: 'hidden' }}>
             {/* header */}
             <HeaderRow align="stretch" pad="20px 24px 16px" style={{ flexDirection: 'column', gap: 5 }}>
-              <Label>{rescoreJob.verb} against résumés</Label>
+              <Label><Trans>{rescoreJob.verb} against résumés</Trans></Label>
               <Heading size={19} className="v2-dialogtitle">{rescoreJob.title}</Heading>
               {rescoreJob.company && <span style={{ fontSize: 12.5, color: 'var(--text-2)' }}>{rescoreJob.company}</span>}
             </HeaderRow>
@@ -1907,10 +1910,10 @@ export default function V2JobFeed() {
             <div style={{ padding: '18px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <Label>Résumés</Label>
-                  <Helper style={{ marginLeft: 'auto' }}>{rescoreSel.length} selected</Helper>
+                  <Label><Trans>Résumés</Trans></Label>
+                  <Helper style={{ marginLeft: 'auto' }}><Trans>{rescoreSel.length} selected</Trans></Helper>
                 </div>
-                {rescoreOpts.length === 0 ? <span style={{ fontSize: 13, color: 'var(--muted)' }}>No résumés available.</span>
+                {rescoreOpts.length === 0 ? <span style={{ fontSize: 13, color: 'var(--muted)' }}><Trans>No résumés available.</Trans></span>
                   : rescoreOpts.map((o) => {
                     const on = rescoreSel.includes(o.id)
                     return (
@@ -1925,9 +1928,9 @@ export default function V2JobFeed() {
                   })}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <Label>Depth</Label>
+                <Label><Trans>Depth</Trans></Label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {[['light', 'Light', 'Scores only'], ['full', 'Full', 'Report + keywords']].map(([v, label, help]) => {
+                  {[['light', t`Light`, t`Scores only`], ['full', t`Full`, t`Report + keywords`]].map(([v, label, help]) => {
                     const on = rescoreDepth === v
                     return (
                       <div key={v} onClick={() => setRescoreDepth(v)} style={{ flex: 1, padding: '10px 12px', border: `1px solid ${on ? 'var(--accent)' : 'var(--edge)'}`, background: on ? 'var(--accent-soft)' : 'transparent', borderRadius: 'var(--radius-cell)', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1941,9 +1944,9 @@ export default function V2JobFeed() {
             </div>
             {/* footer */}
             <FooterRow variant="wide">
-              <Helper>Runs in the background</Helper>
-              <Button variant="secondary" size="sm" onClick={() => setRescoreJob(null)} style={{ marginLeft: 'auto' }}>Cancel</Button>
-              <Button variant="ai" size="sm" onClick={runRescore} disabled={!rescoreSel.length} title={rescoreSel.length ? undefined : 'Pick at least one résumé'}>Run scoring</Button>
+              <Helper><Trans>Runs in the background</Trans></Helper>
+              <Button variant="secondary" size="sm" onClick={() => setRescoreJob(null)} style={{ marginLeft: 'auto' }}><Trans>Cancel</Trans></Button>
+              <Button variant="ai" size="sm" onClick={runRescore} disabled={!rescoreSel.length} title={rescoreSel.length ? undefined : t`Pick at least one résumé`}><Trans>Run scoring</Trans></Button>
             </FooterRow>
         </ModalPanel>
       )}

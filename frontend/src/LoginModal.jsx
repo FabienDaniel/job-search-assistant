@@ -1,5 +1,8 @@
 import React, { useState } from 'react'
 import axios from 'axios'
+import { t } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
+import LanguageSelect from './LanguageSelect'
 import { Button, GlyphBadge, Heading, Helper, Label, ModalPanel } from './ui'
 import { useTheme, themeAttrs } from './theme'
 import './theme.css'
@@ -31,10 +34,11 @@ export default function LoginModal({ onSuccess }) {
         setSuccess(true)
         setTimeout(() => onSuccess?.(), 700)
       } else {
-        setError('Unexpected response from server')
+        setError(t`Unexpected response from server`)
       }
     } catch (err) {
-      setError(err.response?.status === 401 ? 'Invalid API key' : `Login failed: ${err.message || 'unknown error'}`)
+      const reason = err.message || t`unknown error`
+      setError(err.response?.status === 401 ? t`Invalid API key` : t`Login failed: ${reason}`)
     } finally {
       setLoading(false)
     }
@@ -43,14 +47,14 @@ export default function LoginModal({ onSuccess }) {
   return (
     // Scrim carries the look root and its own z-index; panel is a real <form>
     // so Enter submits. No `onClose`: nothing to go back to, so no Escape/scrim dismissal.
-    <ModalPanel as="form" onSubmit={submit} width={360} title="Sign in" zIndex={9999}
+    <ModalPanel as="form" onSubmit={submit} width={360} title={t`Sign in`} zIndex={9999}
       scrimProps={{ className: 'jn-v2', ...themeAttrs(look) }}
       style={{ padding: '26px 26px 22px', gap: 14 }}>
       {success ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '18px 0' }}>
           <GlyphBadge size={34} line={1}>✓</GlyphBadge>
-          <Heading size={19}>Signed in</Heading>
-          <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>Loading dashboard…</span>
+          <Heading size={19}><Trans>Signed in</Trans></Heading>
+          <span style={{ fontSize: 12.5, color: 'var(--muted)' }}><Trans>Loading dashboard…</Trans></span>
         </div>
       ) : (
         <>
@@ -58,12 +62,12 @@ export default function LoginModal({ onSuccess }) {
             {/* ui: keep — the sign-in wordmark is serif 23/28px; the Heading scale is 18/19/22 */}
             <span style={{ fontFamily: 'var(--serif)', fontSize: 23, fontWeight: 400, letterSpacing: '-.02em', lineHeight: '28px' }}>JobNavigator</span>
             <span style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5, textWrap: 'pretty' }}>
-              Enter your dashboard API key — you can view or change it later in Settings.
+              <Trans>Enter your dashboard API key — you can view or change it later in Settings.</Trans>
             </span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Label>API key</Label>
+            <Label><Trans>API key</Trans></Label>
             <div className="v2-fieldwrap" style={{ height: 36, padding: '0 12px', border: `1px solid ${error ? 'var(--bad)' : 'var(--edge)'}`, borderRadius: 'var(--radius-row)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* ui: keep — bare input in a v2-fieldwrap with the show/hide toggle; Input can't render this composite */}
               <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type={showKey ? 'text' : 'password'}
@@ -71,19 +75,21 @@ export default function LoginModal({ onSuccess }) {
                 style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', outline: 'none', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text)' }} />
               {/* ui: keep — show/hide toggle deliberately out of tab order (tabIndex -1); Link is a tab stop with role="link" */}
               <span onClick={() => setShowKey((v) => !v)} className="v2-anchor" role="button" tabIndex={-1}
-                aria-label={showKey ? 'Hide API key' : 'Show API key'}
-                style={{ fontSize: 10.5, lineHeight: '14px', color: 'var(--accent)', cursor: 'pointer', whiteSpace: 'nowrap' }}>{showKey ? 'hide' : 'show'}</span>
+                aria-label={showKey ? t`Hide API key` : t`Show API key`}
+                style={{ fontSize: 10.5, lineHeight: '14px', color: 'var(--accent)', cursor: 'pointer', whiteSpace: 'nowrap' }}>{showKey ? t`hide` : t`show`}</span>
             </div>
             {error && <Helper style={{ color: 'var(--bad)' }}>{error}</Helper>}
           </div>
 
-          <Button as="button" type="submit" busy={loading} ariaLabel="Sign in">
-            {loading ? 'Signing in…' : 'Sign in'}
+          <Button as="button" type="submit" busy={loading} ariaLabel={t`Sign in`}>
+            {loading ? t`Signing in…` : t`Sign in`}
           </Button>
 
           <Helper style={{ textWrap: 'pretty' }}>
-            If no API key is set yet, leave this blank and sign in. You can add a key later in Settings › Advanced.
+            <Trans>If no API key is set yet, leave this blank and sign in. You can add a key later in Settings › Advanced.</Trans>
           </Helper>
+
+          <LanguageSelect width="100%" />
         </>
       )}
     </ModalPanel>

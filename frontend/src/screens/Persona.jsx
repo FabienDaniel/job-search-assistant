@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import api, { accountChanged, writeHeaders } from '../api'
 import { useFlushBeforeSwitch } from '../accounts'
 import { useToasts, ToastStack } from '../Toast'
@@ -20,63 +22,63 @@ import {
 
 // ── the autofill field table ────────────────────────────────────────────────
 // Mirrors backend/autofill_schema.py ANSWER_SCHEMA one-for-one (31 answerable fields + the decline flag).
-const GENDER = [['male', 'Male'], ['female', 'Female'], ['nonbinary', 'Non-binary']]
-const RACE = [['hispanic_latino', 'Hispanic/Latino'], ['white', 'White'], ['black', 'Black/African American'],
-  ['asian', 'Asian'], ['native_american', 'Native American'], ['pacific_islander', 'Pacific Islander'],
-  ['two_or_more', 'Two or more']]
-const VETERAN = [['protected_veteran', 'I am a protected veteran'], ['not_protected_veteran', 'Not a protected veteran']]
-const YESNO = [['yes', 'Yes'], ['no', 'No']]
-const AGE = [['under_30', 'Under 30'], ['30_39', '30–39'], ['40_49', '40–49'], ['50_59', '50–59'], ['60_plus', '60 or older']]
-const TRANS = [['no', 'No'], ['yes', 'Yes']]
-const ORIENT = [['heterosexual', 'Heterosexual / straight'], ['gay', 'Gay'], ['lesbian', 'Lesbian'],
-  ['bisexual', 'Bisexual'], ['queer', 'Queer'], ['other', 'Other']]
-const WORK_AUTH_TYPE = [['citizen', 'U.S. citizen'], ['permanent_resident', 'Permanent resident'],
-  ['visa', 'Visa holder'], ['other', 'Other']]
+const GENDER = [['male', t`Male`], ['female', t`Female`], ['nonbinary', t`Non-binary`]]
+const RACE = [['hispanic_latino', t`Hispanic/Latino`], ['white', t`White`], ['black', t`Black/African American`],
+  ['asian', t`Asian`], ['native_american', t`Native American`], ['pacific_islander', t`Pacific Islander`],
+  ['two_or_more', t`Two or more`]]
+const VETERAN = [['protected_veteran', t`I am a protected veteran`], ['not_protected_veteran', t`Not a protected veteran`]]
+const YESNO = [['yes', t`Yes`], ['no', 'No']]
+const AGE = [['under_30', t`Under 30`], ['30_39', '30–39'], ['40_49', '40–49'], ['50_59', '50–59'], ['60_plus', t`60 or older`]]
+const TRANS = [['no', 'No'], ['yes', t`Yes`]]
+const ORIENT = [['heterosexual', t`Heterosexual / straight`], ['gay', t`Gay`], ['lesbian', t`Lesbian`],
+  ['bisexual', t`Bisexual`], ['queer', t`Queer`], ['other', t`Other`]]
+const WORK_AUTH_TYPE = [['citizen', t`U.S. citizen`], ['permanent_resident', t`Permanent resident`],
+  ['visa', t`Visa holder`], ['other', t`Other`]]
 
 // GROUPS: [id, title, fields[]]   fields: [node, key, label, kind, opts]
 const GROUPS = [
-  ['contact', 'Contact / basics', [
-    ['contact', 'first_name', 'First name', 'text'],
-    ['contact', 'last_name', 'Last name', 'text'],
-    ['contact', 'email', 'Email', 'text'],
-    ['contact', 'phone', 'Phone', 'text'],
-    ['contact', 'city', 'City', 'text'],
-    ['contact', 'state', 'State', 'text'],
-    ['contact', 'country', 'Country', 'text'],
-    ['contact', 'current_company', 'Current company', 'text'],
+  ['contact', t`Contact / basics`, [
+    ['contact', 'first_name', t`First name`, 'text'],
+    ['contact', 'last_name', t`Last name`, 'text'],
+    ['contact', 'email', t`Email`, 'text'],
+    ['contact', 'phone', t`Phone`, 'text'],
+    ['contact', 'city', t`City`, 'text'],
+    ['contact', 'state', t`State`, 'text'],
+    ['contact', 'country', t`Country`, 'text'],
+    ['contact', 'current_company', t`Current company`, 'text'],
     ['contact', 'linkedin', 'LinkedIn', 'text'],
     ['contact', 'github', 'GitHub', 'text'],
-    ['contact', 'portfolio', 'Portfolio URL', 'text', { wide: true }],
+    ['contact', 'portfolio', t`Portfolio URL`, 'text', { wide: true }],
   ]],
-  ['demographics', 'Demographics · EEO', [
-    ['demographics', 'gender', 'Gender', 'enum', { options: GENDER }],
-    ['demographics', 'race_ethnicity', 'Race / ethnicity', 'enum', { options: RACE }],
-    ['demographics', 'hispanic_latino', 'Hispanic or Latino?', 'enum', { options: YESNO }],
-    ['demographics', 'veteran_status', 'Veteran status', 'enum', { options: VETERAN }],
-    ['demographics', 'disability_status', 'Disability status', 'enum', { options: YESNO }],
-    ['demographics', 'age_range', 'Age range', 'enum', { options: AGE }],
-    ['demographics', 'transgender', 'Transgender?', 'enum', { options: TRANS }],
-    ['demographics', 'sexual_orientation', 'Sexual orientation', 'enum', { options: ORIENT }],
+  ['demographics', t`Demographics · EEO`, [
+    ['demographics', 'gender', t`Gender`, 'enum', { options: GENDER }],
+    ['demographics', 'race_ethnicity', t`Race / ethnicity`, 'enum', { options: RACE }],
+    ['demographics', 'hispanic_latino', t`Hispanic or Latino?`, 'enum', { options: YESNO }],
+    ['demographics', 'veteran_status', t`Veteran status`, 'enum', { options: VETERAN }],
+    ['demographics', 'disability_status', t`Disability status`, 'enum', { options: YESNO }],
+    ['demographics', 'age_range', t`Age range`, 'enum', { options: AGE }],
+    ['demographics', 'transgender', t`Transgender?`, 'enum', { options: TRANS }],
+    ['demographics', 'sexual_orientation', t`Sexual orientation`, 'enum', { options: ORIENT }],
     ['demographics', 'decline_demographics', '', 'check', {
       wide: true, uncounted: true,
-      text: 'Decline demographic questions where the form allows it',
+      text: t`Decline demographic questions where the form allows it`,
     }],
   ]],
-  ['workauth', 'Work authorization', [
-    ['work_auth', 'authorized_us', 'Authorized to work in the US?', 'bool'],
-    ['work_auth', 'requires_sponsorship_now', 'Require sponsorship now?', 'bool'],
-    ['work_auth', 'requires_sponsorship_future', 'Require sponsorship in the future?', 'bool'],
-    ['work_auth', 'over_18', 'Are you over 18?', 'bool'],
-    ['work_auth', 'work_auth_type', 'Work authorization type', 'enum', { options: WORK_AUTH_TYPE, wide: true }],
+  ['workauth', t`Work authorization`, [
+    ['work_auth', 'authorized_us', t`Authorized to work in the US?`, 'bool'],
+    ['work_auth', 'requires_sponsorship_now', t`Require sponsorship now?`, 'bool'],
+    ['work_auth', 'requires_sponsorship_future', t`Require sponsorship in the future?`, 'bool'],
+    ['work_auth', 'over_18', t`Are you over 18?`, 'bool'],
+    ['work_auth', 'work_auth_type', t`Work authorization type`, 'enum', { options: WORK_AUTH_TYPE, wide: true }],
   ]],
-  ['screening', 'Screening defaults', [
-    ['preferences', 'willing_to_relocate', 'Willing to relocate?', 'bool'],
-    ['preferences', 'willing_remote', 'Willing to work remote?', 'bool'],
-    ['preferences', 'notice_period', 'Notice period', 'text'],
-    ['preferences', 'earliest_start', 'Earliest start date', 'text'],
-    ['preferences', 'referral_source', 'Referral source', 'text'],
-    ['preferences', 'how_did_you_hear', 'How did you hear about us?', 'text'],
-    ['compensation', 'desired_salary', 'Desired salary', 'text', { wide: true }],
+  ['screening', t`Screening defaults`, [
+    ['preferences', 'willing_to_relocate', t`Willing to relocate?`, 'bool'],
+    ['preferences', 'willing_remote', t`Willing to work remote?`, 'bool'],
+    ['preferences', 'notice_period', t`Notice period`, 'text'],
+    ['preferences', 'earliest_start', t`Earliest start date`, 'text'],
+    ['preferences', 'referral_source', t`Referral source`, 'text'],
+    ['preferences', 'how_did_you_hear', t`How did you hear about us?`, 'text'],
+    ['compensation', 'desired_salary', t`Desired salary`, 'text', { wide: true }],
   ]],
 ]
 const ANSWERABLE = GROUPS.reduce((n, g) => n + g[2].filter((f) => !f[4]?.uncounted).length, 0)
@@ -84,7 +86,6 @@ const ANSWERABLE = GROUPS.reduce((n, g) => n + g[2].filter((f) => !f[4]?.uncount
 const isSet = (v) => v !== undefined && v !== null && v !== ''
 // the server's own words for a failure, when it sent any
 const errDetail = (e) => (typeof e?.response?.data?.detail === 'string' ? ' — ' + e.response.data.detail : '')
-const plural = (n, word) => `${n || 0} ${word}${(n || 0) === 1 ? '' : 's'}`
 // The Picker's clear row needs a value of its own: an unset answer renders as the
 // placeholder, so '' would make "— not answered" the trigger's *label* instead of the em dash.
 const UNSET = '__unset__'
@@ -102,7 +103,7 @@ const FIELD_LABEL = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'e
 // Thin wrapper over ui.jsx's Select that keeps the "— not answered" row: clearing an
 // answer is a real action here (unset differs from empty for the autofill extension).
 function Picker({ value, options, onChange, placeholder = '—', ariaLabel }) {
-  const opts = useMemo(() => [[UNSET, '— not answered'], ...options], [options])
+  const opts = useMemo(() => [[UNSET, t`— not answered`], ...options], [options])
   return (
     <Select value={isSet(value) ? value : ''} options={opts} placeholder={placeholder}
       ariaLabel={ariaLabel} onPick={(v) => onChange(v === UNSET ? undefined : v)}
@@ -143,7 +144,7 @@ function ColumnHead({ title, help }) {
   return (
     <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'baseline', gap: 9, padding: '16px 26px 10px', lineHeight: '26px' }}>
       <Heading strong size={18}>{title}</Heading>
-      <Helper title={help} style={{ cursor: 'help', borderBottom: '1px dotted var(--line-strong)' }}>what is this?</Helper>
+      <Helper title={help} style={{ cursor: 'help', borderBottom: '1px dotted var(--line-strong)' }}><Trans>what is this?</Trans></Helper>
     </div>
   )
 }
@@ -194,7 +195,7 @@ export default function Persona() {
 
   const loadPersona = useCallback(() => (
     api.get('/persona').then(({ data }) => { if (data) { setP(data); setLoadErr(false) } else { setLoadErr(true) } })
-      .catch((e) => { console.error(e); setLoadErr(true); pushToast({ kind: 'error', msg: 'Could not load your persona' + (typeof e?.response?.data?.detail === 'string' ? ' — ' + e.response.data.detail : '') }) })
+      .catch((e) => { console.error(e); setLoadErr(true); pushToast({ kind: 'error', msg: t`Could not load your persona` + (typeof e?.response?.data?.detail === 'string' ? ' — ' + e.response.data.detail : '') }) })
   ), [pushToast])
 
   // One request; the screen simply waits for it rather than showing a "Loading…" line.
@@ -223,7 +224,7 @@ export default function Persona() {
       try { await api.patch('/persona', { [key]: body }); flash() }
       catch (e) {
         console.error(`persona ${key}`, e)
-        pushToast({ kind: 'error', msg: 'Could not save your changes' + (typeof e?.response?.data?.detail === 'string' ? ' — ' + e.response.data.detail : '') })
+        pushToast({ kind: 'error', msg: t`Could not save your changes` + (typeof e?.response?.data?.detail === 'string' ? ' — ' + e.response.data.detail : '') })
       }
     }, 500)
     timers.current[key] = { timer, value: body }
@@ -261,7 +262,7 @@ export default function Persona() {
   const removeQa = (i) => {
     const gone = qa[i]
     writeQa(qa.filter((_, j) => j !== i))
-    pushToast({ kind: 'undo', msg: 'Removed answer', action: 'Undo', onAction: () => writeQa([...qaRef.current.slice(0, i), gone, ...qaRef.current.slice(i)]) })
+    pushToast({ kind: 'undo', msg: t`Removed answer`, action: t`Undo`, onAction: () => writeQa([...qaRef.current.slice(0, i), gone, ...qaRef.current.slice(i)]) })
   }
 
   const filled = useMemo(() => {
@@ -290,13 +291,13 @@ export default function Persona() {
       const s = data.summary || {}
       pushToast({
         kind: 'success',
-        msg: `Imported ${plural(s.roles, 'role')} · ${plural(s.bullets, 'bullet')} · ${plural(s.skill_groups, 'skill group')} from ${label}`,
+        msg: t`Imported ${plural(s.roles || 0, { one: '# role', other: '# roles' })} · ${plural(s.bullets || 0, { one: '# bullet', other: '# bullets' })} · ${plural(s.skill_groups || 0, { one: '# skill group', other: '# skill groups' })} from ${label}`,
       })
       setImportOpen(false)
     } catch (e) {
       // the modal stays up on a failure: the source is still picked, so "Replace" is one click away again
       console.error('persona import', e)
-      pushToast({ kind: 'error', msg: 'Import failed' + errDetail(e) })
+      pushToast({ kind: 'error', msg: t`Import failed` + errDetail(e) })
     } finally { setImporting(false) }
   }, [pushToast])
 
@@ -314,19 +315,19 @@ export default function Persona() {
   const header = (
     <HeaderRow as="header" variant="screen" align="flex-end" style={{ gap: 18 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-        <PageTitle>Persona</PageTitle>
+        <PageTitle><Trans>Persona</Trans></PageTitle>
         {/* integer line-heights: at the inherited 1.5, 13px would be 19.5px, landing
             rows below the header on a half pixel where Chrome rounds borders away */}
         {/* ui: keep — 13/20px is outside Helper's 11.5/16 tolerance; needed for whole-pixel rows */}
         <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {ready && p ? `Saves automatically · autofill ${filled} of ${ANSWERABLE} set` : NBSP}
+          {ready && p ? t`Saves automatically · autofill ${filled} of ${ANSWERABLE} set` : NBSP}
         </span>
       </div>
       {/* ui: keep — accent-ink save indicator, not a Link (would add cursor:pointer + hover) */}
-      <span style={{ marginLeft: 'auto', fontSize: 11.5, lineHeight: '17px', color: 'var(--accent)', visibility: saved ? 'visible' : 'hidden' }}>Saved ✓</span>
+      <span style={{ marginLeft: 'auto', fontSize: 11.5, lineHeight: '17px', color: 'var(--accent)', visibility: saved ? 'visible' : 'hidden' }}><Trans>Saved ✓</Trans></span>
       <Button variant="secondary" size="sm" busy={importing} disabled={!ready || !p} ariaHaspopup="dialog"
-        title="Fill contact details and résumé content from a base résumé or a PDF"
-        onClick={() => setImportOpen(true)}>{importing ? 'Parsing…' : 'Import ↑'}</Button>
+        title={t`Fill contact details and résumé content from a base résumé or a PDF`}
+        onClick={() => setImportOpen(true)}>{importing ? t`Parsing…` : t`Import ↑`}</Button>
     </HeaderRow>
   )
 
@@ -337,8 +338,8 @@ export default function Persona() {
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 9, color: 'var(--muted)', fontSize: 13 }}>
         {ready && loadErr ? (
           <>
-            <span>Couldn’t load your persona.</span>
-            <Pill size="sm" onClick={() => { setLoadErr(false); setReload((n) => n + 1) }}>Try again</Pill>
+            <span><Trans>Couldn’t load your persona.</Trans></span>
+            <Pill size="sm" onClick={() => { setLoadErr(false); setReload((n) => n + 1) }}><Trans>Try again</Trans></Pill>
           </>
         ) : null}
       </div>
@@ -355,15 +356,15 @@ export default function Persona() {
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* left — résumé content, edited with the Résumé editor's own components */}
         <div style={{ flex: 1.1, minWidth: 0, borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <ColumnHead title="Résumé content"
-            help="Your full work history, summary, skills and achievements. Used for tailored résumés, cover letters and job scoring." />
+          <ColumnHead title={t`Résumé content`}
+            help={t`Your full work history, summary, skills and achievements. Used for tailored résumés, cover letters and job scoring.`} />
           <div className="v2-scroll" style={{ flex: 1, overflow: 'auto', padding: '0 26px 24px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
             {SECTION_ORDER.map((name) => (
               <SectionShell key={name} name={name} count={counts[name]} open={sections.has(name)} onToggle={() => toggleSection(name)}>
                 <SectionEditor name={name} data={resume} setField={setField} mutate={mutate}
                   onError={(msg) => pushToast({ kind: 'error', msg })}
-                  onRemoved={(msg, undo) => pushToast({ kind: 'undo', msg, action: 'Undo', onAction: undo })}
-                  pageHint={false} emptyNote="Tailored résumés use whatever you add here." />
+                  onRemoved={(msg, undo) => pushToast({ kind: 'undo', msg, action: t`Undo`, onAction: undo })}
+                  pageHint={false} emptyNote={t`Tailored résumés use whatever you add here.`} />
               </SectionShell>
             ))}
           </div>
@@ -371,8 +372,8 @@ export default function Persona() {
 
         {/* right — the autofill nodes + the Q&A bank */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <ColumnHead title="Autofill content"
-            help="Details used to fill application forms: contact, work authorization, EEO answers, salary and reusable screener answers. Not used for résumés or scoring." />
+          <ColumnHead title={t`Autofill content`}
+            help={t`Details used to fill application forms: contact, work authorization, EEO answers, salary and reusable screener answers. Not used for résumés or scoring.`} />
           <div className="v2-scroll" style={{ flex: 1, overflow: 'auto', padding: '0 26px 24px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
             {GROUPS.map(([id, title, fields]) => {
               const open = groups.has(id)
@@ -384,7 +385,7 @@ export default function Persona() {
                   <SectionHead card open={open} onToggle={() => toggleGroup(id)} hover="v2-clhead" style={{ padding: '11px 14px' }}>
                     <span style={{ flex: '0 0 auto', fontSize: 13, fontWeight: 600 }}>{title}</span>
                     <span style={{ flex: 1, minWidth: 0 }} />
-                    <Helper size="xs" style={{ flex: '0 0 auto', color: done ? 'var(--accent)' : 'var(--muted)' }}>{done ? 'complete' : `${n} of ${counted.length} set`}</Helper>
+                    <Helper size="xs" style={{ flex: '0 0 auto', color: done ? 'var(--accent)' : 'var(--muted)' }}>{done ? t`complete` : t`${n} of ${counted.length} set`}</Helper>
                   </SectionHead>
                   {open && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, padding: '12px 14px 14px', borderTop: '1px solid var(--line-soft)' }}>
@@ -401,9 +402,9 @@ export default function Persona() {
             {/* ui: keep — only amber-tinted card in v2; answers reach the LLM verbatim, sets it apart */}
             <div style={{ border: '1px solid var(--amber-line)', borderRadius: 'var(--radius-card)', background: 'var(--amber-bg)', display: 'flex', flexDirection: 'column' }}>
               <SectionHead card open={groups.has('qa')} onToggle={() => toggleGroup('qa')} hover="v2-qahead" style={{ padding: '11px 14px' }}>
-                <span style={{ flex: '0 0 auto', fontSize: 13, fontWeight: 600 }}>Q&amp;A bank</span>
-                <Helper style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>reusable screener answers</Helper>
-                <Helper size="xs" style={{ flex: '0 0 auto' }}>{qa.length} answer{qa.length === 1 ? '' : 's'}</Helper>
+                <span style={{ flex: '0 0 auto', fontSize: 13, fontWeight: 600 }}><Trans>Q&amp;A bank</Trans></span>
+                <Helper style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><Trans>reusable screener answers</Trans></Helper>
+                <Helper size="xs" style={{ flex: '0 0 auto' }}>{plural(qa.length, { one: '# answer', other: '# answers' })}</Helper>
               </SectionHead>
               {groups.has('qa') && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '12px 14px 14px', borderTop: '1px solid var(--amber-line-soft)' }}>
@@ -414,19 +415,19 @@ export default function Persona() {
                           height instead of width and clips the answer to one line */}
                       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                         <div style={{ flex: '0 0 auto', display: 'flex', minWidth: 0 }}>
-                          <BulletText bold lh="19px" value={e.question} placeholder="Question as the form asks it…"
+                          <BulletText bold lh="19px" value={e.question} placeholder={t`Question as the form asks it…`}
                             onChange={(v) => writeQa(qa.map((x, j) => (j === i ? { ...x, question: v } : x)))} />
                         </div>
                         <div style={{ flex: '0 0 auto', display: 'flex', minWidth: 0 }}>
-                          <BulletText lh="19px" value={e.answer} placeholder="Your reusable answer…"
+                          <BulletText lh="19px" value={e.answer} placeholder={t`Your reusable answer…`}
                             onChange={(v) => writeQa(qa.map((x, j) => (j === i ? { ...x, answer: v } : x)))} />
                         </div>
                       </div>
-                      <RemoveX onClick={() => removeQa(i)} title="Remove answer" lh="19px" />
+                      <RemoveX onClick={() => removeQa(i)} title={t`Remove answer`} lh="19px" />
                     </div>
                   ))}
-                  {qa.length === 0 && <Helper>No saved answers yet — the extension can add them as you apply.</Helper>}
-                  <DashedAdd onClick={() => writeQa([...qa, { question: '', answer: '' }])}>+ Add answer</DashedAdd>
+                  {qa.length === 0 && <Helper><Trans>No saved answers yet — the extension can add them as you apply.</Trans></Helper>}
+                  <DashedAdd onClick={() => writeQa([...qa, { question: '', answer: '' }])}><Trans>+ Add answer</Trans></DashedAdd>
                 </div>
               )}
             </div>
@@ -445,8 +446,8 @@ export default function Persona() {
 // Same ChoiceModal shell as the résumé editor's Tailor modal, with this screen's two
 // sources as ChoiceCards/ChoiceRows. Escape closes (ModalPanel's useEscape), Enter picks a row (kb()).
 const IMPORT_SOURCES = [
-  ['resume', '☰ From a résumé', 'Copies a base résumé’s header and sections — no LLM call'],
-  ['pdf', '↑ From a PDF', 'The AI reads the file — one LLM call; nothing is stored as a résumé'],
+  ['resume', t`☰ From a résumé`, t`Copies a base résumé’s header and sections — no LLM call`],
+  ['pdf', t`↑ From a PDF`, t`The AI reads the file — one LLM call; nothing is stored as a résumé`],
 ]
 
 function ImportModal({ busy, onClose, onRun, pushToast }) {
@@ -464,7 +465,7 @@ function ImportModal({ busy, onClose, onRun, pushToast }) {
       .catch((e) => {
         console.error('persona import: list résumés', e)
         setBases([])
-        pushToast({ kind: 'error', msg: 'Could not list your résumés' + errDetail(e) })
+        pushToast({ kind: 'error', msg: t`Could not list your résumés` + errDetail(e) })
       })
   }, [pushToast])
 
@@ -489,16 +490,16 @@ function ImportModal({ busy, onClose, onRun, pushToast }) {
 
   return (
     <ChoiceModal
-      title="Import persona content"
-      sub="Fills your contact block and résumé content from one source."
+      title={t`Import persona content`}
+      sub={t`Fills your contact block and résumé content from one source.`}
       onClose={onClose}
       note={<Helper style={{ textWrap: 'pretty' }}>
-        Replaces contact and résumé content. Work authorization, demographics, compensation, preferences and the Q&amp;A bank stay.
+        <Trans>Replaces contact and résumé content. Work authorization, demographics, compensation, preferences and the Q&amp;A bank stay.</Trans>
       </Helper>}
-      action={busy ? 'Parsing…' : 'Replace'} actionVariant="danger" actionBusy={busy}
+      action={busy ? t`Parsing…` : t`Replace`} actionVariant={'danger'} actionBusy={busy}
       actionDisabled={!canRun} onAction={run}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <Label>Where from</Label>
+        <Label><Trans>Where from</Trans></Label>
         <div style={{ display: 'flex', gap: 7 }}>
           {IMPORT_SOURCES.map(([id, label, hint]) => (
             <ChoiceCard key={id} on={source === id} label={label} hint={hint} title={hint}
@@ -509,14 +510,14 @@ function ImportModal({ busy, onClose, onRun, pushToast }) {
 
       {source === 'resume' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <Label>Which base résumé</Label>
+          <Label><Trans>Which base résumé</Trans></Label>
           {/* nothing drawn while the list is in flight — rows land once, no "Loading…" line */}
           {(bases || []).map((r) => (
             <ChoiceRow key={r.id} on={String(pick) === String(r.id)} label={r.name}
               hint={ago(r.updated_at)} onClick={() => setPick(r.id)} />
           ))}
           {bases && bases.length === 0 && (
-            <Band interactive={false} style={{ padding: 12 }}><Helper>No base résumés yet — import a PDF instead.</Helper></Band>
+            <Band interactive={false} style={{ padding: 12 }}><Helper><Trans>No base résumés yet — import a PDF instead.</Trans></Helper></Band>
           )}
         </div>
       ) : (
@@ -527,15 +528,15 @@ function ImportModal({ busy, onClose, onRun, pushToast }) {
             e.preventDefault(); setDropping(false)
             const f = e.dataTransfer?.files?.[0]
             if (f && /\.pdf$/i.test(f.name)) takePdf(f)
-            else if (f) pushToast({ kind: 'error', msg: 'That is not a PDF.' })
+            else if (f) pushToast({ kind: 'error', msg: t`That is not a PDF.` })
           }}>
-          <Label>Which PDF</Label>
-          <DashedAdd big title="Choose a résumé PDF, or drop one here"
+          <Label><Trans>Which PDF</Trans></Label>
+          <DashedAdd big title={t`Choose a résumé PDF, or drop one here`}
             onClick={() => fileRef.current?.click()} style={{ padding: '0 11px' }}>
             {/* a picked file writes its own name here, and a résumé PDF's name is
                 routinely longer than the row — clip it rather than blow the row out */}
             <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {dropping ? 'Drop the PDF here' : file ? file.name : 'Choose a PDF…'}
+              {dropping ? t`Drop the PDF here` : file ? file.name : t`Choose a PDF…`}
             </span>
           </DashedAdd>
           {/* clear the value after every pick, or choosing the same PDF twice fires no change event */}

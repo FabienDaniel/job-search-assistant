@@ -4,6 +4,8 @@
 // Real data is looser than the EMPTY skeleton (unknown keys, missing sections). Every mutation
 // goes through mutate(), which deep-clones and writes one path, so unknown keys survive.
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { Band, Card, DashedAdd, Helper, Input, Label, MoveArrows, RemoveLink, RemoveX, SectionHead, Switch, Textarea } from '../ui'
 
 // The résumé sections' add-line IS ui.jsx's DashedAdd (accent ink · 1px dashed
@@ -20,6 +22,8 @@ export const kb = (fn, role = 'button') => ({
   onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(e) } },
 })
 export const EMPTY = { header: { name: '', contact_items: [] }, summary: '', experience: [], skills: {}, education: [], projects: [], publications: [] }
+// Section names double as ids in state and in the SectionEditor switch, so only their display is translated.
+const SECTION_LABEL = { Header: t`Header`, Summary: t`Summary`, Experience: t`Experience`, Skills: t`Skills`, Education: t`Education`, Projects: t`Projects`, Publications: t`Publications`, Settings: t`Settings` }
 export const SECTION_ORDER = ['Header', 'Summary', 'Experience', 'Skills', 'Education', 'Projects', 'Publications']
 // The résumé editor's sections: the page footer needs a job's title and company, so only a
 // job-linked tailored copy gets the 'Settings' section (never a base, a freeform tailor or Persona).
@@ -110,8 +114,8 @@ export const BandRule = () => (
 // overrides it, since its resume_content is a source pool that never prints.
 export const EmptyState = ({ what, note }) => (
   <Band interactive={false} style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-    <span style={{ fontSize: 12.5, lineHeight: '18px', color: 'var(--text-2)' }}>No {what} yet</span>
-    <Helper style={{ textAlign: 'center' }}>{note || 'Empty sections are left out of the PDF.'}</Helper>
+    <span style={{ fontSize: 12.5, lineHeight: '18px', color: 'var(--text-2)' }}><Trans>No {what} yet</Trans></span>
+    <Helper style={{ textAlign: 'center' }}>{note || t`Empty sections are left out of the PDF.`}</Helper>
   </Band>
 )
 // MenuHead / MenuItem used to be declared here too. There is now one of each,
@@ -130,7 +134,7 @@ export function SectionShell({ name, count, open, onToggle, meta, children }) {
     <Card style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
       <SectionHead card open={!!open} onToggle={onToggle} style={{ padding: '10px 14px' }}>
         <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>{name}</span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{SECTION_LABEL[name] || name}</span>
           {count != null && <Helper>({count})</Helper>}
         </span>
         {meta}
@@ -166,9 +170,9 @@ export function SectionEditor({ name, data, setField, mutate, baseData, emptyNot
 export function SettingsEditor({ data, setField }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 10 }}>
-      <Switch on={data.footer_enabled === true} onChange={(v) => setField('footer_enabled', v)} label="Page footer"
-        title="Print your name, the job title and the company at the foot of every page of this résumé's PDF and Word downloads." />
-      <Helper>Adds “name - job title - company” in small type at the foot of every page.</Helper>
+      <Switch on={data.footer_enabled === true} onChange={(v) => setField('footer_enabled', v)} label={t`Page footer`}
+        title={t`Print your name, the job title and the company at the foot of every page of this résumé's PDF and Word downloads.`} />
+      <Helper><Trans>Adds “name - job title - company” in small type at the foot of every page.</Trans></Helper>
     </div>
   )
 }
@@ -181,19 +185,19 @@ export function HeaderEditor({ data, setField, mutate, onRemoved }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 10 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <Label>Full name</Label>
-        <Input value={data.header?.name || ''} onChange={(v) => setField('header.name', v)} ariaLabel="Full name" />
+        <Label><Trans>Full name</Trans></Label>
+        <Input value={data.header?.name || ''} onChange={(v) => setField('header.name', v)} ariaLabel={t`Full name`} />
       </div>
       {/* header.title round-trips through the API and prints in the templates.
           Optional: an empty value renders nothing at all in the PDF. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <Label>Title</Label>
-        <Input value={data.header?.title || ''} onChange={(v) => setField('header.title', v)} placeholder="Headline, e.g. Senior Product Manager" ariaLabel="Title" />
+        <Label><Trans>Title</Trans></Label>
+        <Input value={data.header?.title || ''} onChange={(v) => setField('header.title', v)} placeholder={t`Headline, e.g. Senior Product Manager`} ariaLabel={t`Title`} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <Label>Contact items</Label>
-          <Helper size="xs" style={{ marginLeft: 'auto' }}>text · link · stub</Helper>
+          <Label><Trans>Contact items</Trans></Label>
+          <Helper size="xs" style={{ marginLeft: 'auto' }}><Trans>text · link · stub</Trans></Helper>
         </div>
         {items.map((it, i) => {
           const showStub = it.url && !it.url.startsWith('mailto:')
@@ -201,19 +205,19 @@ export function HeaderEditor({ data, setField, mutate, onRemoved }) {
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ flex: '45 1 0', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>   {/* controls + text: 45 % of the row */}
               {arrows(i)}
-              <Input value={it.text || ''} onChange={(v) => setField(`header.contact_items.${i}.text`, v)} placeholder="Display text" ariaLabel="Contact item text" style={{ flex: 1, minWidth: 0 }} />
+              <Input value={it.text || ''} onChange={(v) => setField(`header.contact_items.${i}.text`, v)} placeholder={t`Display text`} ariaLabel={t`Contact item text`} style={{ flex: 1, minWidth: 0 }} />
               </div>
               <div style={{ flex: '55 1 0', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>   {/* url + stub: 55 % */}
-              <Input value={it.url || ''} onChange={(v) => setField(`header.contact_items.${i}.url`, v)} placeholder="URL (optional)" ariaLabel="Contact item URL" style={{ flex: 1, minWidth: 0 }} />
-              {showStub && <Input value={it.stub || ''} onChange={(v) => setField(`header.contact_items.${i}.stub`, v)} placeholder="id" mono ariaLabel="Tracked link stub" title="Short stub used in the tracked link, e.g. l, w, gh" style={{ flex: '0 0 34px', padding: '0 6px', textAlign: 'center' }} />}
-              <RemoveX onClick={() => undoRemove('Removed contact item',
+              <Input value={it.url || ''} onChange={(v) => setField(`header.contact_items.${i}.url`, v)} placeholder={t`URL (optional)`} ariaLabel={t`Contact item URL`} style={{ flex: 1, minWidth: 0 }} />
+              {showStub && <Input value={it.stub || ''} onChange={(v) => setField(`header.contact_items.${i}.stub`, v)} placeholder={t`id`} mono ariaLabel={t`Tracked link stub`} title={t`Short stub used in the tracked link, e.g. l, w, gh`} style={{ flex: '0 0 34px', padding: '0 6px', textAlign: 'center' }} />}
+              <RemoveX onClick={() => undoRemove(t`Removed contact item`,
                 (d) => d.header.contact_items.splice(i, 1),
                 (d) => { d.header = d.header || {}; (d.header.contact_items = d.header.contact_items || []).splice(i, 0, it) })} />
               </div>
             </div>
           )
         })}
-        <DashedAdd onClick={() => mutate((d) => { d.header = d.header || { contact_items: [] }; (d.header.contact_items = d.header.contact_items || []).push({ text: '', url: '' }) })}>+ Add contact item</DashedAdd>
+        <DashedAdd onClick={() => mutate((d) => { d.header = d.header || { contact_items: [] }; (d.header.contact_items = d.header.contact_items || []).push({ text: '', url: '' }) })}><Trans>+ Add contact item</Trans></DashedAdd>
       </div>
     </div>
   )
@@ -227,8 +231,8 @@ export function ExperienceEditor({ emptyNote, data, setField, mutate, baseExp, o
   const bulletMark = (i, bi, txt) => {
     if (!baseExp) return null
     const bb = baseExp[i]?.bullets || []
-    if (bi >= bb.length) return { kind: 'added', label: 'Added by tailoring' }
-    if (bb[bi] !== txt) return { kind: 'changed', label: 'Changed by tailoring', base: bb[bi] }
+    if (bi >= bb.length) return { kind: 'added', label: t`Added by tailoring` }
+    if (bb[bi] !== txt) return { kind: 'changed', label: t`Changed by tailoring`, base: bb[bi] }
     return null
   }
   const entryChanged = (e, i) => (e.bullets || []).some((b, bi) => bulletMark(i, bi, b)) || (e.suggested_bullets || []).length > 0
@@ -244,23 +248,23 @@ export function ExperienceEditor({ emptyNote, data, setField, mutate, baseExp, o
             {/* explicit integer line-height: at the inherited 1.5, 12.5px lands this row (and
                 every row below it) on a half pixel, where Chrome rounds 1px borders away */}
             <SectionHead card open={isOpen} onToggle={() => toggle(i)} style={{ alignItems: 'baseline', padding: '9px 11px' }}>
-              <span style={{ flex: '0 1 auto', minWidth: 0, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.title || 'Untitled role'}</span>
+              <span style={{ flex: '0 1 auto', minWidth: 0, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.title || t`Untitled role`}</span>
               <span style={{ flex: '0 1 auto', minWidth: 0, fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.company}</span>
               <Helper style={{ flex: '0 0 auto', marginLeft: 'auto' }}>{e.date}</Helper>
-              <Helper style={{ flex: '0 0 auto' }}>{nb} bullet{nb === 1 ? '' : 's'}</Helper>
+              <Helper style={{ flex: '0 0 auto' }}>{plural(nb, { one: '# bullet', other: '# bullets' })}</Helper>
               {/* lineHeight 1: this head is baseline-aligned, so a 10px glyph on the row's
                   18px line-height would ride a font-dependent baseline offset */}
-              {ch && <span title="Contains unreviewed tailoring changes" style={{ flex: '0 0 auto', fontSize: 10, lineHeight: 1, color: 'var(--warn)' }}>●</span>}
+              {ch && <span title={t`Contains unreviewed tailoring changes`} style={{ flex: '0 0 auto', fontSize: 10, lineHeight: 1, color: 'var(--warn)' }}>●</span>}
             </SectionHead>
             {isOpen && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '2px 11px 11px', borderTop: '1px solid var(--line-soft)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, paddingTop: 9 }}>
-                  <Field label="Company" value={e.company} onChange={(v) => setField(`experience.${i}.company`, v)} />
-                  <Field label="Title" value={e.title} onChange={(v) => setField(`experience.${i}.title`, v)} />
-                  <Field label="Location" value={e.location} onChange={(v) => setField(`experience.${i}.location`, v)} />
-                  <Field label="Date" value={e.date} onChange={(v) => setField(`experience.${i}.date`, v)} placeholder="Jan 2022 – Present" />
+                  <Field label={t`Company`} value={e.company} onChange={(v) => setField(`experience.${i}.company`, v)} />
+                  <Field label={t`Title`} value={e.title} onChange={(v) => setField(`experience.${i}.title`, v)} />
+                  <Field label={t`Location`} value={e.location} onChange={(v) => setField(`experience.${i}.location`, v)} />
+                  <Field label={t`Date`} value={e.date} onChange={(v) => setField(`experience.${i}.date`, v)} placeholder={t`Jan 2022 – Present`} />
                 </div>
-                <Field label="Description" value={e.description} onChange={(v) => setField(`experience.${i}.description`, v)} placeholder="Optional role description" />
+                <Field label={t`Description`} value={e.description} onChange={(v) => setField(`experience.${i}.description`, v)} placeholder={t`Optional role description`} />
                 {(e.bullets || []).map((b, bi) => {
                   const m = bulletMark(i, bi, b)
                   return (
@@ -268,8 +272,8 @@ export function ExperienceEditor({ emptyNote, data, setField, mutate, baseExp, o
                     <div key={bi} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', border: `1px solid ${m ? 'var(--change-soft)' : 'var(--line)'}`, background: m ? 'var(--change-bg)' : 'var(--surface)', boxShadow: m ? 'var(--change-edge)' : undefined, borderRadius: 'var(--radius-field)' }}>
                       <span title={m?.label || ''} style={{ flex: '0 0 auto', color: m ? 'var(--ai)' : 'var(--muted)', fontSize: 11, lineHeight: '19px' }}>{m ? '✦' : '—'}</span>
                       <BulletText value={b} onChange={(v) => setBullet(i, bi, v)} />
-                      {m?.kind === 'changed' && <span onClick={() => setBullet(i, bi, m.base)} title="Decline this tailoring change — restores the base text" style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--warn)', cursor: 'pointer', fontWeight: 500, lineHeight: '19px' }}>↩</span>}
-                      <RemoveX size={10} lh="19px" onClick={() => undoRemove('Removed bullet',
+                      {m?.kind === 'changed' && <span onClick={() => setBullet(i, bi, m.base)} title={t`Decline this tailoring change — restores the base text`} style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--warn)', cursor: 'pointer', fontWeight: 500, lineHeight: '19px' }}>↩</span>}
+                      <RemoveX size={10} lh="19px" onClick={() => undoRemove(t`Removed bullet`,
                         (d) => d.experience[i].bullets.splice(bi, 1),
                         (d) => { d.experience[i].bullets = d.experience[i].bullets || []; d.experience[i].bullets.splice(bi, 0, b) })} />
                     </div>
@@ -278,23 +282,23 @@ export function ExperienceEditor({ emptyNote, data, setField, mutate, baseExp, o
                 {/* ui: keep — same field-shaped prose row, always tinted */}
                 {(e.suggested_bullets || []).map((sb, k) => (
                   <div key={`sb${k}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', border: '1px solid var(--change-soft)', background: 'var(--change-bg)', boxShadow: 'var(--change-edge)', borderRadius: 'var(--radius-field)' }}>
-                    <span title="Suggested by tailoring. Kept unless you decline it in Review." style={{ flex: '0 0 auto', color: 'var(--ai)', fontSize: 11, lineHeight: '19px' }}>✦</span>
+                    <span title={t`Suggested by tailoring. Kept unless you decline it in Review.`} style={{ flex: '0 0 auto', color: 'var(--ai)', fontSize: 11, lineHeight: '19px' }}>✦</span>
                     <span style={{ flex: 1, fontSize: 12.5, lineHeight: '19px', color: 'var(--text-2)' }}>{sb}</span>
                     {/* ui: keep — the row's markers and this tag ride the 19px prose line of BulletText; Helper's 16px would unalign them */}
-                    <span style={{ flex: '0 0 auto', fontSize: 9.5, color: 'var(--muted)', lineHeight: '19px' }}>suggested</span>
+                    <span style={{ flex: '0 0 auto', fontSize: 9.5, color: 'var(--muted)', lineHeight: '19px' }}><Trans>suggested</Trans></span>
                   </div>
                 ))}
-                <DashedAdd onClick={() => addBullet(i)}>+ Add bullet</DashedAdd>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove('Removed role',
+                <DashedAdd onClick={() => addBullet(i)}><Trans>+ Add bullet</Trans></DashedAdd>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove(t`Removed role`,
                   (d) => d.experience.splice(i, 1),
-                  (d) => { d.experience = d.experience || []; d.experience.splice(i, 0, e) })}>Remove role</RemoveLink></div>
+                  (d) => { d.experience = d.experience || []; d.experience.splice(i, 0, e) })}><Trans>Remove role</Trans></RemoveLink></div>
               </div>
             )}
           </Card>
         )
       })}
       {exp.length === 0 && <EmptyState note={emptyNote} what="experience" />}
-      <DashedAdd big onClick={() => mutate((d) => { d.experience = d.experience || []; d.experience.push({ company: '', title: '', location: '', date: '', description: '', bullets: [] }) })}>+ Add experience</DashedAdd>
+      <DashedAdd big onClick={() => mutate((d) => { d.experience = d.experience || []; d.experience.push({ company: '', title: '', location: '', date: '', description: '', bullets: [] }) })}><Trans>+ Add experience</Trans></DashedAdd>
     </div>
   )
 }
@@ -306,11 +310,11 @@ export function SummaryEditor({ data, setField, baseSummary, pageHint = true }) 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 10 }}>
       {/* ui: keep — the summary is one field-shaped prose row (r6), not a card */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '9px 11px', border: `1px solid ${changed ? 'var(--change-soft)' : 'var(--line)'}`, background: changed ? 'var(--change-bg)' : 'var(--surface)', boxShadow: changed ? 'var(--change-edge)' : undefined, borderRadius: 'var(--radius-field)' }}>
-        <span title={changed ? 'Changed by tailoring' : ''} style={{ flex: '0 0 auto', color: changed ? 'var(--ai)' : 'var(--muted)', fontSize: 11, lineHeight: '19px' }}>{changed ? '✦' : '—'}</span>
+        <span title={changed ? t`Changed by tailoring` : ''} style={{ flex: '0 0 auto', color: changed ? 'var(--ai)' : 'var(--muted)', fontSize: 11, lineHeight: '19px' }}>{changed ? '✦' : '—'}</span>
         <BulletText value={txt} onChange={(v) => setField('summary', v)} />
-        {changed && <span onClick={() => setField('summary', baseSummary)} title="Decline this tailoring change — restores the base text" style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--warn)', cursor: 'pointer', fontWeight: 500, lineHeight: '19px' }}>↩</span>}
+        {changed && <span onClick={() => setField('summary', baseSummary)} title={t`Decline this tailoring change — restores the base text`} style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--warn)', cursor: 'pointer', fontWeight: 500, lineHeight: '19px' }}>↩</span>}
       </div>
-      <Helper size="xs">{txt.length} characters</Helper>
+      <Helper size="xs"><Trans>{txt.length} characters</Trans></Helper>
     </div>
   )
 }
@@ -326,9 +330,9 @@ export function SkillsEditor({ emptyNote, data, mutate, baseSkills, onError, onR
   // blank name; the caller reverts the uncontrolled input.
   const rename = (oldK, newK) => {
     if (oldK === newK) return true
-    if (!newK.trim()) { onError?.('A skills category needs a name.'); return false }
-    if (DANGEROUS.has(newK)) { onError?.(`“${newK}” can’t be used as a category name.`); return false }
-    if (Object.prototype.hasOwnProperty.call(data.skills || {}, newK)) { onError?.(`“${newK}” already exists — renaming onto it would erase its values.`); return false }
+    if (!newK.trim()) { onError?.(t`A skills category needs a name.`); return false }
+    if (DANGEROUS.has(newK)) { onError?.(t`“${newK}” can’t be used as a category name.`); return false }
+    if (Object.prototype.hasOwnProperty.call(data.skills || {}, newK)) { onError?.(t`“${newK}” already exists — renaming onto it would erase its values.`); return false }
     mutate((d) => { const ns = {}; for (const [k, v] of Object.entries(d.skills)) ns[k === oldK ? newK : k] = v; d.skills = ns })
     return true
   }
@@ -352,24 +356,24 @@ export function SkillsEditor({ emptyNote, data, mutate, baseSkills, onError, onR
                 a skills row keeps its field colour and signals via ✦ + --change-soft border. */}
             {/* ui: keep — a *field* box (h29 · r6), not a card */}
             <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: 29, padding: '0 9px', border: `1px solid ${marked ? 'var(--change-soft)' : 'var(--edge)'}`, background: 'var(--surface-2)', boxShadow: marked ? 'var(--change-edge)' : undefined, borderRadius: 'var(--radius-field)' }}>
-              {marked && <span title={added ? 'Added by tailoring' : 'Changed by tailoring'} style={{ flex: '0 0 auto', color: 'var(--ai)', fontSize: 10 }}>✦</span>}
+              {marked && <span title={added ? t`Added by tailoring` : t`Changed by tailoring`} style={{ flex: '0 0 auto', color: 'var(--ai)', fontSize: 10 }}>✦</span>}
               {/* ui: keep — bare input inside the row's own bordered box, not a field */}
-              <input value={v} onChange={(e) => setVal(k, e.target.value)} placeholder="Skill values…" style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', outline: 'none', fontSize: 12, color: 'var(--text-2)', fontFamily: 'var(--sans)' }} />
+              <input value={v} onChange={(e) => setVal(k, e.target.value)} placeholder={t`Skill values…`} style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', outline: 'none', fontSize: 12, color: 'var(--text-2)', fontFamily: 'var(--sans)' }} />
               {/* --change-ink, not --good: this mark means "tailoring added it", and the
                   two are the same colour in the default palette but not in a theme
                   whose tailoring tint is its own (saas: violet). */}
-              {added && <span title="Added by tailoring" style={{ flex: '0 0 auto', padding: '1px 6px', borderRadius: 'var(--radius-inline)', background: 'var(--change-soft)', color: 'var(--change-ink)', fontSize: 11, fontWeight: 500 }}>added</span>}
-              {changed && <span onClick={() => setVal(k, baseSkills[k])} title="Decline this tailoring change" style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--warn)', cursor: 'pointer', fontWeight: 500 }}>↩</span>}
+              {added && <span title={t`Added by tailoring`} style={{ flex: '0 0 auto', padding: '1px 6px', borderRadius: 'var(--radius-inline)', background: 'var(--change-soft)', color: 'var(--change-ink)', fontSize: 11, fontWeight: 500 }}><Trans>added</Trans></span>}
+              {changed && <span onClick={() => setVal(k, baseSkills[k])} title={t`Decline this tailoring change`} style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--warn)', cursor: 'pointer', fontWeight: 500 }}>↩</span>}
             </div>
             {/* restore rebuilds the key order so the row comes back where it was */}
-            <RemoveX onClick={() => undoRemove('Removed skill category',
+            <RemoveX onClick={() => undoRemove(t`Removed skill category`,
               (d) => { delete d.skills[k] },
               (d) => { const en = Object.entries(d.skills || {}); en.splice(ei, 0, [k, v]); d.skills = Object.fromEntries(en) })} />
           </div>
         )
       })}
       {entries.length === 0 && <EmptyState note={emptyNote} what="skills" />}
-      <DashedAdd onClick={() => mutate((d) => { d.skills = d.skills || {}; d.skills[`Skill ${Object.keys(d.skills).length + 1}`] = '' })}>+ Add skill row</DashedAdd>
+      <DashedAdd onClick={() => mutate((d) => { d.skills = d.skills || {}; d.skills[t`Skill ${Object.keys(d.skills).length + 1}`] = '' })}><Trans>+ Add skill row</Trans></DashedAdd>
     </div>
   )
 }
@@ -382,7 +386,7 @@ function CategoryName({ name, rename }) {
   useEffect(() => () => clearTimeout(timer.current), [])
   const commit = (v) => { clearTimeout(timer.current); if (v !== name && !rename.current(name, v)) setDraft(name) }
   return (
-    <Input value={draft} placeholder="Category" ariaLabel="Skill category"
+    <Input value={draft} placeholder={t`Category`} ariaLabel={t`Skill category`}
       onChange={(v) => { setDraft(v); clearTimeout(timer.current); timer.current = setTimeout(() => commit(v), 500) }}
       onBlur={() => commit(draft)}
       style={{ flex: '0 0 118px', fontWeight: 500 }} />
@@ -395,20 +399,20 @@ export function EducationEditor({ emptyNote, data, setField, mutate, onRemoved }
       {(data.education || []).map((e, i) => (
         <Card key={i} style={{ padding: 11, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
-            <MicroField label="School" value={e.school} onChange={(v) => setField(`education.${i}.school`, v)} />
-            <MicroField label="Location" value={e.location} onChange={(v) => setField(`education.${i}.location`, v)} />
+            <MicroField label={t`School`} value={e.school} onChange={(v) => setField(`education.${i}.school`, v)} />
+            <MicroField label={t`Location`} value={e.location} onChange={(v) => setField(`education.${i}.location`, v)} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
-            <MicroField label="Degree" value={e.degree} onChange={(v) => setField(`education.${i}.degree`, v)} />
-            <MicroField label="Years" value={e.years} onChange={(v) => setField(`education.${i}.years`, v)} placeholder="2015 – 2019" />
+            <MicroField label={t`Degree`} value={e.degree} onChange={(v) => setField(`education.${i}.degree`, v)} />
+            <MicroField label={t`Years`} value={e.years} onChange={(v) => setField(`education.${i}.years`, v)} placeholder="2015 – 2019" />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove('Removed education entry',
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove(t`Removed education entry`,
             (d) => d.education.splice(i, 1),
             (d) => { d.education = d.education || []; d.education.splice(i, 0, e) })} /></div>
         </Card>
       ))}
       {(data.education || []).length === 0 && <EmptyState note={emptyNote} what="education" />}
-      <DashedAdd big onClick={() => mutate((d) => { d.education = d.education || []; d.education.push({ school: '', location: '', degree: '' }) })}>+ Add education</DashedAdd>
+      <DashedAdd big onClick={() => mutate((d) => { d.education = d.education || []; d.education.push({ school: '', location: '', degree: '' }) })}><Trans>+ Add education</Trans></DashedAdd>
     </div>
   )
 }
@@ -419,31 +423,31 @@ export function ProjectsEditor({ emptyNote, data, setField, mutate, onRemoved })
       {(data.projects || []).map((p, i) => (
         <Card key={i} style={{ padding: 11, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
-            <MicroField label="Name" value={p.name} onChange={(v) => setField(`projects.${i}.name`, v)} />
+            <MicroField label={t`Name`} value={p.name} onChange={(v) => setField(`projects.${i}.name`, v)} />
             <MicroField label="URL" value={p.url} onChange={(v) => setField(`projects.${i}.url`, v)} />
           </div>
-          <MicroField label="Description" value={p.description} onChange={(v) => setField(`projects.${i}.description`, v)} />
+          <MicroField label={t`Description`} value={p.description} onChange={(v) => setField(`projects.${i}.description`, v)} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Label>Bullets</Label>
+            <Label><Trans>Bullets</Trans></Label>
             {(p.bullets || []).map((b, bi) => (
               /* ui: keep — field-shaped prose row (r6), as in Experience */
               <div key={bi} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', border: '1px solid var(--line)', background: 'var(--surface)', borderRadius: 'var(--radius-field)' }}>
                 <span style={{ flex: '0 0 auto', color: 'var(--muted)', fontSize: 11, lineHeight: '19px' }}>—</span>
                 <BulletText value={b} onChange={(v) => mutate((d) => { d.projects[i].bullets[bi] = v })} />
-                <RemoveX size={10} lh="19px" onClick={() => undoRemove('Removed bullet',
+                <RemoveX size={10} lh="19px" onClick={() => undoRemove(t`Removed bullet`,
                   (d) => d.projects[i].bullets.splice(bi, 1),
                   (d) => { d.projects[i].bullets = d.projects[i].bullets || []; d.projects[i].bullets.splice(bi, 0, b) })} />
               </div>
             ))}
-            <DashedAdd onClick={() => mutate((d) => { d.projects[i].bullets = d.projects[i].bullets || []; d.projects[i].bullets.push('') })}>+ Add bullet</DashedAdd>
+            <DashedAdd onClick={() => mutate((d) => { d.projects[i].bullets = d.projects[i].bullets || []; d.projects[i].bullets.push('') })}><Trans>+ Add bullet</Trans></DashedAdd>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove('Removed project',
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove(t`Removed project`,
             (d) => d.projects.splice(i, 1),
-            (d) => { d.projects = d.projects || []; d.projects.splice(i, 0, p) })}>Remove project</RemoveLink></div>
+            (d) => { d.projects = d.projects || []; d.projects.splice(i, 0, p) })}><Trans>Remove project</Trans></RemoveLink></div>
         </Card>
       ))}
       {(data.projects || []).length === 0 && <EmptyState note={emptyNote} what="projects" />}
-      <DashedAdd big onClick={() => mutate((d) => { d.projects = d.projects || []; d.projects.push({ name: '', description: '', url: '', bullets: [] }) })}>+ Add project</DashedAdd>
+      <DashedAdd big onClick={() => mutate((d) => { d.projects = d.projects || []; d.projects.push({ name: '', description: '', url: '', bullets: [] }) })}><Trans>+ Add project</Trans></DashedAdd>
     </div>
   )
 }
@@ -454,14 +458,14 @@ export function PublicationsEditor({ emptyNote, data, setField, mutate, onRemove
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 10 }}>
       {pubs.length === 0 ? <EmptyState note={emptyNote} what="publications" /> : pubs.map((p, i) => (
         <Card key={i} style={{ padding: 11, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <MicroField label="Title" value={p.title} onChange={(v) => setField(`publications.${i}.title`, v)} />
-          <MicroField label="Description" value={p.description} onChange={(v) => setField(`publications.${i}.description`, v)} />
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove('Removed publication',
+          <MicroField label={t`Title`} value={p.title} onChange={(v) => setField(`publications.${i}.title`, v)} />
+          <MicroField label={t`Description`} value={p.description} onChange={(v) => setField(`publications.${i}.description`, v)} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><RemoveLink onClick={() => undoRemove(t`Removed publication`,
             (d) => d.publications.splice(i, 1),
             (d) => { d.publications = d.publications || []; d.publications.splice(i, 0, p) })} /></div>
         </Card>
       ))}
-      <DashedAdd big onClick={() => mutate((d) => { d.publications = d.publications || []; d.publications.push({ title: '', description: '' }) })}>+ Add publication</DashedAdd>
+      <DashedAdd big onClick={() => mutate((d) => { d.publications = d.publications || []; d.publications.push({ title: '', description: '' }) })}><Trans>+ Add publication</Trans></DashedAdd>
     </div>
   )
 }

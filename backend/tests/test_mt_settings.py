@@ -59,7 +59,7 @@ def test_ui_sections_match_the_settings_screen():
     screen = SCREEN_SECTIONS
     src = (pathlib.Path(__file__).resolve().parents[2] / "frontend/src/screens/Settings.jsx")
     if src.exists():
-        screen = set(re.findall(r"^\s{6}\['([a-z]+)', '", src.read_text(encoding="utf-8"), re.M))
+        screen = set(re.findall(r"^\s{6}\['([a-z]+)', (?:'|t`)", src.read_text(encoding="utf-8"), re.M))
         screen.discard("appearance")
         assert screen == SCREEN_SECTIONS
     ui = {u for sec in S.SETTING_SECTIONS.values() for u in sec["ui"]}

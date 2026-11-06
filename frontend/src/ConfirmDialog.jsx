@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import { t } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import './theme.css'
 import { Button, CopyGlyph, Heading, Input, ModalPanel } from './ui'
 
@@ -21,8 +23,8 @@ export default function ConfirmDialog({ title, body, label, danger, onConfirm, o
           plain text on the grey face and not a muted helper line. */}
       {body && <span className="v2-dialogtext" style={{ fontSize: 12.5, lineHeight: '18px', color: 'var(--helper-ink)' }}>{body}</span>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
-        <Button variant="secondary" size="sm" onClick={onCancel}>Cancel</Button>
-        <Button variant={danger ? 'danger' : 'primary'} size="sm" onClick={onConfirm}>{label || 'Confirm'}</Button>
+        <Button variant="secondary" size="sm" onClick={onCancel}><Trans>Cancel</Trans></Button>
+        <Button variant={danger ? 'danger' : 'primary'} size="sm" onClick={onConfirm}>{label || t`Confirm`}</Button>
       </div>
     </ModalPanel>
   )
@@ -48,8 +50,8 @@ export function PromptDialog({ title, body, label, value, placeholder, readOnly,
         onFocus={(e) => readOnly && e.target.select()}
         style={{ marginTop: 4 }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-        {readOnly && <Button variant="secondary" size="sm" onClick={copy}>{copied ? 'Copied ✓' : <><CopyGlyph />Copy</>}</Button>}
-        {!readOnly && <Button variant="secondary" size="sm" onClick={onCancel} style={{ marginLeft: 'auto' }}>Cancel</Button>}
+        {readOnly && <Button variant="secondary" size="sm" onClick={copy}>{copied ? t`Copied ✓` : <><CopyGlyph /><Trans>Copy</Trans></>}</Button>}
+        {!readOnly && <Button variant="secondary" size="sm" onClick={onCancel} style={{ marginLeft: 'auto' }}><Trans>Cancel</Trans></Button>}
         <Button size="sm" onClick={() => onSubmit(v)} style={{ marginLeft: readOnly ? 'auto' : 0 }}>{label || 'OK'}</Button>
       </div>
     </ModalPanel>

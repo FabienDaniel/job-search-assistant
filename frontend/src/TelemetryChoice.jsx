@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { t } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import api from './api'
 import { Button, FooterRow, Helper, Label, ModalPanel, Radio, Select } from './ui'
 import { initTelemetry, track } from './telemetry'
@@ -6,29 +8,29 @@ import { useTheme, themeAttrs } from './theme'
 
 // The owner's telemetry choice (docs/superpowers/specs/2026-10-26-telemetry-design.md): Yes (full)
 // or Essentials. Off exists only as JN_TELEMETRY=off, and every place that asks says so.
-export const PURPOSE = 'This data is collected to improve JobNavigator and to show which parts need maintaining first, as time for maintenance is limited.'
+export const PURPOSE = t`This data is collected to improve JobNavigator and to show which parts need maintaining first, as time for maintenance is limited.`
 export const LEVELS = [
-  ['full', 'Yes — health and how the app is used'],
-  ['essentials', 'Essentials — scraper and AI health only'],
+  ['full', t`Yes — health and how the app is used`],
+  ['essentials', t`Essentials — scraper and AI health only`],
 ]
 // What each level sends; Yes sends the Essentials list plus its own.
 export const SENT = {
   essentials: [
-    'The version and the number of accounts',
-    'Which search types, job boards and AI providers are in use',
-    'How often scrapes and AI calls succeed or fail (error types only)',
-    'Rough activity counts',
+    t`The version and the number of accounts`,
+    t`Which search types, job boards and AI providers are in use`,
+    t`How often scrapes and AI calls succeed or fail (error types only)`,
+    t`Rough activity counts`,
   ],
   full: [
-    'Which screens are opened (no ids)',
-    'Actions such as saving a job, running a search or exporting a résumé (no text)',
-    'The address of a job board whose scrape fails (e.g. nvidia.wd5.myworkdayjobs.com, which can name the company)',
+    t`Which screens are opened (no ids)`,
+    t`Actions such as saving a job, running a search or exporting a résumé (no text)`,
+    t`The address of a job board whose scrape fails (e.g. nvidia.wd5.myworkdayjobs.com, which can name the company)`,
   ],
-  never: 'Job titles, search terms, résumé, letter or persona text, anything typed, keys, the browser or IP, or this install’s address.',
-  off: 'To turn telemetry off completely, set JN_TELEMETRY=off in .env.',
+  never: t`Job titles, search terms, résumé, letter or persona text, anything typed, keys, the browser or IP, or this install’s address.`,
+  off: t`To turn telemetry off completely, set JN_TELEMETRY=off in .env.`,
 }
 // One paragraph for Settings' (i).
-export const SENT_SUMMARY = `Essentials, once a day from the server: ${SENT.essentials.join('; ')}. Yes adds: ${SENT.full.join('; ')}. Never sent: ${SENT.never} ${SENT.off}`
+export const SENT_SUMMARY = t`Essentials, once a day from the server: ${SENT.essentials.join('; ')}. Yes adds: ${SENT.full.join('; ')}. Never sent: ${SENT.never} ${SENT.off}`
 
 function Bullets({ items }) {
   return items.map((t) => (
@@ -42,13 +44,13 @@ function Bullets({ items }) {
 function SentFor({ level }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <Label>Sent once a day, from the server</Label>
+      <Label><Trans>Sent once a day, from the server</Trans></Label>
       <Bullets items={SENT.essentials} />
       {level === 'full' && <>
-        <Label style={{ marginTop: 8 }}>Also sent with Yes, as the app is used</Label>
+        <Label style={{ marginTop: 8 }}><Trans>Also sent with Yes, as the app is used</Trans></Label>
         <Bullets items={SENT.full} />
       </>}
-      <Label style={{ marginTop: 8 }}>Never sent</Label>
+      <Label style={{ marginTop: 8 }}><Trans>Never sent</Trans></Label>
       <Helper>{SENT.never}</Helper>
       <Helper style={{ marginTop: 8 }}>{SENT.off}</Helper>
     </div>
@@ -73,26 +75,26 @@ export function TelemetryDialog({ onDone }) {
   }
   // No onClose: only Save closes it (Escape and a click outside do nothing), so a choice is always made.
   return (
-    <ModalPanel width={460} title="Help improve JobNavigator" escapeCapture zIndex={9997}
+    <ModalPanel width={460} title={t`Help improve JobNavigator`} escapeCapture zIndex={9997}
       scrimProps={{ className: 'jn-v2', ...themeAttrs(look) }} scrimStyle={{ padding: 16 }}
       style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 32px)', overflow: 'auto' }}>
       <div style={{ padding: '20px 24px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className="v2-dialogtitle" style={{ fontWeight: 600 }}>Allow anonymous telemetry?</span>
+          <span className="v2-dialogtitle" style={{ fontWeight: 600 }}><Trans>Allow anonymous telemetry?</Trans></span>
           <Helper>{PURPOSE}</Helper>
         </div>
-        <div role="radiogroup" aria-label="Allow anonymous telemetry" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div role="radiogroup" aria-label={t`Allow anonymous telemetry`} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {LEVELS.map(([v, label]) => <Radio key={v} checked={level === v} onChange={() => setLevel(v)} label={label} />)}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <Helper onClick={() => setOpen((o) => !o)} ariaLabel={open ? 'Hide what is sent' : 'What is sent?'}>
-            {`${open ? '▾' : '▸'} What is sent?`}
+          <Helper onClick={() => setOpen((o) => !o)} ariaLabel={open ? t`Hide what is sent` : t`What is sent?`}>
+            {t`${open ? '▾' : '▸'} What is sent?`}
           </Helper>
           {open && <SentFor level={level} />}
         </div>
       </div>
       <FooterRow pad="12px 24px" soft bg="page" gap="normal">
-        <Button size="xs" busy={busy} onClick={save} style={{ marginLeft: 'auto' }}>Save</Button>
+        <Button size="xs" busy={busy} onClick={save} style={{ marginLeft: 'auto' }}><Trans>Save</Trans></Button>
       </FooterRow>
     </ModalPanel>
   )
@@ -114,10 +116,10 @@ export function TelemetrySettingRow() {
   const load = () => api.get('/telemetry').then(({ data }) => setState(data)).catch(() => {})
   useEffect(() => { load() }, [])
   if (!state) return null
-  if (state.locked) return <Helper style={{ flex: 1, minWidth: 0 }}>{`Set by JN_TELEMETRY=${state.level} in .env.`}</Helper>
+  if (state.locked) return <Helper style={{ flex: 1, minWidth: 0 }}>{t`Set by JN_TELEMETRY=${state.level} in .env.`}</Helper>
   return (
-    <Select value={state.asked ? state.level : ''} options={state.asked ? LEVELS : [['', 'Not chosen yet'], ...LEVELS]}
-      width="300px" ariaLabel="Allow anonymous telemetry"
+    <Select value={state.asked ? state.level : ''} options={state.asked ? LEVELS : [['', t`Not chosen yet`], ...LEVELS]}
+      width="300px" ariaLabel={t`Allow anonymous telemetry`}
       onPick={async (v) => { if (v) { await choose(v); load() } }} />
   )
 }

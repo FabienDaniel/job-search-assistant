@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { t, plural } from '@lingui/core/macro'
+import { Trans } from '@lingui/react/macro'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import { track } from '../telemetry'
@@ -16,20 +18,20 @@ import '../theme.css'
 const ago = (iso) => {
   if (!iso) return 'never'
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
+  if (m < 1) return t`just now`
+  if (m < 60) return t`${m}m ago`
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+  if (h < 24) return t`${h}h ago`
+  return t`${Math.floor(h / 24)}d ago`
 }
 const until = (iso) => {
   if (!iso) return null
   const m = Math.round((new Date(iso).getTime() - Date.now()) / 60000)
-  if (m <= 0) return 'due now'
-  if (m < 60) return `${m}m`
+  if (m <= 0) return t`due now`
+  if (m < 60) return t`${m}m`
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ${m % 60}m`
-  return `${Math.floor(h / 24)}d ${h % 24}h`
+  if (h < 24) return t`${h}h ${m % 60}m`
+  return t`${Math.floor(h / 24)}d ${h % 24}h`
 }
 const short = (u, n = 52) => {
   const s = (u || '').replace(/^https?:\/\//, '')
@@ -57,8 +59,8 @@ const isExt = isExtensionMode
 // run that quietly finds nothing.
 const configError = (s) => {
   const term = `${s.search_term || ''}`.trim()
-  if (needsTerm(s.search_mode) && !term) return 'Add a search term before running'
-  if (needsQuery(s.search_mode) && !(term || `${s.direct_url || ''}`.trim())) return 'Add a search term or a URL before running'
+  if (needsTerm(s.search_mode) && !term) return t`Add a search term before running`
+  if (needsQuery(s.search_mode) && !(term || `${s.direct_url || ''}`.trim())) return t`Add a search term or a URL before running`
   return null
 }
 
@@ -85,44 +87,44 @@ const writeTestRec = (v) => {
 // `dots` is a COUNT, not a glyph string — Segmented draws that many accent Dots
 // before the label; 0 must draw nothing, not an empty span (that shifts centering).
 const DEPTHS = [
-  { id: 'off', label: 'Off', dots: 0, hint: 'New results arrive unscored — score them by hand from the feed' },
-  { id: 'light', label: 'Light', dots: 1, hint: 'Score only. Low cost.' },
-  { id: 'full', label: 'Full', dots: 2, hint: 'Score plus the full report with keywords and requirements' },
+  { id: 'off', label: t`Off`, dots: 0, hint: t`New results arrive unscored — score them by hand from the feed` },
+  { id: 'light', label: t`Light`, dots: 1, hint: t`Score only. Low cost.` },
+  { id: 'full', label: t`Full`, dots: 2, hint: t`Score plus the full report with keywords and requirements` },
 ]
-const SOURCES = [['linkedin', 'LinkedIn'], ['indeed', 'Indeed'], ['zip_recruiter', 'ZipRecruiter'], ['google', 'Google Jobs'], ['direct', 'Direct (Playwright)']]
-const COLLECTIONS = [['recommended', 'Recommended'], ['top-applicant', 'Top Applicant']]
+const SOURCES = [['linkedin', 'LinkedIn'], ['indeed', 'Indeed'], ['zip_recruiter', 'ZipRecruiter'], ['google', t`Google Jobs`], ['direct', t`Direct (Playwright)`]]
+const COLLECTIONS = [['recommended', t`Recommended`], ['top-applicant', t`Top Applicant`]]
 // backend/scraper/search_modes.py CREATIVE_BOARDS, same order
-const CREATIVE_BOARDS = [['behance', 'Behance'], ['hollylist', 'Hollylist'], ['wanacreate', 'Wana Create'], ['dribbble', 'Dribbble'], ['artstation', 'ArtStation'], ['workwithindies', 'Work With Indies']]
+const CREATIVE_BOARDS = [['behance', 'Behance'], ['hollylist', 'Hollylist'], ['wanacreate', t`Wana Create`], ['dribbble', 'Dribbble'], ['artstation', 'ArtStation'], ['workwithindies', t`Work With Indies`]]
 const creativeLabel = (k) => (CREATIVE_BOARDS.find(([id]) => id === k) || [k, k])[1]
 
 // note banners reuse the mode-badge palettes (sm-levels green / sm-jobright teal)
 const noteFor = (mode) => {
-  if (mode === 'keyword') return ['Listings link to the board (LinkedIn, Indeed, ZipRecruiter, Google), not to the company’s own page. The same job found later by a company scrape or the extension is only recognised as a duplicate when company and title match exactly.', 'sm-keyword']
-  if (mode === 'levels_fyi') return ['Set your filters on levels.fyi and paste the URL here. The URL contains location, job family, salary and date filters.', 'sm-levels']
-  if (mode === 'jobright') return ['Recommendations from your Jobright.ai account. Enter a search term to search instead. Credentials are in Settings › Accounts.', 'sm-jobright']
-  if (mode === 'apify') return ['Runs Apify actors with the API key from Settings › Apify. Apify bills your account for each result: Results wanted (at most 200) caps every board on every run, each run carries a spend cap and stops after 15 minutes, and Test fetches 20 jobs per board at most. A new Apify search starts paused: check the boards, then press Paused to resume it.', 'sm-apify']
-  if (mode === 'caribbeanjobs') return ['Set the filters on caribbeanjobs.com and paste the search URL, or enter a term. The description of each result is read from its own page; Test reads at most 20 of those pages. A salary in a local currency is kept as text in the description, not as a number.', 'sm-caribbeanjobs']
-  if (mode === 'trulyremote') return ['Reads TrulyRemoteWork.com’s full corpus of worldwide-remote roles. Every listing is remote with no location restriction, so you narrow it with the title and company filters below. Each new job’s description is read from its own page; Test reads at most 20 of those pages.', 'sm-trulyremote']
-  if (mode === 'creative') return ['Reads the job APIs and feeds of Behance, Hollylist, Wana Create, Dribbble, ArtStation and Work With Indies directly: no login and no Apify key. Remote applies on every board: where a board cannot filter it, the jobs that the posting calls on-site or hybrid are dropped. Location (a city name) applies on Hollylist, Wana Create, Dribbble, ArtStation and Work With Indies (remote jobs stay); Behance ignores it. On Remote searches, Country drops the Behance jobs that are not open to that country. Hollylist members-only offers are skipped, and a salary is stored as a number only in US dollars per year. Test reads at most 20 job pages.', 'sm-creative']
-  if (mode === 'himalayas') return ['Reads the public API of himalayas.app: no login and no key. Every job is remote, so there is no Remote or Location. Country keeps the jobs open to that country, worldwide jobs included. A salary is stored as a number only in US dollars per year.', 'sm-himalayas']
-  if (mode === 'eluta') return ['Reads Canadian jobs from employer career sites through the RSS search of eluta.ca: no login and no key. Location is a city with a 50 km radius; empty means all of Canada. Eluta has no remote filter. It allows 10 RSS checks a day from one address, so give each search a run interval of 1440 minutes. One run reads one feed page and at most 6 job pages; the other new jobs wait for the next run.', 'sm-eluta']
-  if (mode === 'extension') return ['Jobs come from the “Save to Job Feed” button on any website. The filters and auto-score depth below apply to each job as it is saved.', 'sm-levels']
-  if (mode === 'linkedin_extension') return ['Jobs are captured while you browse linkedin.com/jobs/collections pages. The filters below are applied on import.', 'sm-levels']
+  if (mode === 'keyword') return [t`Listings link to the board (LinkedIn, Indeed, ZipRecruiter, Google), not to the company’s own page. The same job found later by a company scrape or the extension is only recognised as a duplicate when company and title match exactly.`, 'sm-keyword']
+  if (mode === 'levels_fyi') return [t`Set your filters on levels.fyi and paste the URL here. The URL contains location, job family, salary and date filters.`, 'sm-levels']
+  if (mode === 'jobright') return [t`Recommendations from your Jobright.ai account. Enter a search term to search instead. Credentials are in Settings › Accounts.`, 'sm-jobright']
+  if (mode === 'apify') return [t`Runs Apify actors with the API key from Settings › Apify. Apify bills your account for each result: Results wanted (at most 200) caps every board on every run, each run carries a spend cap and stops after 15 minutes, and Test fetches 20 jobs per board at most. A new Apify search starts paused: check the boards, then press Paused to resume it.`, 'sm-apify']
+  if (mode === 'caribbeanjobs') return [t`Set the filters on caribbeanjobs.com and paste the search URL, or enter a term. The description of each result is read from its own page; Test reads at most 20 of those pages. A salary in a local currency is kept as text in the description, not as a number.`, 'sm-caribbeanjobs']
+  if (mode === 'trulyremote') return [t`Reads TrulyRemoteWork.com’s full corpus of worldwide-remote roles. Every listing is remote with no location restriction, so you narrow it with the title and company filters below. Each new job’s description is read from its own page; Test reads at most 20 of those pages.`, 'sm-trulyremote']
+  if (mode === 'creative') return [t`Reads the job APIs and feeds of Behance, Hollylist, Wana Create, Dribbble, ArtStation and Work With Indies directly: no login and no Apify key. Remote applies on every board: where a board cannot filter it, the jobs that the posting calls on-site or hybrid are dropped. Location (a city name) applies on Hollylist, Wana Create, Dribbble, ArtStation and Work With Indies (remote jobs stay); Behance ignores it. On Remote searches, Country drops the Behance jobs that are not open to that country. Hollylist members-only offers are skipped, and a salary is stored as a number only in US dollars per year. Test reads at most 20 job pages.`, 'sm-creative']
+  if (mode === 'himalayas') return [t`Reads the public API of himalayas.app: no login and no key. Every job is remote, so there is no Remote or Location. Country keeps the jobs open to that country, worldwide jobs included. A salary is stored as a number only in US dollars per year.`, 'sm-himalayas']
+  if (mode === 'eluta') return [t`Reads Canadian jobs from employer career sites through the RSS search of eluta.ca: no login and no key. Location is a city with a 50 km radius; empty means all of Canada. Eluta has no remote filter. It allows 10 RSS checks a day from one address, so give each search a run interval of 1440 minutes. One run reads one feed page and at most 6 job pages; the other new jobs wait for the next run.`, 'sm-eluta']
+  if (mode === 'extension') return [t`Jobs come from the “Save to Job Feed” button on any website. The filters and auto-score depth below apply to each job as it is saved.`, 'sm-levels']
+  if (mode === 'linkedin_extension') return [t`Jobs are captured while you browse linkedin.com/jobs/collections pages. The filters below are applied on import.`, 'sm-levels']
   return null
 }
 
 // share of the search's jobs (last 90 days) with a direct link to the employer; said from five jobs on
 const directRate = (s) => {
   const r = s.direct_rate
-  return r && r.total >= 5 ? ` · ${Math.round((100 * r.direct) / r.total)}% direct links` : ''
+  return r && r.total >= 5 ? t` · ${Math.round((100 * r.direct) / r.total)}% direct links` : ''
 }
 
 // one-line summary of what this search does; `boards` names the Apify boards
 const summaryOf = (s, boards = []) => {
-  const last = s.last_run_at ? ` · last run ${ago(s.last_run_at)}` : ''
+  const last = s.last_run_at ? t` · last run ${ago(s.last_run_at)}` : ''
   const m = s.search_mode
-  if (m === 'linkedin_extension') return 'Passive capture on linkedin.com/jobs/collections/* · title filters apply on import'
-  if (m === 'extension') return 'Manual “Save to Job Feed” button on any website'
+  if (m === 'linkedin_extension') return t`Passive capture on linkedin.com/jobs/collections/* · title filters apply on import`
+  if (m === 'extension') return t`Manual “Save to Job Feed” button on any website`
   if (m === 'keyword') {
     const bits = []
     if (s.search_term) bits.push(`“${s.search_term}”`)
@@ -130,11 +132,11 @@ const summaryOf = (s, boards = []) => {
     if ((s.sources || []).length) bits.push((s.sources || []).join(', '))
     return bits.join(' · ') + last
   }
-  if (m === 'levels_fyi') return `${s.direct_url ? short(s.direct_url) : 'No levels.fyi URL yet'} · ${s.max_pages || 50} pages${last}`
-  if (m === 'linkedin_personal') return `Collections: ${((s.sources || []).length ? s.sources : ['recommended', 'top-applicant']).join(', ')} · credentials in Settings${last}`
+  if (m === 'levels_fyi') return t`${s.direct_url ? short(s.direct_url) : t`No levels.fyi URL yet`} · ${s.max_pages || 50} pages${last}`
+  if (m === 'linkedin_personal') return t`Collections: ${((s.sources || []).length ? s.sources : ['recommended', 'top-applicant']).join(', ')} · credentials in Settings${last}`
   if (m === 'jobright') {
-    const bits = [s.search_term ? `“${s.search_term}”` : 'AI recommendations', `max ${s.results_wanted || 100}`]
-    if (s.require_salary) bits.push('require salary')
+    const bits = [s.search_term ? `“${s.search_term}”` : t`AI recommendations`, t`max ${s.results_wanted || 100}`]
+    if (s.require_salary) bits.push(t`require salary`)
     return bits.join(' · ') + last
   }
   if (m === 'freehire') {
@@ -146,7 +148,7 @@ const summaryOf = (s, boards = []) => {
   if (m === 'apify') {
     const bits = [`“${s.search_term || ''}”`]
     if (s.location) bits.push(s.location)
-    bits.push((s.sources || []).map((k) => boardLabel(boards, k)).join(', ') || 'no board')
+    bits.push((s.sources || []).map((k) => boardLabel(boards, k)).join(', ') || t`no board`)
     return bits.join(' · ') + last
   }
   if (m === 'caribbeanjobs') {
@@ -155,16 +157,16 @@ const summaryOf = (s, boards = []) => {
     if (s.direct_url) bits.push(short(s.direct_url))
     return (bits.join(' · ') || 'caribbeanjobs.com') + last
   }
-  if (m === 'trulyremote') return `Worldwide remote · max ${s.results_wanted || 100} new${last}`
+  if (m === 'trulyremote') return t`Worldwide remote · max ${s.results_wanted || 100} new${last}`
   if (m === 'creative') {
     const bits = [`“${s.search_term || ''}”`]
     if (s.location) bits.push(s.location)
-    bits.push((s.sources || []).map(creativeLabel).join(', ') || 'no board')
+    bits.push((s.sources || []).map(creativeLabel).join(', ') || t`no board`)
     return bits.join(' · ') + last
   }
-  if (m === 'himalayas') return `“${s.search_term || ''}” · Remote${s.country ? ` · ${s.country}` : ''}${last}`
+  if (m === 'himalayas') return t`“${s.search_term || ''}” · Remote${s.country ? ` · ${s.country}` : ''}${last}`
   if (m === 'eluta') return `“${s.search_term || ''}” · ${s.location || 'Canada'}${last}`
-  return `${short(s.direct_url) || 'no URL'}${last}`
+  return `${short(s.direct_url) || t`no URL`}${last}`
 }
 
 // Matches backend/countries.py DEFAULT_COUNTRY — jobspy's own alias for the US.
@@ -279,7 +281,7 @@ const Chip = ({ on, label, badge, onClick }) => (
 // The two call sites live inside the edit form, whose own wrapper already calls
 // stopPropagation on the clickable card behind it, so the cells need none.
 const DepthPills = ({ value, onPick }) => (
-  <Segmented size="sm" ariaLabel="Auto-scoring depth" value={value} onChange={onPick}
+  <Segmented size="sm" ariaLabel={t`Auto-scoring depth`} value={value} onChange={onPick}
     options={DEPTHS.map((d) => ({ value: d.id, label: d.label, hint: d.hint, dots: d.dots }))}
     style={{ height: 31 }} />
 )
@@ -300,12 +302,12 @@ function ConfigForm({ d, set }) {
   const note = noteFor(m)
 
   const fields = []
-  fields.push(<Cell key="name" label="Name" value={d.name} onChange={(v) => set({ name: v })} placeholder="e.g. TPM roles — Tier 1" />)
+  fields.push(<Cell key="name" label={t`Name`} value={d.name} onChange={(v) => set({ name: v })} placeholder={t`e.g. TPM roles — Tier 1`} />)
   if (ext) {
-    fields.push(<Cell key="mode" label="Mode" span={2} disabled
-      value={m === 'extension' ? 'Extension (manual Save-to-Feed)' : 'LinkedIn Extension (passive capture)'} onChange={() => {}} />)
+    fields.push(<Cell key="mode" label={t`Mode`} span={2} disabled
+      value={m === 'extension' ? t`Extension (manual Save-to-Feed)` : t`LinkedIn Extension (passive capture)`} onChange={() => {}} />)
   } else {
-    fields.push(<Cell key="mode" label="Mode" value={m} options={MODE_OPTIONS} onChange={(v) => {
+    fields.push(<Cell key="mode" label={t`Mode`} value={m} options={MODE_OPTIONS} onChange={(v) => {
       const patch = { search_mode: v }
       patch.sources = v === 'apify' ? apifyBoards.slice(0, 1).map((b) => b.value) : defaultSources(v)
       set(patch)
@@ -313,91 +315,91 @@ function ConfigForm({ d, set }) {
   }
   if (m === 'keyword') {
     fields.push(
-      <Cell key="term" label="Search term" mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder="e.g. technical program manager" />,
-      <Cell key="loc" label="Location" value={d.location} onChange={(v) => set({ location: v })} placeholder="e.g. Toronto"
-        sub="A city or a region. Country adds the country. For remote work set Remote and leave this empty." />,
-      <Cell key="ctry" label="Country" value={d.country} options={countries} onChange={(v) => set({ country: v })}
-        sub="The only country source. Every board receives it." />,
-      <Cell key="rem" label="Remote" value={d.is_remote} options={[['', 'Any'], ['true', 'Remote only'], ['false', 'On-site only']]} onChange={(v) => set({ is_remote: v })}
-        sub="Indeed, Glassdoor and Google apply it. LinkedIn ignores it without login, so LinkedIn rows can be on-site." />,
-      <Cell key="jt" label="Job type" value={d.job_type} options={[['fulltime', 'Full-time'], ['parttime', 'Part-time'], ['contract', 'Contract']]} onChange={(v) => set({ job_type: v })} />,
-      <Cell key="ho" label="Hours old · 0–720" mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} />,
-      <Cell key="rw" label="Results wanted · 1–500" mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
+      <Cell key="term" label={t`Search term`} mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`e.g. technical program manager`} />,
+      <Cell key="loc" label={t`Location`} value={d.location} onChange={(v) => set({ location: v })} placeholder={t`e.g. Toronto`}
+        sub={t`A city or a region. Country adds the country. For remote work set Remote and leave this empty.`} />,
+      <Cell key="ctry" label={t`Country`} value={d.country} options={countries} onChange={(v) => set({ country: v })}
+        sub={t`The only country source. Every board receives it.`} />,
+      <Cell key="rem" label={t`Remote`} value={d.is_remote} options={[['', t`Any`], ['true', t`Remote only`], ['false', t`On-site only`]]} onChange={(v) => set({ is_remote: v })}
+        sub={t`Indeed, Glassdoor and Google apply it. LinkedIn ignores it without login, so LinkedIn rows can be on-site.`} />,
+      <Cell key="jt" label={t`Job type`} value={d.job_type} options={[['fulltime', t`Full-time`], ['parttime', t`Part-time`], ['contract', t`Contract`]]} onChange={(v) => set({ job_type: v })} />,
+      <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} />,
+      <Cell key="rw" label={t`Results wanted · 1–500`} mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
     )
   } else if (m === 'levels_fyi') {
     fields.push(
-      <Cell key="mp" label="Max pages · 1–50" mono type="number" min={BOUNDS.max_pages[0]} max={BOUNDS.max_pages[1]} value={d.max_pages} onChange={(v) => set({ max_pages: v })} />,
-      <Cell key="url" label="Levels.fyi URL · filters applied" mono span={3} value={d.direct_url} onChange={(v) => set({ direct_url: v })}
+      <Cell key="mp" label={t`Max pages · 1–50`} mono type="number" min={BOUNDS.max_pages[0]} max={BOUNDS.max_pages[1]} value={d.max_pages} onChange={(v) => set({ max_pages: v })} />,
+      <Cell key="url" label={t`Levels.fyi URL · filters applied`} mono span={3} value={d.direct_url} onChange={(v) => set({ direct_url: v })}
         placeholder="https://www.levels.fyi/jobs/location/united-states?jobFamilySlugs=software-engineer" />,
     )
   } else if (m === 'jobright') {
     fields.push(
-      <Cell key="term" label="Search term · optional" value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder="Leave empty for AI recommendations" />,
-      <Cell key="rw" label="Results wanted · 20–500" mono type="number" min={BOUNDS.results_wanted_jobright[0]} max={BOUNDS.results_wanted_jobright[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
-      <Cell key="ms" label="Min score · 0–100" mono type="number" min={BOUNDS.min_fit_score[0]} max={BOUNDS.min_fit_score[1]} value={d.min_fit_score} onChange={(v) => set({ min_fit_score: v })} placeholder="0 = no filter" />,
+      <Cell key="term" label={t`Search term · optional`} value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`Leave empty for AI recommendations`} />,
+      <Cell key="rw" label={t`Results wanted · 20–500`} mono type="number" min={BOUNDS.results_wanted_jobright[0]} max={BOUNDS.results_wanted_jobright[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
+      <Cell key="ms" label={t`Min score · 0–100`} mono type="number" min={BOUNDS.min_fit_score[0]} max={BOUNDS.min_fit_score[1]} value={d.min_fit_score} onChange={(v) => set({ min_fit_score: v })} placeholder={t`0 = no filter`} />,
     )
   } else if (m === 'freehire') {
     fields.push(
-      <Cell key="term" label="Search term · required without a URL" mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder="e.g. golang backend"
-        sub="Added to the URL filters. Must appear in the posting text." />,
-      <Cell key="url" label="freehire.me URL · required without a term" mono span={2} value={d.direct_url} onChange={(v) => set({ direct_url: v })}
+      <Cell key="term" label={t`Search term · required without a URL`} mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`e.g. golang backend`}
+        sub={t`Added to the URL filters. Must appear in the posting text.`} />,
+      <Cell key="url" label={t`freehire.me URL · required without a term`} mono span={2} value={d.direct_url} onChange={(v) => set({ direct_url: v })}
         placeholder="https://freehire.me/?role=backend&seniority=senior&countries=us"
-        sub="Role, seniority, countries and posting age are taken from the URL as is" />,
-      <Cell key="rw" label="Results wanted · 1–500" mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
+        sub={t`Role, seniority, countries and posting age are taken from the URL as is`} />,
+      <Cell key="rw" label={t`Results wanted · 1–500`} mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
     )
   } else if (m === 'apify') {
     fields.push(
-      <Cell key="term" label="Search term · required" mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder="e.g. technical program manager" />,
-      <Cell key="loc" label="Location" value={d.location} onChange={(v) => set({ location: v })} placeholder="e.g. Austin"
-        sub="A city or a region. Empty = the whole country." />,
-      <Cell key="ctry" label="Country" value={d.country} options={countries} onChange={(v) => set({ country: v })} />,
-      <Cell key="rem" label="Remote" value={d.is_remote} options={[['', 'Any'], ['true', 'Remote only']]} onChange={(v) => set({ is_remote: v })}
-        sub="LinkedIn ignores it without login. On LinkedIn, Remote only drops the postings that say hybrid or on-site." />,
-      <Cell key="ho" label="Hours old · 0–720" mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })}
-        sub="Rounded up to the steps of each board (see Boards)" />,
-      <Cell key="rw" label="Results wanted · 1–200 per board" mono type="number" min={BOUNDS.results_wanted_apify[0]} max={BOUNDS.results_wanted_apify[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
+      <Cell key="term" label={t`Search term · required`} mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`e.g. technical program manager`} />,
+      <Cell key="loc" label={t`Location`} value={d.location} onChange={(v) => set({ location: v })} placeholder={t`e.g. Austin`}
+        sub={t`A city or a region. Empty = the whole country.`} />,
+      <Cell key="ctry" label={t`Country`} value={d.country} options={countries} onChange={(v) => set({ country: v })} />,
+      <Cell key="rem" label={t`Remote`} value={d.is_remote} options={[['', t`Any`], ['true', t`Remote only`]]} onChange={(v) => set({ is_remote: v })}
+        sub={t`LinkedIn ignores it without login. On LinkedIn, Remote only drops the postings that say hybrid or on-site.`} />,
+      <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })}
+        sub={t`Rounded up to the steps of each board (see Boards)`} />,
+      <Cell key="rw" label={t`Results wanted · 1–200 per board`} mono type="number" min={BOUNDS.results_wanted_apify[0]} max={BOUNDS.results_wanted_apify[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
     )
   } else if (m === 'caribbeanjobs') {
     fields.push(
-      <Cell key="term" label="Search term · required without a URL" mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder="e.g. software engineer, developer"
-        sub="Comma-separated alternatives are searched separately and merged. The board ANDs bare words, so keep each term short." />,
-      <Cell key="url" label="caribbeanjobs.com URL · required without a term" mono span={2} value={d.direct_url} onChange={(v) => set({ direct_url: v })}
+      <Cell key="term" label={t`Search term · required without a URL`} mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`e.g. software engineer, developer`}
+        sub={t`Comma-separated alternatives are searched separately and merged. The board ANDs bare words, so keep each term short.`} />,
+      <Cell key="url" label={t`caribbeanjobs.com URL · required without a term`} mono span={2} value={d.direct_url} onChange={(v) => set({ direct_url: v })}
         placeholder="https://www.caribbeanjobs.com/ShowResults.aspx?Keywords=engineer&Location=123"
-        sub="Keywords, Location, Category and job type are taken from the URL as is" />,
-      <Cell key="rw" label="Results wanted · 1–500" mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
+        sub={t`Keywords, Location, Category and job type are taken from the URL as is`} />,
+      <Cell key="rw" label={t`Results wanted · 1–500`} mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
     )
   } else if (m === 'creative') {
     fields.push(
-      <Cell key="term" label="Search term · required" mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder="e.g. illustrator" />,
-      <Cell key="loc" label="Location" value={d.location} onChange={(v) => set({ location: v })} placeholder="e.g. Vancouver"
-        sub="One city name. Behance ignores it." />,
-      <Cell key="ctry" label="Country" value={d.country} options={countries} onChange={(v) => set({ country: v })}
-        sub="Behance on Remote searches: jobs open to this country, worldwide jobs included." />,
-      <Cell key="rem" label="Remote" value={d.is_remote} options={[['', 'Any'], ['true', 'Remote only']]} onChange={(v) => set({ is_remote: v })} />,
-      <Cell key="ho" label="Hours old · 0–720" mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })}
-        sub="0 = no age limit. Behance freelance briefs carry no date." />,
-      <Cell key="rw" label="Results wanted · 1–500 per board" mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
+      <Cell key="term" label={t`Search term · required`} mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`e.g. illustrator`} />,
+      <Cell key="loc" label={t`Location`} value={d.location} onChange={(v) => set({ location: v })} placeholder={t`e.g. Vancouver`}
+        sub={t`One city name. Behance ignores it.`} />,
+      <Cell key="ctry" label={t`Country`} value={d.country} options={countries} onChange={(v) => set({ country: v })}
+        sub={t`Behance on Remote searches: jobs open to this country, worldwide jobs included.`} />,
+      <Cell key="rem" label={t`Remote`} value={d.is_remote} options={[['', t`Any`], ['true', t`Remote only`]]} onChange={(v) => set({ is_remote: v })} />,
+      <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })}
+        sub={t`0 = no age limit. Behance freelance briefs carry no date.`} />,
+      <Cell key="rw" label={t`Results wanted · 1–500 per board`} mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
     )
   } else if (m === 'himalayas') {
     fields.push(
-      <Cell key="term" label="Search term · required" mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder="e.g. designer" />,
-      <Cell key="ctry" label="Country" value={d.country} options={countries} onChange={(v) => set({ country: v })}
-        sub="Jobs open to this country, worldwide jobs included." />,
-      <Cell key="ho" label="Hours old · 0–720" mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} sub="0 = no age limit" />,
-      <Cell key="rw" label="Results wanted · 1–500" mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
+      <Cell key="term" label={t`Search term · required`} mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`e.g. designer`} />,
+      <Cell key="ctry" label={t`Country`} value={d.country} options={countries} onChange={(v) => set({ country: v })}
+        sub={t`Jobs open to this country, worldwide jobs included.`} />,
+      <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} sub={t`0 = no age limit`} />,
+      <Cell key="rw" label={t`Results wanted · 1–500`} mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
     )
   } else if (m === 'eluta') {
     fields.push(
-      <Cell key="term" label="Search term · required" mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder="e.g. designer" />,
-      <Cell key="loc" label="Location" value={d.location} onChange={(v) => set({ location: v })} placeholder="e.g. Vancouver"
-        sub="A city, 50 km around it. Empty = all of Canada." />,
-      <Cell key="ho" label="Hours old · 0–720" mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} sub="0 = no age limit" />,
+      <Cell key="term" label={t`Search term · required`} mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`e.g. designer`} />,
+      <Cell key="loc" label={t`Location`} value={d.location} onChange={(v) => set({ location: v })} placeholder={t`e.g. Vancouver`}
+        sub={t`A city, 50 km around it. Empty = all of Canada.`} />,
+      <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} sub={t`0 = no age limit`} />,
     )
   } else if (m === 'trulyremote') {
     // The whole board is read on every run; this caps the new jobs whose pages one run opens.
     fields.push(
-      <Cell key="rw" label="New jobs per run · 1–500" mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })}
-        sub="The whole board is read; this caps how many new jobs’ pages one run opens" />,
+      <Cell key="rw" label={t`New jobs per run · 1–500`} mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })}
+        sub={t`The whole board is read; this caps how many new jobs’ pages one run opens`} />,
     )
   }
 
@@ -418,7 +420,7 @@ function ConfigForm({ d, set }) {
 
       {m === 'keyword' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-          <Label style={{ marginRight: 3 }}>Sources</Label>
+          <Label style={{ marginRight: 3 }}><Trans>Sources</Trans></Label>
           {SOURCES.map(([id, label]) => <Chip key={id} on={d.sources.includes(id)} label={label} badge={SOURCE_BLOCKS[id] && BLOCKED_BADGE} onClick={() => toggleSrc(id)} />)}
           {/* Visible text, not a hover title, so keyboard and screen-reader users get the reason too. */}
           <Helper style={{ flexBasis: '100%' }}>{BLOCKED_BADGE}: {Object.values(SOURCE_BLOCKS).join(' ')}</Helper>
@@ -426,56 +428,56 @@ function ConfigForm({ d, set }) {
       )}
       {m === 'apify' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-          <Label style={{ marginRight: 3 }}>Boards</Label>
+          <Label style={{ marginRight: 3 }}><Trans>Boards</Trans></Label>
           {apifyBoards.map((b) => <Chip key={b.value} on={d.sources.includes(b.value)} label={b.label} onClick={() => toggleSrc(b.value)} />)}
-          <Helper>Each board is a separate Apify run</Helper>
+          <Helper><Trans>Each board is a separate Apify run</Trans></Helper>
           {apifyBoards.filter((b) => d.sources.includes(b.value)).map((b) => <Helper key={b.value} size="xs" style={{ flexBasis: '100%' }}>{b.label}: {b.hint}</Helper>)}
         </div>
       )}
       {m === 'creative' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-          <Label style={{ marginRight: 3 }}>Boards</Label>
+          <Label style={{ marginRight: 3 }}><Trans>Boards</Trans></Label>
           {CREATIVE_BOARDS.map(([id, label]) => <Chip key={id} on={d.sources.includes(id)} label={label} onClick={() => toggleSrc(id)} />)}
-          <Helper>Free; Apify has paid Behance and Hollylist boards as a fallback</Helper>
+          <Helper><Trans>Free; Apify has paid Behance and Hollylist boards as a fallback</Trans></Helper>
         </div>
       )}
       {m === 'linkedin_personal' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-          <Label style={{ marginRight: 3 }}>Collections</Label>
+          <Label style={{ marginRight: 3 }}><Trans>Collections</Trans></Label>
           {COLLECTIONS.map(([id, label]) => <Chip key={id} on={d.sources.includes(id)} label={label} onClick={() => toggleSrc(id)} />)}
-          <Helper>Credentials are in Settings › Accounts</Helper>
+          <Helper><Trans>Credentials are in Settings › Accounts</Trans></Helper>
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <Cell label="Title include · comma-separated" mono value={d.title_include_keywords} onChange={(v) => set({ title_include_keywords: v })} placeholder="e.g. backend, platform" />
-        <Cell label="Title exclude" mono value={d.title_exclude_keywords} onChange={(v) => set({ title_exclude_keywords: v })} placeholder="intern, junior, associate" />
-        <Cell label="Company include · exact" value={d.company_filter} onChange={(v) => set({ company_filter: v })} placeholder="Any" />
-        <Cell label="Company exclude · exact" value={d.company_exclude} onChange={(v) => set({ company_exclude: v })} placeholder="e.g. Walmart, CommScope" />
+        <Cell label={t`Title include · comma-separated`} mono value={d.title_include_keywords} onChange={(v) => set({ title_include_keywords: v })} placeholder={t`e.g. backend, platform`} />
+        <Cell label={t`Title exclude`} mono value={d.title_exclude_keywords} onChange={(v) => set({ title_exclude_keywords: v })} placeholder={t`intern, junior, associate`} />
+        <Cell label={t`Company include · exact`} value={d.company_filter} onChange={(v) => set({ company_filter: v })} placeholder={t`Any`} />
+        <Cell label={t`Company exclude · exact`} value={d.company_exclude} onChange={(v) => set({ company_exclude: v })} placeholder={t`e.g. Walmart, CommScope`} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 10 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Label>Auto-scoring</Label>
+          <Label><Trans>Auto-scoring</Trans></Label>
           <DepthPills value={d.auto_scoring_depth} onPick={(v) => set({ auto_scoring_depth: v })} />
-          <Helper size="xs">How deeply new results are scored as they arrive</Helper>
+          <Helper size="xs"><Trans>How deeply new results are scored as they arrive</Trans></Helper>
         </div>
         {!ext ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <Label>Run interval · min</Label>
+            <Label><Trans>Run interval · min</Trans></Label>
             <Input type="number" min={BOUNDS.run_interval_minutes[0]} max={BOUNDS.run_interval_minutes[1]} mono
               value={d.run_interval_minutes} onChange={(v) => set({ run_interval_minutes: v })}
-              ariaLabel="Run interval in minutes" style={{ width: 110 }} />
-            <Helper size="xs">0 follows the global schedule from Settings</Helper>
+              ariaLabel={t`Run interval in minutes`} style={{ width: 110 }} />
+            <Helper size="xs"><Trans>0 follows the global schedule from Settings</Trans></Helper>
           </div>
         ) : <div />}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Label>Import rules</Label>
+          <Label><Trans>Import rules</Trans></Label>
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6, minHeight: 31 }}>
-            <Check checked={d.exclude_active_companies} label="Skip my active companies"
-              title="Leaves out jobs from companies you scrape (active in Companies, aliases included): their own careers page already brings those in"
+            <Check checked={d.exclude_active_companies} label={t`Skip my active companies`}
+              title={t`Leaves out jobs from companies you scrape (active in Companies, aliases included): their own careers page already brings those in`}
               onChange={(v) => set({ exclude_active_companies: v })} />
-            {m === 'jobright' && <Check checked={d.require_salary} label="Require salary" title="Drop results without a listed salary"
+            {m === 'jobright' && <Check checked={d.require_salary} label={t`Require salary`} title={t`Drop results without a listed salary`}
               onChange={(v) => set({ require_salary: v })} />}
           </div>
         </div>
@@ -513,8 +515,8 @@ export default function Searches() {
       const { data } = await api.get('/searches')
       setSearches(data); setLoadErr(null)
     } catch (e) {
-      console.error(e); setLoadErr(errText(e, 'Could not load your searches'))
-      pushToast({ kind: 'error', msg: errText(e, 'Could not load your searches') })
+      console.error(e); setLoadErr(errText(e, t`Could not load your searches`))
+      pushToast({ kind: 'error', msg: errText(e, t`Could not load your searches`) })
     }
   }, [pushToast])
   // Health + the schedule are re-read after every mutation and whenever a run
@@ -588,20 +590,20 @@ export default function Searches() {
   const sourceWarnOf = (s) => {
     const errs = s.last_source_errors || []
     if (!errs.length) return null
-    return `${errs.map((e) => `${e.label || e.source} failed (${e.error})`).join(' · ')} on the last run`
+    return t`${errs.map((e) => t`${e.label || e.source} failed (${e.error})`).join(' · ')} on the last run`
   }
   // a failed source wins; then an error; then health's 3-run verdict; then a
   // single clean-but-empty run
   const warnTextOf = (s) => sourceWarnOf(s) || s.last_error || downMap[s.id]
-    || (s.last_run_warning ? 'Last run finished cleanly but returned no jobs' : null)
+    || (s.last_run_warning ? t`Last run finished cleanly but returned no jobs` : null)
   // A paused search or an acknowledged warning is muted on the card ("paused"),
   // not driving the ▲/amber/header/rail — the backend re-raises it once a newer run fails.
   const warnMuted = (s) => !s.active || !!s.warning_acknowledged
   const warnOf = (s) => { const t = warnTextOf(s); return t && !warnMuted(s) ? t : null }
   const mutedWarnOf = (s) => {
-    const t = warnTextOf(s)
-    if (!t || !warnMuted(s)) return null
-    return `${t} · ${s.active ? `acknowledged ${ago(s.warning_acknowledged_at)}` : 'paused'}`
+    const warning = warnTextOf(s)
+    if (!warning || !warnMuted(s)) return null
+    return `${warning} · ${s.active ? t`acknowledged ${ago(s.warning_acknowledged_at)}` : t`paused`}`
   }
   // Header count uses health's verdict alone — same source as the rail's “N need
   // attention”; the row ▲ and drawer banner keep the broader warnOf() predicate.
@@ -617,10 +619,10 @@ export default function Searches() {
     if (!sub) return loadErr ? DASH : NBSP
     const nxt = until(sub.next)
     return [
-      `${sub.n} config${sub.n === 1 ? '' : 's'}`,
-      `${sub.active} active`,
-      ...(sub.warn ? [`${sub.warn} need attention`] : []),
-      ...(nxt ? [nxt === 'due now' ? 'next scheduled run due now' : `next scheduled run in ${nxt}`] : []),
+      plural(sub.n, { one: '# config', other: '# configs' }),
+      t`${sub.active} active`,
+      ...(sub.warn ? [t`${sub.warn} need attention`] : []),
+      ...(nxt ? [nxt === t`due now` ? t`next scheduled run due now` : t`next scheduled run in ${nxt}`] : []),
     ].join(' · ')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sub && sub.n, sub && sub.active, sub && sub.warn, sub && sub.next, tick, loadErr])
@@ -633,7 +635,7 @@ export default function Searches() {
   // The backend starts a new (or newly switched) Apify search paused, since every run bills
   // the Apify account; say so, or the card's "Paused" would look like a glitch.
   const notePaused = (row, verb) => {
-    if (row?.search_mode === 'apify' && row.active === false) pushToast({ kind: 'success', msg: `“${row.name}” ${verb} paused. Apify bills every run, so resume it once the boards and Results wanted look right` })
+    if (row?.search_mode === 'apify' && row.active === false) pushToast({ kind: 'success', msg: t`“${row.name}” ${verb} paused. Apify bills every run, so resume it once the boards and Results wanted look right` })
   }
   const save = async (s) => {
     if (busy) return
@@ -641,15 +643,15 @@ export default function Searches() {
     try {
       const { data } = await api.patch(`/searches/${s.id}`, toPayload(draft)); setEditing(null); load(); loadAux()
       if (s.search_mode !== 'apify' && data?.search_mode === 'apify' && s.active) { bumpCounts(); notePaused(data, 'is') }
-    } catch (e) { fail(e, 'Could not save this search') }
+    } catch (e) { fail(e, t`Could not save this search`) }
     finally { if (mounted.current) setBusy(null) }
   }
   const create = async () => {
     if (busy) return
-    if (!newDraft.name.trim()) { pushToast({ kind: 'error', msg: 'Name is required' }); return }
+    if (!newDraft.name.trim()) { pushToast({ kind: 'error', msg: t`Name is required` }); return }
     setBusy('new')
     try { const { data } = await api.post('/searches', toPayload(newDraft)); track('search_created', { mode: newDraft.search_mode }); setNewOpen(false); setNewDraft(NEW_DRAFT); load(); loadAux(); bumpCounts(); notePaused(data, 'created') }
-    catch (e) { fail(e, 'Could not create this search') }
+    catch (e) { fail(e, t`Could not create this search`) }
     finally { if (mounted.current) setBusy(null) }
   }
   const toggleActive = async (s) => {
@@ -657,7 +659,7 @@ export default function Searches() {
     // pausing/resuming changes what /health/entities counts, so the rail dot is
     // re-read too — loadAux() alone only updates this screen's own badge.
     try { await api.patch(`/searches/${s.id}`, { active: !s.active }); load(); loadAux(); bumpCounts() }
-    catch (e) { fail(e, `Could not ${s.active ? 'pause' : 'resume'} “${s.name}”`) }
+    catch (e) { fail(e, (s.active ? t`Could not pause “${s.name}”` : t`Could not resume “${s.name}”`)) }
   }
   // “I have seen this, stop shouting” — the warning stays on the card, muted,
   // and /health/entities re-raises it by itself once a newer run fails.
@@ -665,8 +667,8 @@ export default function Searches() {
     try {
       await api.post(`/searches/${s.id}/acknowledge`)
       load(); loadAux(); bumpCounts()
-      pushToast({ kind: 'success', msg: `“${s.name}” acknowledged — it stops counting until a later run fails` })
-    } catch (e) { fail(e, `Could not acknowledge “${s.name}”`) }
+      pushToast({ kind: 'success', msg: t`“${s.name}” acknowledged — it stops counting until a later run fails` })
+    } catch (e) { fail(e, t`Could not acknowledge “${s.name}”`) }
   }
   const runNow = async (s) => {
     if (running[s.id] || configError(s)) return
@@ -674,20 +676,20 @@ export default function Searches() {
     try { await api.post(`/searches/${s.id}/run`); track('search_run', { mode: s.search_mode }) } catch (e) {
       // The scheduled scrape is running: nothing was started, so drop the spinner.
       if (e.response?.data?.detail === 'scheduled_scrape_running') {
-        pushToast({ kind: 'error', msg: 'The scheduled scrape is running — try again when it finishes' })
+        pushToast({ kind: 'error', msg: t`The scheduled scrape is running — try again when it finishes` })
         setRunning((m) => { const n = { ...m }; delete n[s.id]; return n })
         return
       }
       // A paid Apify Test of this search is still running: nothing was started.
       if (e.response?.data?.detail === 'test_running') {
-        pushToast({ kind: 'error', msg: e.response.data.message || `A Test of “${s.name}” is still running` })
+        pushToast({ kind: 'error', msg: e.response.data.message || t`A Test of “${s.name}” is still running` })
         setRunning((m) => { const n = { ...m }; delete n[s.id]; return n })
         return
       }
       // 409 means the run is genuinely in flight — keep the spinner, the
       // /monitor/active poll clears it when the run finishes.
-      if (e.response?.status === 409) { pushToast({ kind: 'progress', msg: `“${s.name}” is already running` }); return }
-      fail(e, `Could not start “${s.name}”`)
+      if (e.response?.status === 409) { pushToast({ kind: 'progress', msg: t`“${s.name}” is already running` }); return }
+      fail(e, t`Could not start “${s.name}”`)
       setRunning((m) => { const n = { ...m }; delete n[s.id]; return n })
     }
   }
@@ -695,16 +697,16 @@ export default function Searches() {
   const remove = (s) => {
     setMenuFor(null)
     setConfirm({
-      title: `Delete “${s.name}”?`, body: 'Jobs this search already found are kept.', label: 'Delete', danger: true,
+      title: t`Delete “${s.name}”?`, body: t`Jobs this search already found are kept.`, label: t`Delete`, danger: true,
       onConfirm: async () => {
         setConfirm(null)
-        try { await api.delete(`/searches/${s.id}`); load(); loadAux(); bumpCounts(); pushToast({ kind: 'success', msg: `“${s.name}” deleted` }) } catch (e) { fail(e, `Could not delete “${s.name}”`) }
+        try { await api.delete(`/searches/${s.id}`); load(); loadAux(); bumpCounts(); pushToast({ kind: 'success', msg: t`“${s.name}” deleted` }) } catch (e) { fail(e, t`Could not delete “${s.name}”`) }
       },
     })
   }
   const duplicate = async (s) => {
     setMenuFor(null)
-    try { const { data } = await api.post('/searches', { ...toPayload(draftOf(s)), name: `${s.name} (copy)` }); load(); loadAux(); bumpCounts(); notePaused(data, 'created') } catch (e) { fail(e, `Could not duplicate “${s.name}”`) }
+    try { const { data } = await api.post('/searches', { ...toPayload(draftOf(s)), name: `${s.name} (copy)` }); load(); loadAux(); bumpCounts(); notePaused(data, 'created') } catch (e) { fail(e, t`Could not duplicate “${s.name}”`) }
   }
 
   // Every landing point goes through here, so the outcome is both shown and parked.
@@ -722,10 +724,10 @@ export default function Searches() {
         const p = await api.get(`/searches/test-result/${runId}`, { timeout: 10000 })
         if (p.status === 200) { settleTest(id, name, p.data); setTestingId(null); return }
       } catch (err) {
-        if (err.response?.status === 404) { landTest(id, { name, error: 'Test run expired or not found' }); setTestingId(null); return }
+        if (err.response?.status === 404) { landTest(id, { name, error: t`Test run expired or not found` }); setTestingId(null); return }
       }
     }
-    landTest(id, { name, error: 'Test timed out after 5 minutes — check Stats › Run History' })
+    landTest(id, { name, error: t`Test timed out after 5 minutes — check Stats › Run History` })
     if (mounted.current) setTestingId(null)
   }, [landTest, settleTest])
 
@@ -748,11 +750,11 @@ export default function Searches() {
     const per = (apifyBoards[0] && apifyBoards[0].preview_limit) || 20
     const names = keys.map((k) => boardLabel(apifyBoards, k)).join(', ')
     setConfirm({
-      title: `Run a paid test of “${s.name}”?`,
+      title: t`Run a paid test of “${s.name}”?`,
       body: max > 0
-        ? `Apify bills this test: up to ${per} jobs from each of ${keys.length} board${keys.length === 1 ? '' : 's'} (${names}). Estimated cost ${usd(est)}; each run carries a spend cap, ${usd(max)} at most in all. Nothing is saved.`
-        : `Apify bills this test: up to ${per} jobs from each board. Nothing is saved.`,
-      label: 'Run paid test',
+        ? t`Apify bills this test: up to ${per} jobs from each of ${plural(keys.length, { one: '# board', other: '# boards' })} (${names}). Estimated cost ${usd(est)}; each run carries a spend cap, ${usd(max)} at most in all. Nothing is saved.`
+        : t`Apify bills this test: up to ${per} jobs from each board. Nothing is saved.`,
+      label: t`Run paid test`,
       onConfirm: () => { setConfirm(null); runTest(s) },
     })
   }
@@ -788,15 +790,15 @@ export default function Searches() {
       {/* header */}
       <HeaderRow as="header" variant="screen" line="none" align="flex-end" style={{ gap: 18 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-          <PageTitle>Searches</PageTitle>
+          <PageTitle><Trans>Searches</Trans></PageTitle>
           <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...subStyle }}>{countLine}</span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           <CopyFrom kind="searches" pushToast={pushToast} onCloned={async (row) => {
-            await load(); loadAux(); bumpCounts(); notePaused(row, 'was copied')   // R30 I-04
+            await load(); loadAux(); bumpCounts(); notePaused(row, t`was copied`)   // R30 I-04
             setNewOpen(false); setMenuFor(null); setEditing(row.id); setDraft(draftOf(row))
           }} />
-          <Button onClick={() => { setNewOpen((v) => !v); setEditing(null); setMenuFor(null) }}>+ New search</Button>
+          <Button onClick={() => { setNewOpen((v) => !v); setEditing(null); setMenuFor(null) }}><Trans>+ New search</Trans></Button>
         </div>
       </HeaderRow>
       {/* the design draws the rule inset by 30px on both sides, not full-bleed */}
@@ -808,15 +810,15 @@ export default function Searches() {
         {newOpen && (
           <Card style={{ padding: 0, borderColor: 'var(--accent)', display: 'flex', flexDirection: 'column' }}>
             <HeaderRow pad="11px 16px" soft align="center" style={{ gap: 10 }}>
-              <Heading strong size={15.5}>New search</Heading>
-              <Helper>pick a mode — the fields below follow it</Helper>
+              <Heading strong size={15.5}><Trans>New search</Trans></Heading>
+              <Helper><Trans>pick a mode — the fields below follow it</Trans></Helper>
             </HeaderRow>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 16px', background: 'var(--recessed)', borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }}>
               <ConfigForm d={newDraft} set={(p) => setNewDraft((x) => ({ ...x, ...p }))} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 12, borderTop: '1px solid var(--line-soft)' }}>
-                <Helper>{newDraft.search_mode === 'apify' ? 'Starts paused: resume it on its card when the boards look right' : 'Runs at the next scheduled scrape after you create it'}</Helper>
-                <Button variant="secondary" size="sm" onClick={() => { setNewOpen(false); setNewDraft(NEW_DRAFT) }} style={{ marginLeft: 'auto' }}>Cancel</Button>
-                <Button size="sm" onClick={create} busy={busy === 'new'}>{busy === 'new' ? 'Creating…' : 'Create search'}</Button>
+                <Helper>{newDraft.search_mode === 'apify' ? t`Starts paused: resume it on its card when the boards look right` : t`Runs at the next scheduled scrape after you create it`}</Helper>
+                <Button variant="secondary" size="sm" onClick={() => { setNewOpen(false); setNewDraft(NEW_DRAFT) }} style={{ marginLeft: 'auto' }}><Trans>Cancel</Trans></Button>
+                <Button size="sm" onClick={create} busy={busy === 'new'}>{busy === 'new' ? t`Creating…` : t`Create search`}</Button>
               </div>
             </div>
           </Card>
@@ -834,7 +836,7 @@ export default function Searches() {
           const testBlocked = !!testingId && testingId !== s.id
           const mutedWarn = mutedWarnOf(s)
           const cfgErr = configError(s)
-          const summary = spin ? 'running now. Results appear in the Job Feed as they are found.' : (cfgErr || warn || mutedWarn || summaryOf(s, apifyBoards) + directRate(s))
+          const summary = spin ? t`running now. Results appear in the Job Feed as they are found.` : (cfgErr || warn || mutedWarn || summaryOf(s, apifyBoards) + directRate(s))
           const summaryFg = spin ? 'var(--accent)' : (cfgErr || warn) ? 'var(--warn)' : 'var(--muted)'
           return (
             /* Same card hover as Résumés/Cover Letters, suppressed while open; a warned
@@ -843,7 +845,7 @@ export default function Searches() {
               style={{ padding: 0, ...(warn ? { borderColor: 'var(--warn-line)' } : isOpen ? { borderColor: 'var(--accent)' } : null), display: 'flex', flexDirection: 'column' }}>
               {/* summary row */}
               <div onClick={() => openEdit(s)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', cursor: 'pointer' }}>
-                {warn && <span title={`Needs attention — ${warn}`} style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--warn)' }}>▲</span>}
+                {warn && <span title={t`Needs attention — ${warn}`} style={{ flex: '0 0 auto', fontSize: 11, color: 'var(--warn)' }}>▲</span>}
                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                     {/* Card's integer height comes from `Heading strong`'s own pinned line-height. */}
@@ -860,15 +862,15 @@ export default function Searches() {
                     {warn && !ext && (
                       /* ui: keep — muted 11 inline action, not the Link signature (accent 11.5/500); matches the summary line's 17px row rhythm. */
                       <span onClick={(e) => { e.stopPropagation(); acknowledge(s) }} className="v2-hover-accent-text"
-                        title="Stop counting this search as needing attention. The warning stays here; a run that fails after this raises it again."
-                        style={{ flex: '0 0 auto', fontSize: 11, lineHeight: '17px', color: 'var(--muted)', cursor: 'pointer' }}>Acknowledge</span>
+                        title={t`Stop counting this search as needing attention. The warning stays here; a run that fails after this raises it again.`}
+                        style={{ flex: '0 0 auto', fontSize: 11, lineHeight: '17px', color: 'var(--muted)', cursor: 'pointer' }}><Trans>Acknowledge</Trans></span>
                     )}
                   </div>
                 </div>
                 {depth !== 'off' && (
                   <Label title={depth === 'full'
-                    ? 'Full — every new result gets a score plus the full report with keywords and requirements'
-                    : 'Light: each new job gets a score. Open the job to generate a full report.'}
+                    ? t`Full — every new result gets a score plus the full report with keywords and requirements`
+                    : t`Light: each new job gets a score. Open the job to generate a full report.`}
                     style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 5, cursor: 'help' }}>
                     {/* the same discs the Segmented cells draw — DEPTHS.dots is a count */}
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
@@ -879,41 +881,41 @@ export default function Searches() {
                 {/* fixed width so Active matches Paused and both sit on one vertical axis */}
                 {/* round 7 #16: `xs`, matching Run/Test in the same row */}
                 <Pill size="xs" on={s.active} onClick={(e) => { e.stopPropagation(); toggleActive(s) }}
-                  title={ext ? (s.active ? 'Pause — captured jobs stop importing' : 'Resume importing captured jobs') : (s.active ? 'Pause. Removed from the schedule, settings kept.' : 'Resume the schedule')}
+                  title={ext ? (s.active ? t`Pause — captured jobs stop importing` : t`Resume importing captured jobs`) : (s.active ? t`Pause. Removed from the schedule, settings kept.` : t`Resume the schedule`)}
                   style={{ flex: '0 0 62px' }}>
-                  {s.active ? 'Active' : 'Paused'}
+                  {s.active ? t`Active` : t`Paused`}
                 </Pill>
                 {ext ? (
-                  <span title="Jobs arrive from the browser extension — there is nothing to run or test"
-                    style={{ flex: '0 0 169px', marginLeft: -11, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap', cursor: 'help' }}>extension • passive capture</span>
+                  <span title={t`Jobs arrive from the browser extension — there is nothing to run or test`}
+                    style={{ flex: '0 0 169px', marginLeft: -11, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap', cursor: 'help' }}><Trans>extension • passive capture</Trans></span>
                 ) : (
                   <span style={{ flex: '0 0 169px', marginLeft: -11, display: 'flex', justifyContent: 'flex-end', gap: 3, position: 'relative' }} onClick={(e) => e.stopPropagation()}>
                     {/* ui: keep — running-state box: these 25px pills are padded 0 9, and the running "Running" pill was measured at that width; canonical 0 10 would widen it 2px. */}
                     <Pill size="xs" line="inherit" disabled={!!cfgErr} onClick={() => runNow(s)}
-                      title={cfgErr || (running[s.id] === 'waiting' ? 'Queued: another scrape is running, this one starts when it finishes' : spin ? 'Run in progress — the summary line updates when it finishes' : `Run ${s.name} now, outside the schedule`)}
+                      title={cfgErr || (running[s.id] === 'waiting' ? t`Queued: another scrape is running, this one starts when it finishes` : spin ? t`Run in progress — the summary line updates when it finishes` : t`Run ${s.name} now, outside the schedule`)}
                       style={{ padding: '0 9px', ...(spin ? { color: 'var(--pill-busy-ink)' } : null) }}>
                       {spin ? <Spinner /> : <span style={{ fontSize: 11 }}>↻</span>}
-                      {running[s.id] === 'waiting' ? 'Waiting' : spin ? 'Running' : 'Run'}
+                      {running[s.id] === 'waiting' ? t`Waiting` : spin ? t`Running` : t`Run`}
                     </Pill>
                     {/* ui: keep — running-state box: 0 9 like its twin above, so the spinner branch keeps the width it was measured at. */}
                     {isTestable(s.search_mode) && (
                       <Pill size="xs" line="inherit" disabled={testBlocked || !!cfgErr} onClick={() => askTest(s)}
-                        title={cfgErr || (testBlocked ? 'A test is already running' : 'Preview run. Shows results and why each job was kept or filtered. Saves nothing.')}
+                        title={cfgErr || (testBlocked ? t`A test is already running` : t`Preview run. Shows results and why each job was kept or filtered. Saves nothing.`)}
                         style={{ padding: '0 9px' }}>
-                        {testingId === s.id ? <Spinner /> : <FlaskGlyph size={11} />}Test
+                        <Trans>{testingId === s.id ? <Spinner /> : <FlaskGlyph size={11} />}Test</Trans>
                       </Pill>
                     )}
                     <IconButton size={25} line="inherit" on={menuFor === s.id}
                       onClick={() => setMenuFor(menuFor === s.id ? null : s.id)}
-                      title="More actions" ariaExpanded={menuFor === s.id} ariaHaspopup="menu">⋯</IconButton>
+                      title={t`More actions`} ariaExpanded={menuFor === s.id} ariaHaspopup="menu">⋯</IconButton>
                     {menuFor === s.id && (
-                      <Menu ariaLabel={`${s.name} actions`} onDismiss={() => setMenuFor(null)} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 40, marginTop: 4, width: 236, textAlign: 'left' }}>
-                        {[['✎', 'Edit search', () => openEdit(s)],
-                          ['☰', 'View results in feed', () => navigate(`/feed?search=${s.id}`)],
-                          [<CopyGlyph key="dup" />, 'Duplicate', () => duplicate(s)]].map(([g, label, act]) => (
+                      <Menu ariaLabel={t`${s.name} actions`} onDismiss={() => setMenuFor(null)} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 40, marginTop: 4, width: 236, textAlign: 'left' }}>
+                        {[['✎', t`Edit search`, () => openEdit(s)],
+                          ['☰', t`View results in feed`, () => navigate(`/feed?search=${s.id}`)],
+                          [<CopyGlyph key="dup" />, t`Duplicate`, () => duplicate(s)]].map(([g, label, act]) => (
                           <MenuItem key={label} icon={g} onClick={act}>{label}</MenuItem>
                         ))}
-                        <MenuItem danger icon="✕" onClick={() => remove(s)}>Delete search</MenuItem>
+                        <MenuItem danger icon="✕" onClick={() => remove(s)}><Trans>Delete search</Trans></MenuItem>
                       </Menu>
                     )}
                   </span>
@@ -925,9 +927,9 @@ export default function Searches() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 16px', borderTop: '1px solid var(--line-soft)', background: 'var(--recessed)', borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }} onClick={(e) => e.stopPropagation()}>
                   <ConfigForm d={draft} set={(p) => setDraft((x) => ({ ...x, ...p }))} />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 12, borderTop: '1px solid var(--line-soft)' }}>
-                    <Helper>Changes apply from the next run</Helper>
-                    <Button variant="secondary" size="sm" onClick={() => setEditing(null)} style={{ marginLeft: 'auto' }}>Cancel</Button>
-                    <Button size="sm" onClick={() => save(s)} busy={busy === s.id}>{busy === s.id ? 'Saving…' : 'Save changes'}</Button>
+                    <Helper><Trans>Changes apply from the next run</Trans></Helper>
+                    <Button variant="secondary" size="sm" onClick={() => setEditing(null)} style={{ marginLeft: 'auto' }}><Trans>Cancel</Trans></Button>
+                    <Button size="sm" onClick={() => save(s)} busy={busy === s.id}>{busy === s.id ? t`Saving…` : t`Save changes`}</Button>
                   </div>
                 </div>
               )}
@@ -941,16 +943,16 @@ export default function Searches() {
             once with warning edges already on. */}
         {ready && loadErr && searches.length === 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '44px 30px' }}>
-            <span style={{ fontSize: 13, color: 'var(--bad)' }}>Couldn’t load your searches</span>
+            <span style={{ fontSize: 13, color: 'var(--bad)' }}><Trans>Couldn’t load your searches</Trans></span>
             <Helper>{loadErr}</Helper>
-            <Link onClick={() => setReload((n) => n + 1)} style={{ paddingTop: 2 }}>Try again</Link>
+            <Link onClick={() => setReload((n) => n + 1)} style={{ paddingTop: 2 }}><Trans>Try again</Trans></Link>
           </div>
         )}
         {ready && !loadErr && searches.length === 0 && !newOpen && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '44px 30px' }}>
-            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>No searches yet</span>
-            <Helper>Create one to add jobs to the Job Feed on a schedule.</Helper>
-            <Link onClick={() => setNewOpen(true)} style={{ paddingTop: 2 }}>+ New search</Link>
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}><Trans>No searches yet</Trans></span>
+            <Helper><Trans>Create one to add jobs to the Job Feed on a schedule.</Trans></Helper>
+            <Link onClick={() => setNewOpen(true)} style={{ paddingTop: 2 }}><Trans>+ New search</Trans></Link>
           </div>
         )}
       </div>
@@ -1006,41 +1008,41 @@ function TestModal({ test, tab, setTab, onClose }) {
   // params strip — mode aware (v1 rendered freehire through the keyword branch)
   const params = []
   if (cfg.mode === 'jobright') {
-    params.push(cfg.search_term ? `“${cfg.search_term}”` : 'AI recommendations', `${cfg.results_wanted || 100} wanted`)
+    params.push(cfg.search_term ? `“${cfg.search_term}”` : t`AI recommendations`, t`${cfg.results_wanted || 100} wanted`)
   } else if (cfg.mode === 'linkedin_personal') {
-    params.push(`Collections: ${(cfg.collections || cfg.sources || []).join(', ')}`)
+    params.push(t`Collections: ${(cfg.collections || cfg.sources || []).join(', ')}`)
   } else if (cfg.mode === 'levels_fyi') {
     params.push(short(cfg.url || cfg.direct_url, 70))
   } else if (cfg.mode === 'apify') {
-    params.push(`Boards: ${(cfg.sources || []).map((k) => boardLabel(apifyBoards, k)).join(', ')}`, `${cfg.results_wanted} per board max`)
+    params.push(t`Boards: ${(cfg.sources || []).map((k) => boardLabel(apifyBoards, k)).join(', ')}`, t`${cfg.results_wanted} per board max`)
   } else if (cfg.mode === 'freehire') {
     if (cfg.search_term) params.push(`“${cfg.search_term}”`)
     if (cfg.direct_url) params.push(short(cfg.direct_url, 60))
-    if (cfg.results_wanted) params.push(`${cfg.results_wanted} wanted`)
+    if (cfg.results_wanted) params.push(t`${cfg.results_wanted} wanted`)
   } else if (cfg.mode === 'caribbeanjobs') {
     if (cfg.search_term) params.push(`“${cfg.search_term}”`)
     if (cfg.direct_url) params.push(short(cfg.direct_url, 60))
-    if (cfg.results_wanted) params.push(`${cfg.results_wanted} wanted`)
+    if (cfg.results_wanted) params.push(t`${cfg.results_wanted} wanted`)
   } else if (cfg.mode === 'trulyremote') {
-    params.push('worldwide remote')
-    if (cfg.results_wanted) params.push(`${cfg.results_wanted} new per run`)
+    params.push(t`worldwide remote`)
+    if (cfg.results_wanted) params.push(t`${cfg.results_wanted} new per run`)
   } else if (cfg.mode === 'creative') {
-    params.push(`Boards: ${(cfg.sources || []).map(creativeLabel).join(', ')}`, `${cfg.results_wanted} per board max`)
+    params.push(t`Boards: ${(cfg.sources || []).map(creativeLabel).join(', ')}`, t`${cfg.results_wanted} per board max`)
   } else {
     if (cfg.location) params.push(cfg.location)
-    if (cfg.is_remote === true) params.push('remote only')
-    if (cfg.is_remote === false) params.push('on-site only')
-    if (cfg.hours_old) params.push(`${cfg.hours_old}h`)
-    if (cfg.results_wanted) params.push(`${cfg.results_wanted} wanted`)
+    if (cfg.is_remote === true) params.push(t`remote only`)
+    if (cfg.is_remote === false) params.push(t`on-site only`)
+    if (cfg.hours_old) params.push(t`${cfg.hours_old}h`)
+    if (cfg.results_wanted) params.push(t`${cfg.results_wanted} wanted`)
   }
 
   return (
     // ModalPanel brings Escape handling and pixel-snap; the scrim click already closes it.
-    <ModalPanel width={980} title={`Test run — ${test.name}`} onClose={onClose} zIndex={60} style={{ maxHeight: 660, overflow: 'hidden' }}>
+    <ModalPanel width={980} title={t`Test run — ${test.name}`} onClose={onClose} zIndex={60} style={{ maxHeight: 660, overflow: 'hidden' }}>
         <HeaderRow variant="compact" align="center" style={{ gap: 10 }}>
-          <Heading size={18} className="v2-dialogtitle" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Test run — {test.name}</Heading>
-          <Helper style={{ flex: '0 0 auto' }}>preview run · saves nothing</Helper>
-          <IconButton onClick={onClose} title="Close" style={{ marginLeft: 'auto' }}>✕</IconButton>
+          <Heading size={18} className="v2-dialogtitle" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><Trans>Test run — {test.name}</Trans></Heading>
+          <Helper style={{ flex: '0 0 auto' }}><Trans>preview run · saves nothing</Trans></Helper>
+          <IconButton onClick={onClose} title={t`Close`} style={{ marginLeft: 'auto' }}>✕</IconButton>
         </HeaderRow>
 
         {test.error ? (
@@ -1049,7 +1051,7 @@ function TestModal({ test, tab, setTab, onClose }) {
           <>
             <HeaderRow pad="9px 22px" soft bg="page" align="center" style={{ flexWrap: 'wrap', fontSize: 11, color: 'var(--text-2)' }}>
               {cfg.search_term && cfg.mode !== 'jobright' && cfg.mode !== 'freehire' && cfg.mode !== 'caribbeanjobs' && (
-                <span>Term <span style={{ fontFamily: 'var(--mono)', background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 'var(--radius-inline)' }}>“{cfg.search_term}”</span></span>
+                <span><Trans>Term</Trans> <span style={{ fontFamily: 'var(--mono)', background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 'var(--radius-inline)' }}>“{cfg.search_term}”</span></span>
               )}
               <span>{params.join(' · ')}</span>
               <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -1064,7 +1066,7 @@ function TestModal({ test, tab, setTab, onClose }) {
             {srcErrors.length > 0 && (
               <HeaderRow pad="7px 22px" soft align="center" style={{ flexWrap: 'wrap', gap: 12, fontSize: 11, color: 'var(--bad)' }}>
                 {srcErrors.map(([k, e]) => (
-                  <span key={k}><span style={{ fontFamily: 'var(--mono)' }}>{srcName(k)}</span> failed: {e}</span>
+                  <span key={k}><span style={{ fontFamily: 'var(--mono)' }}>{srcName(k)}</span> <Trans>failed: {e}</Trans></span>
                 ))}
               </HeaderRow>
             )}
@@ -1077,7 +1079,7 @@ function TestModal({ test, tab, setTab, onClose }) {
             )}
 
             <HeaderRow pad="9px 22px" soft style={{ gap: 6 }}>
-              {[['all', `All (${jobs.length})`], ['kept', `Kept (${kept.length})`], ['filtered', `Filtered (${filtered.length})`]].map(([id, label]) => {
+              {[['all', t`All (${jobs.length})`], ['kept', t`Kept (${kept.length})`], ['filtered', t`Filtered (${filtered.length})`]].map(([id, label]) => {
                 const on = tab === id
                 return (
                   <Pill key={id} size="sm" on={on} onClick={() => setTab(id)}>{label}</Pill>
@@ -1087,13 +1089,13 @@ function TestModal({ test, tab, setTab, onClose }) {
 
             <div className="v2-scroll" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
               <TableHead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                <span style={{ flex: '0 0 80px' }}>Source</span>
-                <span style={{ flex: 1.3, minWidth: 0 }}>Company</span>
-                <span style={{ flex: 2, minWidth: 0 }}>Title</span>
-                <span style={{ flex: '0 0 116px' }}>Location</span>
-                <span style={{ flex: '0 0 120px', textAlign: 'right' }}>Salary</span>
-                <span style={{ flex: '0 0 44px', textAlign: 'center' }} title="Description scraped">Desc</span>
-                <span style={{ flex: '0 0 66px', textAlign: 'right' }}>Status</span>
+                <span style={{ flex: '0 0 80px' }}><Trans>Source</Trans></span>
+                <span style={{ flex: 1.3, minWidth: 0 }}><Trans>Company</Trans></span>
+                <span style={{ flex: 2, minWidth: 0 }}><Trans>Title</Trans></span>
+                <span style={{ flex: '0 0 116px' }}><Trans>Location</Trans></span>
+                <span style={{ flex: '0 0 120px', textAlign: 'right' }}><Trans>Salary</Trans></span>
+                <span style={{ flex: '0 0 44px', textAlign: 'center' }} title={t`Description scraped`}><Trans>Desc</Trans></span>
+                <span style={{ flex: '0 0 66px', textAlign: 'right' }}><Trans>Status</Trans></span>
               </TableHead>
               {rows.map((j, i) => {
                 const ok = !!j.kept
@@ -1112,7 +1114,7 @@ function TestModal({ test, tab, setTab, onClose }) {
                       {j.reason && <Helper title={j.reason} style={{ minWidth: 0, color: ok ? 'var(--muted)' : 'var(--bad)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.reason}</Helper>}
                       {/* A kept row the body scan couldn't run on isn't a promise — say which
                           check is missing rather than let the run silently mark it `ignored`. */}
-                      {ok && needsDesc(j) && <Helper title="The preview had no posting text, so the body exclusion phrases were not checked; a run checks them" style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>posting body text check was skipped</Helper>}
+                      {ok && needsDesc(j) && <Helper title={t`The preview had no posting text, so the body exclusion phrases were not checked; a run checks them`} style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><Trans>posting body text check was skipped</Trans></Helper>}
                     </span>
                     <Helper title={j.location} style={{ flex: '0 0 116px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 8 }}>{j.location}</Helper>
                     <span title={j.salary || ''} style={{ flex: '0 0 120px', textAlign: 'right', fontFamily: 'var(--numeral-face)', fontSize: 9.5, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.salary || '—'}</span>
@@ -1121,14 +1123,14 @@ function TestModal({ test, tab, setTab, onClose }) {
                       {/* A body-phrase drop is stored as `ignored`, not filtered out — label it as what it becomes. */}
                       {/* ui: keep — per-row verdict badge (Tag role), not a control */}
                       {/* A global-list drop reads GLOBAL, not a bare OUT — the row passed this search's own filters. */}
-                      <span title={j.reason || 'Passed all filters'} style={{ fontSize: 9.5, letterSpacing: '.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 'var(--radius-control)', background: ok ? 'var(--accent-soft)' : j.body_excluded_by ? 'var(--warn-soft)' : 'var(--bad-soft)', color: ok ? 'var(--good)' : j.body_excluded_by ? 'var(--warn)' : 'var(--bad)', cursor: j.reason ? 'help' : 'default' }}>{ok ? 'Kept' : j.body_excluded_by ? 'Ignored' : globalOut(j) ? 'Global' : 'Out'}</span>
+                      <span title={j.reason || t`Passed all filters`} style={{ fontSize: 9.5, letterSpacing: '.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 'var(--radius-control)', background: ok ? 'var(--accent-soft)' : j.body_excluded_by ? 'var(--warn-soft)' : 'var(--bad-soft)', color: ok ? 'var(--good)' : j.body_excluded_by ? 'var(--warn)' : 'var(--bad)', cursor: j.reason ? 'help' : 'default' }}>{ok ? t`Kept` : j.body_excluded_by ? t`Ignored` : globalOut(j) ? t`Global` : t`Out`}</span>
                     </span>
                   </div>
                 )
               })}
               {rows.length === 0 && (
                 <div style={{ padding: 32, textAlign: 'center', fontSize: 12.5, color: 'var(--muted)' }}>
-                  {tab === 'filtered' ? 'Nothing was filtered out.' : tab === 'kept' ? 'Nothing passed the filters.' : 'No results returned.'}
+                  {tab === 'filtered' ? t`Nothing was filtered out.` : tab === 'kept' ? t`Nothing passed the filters.` : t`No results returned.`}
                 </div>
               )}
             </div>
@@ -1137,18 +1139,18 @@ function TestModal({ test, tab, setTab, onClose }) {
               {/* Three buckets, not two — a body-phrase drop is stored as `ignored` by
                   the run, distinct from "filtered". */}
               <span>
-                <b style={{ color: 'var(--good)' }}>{nKept} kept</b> · <b style={{ color: 'var(--bad)' }}>{nTitleFiltered} title-filtered</b>
+                <b style={{ color: 'var(--good)' }}><Trans>{nKept} kept</Trans></b> · <b style={{ color: 'var(--bad)' }}><Trans>{nTitleFiltered} title-filtered</Trans></b>
                 {/* The global list gets its own term, like the Companies footer */}
-                {nGlobalExcluded > 0 && (
-                  <> · <b style={{ color: 'var(--bad)' }}>{nGlobalExcluded} removed by the global list</b>
-                    {nPassSearch != null && <span style={{ color: 'var(--muted)' }}> ({nPassSearch} pass this search’s filters)</span>}
+                <Trans>{nGlobalExcluded > 0 && (
+                  <> · <b style={{ color: 'var(--bad)' }}><Trans>{nGlobalExcluded} removed by the global list</Trans></b>
+                    {nPassSearch != null && <span style={{ color: 'var(--muted)' }}> <Trans>({nPassSearch} pass this search’s filters)</Trans></span>}
                   </>
                 )}
-                {nBodyExcluded > 0 && <> · <b style={{ color: 'var(--warn)' }}>{nBodyExcluded} would be ignored (body phrases)</b></>}
+                {nBodyExcluded > 0 && <> · <b style={{ color: 'var(--warn)' }}><Trans>{nBodyExcluded} would be ignored (body phrases)</Trans></b></>}
                 {' · '}{nRaw} found{d.duration != null && <span style={{ color: 'var(--muted)' }}> · {d.duration}s</span>}
-                {nBodyUnchecked > 0 && <span style={{ color: 'var(--muted)' }}> · {nBodyUnchecked} with the posting body text check skipped</span>}
+                {nBodyUnchecked > 0 && <span style={{ color: 'var(--muted)' }}> <Trans>· {nBodyUnchecked} with the posting body text check skipped</Trans></span>}</Trans>
               </span>
-              <Pill onClick={onClose} style={{ marginLeft: 'auto' }}>Close</Pill>
+              <Pill onClick={onClose} style={{ marginLeft: 'auto' }}><Trans>Close</Trans></Pill>
             </FooterRow>
           </>
         )}

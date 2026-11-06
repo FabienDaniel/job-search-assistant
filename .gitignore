@@ -127,6 +127,7 @@ cython_debug/
 # Node
 node_modules/
 frontend/dist/
+frontend/src/locales/*.js
 frontend/node_modules/
 
 # Project-specific

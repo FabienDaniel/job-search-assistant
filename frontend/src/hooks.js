@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { t } from '@lingui/core/macro'
 import api from './api'
 
 // Small cross-screen hooks. Kept out of Toast.jsx so a screen can take the
@@ -178,5 +179,5 @@ export function runFailed(run) {
 // The failure text a toast should name: the run's own error, else its summary,
 // else the bare status so the user is never told only that "something failed".
 export function runFailureReason(run) {
-  return (run && (run.error || run.result_summary || run.status)) || 'the run did not finish'
+  return (run && (run.error || run.result_summary || run.status)) || t`the run did not finish`
 }

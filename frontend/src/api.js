@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { serverText } from './serverText';
 
 const api = axios.create({
   baseURL: '/api',
@@ -130,6 +131,7 @@ api.interceptors.response.use(
   (error) => {
     error?.config?._jnDone?.();
     const r = error?.response;
+    if (typeof r?.data?.detail === 'string') r.data.detail = serverText(r.data.detail);
     if (r?.status === 409 && r.data?.detail === 'account_changed') {
       markAccountChanged(r.data?.account || {});
       return Promise.reject(error);

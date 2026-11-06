@@ -1,3 +1,5 @@
+import { t } from '@lingui/core/macro'
+
 // Every search mode the dashboard knows, in one place. The backend's table is
 // backend/scraper/search_modes.py; backend/tests/test_search_modes.py fails when the two
 // differ (keys and order, labels, extension, needsQuery, needsTerm, sources defaults), so change both.
@@ -18,11 +20,21 @@ export const SEARCH_MODES = [
   { key: 'extension', label: 'Extension', badge: 'EXTENSION', cls: 'sm-extension', extension: true, needsQuery: false, needsTerm: false, sources: [] },
 ]
 
+// Labels stay literal in the table above because a backend test compares them. Only those
+// that are not brand names are translated, at the point of display.
+const MODE_LABEL = {
+  keyword: t`Keyword (JobSpy)`,
+  linkedin_personal: t`LinkedIn Personal`,
+  creative: t`Creative boards`,
+  linkedin_extension: t`LinkedIn Extension`,
+  extension: t`Extension`,
+}
+
 const BY_KEY = Object.fromEntries(SEARCH_MODES.map((m) => [m.key, m]))
 
 export const modeOf = (key) => BY_KEY[key || 'keyword'] || null
 // [key, label] for the Mode select: every mode a user can create (not the built-in extension ones).
-export const MODE_OPTIONS = SEARCH_MODES.filter((m) => !m.extension).map((m) => [m.key, m.label])
+export const MODE_OPTIONS = SEARCH_MODES.filter((m) => !m.extension).map((m) => [m.key, MODE_LABEL[m.key] || m.label])
 export const isExtensionMode = (key) => !!modeOf(key)?.extension
 // Every mode with a scraper has a Test.
 export const isTestable = (key) => !!modeOf(key) && !modeOf(key).extension

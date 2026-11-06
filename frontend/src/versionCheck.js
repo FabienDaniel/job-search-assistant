@@ -7,8 +7,9 @@
 // dashboard left on another release is caught here too. A matching install gets
 // null and nothing on screen changes.
 import { useEffect, useState } from 'react'
+import { t } from '@lingui/core/macro'
 
-export const FIX = 'Run `docker compose pull && docker compose up -d`, or `docker compose up --build -d`.'
+export const FIX = t`Run \`docker compose pull && docker compose up -d\`, or \`docker compose up --build -d\`.`
 const SEEN_KEY = 'jobnavigator_version_warned'
 
 export function versionWarning(health, appVersion) {
@@ -16,8 +17,8 @@ export function versionWarning(health, appVersion) {
   if (health.image_outdated) {
     return {
       kind: 'image',
-      short: 'Backend image out of date',
-      message: health.image_message || `The backend image does not match the code. ${FIX}`,
+      short: t`Backend image out of date`,
+      message: health.image_message || t`The backend image does not match the code. ${FIX}`,
     }
   }
   const backend = health.version != null ? String(health.version) : ''
@@ -25,8 +26,8 @@ export function versionWarning(health, appVersion) {
   if (backend && frontend && backend !== frontend) {
     return {
       kind: 'version',
-      short: 'Version mismatch',
-      message: `The dashboard is v${frontend} but the backend is v${backend}. ${FIX}`,
+      short: t`Version mismatch`,
+      message: t`The dashboard is v${frontend} but the backend is v${backend}. ${FIX}`,
     }
   }
   return null

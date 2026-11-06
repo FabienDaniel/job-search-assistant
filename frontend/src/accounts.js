@@ -8,6 +8,7 @@
 // more accounts): a single-account install must look exactly as it did before
 // multi-tenancy.
 import { useEffect, useRef, useState } from 'react'
+import { t } from '@lingui/core/macro'
 import api, { beginOwnSwitch, bindPageAccount, getPageAccount, markAccountChanged, waitForWrites } from './api'
 
 // ── pending writes before a switch (QA F7 / R6-01) ──────────────────────────
@@ -180,7 +181,7 @@ export function switchShortcutIndex(e) {
   return i < MAX_SHORTCUTS ? i : -1
 }
 
-export const roleLabel = (a) => (a?.role === 'owner' ? 'Owner' : 'Member')
+export const roleLabel = (a) => (a?.role === 'owner' ? t`Owner` : t`Member`)
 
 // This browser's account and the install's accounts. `/auth/me` first; the
 // list is only fetched when there is more than one account. Refreshes on
