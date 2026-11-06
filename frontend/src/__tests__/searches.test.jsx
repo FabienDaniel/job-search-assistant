@@ -274,8 +274,15 @@ describe('Skip my active companies · Searches', () => {
     expect(screen.queryByText('Import rules')).toBeNull()
   })
 
+  it('the manual Save to Job Feed search has no company include list either', async () => {
+    await open({ id: 'e1', name: 'Extension', search_mode: 'extension', sources: [] })
+    expect(screen.queryByText('Company include · exact')).toBeNull()
+    expect(screen.getByText('Company exclude · exact')).toBeTruthy()
+  })
+
   it('the LinkedIn capture search keeps it', async () => {
     await open({ id: 'e2', name: 'Extension LI', search_mode: 'linkedin_extension', sources: [] })
     expect(screen.getByText('Skip my active companies')).toBeTruthy()
+    expect(screen.getByText('Company include · exact')).toBeTruthy()
   })
 })

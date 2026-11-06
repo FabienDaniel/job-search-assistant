@@ -452,7 +452,10 @@ function ConfigForm({ d, set }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <Cell label={t`Title include · comma-separated`} mono value={d.title_include_keywords} onChange={(v) => set({ title_include_keywords: v })} placeholder={t`e.g. backend, platform`} />
         <Cell label={t`Title exclude`} mono value={d.title_exclude_keywords} onChange={(v) => set({ title_exclude_keywords: v })} placeholder={t`intern, junior, associate`} />
-        <Cell label={t`Company include · exact`} value={d.company_filter} onChange={(v) => set({ company_filter: v })} placeholder={t`Any`} />
+        {/* On any website, an include list would refuse almost every manual save. */}
+        {m !== 'extension'
+          ? <Cell label={t`Company include · exact`} value={d.company_filter} onChange={(v) => set({ company_filter: v })} placeholder={t`Any`} />
+          : <div />}
         <Cell label={t`Company exclude · exact`} value={d.company_exclude} onChange={(v) => set({ company_exclude: v })} placeholder={t`e.g. Walmart, CommScope`} />
       </div>
 
