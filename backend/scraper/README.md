@@ -140,7 +140,7 @@ Handler contract (`ats/<name>.py`):
 Every source follows the same order. `_shared/job_boards.run` and `company_pages.scrape_single_career_page` are the clearest examples.
 
 1. Fetch, through `shared.get` when there is a shared fetch.
-2. Filter titles and companies: `search_title_filters`, `title_kept`, `company_included`, `build_search_exclude_sets` (companies: `_apply_company_filters`), all in `_shared/filters.py`.
+2. Filter titles and companies: `search_title_filters`, `title_kept` (or `title_filter_hit` for a caller's own wording), `company_included`, `build_search_exclude_sets` (companies: `_apply_company_filters`), all in `_shared/filters.py`.
 3. Skip known jobs: `models.db.get_existing_external_ids` and `_shared/dedup.make_external_id`.
 4. Fetch details only for rows that passed and are new.
 5. `await _shared/analysis.prefetch_h1b(companies)` before the first `db.add`, so per-job lookups hit the cache.
@@ -207,9 +207,9 @@ Use the `test_db` or `api_client` fixture in any test that touches the database.
 
 These are places where scraping logic lives outside this package, or where the package depends on layers above it.
 
-- **Previews filter with their own code.** `company_pages.preview`, `jobspy.preview` and `levelsfyi.preview` re-implement the filter layers to report a reason per row, instead of calling `_shared/filters.py`. The JobSpy one uses pandas and parses `body_exclusion_phrases` by hand.
+- **JobSpy and company filters outside `_shared/filters.py`.** JobSpy runs and previews filter titles with a pandas mask (`jobspy.apply_title_filters`) that reads include keywords as a regular expression, where `title_kept` reads them as plain text. `company_pages` applies its per-company layers inline, and its preview repeats them to report a reason per row.
 - **Posting-URL parsing in a route.** `api/routes_applications.extract_posting` and its helpers (`_company_from_url`, `_known_posting`) read a posting's title and company from its URL inside the API layer.
-- **Duplicated filters.** `api/routes_jobs.save_from_extension` has its own copy of the title and company filters.
+- **Extension company excludes.** `routes_jobs.save_from_extension` and `linkedin_extension.enrich` check only the extension search's own company exclude list, not the global list or the active companies that `build_search_exclude_sets` adds.
 - **LinkedIn cookie paths.** The per-account jar and PIN file paths (`linkedin_*_cookies`, `linkedin_pin_file`) live in `accounts/credentials.py` with the other per-account credential paths.
 - **Smaller items.** `backend/countries.py` is the Indeed and JobSpy country vocabulary. `main.trigger_backfill_descriptions` loops over the private `_fetch_job_description`. Scrape summaries and health rules are in `scheduler.py` (`_format_scrape_summary`, `check_scrape_health`). `models/db.get_existing_external_ids` is only used by sources. `targets.now_utc` has no callers.
 - **Scoring from inside the scraper.** `orchestrator`, `company_pages` and `linkedin_extension` call `analyzer.cv_scorer.analyze_unscored_jobs` themselves rather than leaving it to the caller.
