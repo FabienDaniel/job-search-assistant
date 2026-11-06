@@ -845,22 +845,13 @@ async def run(search: Search) -> dict:
                 unique_jobs.append(j)
 
         # Apply search-level + global title filters
-        from backend.models.db import get_global_title_exclude
+        from backend.scraper._shared.filters import search_title_filters, title_kept
         _gte_db = SessionLocal()
         try:
-            _global_title_excl = get_global_title_exclude(_gte_db)
+            include_kw, exclude_kw = search_title_filters(search, _gte_db)
         finally:
             _gte_db.close()
-        include_kw = search.title_include_keywords or []
-        exclude_kw = list(set((search.title_exclude_keywords or []) + _global_title_excl))
-        kept_jobs = []
-        for j in unique_jobs:
-            title_lower = j["title"].lower()
-            if include_kw and not any(kw.lower() in title_lower for kw in include_kw):
-                continue
-            if exclude_kw and any(re.search(r'\b' + re.escape(kw) + r'\b', title_lower) for kw in exclude_kw):
-                continue
-            kept_jobs.append(j)
+        kept_jobs = [j for j in unique_jobs if title_kept(j["title"], include_kw, exclude_kw)[0]]
 
         # Company exclude (global + per-search + active companies if flag on)
         db_excl = SessionLocal()
@@ -1078,16 +1069,9 @@ async def preview(search, db) -> dict:
                 unique_jobs.append(j)
 
         raw_count = len(unique_jobs)
-        from backend.models.db import get_global_title_exclude
-        _global_title_excl = get_global_title_exclude(db)
-        include_kw = search.title_include_keywords or []
-        exclude_kw = list(set((search.title_exclude_keywords or []) + _global_title_excl))
-
-        global_exclude_raw = get_setting(db, "company_exclude_global")
-        global_exclude = json.loads(global_exclude_raw) if global_exclude_raw else []
-        global_exclude_set = {e.lower() for e in global_exclude}
-        search_exclude = [e.lower() for e in (search.company_exclude or [])]
-        search_exclude_set = set(search_exclude)
+        from backend.scraper._shared.filters import build_search_exclude_sets, search_title_filters, title_kept
+        include_kw, exclude_kw = search_title_filters(search, db)
+        global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
         all_exclude = list(global_exclude_set | search_exclude_set)
 
         body_raw = get_setting(db, "body_exclusion_phrases")
@@ -1107,18 +1091,7 @@ async def preview(search, db) -> dict:
         results = []
         for j in unique_jobs:
             title = j["title"]
-            title_lower = title.lower()
-            kept = True
-            reason = None
-
-            if include_kw and not any(kw.lower() in title_lower for kw in include_kw):
-                kept = False
-                reason = f"No match for: {', '.join(include_kw)}"
-            if kept and exclude_kw:
-                matched = [kw for kw in exclude_kw if re.search(r'\b' + re.escape(kw) + r'\b', title_lower)]
-                if matched:
-                    kept = False
-                    reason = f"Excluded by: {', '.join(matched)}"
+            kept, reason = title_kept(title, include_kw, exclude_kw)
             if kept and (global_exclude_set or search_exclude_set):
                 company_lower = (j.get("company") or "").lower()
                 if company_lower in global_exclude_set:

@@ -1,12 +1,13 @@
 """Tests for sources/levelsfyi.py."""
 import asyncio
 
+import pytest
 
-def test_exposes_run_and_scrape():
+
+def test_exposes_run_and_preview():
     from backend.scraper.sources import levelsfyi
     assert hasattr(levelsfyi, "run")
-    # _scrape_levelsfyi is used externally by routes_searches.py:409 — keep as-is
-    assert hasattr(levelsfyi, "_scrape_levelsfyi")
+    assert hasattr(levelsfyi, "preview")
 
 
 def test_run_is_async():
@@ -46,3 +47,65 @@ def test_parse_levelsfyi_salary_parses_range():
     assert work_arrangement == "Remote"
     assert salary_min == 100000
     assert salary_max == 150000
+
+
+@pytest.mark.asyncio
+async def test_preview_needs_a_url(test_db):
+    from backend.models.db import Search
+    from backend.scraper.sources import levelsfyi
+    with pytest.raises(ValueError, match="levels.fyi URL"):
+        await levelsfyi.preview(Search(name="t", search_mode="levels_fyi"), test_db)
+
+
+class _Closeable:
+    async def close(self):
+        return None
+
+    async def stop(self):
+        return None
+
+
+def _fake_levels_page(monkeypatch, titles):
+    from backend.scraper.sources import levelsfyi
+
+    async def fake_get_browser():
+        return _Closeable(), _Closeable()
+
+    async def fake_scrape(url, browser=None, max_pages=50):
+        return [{"title": t, "company": "Acme", "url": f"https://www.levels.fyi/jobs?jobId={i}"}
+                for i, t in enumerate(titles, 1)]
+    monkeypatch.setattr(levelsfyi, "_get_browser", fake_get_browser)
+    monkeypatch.setattr(levelsfyi, "_scrape_levelsfyi", fake_scrape)
+
+
+@pytest.mark.asyncio
+async def test_preview_reports_the_title_filter_without_saving(test_db, monkeypatch):
+    from backend.models.db import Job, Search
+    from backend.scraper.sources import levelsfyi
+    _fake_levels_page(monkeypatch, ["Product Manager", "Sales Intern"])
+    search = Search(name="t", search_mode="levels_fyi", direct_url="https://www.levels.fyi/jobs",
+                    title_exclude_keywords=["intern"])
+
+    out = await levelsfyi.preview(search, test_db)
+
+    assert out["raw_count"] == 2 and out["after_filter"] == 1
+    assert [(j["title"], j["kept"]) for j in out["jobs"]] == [("Product Manager", True), ("Sales Intern", False)]
+    assert out["jobs"][1]["reason"] == "Excluded by: intern"
+    assert test_db.query(Job).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_preview_drops_titles_on_the_global_exclude_list_like_the_run(test_db, monkeypatch):
+    import json
+    from backend.models.db import Search, Setting
+    from backend.scraper.sources import levelsfyi
+    test_db.add(Setting(key="title_exclude_global", value=json.dumps(["staff"])))
+    test_db.commit()
+    _fake_levels_page(monkeypatch, ["Product Manager", "Staff Product Manager"])
+    search = Search(name="t", search_mode="levels_fyi", direct_url="https://www.levels.fyi/jobs")
+
+    out = await levelsfyi.preview(search, test_db)
+
+    assert [(j["title"], j["kept"]) for j in out["jobs"]] == [("Product Manager", True),
+                                                              ("Staff Product Manager", False)]
+    assert out["jobs"][1]["reason"] == "Excluded by: staff"

@@ -316,7 +316,7 @@ async def test_page_caching_is_bounded_and_holds_no_session_while_fetching(
         test_db, monkeypatch, counter, _fresh_limiters):
     """Twelve concurrent caches: at most four fetch at a time (one Chromium
     each, in the worst case) and none holds a connection while fetching."""
-    import backend.api.routes_applications as ra
+    import backend.scraper._shared.page_cache as ra
 
     job_ids = _make_jobs(test_db, 12)
     counter.install(monkeypatch, ra)

@@ -628,3 +628,257 @@ async def run(search, proxy_url: str = None, shared=None) -> dict:
     if shared is None:
         return await asyncio.to_thread(_run_sync, search, proxy_url)
     return await asyncio.to_thread(_run_sync, search, proxy_url, shared)
+
+
+async def preview(search: Search, db) -> dict:
+    """The Test button: one scrape_jobs() call, then every filter layer the run applies,
+    reported per row without saving. Raises ValueError when the search cannot run."""
+    import pandas as pd
+    from jobspy import scrape_jobs
+
+    sources = [s for s in (search.sources or []) if s != "direct"]
+    if not sources:
+        raise ValueError("No JobSpy sources configured")
+
+    proxy_url = get_setting(db, "proxy_url") or None
+
+    kwargs = jobspy_kwargs(search, proxy_url)
+
+    start = time.time()
+    try:
+        jobs_df = await asyncio.to_thread(scrape_jobs, **kwargs)
+    except Exception:
+        logger.exception("JobSpy scrape_jobs failed during test for search %s", search.name)
+        return {
+            "search_name": search.name,
+            "error": "Scrape failed; see server logs for details.",
+            "config": {
+                "sources": sources,
+                "search_term": kwargs["search_term"],
+                "location": kwargs["location"],
+                "results_wanted": kwargs["results_wanted"],
+                "hours_old": kwargs["hours_old"],
+                "job_type": kwargs["job_type"],
+                "is_remote": search.is_remote,
+                "proxy": bool(proxy_url),
+            },
+        }
+
+    duration = round(time.time() - start, 1)
+    # {board: text} for each board that failed; source_breakdown keeps its shape.
+    source_errors = _board_errors(_errors_of(jobs_df), jobs_df, sources)
+
+    if jobs_df is None or jobs_df.empty:
+        return {
+            "search_name": search.name,
+            "duration": duration,
+            "raw_count": 0,
+            "after_filter": 0,
+            "after_search_filter": 0,
+            "global_excluded_count": 0,
+            "global_exclude_keyword_count": 0,
+            "body_excluded_count": 0,
+            "body_unchecked_count": 0,
+            "body_phrase_count": 0,
+            "source_breakdown": {},
+            "source_errors": source_errors,
+            "company_breakdown": {},
+            "include_keywords": search.title_include_keywords or [],
+            "exclude_keywords": search.title_exclude_keywords or [],
+            "company_filter": search.company_filter or [],
+            "company_exclude": search.company_exclude or [],
+            "jobs": [],
+            "config": {
+                "sources": sources,
+                "search_term": kwargs["search_term"],
+                "location": kwargs["location"],
+                "results_wanted": kwargs["results_wanted"],
+                "hours_old": kwargs["hours_old"],
+                "job_type": kwargs["job_type"],
+                "is_remote": search.is_remote,
+                "proxy": bool(proxy_url),
+            },
+        }
+
+    raw_count = len(jobs_df)
+
+    include_kw = search.title_include_keywords or []
+    exclude_kw = search.title_exclude_keywords or []
+
+    mask = pd.Series(True, index=jobs_df.index)
+    if include_kw:
+        pattern = "|".join(include_kw)
+        mask &= jobs_df["title"].str.contains(pattern, case=False, na=False)
+    if exclude_kw:
+        pattern = "|".join(r'\b' + re.escape(kw) + r'\b' for kw in exclude_kw)
+        mask &= ~jobs_df["title"].str.contains(pattern, case=False, na=False, regex=True)
+
+    company_filter = search.company_filter or []
+    if company_filter:
+        cf_set = {cf.lower() for cf in company_filter}
+        mask &= jobs_df["company"].str.lower().isin(cf_set)
+
+    import json
+    from backend.scraper._shared.filters import build_search_exclude_sets, title_kept
+    global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
+    all_exclude = list(global_exclude_set | search_exclude_set)
+    if global_exclude_set or search_exclude_set:
+        def _kw_excl(name):
+            nl = str(name).lower()
+            if nl in global_exclude_set:
+                return True
+            return nl in search_exclude_set
+        excl_mask = jobs_df["company"].apply(_kw_excl)
+        mask &= ~excl_mask
+
+    # The run merges title_exclude_global into the exclude list before storing (see
+    # _run_sync); applied after the per-search layers here too, mirroring routes_companies.py.
+    from backend.models.db import get_global_title_exclude
+    global_exclude_kw = [kw for kw in (get_global_title_exclude(db) or []) if str(kw).strip()]
+    after_search_filter = int(mask.sum())   # passes the per-search layers only
+    global_hits = {}                        # df index -> the global keywords that matched
+    if global_exclude_kw:
+        for idx in jobs_df.index:
+            if not mask[idx]:
+                continue
+            title_text = str(jobs_df.at[idx, "title"])
+            matched_global = [
+                kw for kw in global_exclude_kw
+                if re.search(r'\b' + re.escape(str(kw)) + r'\b', title_text, re.IGNORECASE)
+            ]
+            if matched_global:
+                global_hits[idx] = matched_global
+                mask[idx] = False
+
+    body_raw = get_setting(db, "body_exclusion_phrases")
+    body_phrases = []
+    if body_raw:
+        try:
+            body_phrases = json.loads(body_raw)
+        except json.JSONDecodeError:
+            pass
+    # Record which phrase hit (and which rows couldn't be checked at all) so each row can report it inline.
+    body_hits = {}          # df index -> the exclusion phrase that matched
+    body_unchecked = set()  # df index -> passed the title layers, but had no description
+    if body_phrases:
+        from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+        for idx in jobs_df.index:
+            if mask[idx]:
+                desc = str(jobs_df.at[idx, "description"]) if "description" in jobs_df.columns else ""
+                if desc and desc != "nan":
+                    result = scan_jd_for_h1b_flags(desc, body_phrases)
+                    if result["jd_flag"]:
+                        body_hits[idx] = result["matched_phrase"] or "matched"
+                        mask[idx] = False
+                else:
+                    body_unchecked.add(idx)
+
+    source_breakdown = {}
+    if "site" in jobs_df.columns:
+        source_breakdown = jobs_df["site"].value_counts().to_dict()
+
+    company_breakdown = {}
+    if "company" in jobs_df.columns:
+        company_breakdown = jobs_df["company"].value_counts().head(20).to_dict()
+
+    results = []
+    for idx, row in jobs_df.iterrows():
+        kept = bool(mask[idx])
+        company = str(row.get("company", ""))
+        title = str(row.get("title", ""))
+        url = str(row.get("job_url", ""))
+        site = str(row.get("site", ""))
+        location = str(row.get("location", ""))
+        desc = str(row.get("description", ""))
+        min_sal = row.get("min_amount")
+        max_sal = row.get("max_amount")
+
+        reason = None
+        if not kept:
+            reason = title_kept(title, include_kw, exclude_kw)[1]
+            if not reason and company_filter:
+                company_lower = company.lower()
+                if company_lower not in {cf.lower() for cf in company_filter}:
+                    reason = f"Company filter: {', '.join(company_filter)}"
+            if not reason and (global_exclude_set or search_exclude_set):
+                company_lower = company.lower()
+                if company_lower in global_exclude_set:
+                    reason = f"Company excluded (global): {company_lower}"
+                elif company_lower in search_exclude_set:
+                    reason = f"Company excluded: {company_lower}"
+            # The global list is its own layer, named as such — a row dropped by it
+            # is not "excluded by this search's filters".
+            if not reason and idx in global_hits:
+                reason = f"[Global] Excluded by: {', '.join(global_hits[idx])}"
+            if not reason and idx in body_hits:
+                reason = f"Body exclusion: {body_hits[idx]}"
+            if not reason:
+                reason = "Filtered"
+
+        salary = None
+        try:
+            if min_sal and str(min_sal) != "nan":
+                salary = f"${int(float(min_sal)):,}"
+                if max_sal and str(max_sal) != "nan":
+                    salary += f" – ${int(float(max_sal)):,}"
+        except (ValueError, TypeError):
+            pass
+
+        has_desc = bool(desc and desc != "nan" and len(desc) > 50)
+
+        results.append({
+            "title": title,
+            "company": company,
+            "url": url,
+            "source": site,
+            "location": location if location != "nan" else "",
+            "salary": salary,
+            "has_description": has_desc,
+            "desc_length": len(desc) if has_desc else 0,
+            "kept": kept,
+            "reason": reason,
+            # The global title-exclude keywords that matched, or [].
+            "global_excluded_by": global_hits.get(idx, []),
+            # The phrase that would make the run store this row as `ignored`, or
+            # null; body_checked is false when there was no description to scan.
+            "body_excluded_by": body_hits.get(idx),
+            "body_checked": bool(body_phrases) and idx not in body_unchecked,
+        })
+
+    after_filter = sum(1 for j in results if j["kept"])
+    body_excluded_count = len(body_hits)
+    body_unchecked_count = len(body_unchecked)
+
+    return {
+        "search_name": search.name,
+        "duration": duration,
+        "raw_count": raw_count,
+        "after_filter": after_filter,
+        # Footer arithmetic: how many survived this search's own filters, and how
+        # many of those the global list then removed.
+        "after_search_filter": after_search_filter,
+        "global_excluded_count": len(global_hits),
+        "global_exclude_keyword_count": len(global_exclude_kw),
+        # Footer arithmetic: kept · title/company-filtered · would-be-ignored
+        "body_excluded_count": body_excluded_count,
+        "body_unchecked_count": body_unchecked_count,
+        "body_phrase_count": len(body_phrases),
+        "source_breakdown": source_breakdown,
+        "source_errors": source_errors,
+        "company_breakdown": company_breakdown,
+        "include_keywords": include_kw,
+        "exclude_keywords": exclude_kw,
+        "company_filter": company_filter,
+        "company_exclude": all_exclude,
+        "jobs": results,
+        "config": {
+            "sources": sources,
+            "search_term": kwargs["search_term"],
+            "location": kwargs["location"],
+            "results_wanted": kwargs["results_wanted"],
+            "hours_old": kwargs["hours_old"],
+            "job_type": kwargs["job_type"],
+            "is_remote": search.is_remote,
+            "proxy": bool(proxy_url),
+        },
+    }

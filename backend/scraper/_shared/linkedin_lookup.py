@@ -33,8 +33,8 @@ STOP_AFTER_NO_DATA = 3
 
 def mock_session_problem(db):
     """None when the mock session can be used, else why not: a mock account must be set, and the
-    jar's sign-in record (refresh_linkedin_session.record_sign_in) must say the mock signed it."""
-    from backend import refresh_linkedin_session as rls
+    jar's sign-in record (linkedin_session.record_sign_in) must say the mock signed it."""
+    from backend.scraper._shared import linkedin_session as rls
     from backend.accounts.settings import get_setting
     mock = str(get_setting(db, "linkedin_mock_email") or "").strip().lower()
     if not mock:
@@ -169,7 +169,7 @@ async def _fetcher(fetch):
     from backend.accounts.background import acting_as
     from backend.models.db import SessionLocal
     from backend.scraper.sources import linkedin_extension as le
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     with acting_as(None):
         sdb = SessionLocal()
         try:

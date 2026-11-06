@@ -5,9 +5,8 @@ import re
 from urllib.parse import urlparse
 
 
-def build_search_exclude_sets(db, search) -> tuple[set, set]:
-    """Return (global_exclude_set, search_exclude_set) of lowercased company names; the search set adds every active Company's name+aliases when exclude_active_companies is true."""
-    from backend.models.db import Company
+def global_company_exclude_set(db) -> set:
+    """Lowercased company names on the account's Company exclude list in Settings."""
     from backend.accounts.settings import get_setting
 
     global_raw = get_setting(db, "company_exclude_global")
@@ -17,7 +16,14 @@ def build_search_exclude_sets(db, search) -> tuple[set, set]:
             global_list = json.loads(global_raw or "[]")
         except (ValueError, TypeError):
             global_list = []
-    global_set = {e.lower() for e in global_list if e}
+    return {e.lower() for e in global_list if e}
+
+
+def build_search_exclude_sets(db, search) -> tuple[set, set]:
+    """Return (global_exclude_set, search_exclude_set) of lowercased company names; the search set adds every active Company's name+aliases when exclude_active_companies is true."""
+    from backend.models.db import Company
+
+    global_set = global_company_exclude_set(db)
 
     search_set = {(e or "").lower() for e in (search.company_exclude or []) if e}
     if getattr(search, "exclude_active_companies", False):
@@ -187,15 +193,27 @@ def search_title_filters(search, db) -> tuple[list, list]:
     return include_kw, exclude_kw
 
 
-def title_kept(title: str, include_kw: list, exclude_kw: list) -> tuple[bool, str | None]:
-    """(kept, reason): include is a substring match on any keyword, exclude a whole-word match."""
+def title_filter_hit(title: str, include_kw: list, exclude_kw: list) -> tuple[str | None, list]:
+    """The title rule that drops a title, for callers that word their own reason:
+    ("include", include_kw) when no include keyword is a substring of it,
+    ("exclude", the matched keywords) when exclude keywords are whole words of it,
+    (None, []) when it is kept. Both ignore case."""
     tl = title.lower()
     if include_kw and not any(kw.lower() in tl for kw in include_kw):
-        return False, f"No match for: {', '.join(include_kw)}"
-    if exclude_kw:
-        matched = [kw for kw in exclude_kw if re.search(r'\b' + re.escape(kw) + r'\b', tl)]
-        if matched:
-            return False, f"Excluded by: {', '.join(matched)}"
+        return "include", list(include_kw)
+    matched = [kw for kw in exclude_kw or [] if re.search(r'\b' + re.escape(kw.lower()) + r'\b', tl)]
+    if matched:
+        return "exclude", matched
+    return None, []
+
+
+def title_kept(title: str, include_kw: list, exclude_kw: list) -> tuple[bool, str | None]:
+    """(kept, reason) with the reason the previews show (see title_filter_hit)."""
+    rule, keywords = title_filter_hit(title, include_kw, exclude_kw)
+    if rule == "include":
+        return False, f"No match for: {', '.join(keywords)}"
+    if rule == "exclude":
+        return False, f"Excluded by: {', '.join(keywords)}"
     return True, None
 
 

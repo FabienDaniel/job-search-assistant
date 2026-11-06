@@ -34,7 +34,7 @@ async def _no_resolve(url):
 def mock_jar(tmp_path, monkeypatch):
     """Both LinkedIn jars in a temp dir; `ready(db, cookies=, signed=)` sets the mock account up."""
     import json as _json
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     from backend.accounts import credentials as C
     monkeypatch.setattr(C, "LI_EXTENSION_OWNER", str(tmp_path / "li_cookies.json"))
     monkeypatch.setattr(C, "LI_PERSONAL_OWNER", str(tmp_path / "linkedin_cookies.json"))
@@ -242,7 +242,7 @@ async def test_lookup_needs_a_mock_account(test_db, mock_jar):
 @pytest.mark.asyncio
 async def test_lookup_needs_the_mock_accounts_own_sign_in(test_db, mock_jar):
     """A jar saved before the sessions were split (or by the main sign-in) proves nothing."""
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     mock_jar(test_db, signed=False)
     _li(test_db)
     out = await ll.run_lookup(per_run=20, pause=0)
@@ -253,7 +253,7 @@ async def test_lookup_needs_the_mock_accounts_own_sign_in(test_db, mock_jar):
 
 @pytest.mark.asyncio
 async def test_lookup_refuses_a_mock_signed_in_with_another_email(test_db, mock_jar):
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     mock_jar(test_db, signed=False)
     rls.record_sign_in(rls.MOCK, "old@x.io")
     _li(test_db)

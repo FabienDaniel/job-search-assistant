@@ -64,12 +64,12 @@ async def test_a_refused_first_page_is_an_error_not_an_empty_board():
 
 
 def test_the_posting_key_and_the_label():
-    from backend.api.routes_companies import detect_scrape_type
+    from backend.scraper.ats.registry import scrape_type
     from backend.scraper._shared.postings import posting_key
     # Uber kept its ids when it moved: 160013 is the same posting on both sites
     assert posting_key("https://jobs.uber.com/en/jobs/160013/") == "site:uber.com:160013"
     assert posting_key("https://www.uber.com/careers/list/160013") == "site:uber.com:160013"
-    assert detect_scrape_type(OLD) == "Uber API"
+    assert scrape_type(OLD) == "Uber API"
 
 
 @pytest.mark.asyncio

@@ -13,10 +13,7 @@ from backend.scraper._shared.browser import _get_browser, _new_page, _close_page
 from backend.scraper._shared.filters import _apply_company_filters
 from backend.scraper._shared.dedup import make_external_id, make_content_hash, mark_ignored, _normalize_url
 from backend.scraper._shared.posting_links import counts_as_new
-from backend.scraper.ats import (
-    workday, greenhouse, lever, ashby, oracle_hcm,
-    phenom, talentbrew, rippling, smartrecruiters, meta, google, amazon, uber, generic,
-)
+from backend.scraper.ats import generic, registry
 from backend.scraper.ats._descriptions import _fetch_descriptions_parallel
 
 logger = logging.getLogger("jobnavigator.scraper.sources.company_pages")
@@ -25,34 +22,12 @@ logger = logging.getLogger("jobnavigator.scraper.sources.company_pages")
 # ── ATS dispatcher ───────────────────────────────────────────────────────────
 
 async def _dispatch_ats(url: str, debug: bool = False, shared_browser=None, max_pages: int | None = None):
-    """Detect ATS by URL and call the matching scraper, falling back to generic; order must match the if/elif chain in scrape_single_career_page, and `max_pages` only affects Playwright-paginated scrapers (Google, Meta) since HTTP-only ones are API-driven and unbounded."""
-    if phenom.is_phenom(url):
-        return await phenom.scrape(url, debug=debug)
-    if talentbrew.is_talentbrew(url):
-        return await talentbrew.scrape(url, debug=debug)
-    if oracle_hcm.is_oracle_hcm(url):
-        return await oracle_hcm.scrape(url, debug=debug)
-    if lever.is_lever(url):
-        return await lever.scrape(url, debug=debug)
-    if workday.is_workday(url):
-        return await workday.scrape(url, debug=debug)
-    if ashby.is_ashby(url):
-        return await ashby.scrape(url, debug=debug)
-    if greenhouse.is_greenhouse(url):
-        return await greenhouse.scrape(url, debug=debug)
-    if rippling.is_rippling(url):
-        return await rippling.scrape(url, debug=debug)
-    if smartrecruiters.is_smartrecruiters(url):
-        return await smartrecruiters.scrape(url, debug=debug)
-    if amazon.is_amazon(url):
-        return await amazon.scrape(url, debug=debug)
-    if uber.is_uber(url):
-        return await uber.scrape(url, debug=debug)
-    if meta.is_meta(url):
-        return await meta.scrape(url, browser=shared_browser, max_pages=max_pages, debug=debug)
-    if google.is_google(url):
-        return await google.scrape(url, browser=shared_browser, max_pages=max_pages, debug=debug)
-    # The fallback honours the same per-company page cap as every other handler; None keeps generic's own default.
+    """Call the handler `ats.registry` picks for this URL, or the generic reader. `max_pages`
+    only caps Playwright-paginated readers (Meta, Google, generic). The API handlers read the whole board."""
+    handler = registry.detect(url)
+    if handler is not None:
+        return await handler.scrape(url, debug=debug, browser=shared_browser, max_pages=max_pages)
+    # None keeps generic's own default page cap.
     return await generic.scrape(url, browser=shared_browser, debug=debug, **({'max_pages': max_pages} if max_pages else {}))
 
 
@@ -91,15 +66,14 @@ def _refresh_known_jobs(db, known: dict) -> int:
 
 
 def _ats_labels_for(urls) -> str:
-    """Return a comma-separated list of distinct ATS labels for these URLs, for activity-log messages (e.g. "Acme (Greenhouse): 3 new"); strips the API/AJAX/(Playwright) suffix from detect_scrape_type's labels for compactness."""
-    from backend.api.routes_companies import detect_scrape_type
+    """Return a comma-separated list of distinct ATS labels for these URLs, for activity-log messages (e.g. "Acme (Greenhouse): 3 new"); strips the API/AJAX/(Playwright) suffix from the registry labels for compactness."""
     labels = set()
     for u in urls:
         u = (u or "").strip()
         if not u:
             continue
         # "Workday API" → "Workday"; "Generic (Playwright)" → "Generic"; "TalentBrew AJAX" → "TalentBrew"
-        label = detect_scrape_type(u).split(" ", 1)[0]
+        label = registry.scrape_type(u).split(" ", 1)[0]
         labels.add(label)
     if not labels:
         return "?"
@@ -146,22 +120,6 @@ def record_company_scrape_log(company_id, company_name: str, result: dict, db=No
             db.close()
 
 
-def _needs_browser(urls):
-    """True if any URL requires a real browser (not a pure-API ATS)."""
-    for u in urls:
-        u = (u or "").strip()
-        if not u:
-            continue
-        if (phenom.is_phenom(u) or talentbrew.is_talentbrew(u) or oracle_hcm.is_oracle_hcm(u)
-                or lever.is_lever(u) or workday.is_workday(u) or ashby.is_ashby(u)
-                or greenhouse.is_greenhouse(u) or rippling.is_rippling(u)
-                or smartrecruiters.is_smartrecruiters(u) or amazon.is_amazon(u) or uber.is_uber(u)):
-            continue
-        # Meta, Google, levels.fyi, or generic Playwright — needs browser
-        return True
-    return False
-
-
 # ── Per-company scraper ──────────────────────────────────────────────────────
 
 async def _fetch_postings(company, target_urls: list, browser) -> tuple[list, list]:
@@ -178,13 +136,7 @@ async def _fetch_postings(company, target_urls: list, browser) -> tuple[list, li
         try:
             # Handled explicitly here (not via _dispatch_ats's generic branch) because generic
             # needs company.wait_for_selector + max_pages, not _dispatch_ats's defaults.
-            if (phenom.is_phenom(target_url) or talentbrew.is_talentbrew(target_url)
-                    or oracle_hcm.is_oracle_hcm(target_url) or lever.is_lever(target_url)
-                    or workday.is_workday(target_url) or ashby.is_ashby(target_url)
-                    or greenhouse.is_greenhouse(target_url) or rippling.is_rippling(target_url)
-                    or smartrecruiters.is_smartrecruiters(target_url)
-                    or amazon.is_amazon(target_url) or uber.is_uber(target_url)
-                    or meta.is_meta(target_url) or google.is_google(target_url)):
+            if registry.detect(target_url) is not None:
                 page_jobs = await _dispatch_ats(target_url, debug=False, shared_browser=browser, max_pages=max_pages)
             else:
                 page = await _new_page(browser)
@@ -231,7 +183,7 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
     # Only launch a browser if a URL needs one; API-only ATS batches (Lever, Greenhouse, etc.)
     # skip Chromium, avoiding failures on hosts without Playwright browsers installed (CI).
     # A subscriber whose postings were already fetched needs no browser at all.
-    needs_browser = not prefetched and _needs_browser(target_urls)
+    needs_browser = not prefetched and registry.needs_browser(target_urls)
     own_browser = shared_browser is None and needs_browser
     pw = None
     browser = shared_browser
@@ -534,7 +486,7 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
             + (f", {len(skipped)} active without URLs" if skipped else "")
         )
 
-        any_needs_browser = any(_needs_browser(c.scrape_urls or []) for c in companies)
+        any_needs_browser = any(registry.needs_browser(c.scrape_urls or []) for c in companies)
         if any_needs_browser:
             shared_pw, shared_browser = await _get_browser()
             logger.info("Playwright: launched shared browser for batch scrape")
@@ -675,3 +627,177 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
         if shared_pw:
             await shared_pw.stop()
         db.close()
+
+
+# ── Test scrape ──────────────────────────────────────────────────────────────
+
+async def preview(company: Company, db) -> dict:
+    """Scrape a company's career pages and say what the run would keep, without saving.
+
+    Applies the same three filter layers as the run: the company's title filters, the global
+    title exclude, and the body-exclusion phrases. Generic pages also return a screenshot."""
+    import base64
+    import re
+
+    from backend.scraper._shared.browser import _get_browser, _new_page, _close_page
+    from backend.scraper._shared.filters import match_title_expr
+    from backend.scraper.ats.generic import (
+        _extract_all_pages, _wait_for_content, _setup_route_blocks,
+    )
+    from backend.scraper.ats import registry
+
+    urls = company.scrape_urls or []
+
+    include_expr = company.title_include_expr
+    exclude_kws = [kw.lower() for kw in (company.title_exclude_keywords or [])]
+    # Mirrors the live scraper: title_exclude_global is applied at INSERT time (see
+    # scraper/sources/company_pages.py:_apply_company_filters), so this reports what would actually save.
+    from backend.models.db import get_global_title_exclude
+    global_exclude_kws = [kw.lower() for kw in (get_global_title_exclude(db) or [])]
+    # The run also drops jobs whose body matches body_exclusion_phrases (stored as
+    # `ignored`); mirrored here with the same phrase scan, no live MyVisaJobs lookup.
+    from backend.analyzer.h1b_checker import load_exclusion_phrases, scan_jd_for_h1b_flags
+    body_phrases = load_exclusion_phrases(db) or []
+
+    all_jobs = []
+    urls_scraped = []
+    pw = None
+    browser = None
+    try:
+        pw, browser = await _get_browser()
+        max_pages = company.max_pages or 5
+
+        all_rejected = []
+        all_pagination_debug = []
+        screenshots = []
+        for target_url in urls:
+            target_url = target_url.strip()
+            if not target_url:
+                continue
+            page = None
+            try:
+                handler = registry.detect(target_url)
+                if handler is not None:
+                    jobs, rejected = await handler.scrape(target_url, debug=True, browser=browser)
+                    all_jobs.extend(jobs)
+                    all_rejected.extend(rejected)
+                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via {handler.label})")
+                    continue
+
+                page = await _new_page(browser)
+                await _setup_route_blocks(page)
+                await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
+                await _wait_for_content(page, company.wait_for_selector)
+                png_bytes = await page.screenshot(full_page=True)
+                screenshots.append({
+                    "url": target_url,
+                    "data": base64.b64encode(png_bytes).decode(),
+                })
+                jobs, rejected, pag_debug = await _extract_all_pages(page, target_url, max_pages, debug=True, wait_for_selector=company.wait_for_selector)
+                all_jobs.extend(jobs)
+                all_rejected.extend(rejected)
+                all_pagination_debug.extend(pag_debug)
+                urls_scraped.append(f"{target_url} ({len(jobs)} found, {len(rejected)} rejected)")
+            except Exception as e:
+                urls_scraped.append(f"{target_url[:80]}... (error: {e})")
+            finally:
+                if page:
+                    await _close_page(page)
+
+        # Classify jobs with filter reasons across the layers the live run applies
+        # (per-company title filters, then the global title_exclude_global setting).
+        results = []
+        after_company_count = 0   # passes per-company only
+        would_save_count = 0      # passes per-company, global AND the body scan
+        body_excluded_count = 0   # would be stored as `ignored` by the real run
+        body_unchecked_count = 0  # no description in the preview — can't say
+        for j in all_jobs:
+            title_lower = j["title"].lower()
+            title_orig = j["title"]
+            reason = None
+            global_excluded_by = []
+
+            matched_exclude = [kw for kw in exclude_kws if re.search(r'\b' + re.escape(kw) + r'\b', title_lower)]
+            if matched_exclude:
+                reason = f"Excluded by: {', '.join(matched_exclude)}"
+            elif include_expr and include_expr.strip():
+                    if not match_title_expr(include_expr, j["title"]):
+                        reason = f"No match for: {include_expr}"
+
+            passes_company = reason is None
+            body_excluded_by = None
+            body_checked = False
+            if passes_company:
+                after_company_count += 1
+                global_excluded_by = [
+                    kw for kw in global_exclude_kws
+                    if re.search(r'\b' + re.escape(kw) + r'\b', title_orig, re.IGNORECASE)
+                ]
+                if global_excluded_by:
+                    reason = f"[Global] Excluded by: {', '.join(global_excluded_by)}"
+                else:
+                    # Third layer: the body scan the run performs at insert time.
+                    desc = (j.get("description") or "").strip()
+                    if body_phrases and desc:
+                        body_checked = True
+                        scan = scan_jd_for_h1b_flags(desc, body_phrases)
+                        if scan["jd_flag"]:
+                            body_excluded_by = scan["matched_phrase"] or "matched"
+                            reason = f"Body exclusion: {body_excluded_by}"
+                            body_excluded_count += 1
+                    elif body_phrases:
+                        # The ATS list endpoints don't carry descriptions; the run
+                        # fetches them later. Say so instead of implying a pass.
+                        body_unchecked_count += 1
+                    if reason is None:
+                        would_save_count += 1
+
+            kept = reason is None  # would actually save (passes all three layers)
+
+            results.append({
+                "title": j["title"],
+                "url": j["url"],
+                "kept": kept,
+                "reason": reason,
+                "passes_company_filter": passes_company,
+                "global_excluded_by": global_excluded_by,
+                # The phrase that would make the run store this as `ignored`, or null;
+                # body_checked is false when the preview had no description to scan.
+                "body_excluded_by": body_excluded_by,
+                "body_checked": body_checked,
+            })
+
+        # Append rejected entries at the end so user can see what was dropped
+        for r in all_rejected:
+            results.append({
+                "title": r["title"],
+                "url": r["url"],
+                "kept": False,
+                "reason": f"[Validation] {r['reason']} (via {r['selector']})",
+                "body_excluded_by": None,
+                "body_checked": False,
+            })
+
+        return {
+            "company": company.name,
+            "urls_scraped": urls_scraped,
+            "screenshots": screenshots,
+            "pagination_debug": all_pagination_debug,
+            "include_expr": include_expr,
+            "exclude_keywords": exclude_kws,
+            "global_exclude_keyword_count": len(global_exclude_kws),
+            "total_found": len(all_jobs),
+            "total_rejected": len(all_rejected),
+            "after_company_filter": after_company_count,  # passes per-company only
+            "after_filter": would_save_count,             # passes all three — what'd actually save
+            # Footer arithmetic: kept · title-filtered · would-be-ignored
+            "body_excluded_count": body_excluded_count,
+            "body_unchecked_count": body_unchecked_count,
+            "body_phrase_count": len(body_phrases),
+            "jobs": results,
+        }
+    finally:
+        if browser:
+            await browser.close()
+        if pw:
+            await pw.stop()

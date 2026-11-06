@@ -1,4 +1,4 @@
-"""Tests for /api/companies CRUD + detect_scrape_type ATS dispatch (no DELETE endpoint; detect_scrape_type is an internal helper, not an HTTP endpoint)."""
+"""Tests for /api/companies CRUD (there is no DELETE endpoint) and the ATS label from ats.registry.scrape_type."""
 import pytest
 
 
@@ -96,24 +96,24 @@ def test_update_company_not_found(api_client, test_db):
     assert resp.status_code == 404
 
 
-# ── detect_scrape_type unit tests ────────────────────────────────────────────
+# ── scrape_type unit tests ────────────────────────────────────────────
 
 
-def test_detect_scrape_type_workday():
-    from backend.api.routes_companies import detect_scrape_type
-    assert detect_scrape_type(
+def test_scrape_type_workday():
+    from backend.scraper.ats.registry import scrape_type
+    assert scrape_type(
         "https://nvidia.wd5.myworkdayjobs.com/CareerSite"
     ) == "Workday API"
 
 
-def test_detect_scrape_type_greenhouse():
-    from backend.api.routes_companies import detect_scrape_type
-    result = detect_scrape_type("https://boards.greenhouse.io/acme")
+def test_scrape_type_greenhouse():
+    from backend.scraper.ats.registry import scrape_type
+    result = scrape_type("https://boards.greenhouse.io/acme")
     assert "Greenhouse" in result
 
 
-def test_detect_scrape_type_generic_fallback():
-    from backend.api.routes_companies import detect_scrape_type
+def test_scrape_type_generic_fallback():
+    from backend.scraper.ats.registry import scrape_type
     # An unknown career page should fall through to the Playwright generic path.
-    result = detect_scrape_type("https://example.com/careers")
+    result = scrape_type("https://example.com/careers")
     assert "Playwright" in result or "Generic" in result

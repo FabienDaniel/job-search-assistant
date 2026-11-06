@@ -771,7 +771,6 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
     from backend.analyzer.h1b_checker import check_job_h1b
     from backend.models.db import Search
     import uuid as _uuid
-    import re as _re
 
     # str_field answers 400 for a wrongly typed value the same way the blank
     # checks below answer 400 for an empty one (R4-T1-20).
@@ -820,26 +819,27 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
     filter_reject_reason = None
     reject_message = None
     if ext_search is not None:
-        from backend.models.db import get_global_title_exclude
-        title_lower = title.lower()
-        include_kw = ext_search.title_include_keywords or []
-        exclude_kw = list(set((ext_search.title_exclude_keywords or []) + get_global_title_exclude(db)))
-        if include_kw and not any(kw.lower() in title_lower for kw in include_kw):
+        from backend.scraper._shared.filters import (global_company_exclude_set, search_title_filters,
+                                                     title_filter_hit)
+        include_kw, exclude_kw = search_title_filters(ext_search, db)
+        rule, keywords = title_filter_hit(title, include_kw, exclude_kw)
+        if rule == "include":
             filter_reject_reason = f"title-include miss: needed any of {include_kw}"
             reject_message = ("title matches none of the required keywords ("
                               + ", ".join(include_kw) + ")")
-        if not filter_reject_reason and exclude_kw:
-            matched = [kw for kw in exclude_kw if _re.search(r'\b' + _re.escape(kw) + r'\b', title, _re.IGNORECASE)]
-            if matched:
-                filter_reject_reason = f"title-exclude hit: {', '.join(matched)}"
-                reject_message = "title excluded by " + ", ".join(f"'{kw}'" for kw in matched)
-        if not filter_reject_reason:
+        elif rule == "exclude":
+            filter_reject_reason = f"title-exclude hit: {', '.join(keywords)}"
+            reject_message = "title excluded by " + ", ".join(f"'{kw}'" for kw in keywords)
+        else:
             company_lower = company.lower()
             for excl in (ext_search.company_exclude or []):
                 if excl and excl.lower() == company_lower:
                     filter_reject_reason = f"company-exclude: {excl}"
                     reject_message = f"company excluded by '{excl}'"
                     break
+            if not filter_reject_reason and company_lower in global_company_exclude_set(db):
+                filter_reject_reason = f"company-exclude (global): {company}"
+                reject_message = "company is on your global Company exclude list"
 
     job = Job(
         external_id=external_id,
@@ -973,7 +973,8 @@ def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session
 
     # The enrichment the hand-logged application path runs: without it the first
     # score, tailor or cover letter pays for the fetch.
-    from backend.api.routes_applications import _cache_job_page, _fetch_and_store_description
+    from backend.api.routes_applications import _fetch_and_store_description
+    from backend.scraper._shared.page_cache import _cache_job_page
     background_tasks.add_task(_cache_job_page, str(job.id), url)
     background_tasks.add_task(_fetch_and_store_description, str(job.id), url)
 
@@ -1105,7 +1106,7 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
 
     if updates.get("status") == "applied":
         if job_link(job) and not job.has_cached_page:
-            from backend.api.routes_applications import _cache_job_page
+            from backend.scraper._shared.page_cache import _cache_job_page
             background_tasks.add_task(_cache_job_page, str(job.id), job_link(job))
 
         from backend.models.db import Application
@@ -1150,7 +1151,7 @@ def cache_applied_jobs(background_tasks: BackgroundTasks, db: Session = Depends(
     ).all()
 
     for job in jobs:
-        from backend.api.routes_applications import _cache_job_page
+        from backend.scraper._shared.page_cache import _cache_job_page
         background_tasks.add_task(_cache_job_page, str(job.id), job_link(job))
 
     return {"queued": len(jobs)}
@@ -1258,7 +1259,7 @@ async def get_live_page(job_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No posting URL captured for this job")
 
     from backend.scraper._shared.url_safety import safe_get, UnsafeURLError
-    from backend.api.routes_applications import _extract_clean_content
+    from backend.scraper._shared.page_cache import _extract_clean_content
     try:
         resp = await safe_get(job_link(job), timeout=20, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",

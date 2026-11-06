@@ -1,5 +1,5 @@
 """LinkedIn Extension source — Voyager enrichment for job IDs captured passively by the Chrome extension, received via POST /api/jobs/linkedin-import.
-Runs Voyager from inside a logged-in Playwright browser (not linkedin-api) since password login now hits CHALLENGE and standalone HTTP clients get session-poisoned by LinkedIn's rotating cookies; the session is refreshed by backend/refresh_linkedin_session.py."""
+Runs Voyager from inside a logged-in Playwright browser (not linkedin-api) since password login now hits CHALLENGE and standalone HTTP clients get session-poisoned by LinkedIn's rotating cookies; the session is refreshed by backend/scraper/_shared/linkedin_session.py."""
 import asyncio
 import json
 import logging
@@ -69,7 +69,7 @@ class _PerAccountProgress(MutableMapping):
 _linkedin_import_progress = _PerAccountProgress()
 
 # Persisted (mounted) Playwright session cookies — written by
-# backend/refresh_linkedin_session.py. Survives container restarts.
+# backend/scraper/_shared/linkedin_session.py. Survives container restarts.
 def _session_path() -> str:
     """The jar the LinkedIn import reads: the mock account's session when a mock account is set
     (Settings › LinkedIn), else the main account's. MT-16: the current account's jars (the
@@ -173,7 +173,6 @@ async def _voyager_fetch(page, lid: str) -> dict | None:
 
 async def enrich(linkedin_ids: list[str], db=None):
     """Background: fetch LinkedIn job data via in-browser Voyager, create jobs."""
-    import re
     from backend.models.db import Search
 
     logger.info(f"LinkedIn import: fetching {len(linkedin_ids)} jobs via Voyager (browser session)")
@@ -207,7 +206,7 @@ async def enrich(linkedin_ids: list[str], db=None):
         ext_search = db.query(Search).filter(Search.search_mode == "linkedin_extension").first()
 
         # Require a persisted logged-in session (established out-of-band via
-        # backend/refresh_linkedin_session.py). Without it we can't reach Voyager.
+        # backend/scraper/_shared/linkedin_session.py). Without it we can't reach Voyager.
         session_cookies = _load_session_cookies()
         if not session_cookies:
             logger.error("LinkedIn import: no session cookies at %s — run "
@@ -220,9 +219,14 @@ async def enrich(linkedin_ids: list[str], db=None):
         existing_ext_ids = get_existing_external_ids(db)
         company_lookup = build_company_lookup(db)
         # Hoisted per import so these aren't re-read per job in the loop
-        from backend.models.db import get_global_title_exclude
+        from backend.scraper._shared.filters import (build_search_exclude_sets, company_included,
+                                                     search_title_filters, title_filter_hit)
         from backend.analyzer.h1b_checker import load_exclusion_phrases
-        _global_te = get_global_title_exclude(db)
+        include_kw, exclude_kw = search_title_filters(ext_search, db) if ext_search else ([], [])
+        # The search set holds the search's own list plus, when "Skip my active companies" is on,
+        # every active company and its aliases.
+        global_company_ex, search_company_ex = (
+            build_search_exclude_sets(db, ext_search) if ext_search else (set(), set()))
         _phrases = load_exclusion_phrases(db)
         imported = 0
         skipped = pre_skipped
@@ -275,23 +279,30 @@ async def enrich(linkedin_ids: list[str], db=None):
 
                     # Apply search filters (title include/exclude, company exclude)
                     if ext_search:
-                        title_lower = title.lower()
-                        include_kw = ext_search.title_include_keywords or []
-                        if include_kw and not any(kw.lower() in title_lower for kw in include_kw):
+                        rule, _ = title_filter_hit(title, include_kw, exclude_kw)
+                        if rule == "include":
                             logger.info(f"LinkedIn {lid}: title '{title}' doesn't match include filter, skipping")
                             skipped += 1
                             continue
-                        # Title exclude filter (merge global — hoisted above loop)
-                        exclude_kw = list(set((ext_search.title_exclude_keywords or []) + _global_te))
-                        if exclude_kw:
-                            pattern = "|".join(r'\b' + re.escape(kw) + r'\b' for kw in exclude_kw)
-                            if re.search(pattern, title, re.IGNORECASE):
-                                logger.info(f"LinkedIn {lid}: title '{title}' matches exclude filter, skipping")
-                                skipped += 1
-                                continue
+                        if rule == "exclude":
+                            logger.info(f"LinkedIn {lid}: title '{title}' matches exclude filter, skipping")
+                            skipped += 1
+                            continue
                         company_excl = ext_search.company_exclude or []
                         if company_excl and company.lower().strip() in {c.lower().strip() for c in company_excl}:
                             logger.info(f"LinkedIn {lid}: company '{company}' excluded, skipping")
+                            skipped += 1
+                            continue
+                        if company.lower() in global_company_ex:
+                            logger.info(f"LinkedIn {lid}: company '{company}' on the global exclude list, skipping")
+                            skipped += 1
+                            continue
+                        if company.lower() in search_company_ex:
+                            logger.info(f"LinkedIn {lid}: company '{company}' is an active company, skipping")
+                            skipped += 1
+                            continue
+                        if not company_included(company, ext_search.company_filter)[0]:
+                            logger.info(f"LinkedIn {lid}: company '{company}' not on the include list, skipping")
                             skipped += 1
                             continue
 

@@ -20,7 +20,7 @@ async def test_cache_job_page_rejects_aws_metadata_url(monkeypatch, test_db):
     from sqlalchemy.orm import sessionmaker
     TestSession = sessionmaker(bind=test_db.get_bind())
     monkeypatch.setattr(
-        "backend.api.routes_applications.SessionLocal", TestSession, raising=False,
+        "backend.scraper._shared.page_cache.SessionLocal", TestSession, raising=False,
     )
 
     # Ensure neither httpx nor Playwright is ever touched
@@ -31,7 +31,7 @@ async def test_cache_job_page_rejects_aws_metadata_url(monkeypatch, test_db):
     )
     monkeypatch.setattr(_httpx, "AsyncClient", forbidden)
 
-    from backend.api.routes_applications import _cache_job_page
+    from backend.scraper._shared.page_cache import _cache_job_page
     await _cache_job_page(str(job.id), job.url)
 
     test_db.expire_all()
@@ -58,10 +58,10 @@ async def test_cache_job_page_rejects_private_ip(monkeypatch, test_db):
     from sqlalchemy.orm import sessionmaker
     TestSession = sessionmaker(bind=test_db.get_bind())
     monkeypatch.setattr(
-        "backend.api.routes_applications.SessionLocal", TestSession, raising=False,
+        "backend.scraper._shared.page_cache.SessionLocal", TestSession, raising=False,
     )
 
-    from backend.api.routes_applications import _cache_job_page
+    from backend.scraper._shared.page_cache import _cache_job_page
     await _cache_job_page(str(job.id), job.url)
 
     test_db.expire_all()

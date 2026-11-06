@@ -452,7 +452,10 @@ function ConfigForm({ d, set }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <Cell label={t`Title include · comma-separated`} mono value={d.title_include_keywords} onChange={(v) => set({ title_include_keywords: v })} placeholder={t`e.g. backend, platform`} />
         <Cell label={t`Title exclude`} mono value={d.title_exclude_keywords} onChange={(v) => set({ title_exclude_keywords: v })} placeholder={t`intern, junior, associate`} />
-        <Cell label={t`Company include · exact`} value={d.company_filter} onChange={(v) => set({ company_filter: v })} placeholder={t`Any`} />
+        {/* On any website, an include list would refuse almost every manual save. */}
+        {m !== 'extension'
+          ? <Cell label={t`Company include · exact`} value={d.company_filter} onChange={(v) => set({ company_filter: v })} placeholder={t`Any`} />
+          : <div />}
         <Cell label={t`Company exclude · exact`} value={d.company_exclude} onChange={(v) => set({ company_exclude: v })} placeholder={t`e.g. Walmart, CommScope`} />
       </div>
 
@@ -471,16 +474,19 @@ function ConfigForm({ d, set }) {
             <Helper size="xs"><Trans>0 follows the global schedule from Settings</Trans></Helper>
           </div>
         ) : <div />}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Label><Trans>Import rules</Trans></Label>
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6, minHeight: 31 }}>
-            <Check checked={d.exclude_active_companies} label={t`Skip my active companies`}
-              title={t`Leaves out jobs from companies you scrape (active in Companies, aliases included): their own careers page already brings those in`}
-              onChange={(v) => set({ exclude_active_companies: v })} />
-            {m === 'jobright' && <Check checked={d.require_salary} label={t`Require salary`} title={t`Drop results without a listed salary`}
-              onChange={(v) => set({ require_salary: v })} />}
+        {/* A manual Save to Job Feed keeps its job even at an active company: the click is a choice made for that job. */}
+        {m !== 'extension' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <Label><Trans>Import rules</Trans></Label>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6, minHeight: 31 }}>
+              <Check checked={d.exclude_active_companies} label={t`Skip my active companies`}
+                title={t`Leaves out jobs from companies you scrape (active in Companies, aliases included): their own careers page already brings those in`}
+                onChange={(v) => set({ exclude_active_companies: v })} />
+              {m === 'jobright' && <Check checked={d.require_salary} label={t`Require salary`} title={t`Drop results without a listed salary`}
+                onChange={(v) => set({ require_salary: v })} />}
+            </div>
           </div>
-        </div>
+        ) : <div />}
       </div>
     </>
   )

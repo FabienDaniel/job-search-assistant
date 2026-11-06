@@ -567,7 +567,7 @@ def test_applying_reuses_an_existing_application_and_company(client, test_db):
 # ── POST /cache-applied ──────────────────────────────────────────────────────
 
 def test_cache_applied_queues_only_uncached_applied_jobs(client, test_db, monkeypatch):
-    import backend.api.routes_applications as ra
+    import backend.scraper._shared.page_cache as ra
     queued = []
 
     async def _spy(job_id, url):

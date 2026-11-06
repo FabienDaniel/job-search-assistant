@@ -188,7 +188,7 @@ async def test_extension_import_reads_the_accounts_own_session(test_db, accounts
         assert ext._load_session_cookies()[0]["value"] == "owner"
 
 
-# ── refresh_linkedin_session ─────────────────────────────────────────────────
+# ── linkedin_session ─────────────────────────────────────────────────────────
 
 class _Page:
     url = "https://www.linkedin.com/feed/"
@@ -231,7 +231,7 @@ def fake_browser(monkeypatch):
 
 
 async def test_refresh_writes_the_current_accounts_jar_only(test_db, accounts, roots, fake_browser):
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     a, b = accounts
     with use_account(b):
         assert await rls._login_and_save("e", "p") == 0
@@ -244,7 +244,7 @@ async def test_refresh_writes_the_current_accounts_jar_only(test_db, accounts, r
 
 
 async def test_refresh_state_and_pin_drop_are_per_account(test_db, accounts, roots):
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     a, b = accounts
     rls.STATES["mock"].update(phase="idle", detail="")
     rls._MEMBER_STATES.clear()
@@ -262,7 +262,7 @@ async def test_a_mock_jar_saved_before_the_split_asks_for_a_new_sign_in(test_db,
     """A mock jar without the sign-in record (saved before 3.2) cannot be used by the employer-link
     lookup; the Mock session row says so instead of looking signed in."""
     from backend.api import routes_linkedin as rl
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     a, _ = accounts
     (roots / "li").mkdir(parents=True)
     (roots / "li" / "li_cookies.json").write_text("[]")
@@ -282,7 +282,7 @@ async def test_a_mock_jar_saved_before_the_split_asks_for_a_new_sign_in(test_db,
 
 async def test_session_routes_follow_the_callers_account(test_db, accounts, roots):
     from backend.api import routes_linkedin as rl
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     a, b = accounts
     rls._MEMBER_STATES.clear()
     (roots / "li").mkdir(parents=True)

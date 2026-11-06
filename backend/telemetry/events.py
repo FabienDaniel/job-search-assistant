@@ -32,10 +32,10 @@ def _url_of(raw: str) -> str:
 
 
 def scraper_kind_for_urls(urls) -> str:
-    from backend.api.routes_companies import detect_scrape_type
+    from backend.scraper.ats.registry import scrape_type
     for u in urls or []:
         if u and u.strip():
-            return detect_scrape_type(u.strip()).split(" ", 1)[0].lower()
+            return scrape_type(u.strip()).split(" ", 1)[0].lower()
     return "none"
 
 
