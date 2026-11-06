@@ -18,13 +18,13 @@ from sqlalchemy.exc import IntegrityError
 
 from backend.models.db import (
     SessionLocal, Job, Search, get_existing_external_ids,
-    get_global_title_exclude,
 )
 from backend.accounts.settings import get_setting
 from backend.analyzer import salary_extractor
 from backend.scraper._shared.dedup import make_external_id, make_content_hash, mark_ignored
 from backend.scraper._shared.posting_links import counts_as_new
-from backend.scraper._shared.filters import build_search_exclude_sets, company_included
+from backend.scraper._shared.filters import (build_search_exclude_sets, company_included,
+                                             search_title_filters, title_kept)
 from backend.scraper._shared.analysis import analyze_inline, prefetch_h1b
 
 logger = logging.getLogger("jobnavigator.trulyremote")
@@ -290,23 +290,6 @@ async def _fetch_details(client: httpx.AsyncClient, candidates: list[dict], cach
     return details
 
 
-def _title_filters(search: Search, db) -> tuple[list, list]:
-    include_kw = search.title_include_keywords or []
-    exclude_kw = list(set((search.title_exclude_keywords or []) + get_global_title_exclude(db)))
-    return include_kw, exclude_kw
-
-
-def _title_kept(title: str, include_kw: list, exclude_kw: list) -> tuple[bool, str | None]:
-    tl = title.lower()
-    if include_kw and not any(kw.lower() in tl for kw in include_kw):
-        return False, f"No match for: {', '.join(include_kw)}"
-    if exclude_kw:
-        matched = [kw for kw in exclude_kw if re.search(r'\b' + re.escape(kw) + r'\b', tl)]
-        if matched:
-            return False, f"Excluded by: {', '.join(matched)}"
-    return True, None
-
-
 def _remember_ignored(db, j: dict, search: Search, existing_ids: set) -> bool:
     """Write a job dropped after its detail page as `ignored`, so the next run's dedup skips it
     before fetching the page again (jobspy and company_pages do the same for filtered rows).
@@ -353,7 +336,7 @@ async def run(search: Search, shared=None) -> dict:
     try:
         db = SessionLocal()
         try:
-            include_kw, exclude_kw = _title_filters(search, db)
+            include_kw, exclude_kw = search_title_filters(search, db)
             global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
             existing_ids = get_existing_external_ids(db)
             detail_cache = halt = None
@@ -374,7 +357,7 @@ async def run(search: Search, shared=None) -> dict:
                 for j in listings:
                     if not j["url"]:
                         continue
-                    ok, _ = _title_kept(j["title"], include_kw, exclude_kw)
+                    ok, _ = title_kept(j["title"], include_kw, exclude_kw)
                     if not ok:
                         continue
                     if not company_included(j.get("company"), search.company_filter)[0]:
@@ -411,7 +394,7 @@ async def run(search: Search, shared=None) -> dict:
                 j = {**j, **details[j["url"]]}
                 # The detail page's canonical title can differ from the listing's, so run the
                 # filters over it too (preview already does this).
-                kept, why = _title_kept(j["title"], include_kw, exclude_kw)
+                kept, why = title_kept(j["title"], include_kw, exclude_kw)
                 if kept:
                     kept, why = company_included(j.get("company"), search.company_filter)
                 company_lower = (j.get("company") or "").lower()
@@ -522,7 +505,7 @@ async def preview(search: Search, db) -> dict:
     """Dry-run: fetch the roster, apply filters, return per-job diagnostics without saving."""
     start = time.time()
     try:
-        include_kw, exclude_kw = _title_filters(search, db)
+        include_kw, exclude_kw = search_title_filters(search, db)
         global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
         all_exclude = list(global_exclude_set | search_exclude_set)
 
@@ -530,7 +513,7 @@ async def preview(search: Search, db) -> dict:
             unique = await _fetch_roster(client)
             survivors = []
             for j in unique:
-                kept, _ = _title_kept(j["title"], include_kw, exclude_kw)
+                kept, _ = title_kept(j["title"], include_kw, exclude_kw)
                 if kept and company_included(j.get("company"), search.company_filter)[0]:
                     cl = (j.get("company") or "").lower()
                     if cl not in global_exclude_set and cl not in search_exclude_set:
@@ -557,7 +540,7 @@ async def preview(search: Search, db) -> dict:
             # Not sampled, or its page could not be read: only the roster's blurb is known.
             unread = j["url"] not in details
             j = details.get(j["url"], j)
-            kept, reason = _title_kept(j["title"], include_kw, exclude_kw)
+            kept, reason = title_kept(j["title"], include_kw, exclude_kw)
             if kept:
                 kept, reason = company_included(j.get("company"), search.company_filter)
             if kept:
