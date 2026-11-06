@@ -16,6 +16,7 @@ Releases are named major.minor ("3.2"), with a patch number when needed ("3.2.1"
 - **LinkedIn personal Test ignored Skip my active companies:** with the box ticked, the run drops jobs at a company you track, but Test kept them. Test now builds its company exclude list as the run does.
 - **Company exclude list in Settings and the extension:** jobs saved with the extension's Save to Job Feed button or captured from LinkedIn collections skipped the Company exclude list in Settings, which every scraper applies. Both now drop those companies too. A saved job says "company is on your global Company exclude list" and stays out of the feed.
 - **Skip my active companies on LinkedIn capture:** the option on the LinkedIn Extension search did nothing. Jobs captured from LinkedIn collections at a company you track (aliases included) are now skipped when it is ticked, as for the other searches. The Save to Job Feed button still keeps them, since each save is a choice made for that job, and its Extension search no longer shows the option.
+- **Company include on LinkedIn capture:** the LinkedIn Extension search's "Company include · exact" list did nothing. Jobs captured from LinkedIn collections now come in only from the listed companies (exact name, any case), as on the other searches. An empty list still keeps every company.
 
 ### Added
 

@@ -219,8 +219,8 @@ async def enrich(linkedin_ids: list[str], db=None):
         existing_ext_ids = get_existing_external_ids(db)
         company_lookup = build_company_lookup(db)
         # Hoisted per import so these aren't re-read per job in the loop
-        from backend.scraper._shared.filters import (build_search_exclude_sets, search_title_filters,
-                                                     title_filter_hit)
+        from backend.scraper._shared.filters import (build_search_exclude_sets, company_included,
+                                                     search_title_filters, title_filter_hit)
         from backend.analyzer.h1b_checker import load_exclusion_phrases
         include_kw, exclude_kw = search_title_filters(ext_search, db) if ext_search else ([], [])
         # The search set holds the search's own list plus, when "Skip my active companies" is on,
@@ -299,6 +299,10 @@ async def enrich(linkedin_ids: list[str], db=None):
                             continue
                         if company.lower() in search_company_ex:
                             logger.info(f"LinkedIn {lid}: company '{company}' is an active company, skipping")
+                            skipped += 1
+                            continue
+                        if not company_included(company, ext_search.company_filter)[0]:
+                            logger.info(f"LinkedIn {lid}: company '{company}' not on the include list, skipping")
                             skipped += 1
                             continue
 

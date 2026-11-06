@@ -104,3 +104,34 @@ async def test_import_skips_active_companies_when_the_search_asks(test_db, monke
     await enrich(["1", "2"])
 
     assert _imported_companies(test_db) == ["Globex"]
+
+
+@pytest.mark.asyncio
+async def test_import_keeps_only_the_companies_on_the_include_list(test_db, monkeypatch):
+    """"Company include · exact" keeps only those companies, any case, as on every other search."""
+    from backend.models.db import Search
+    from backend.scraper.sources.linkedin_extension import enrich
+    test_db.add(Search(name="Extension LI", search_mode="linkedin_extension", active=True,
+                       title_exclude_keywords=[], company_exclude=[], auto_scoring_depth="off",
+                       company_filter=["Acme"]))
+    test_db.commit()
+    _fake_voyager(monkeypatch, {"1": _li_job("ACME"), "2": _li_job("Globex")})
+
+    await enrich(["1", "2"])
+
+    assert _imported_companies(test_db) == ["ACME"]
+
+
+@pytest.mark.asyncio
+async def test_import_with_an_empty_include_list_keeps_every_company(test_db, monkeypatch):
+    from backend.models.db import Search
+    from backend.scraper.sources.linkedin_extension import enrich
+    test_db.add(Search(name="Extension LI", search_mode="linkedin_extension", active=True,
+                       title_exclude_keywords=[], company_exclude=[], auto_scoring_depth="off",
+                       company_filter=[]))
+    test_db.commit()
+    _fake_voyager(monkeypatch, {"1": _li_job("Acme"), "2": _li_job("Globex")})
+
+    await enrich(["1", "2"])
+
+    assert _imported_companies(test_db) == ["Acme", "Globex"]
