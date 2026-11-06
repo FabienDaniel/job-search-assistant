@@ -395,7 +395,7 @@ def test_removal_deletes_the_claude_home(test_db, accounts, cli_roots):
 # ── R5-09: refresh CLI --account ─────────────────────────────────────────────
 
 def test_refresh_cli_runs_under_the_named_account(test_db, accounts, monkeypatch, capsys):
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     a, b = accounts
     seen = []
     before = current_account.get()
@@ -415,7 +415,7 @@ def test_refresh_cli_runs_under_the_named_account(test_db, accounts, monkeypatch
 
 
 def test_refresh_cli_unknown_account(test_db, accounts, monkeypatch, capsys):
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     monkeypatch.setattr(rls, "_run", lambda which="mock": pytest.fail("must not run"))
     assert rls.main(["--account", "nobody"]) == 1
     assert "No single account" in capsys.readouterr().err
@@ -424,7 +424,7 @@ def test_refresh_cli_unknown_account(test_db, accounts, monkeypatch, capsys):
 # ── R5-10: removal forgets in-memory and /tmp state ──────────────────────────
 
 def test_removal_forgets_pin_file_codes_states_progress_and_counters(test_db, accounts, tmp_path, monkeypatch):
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     from backend.accounts import auth as A
     from backend.accounts import credentials as C
     from backend.accounts.admin import delete_account_rows
@@ -465,7 +465,7 @@ def test_removal_forgets_pin_file_codes_states_progress_and_counters(test_db, ac
 
 def test_refresh_cli_names_the_session(test_db, monkeypatch):
     """Task 8: --session picks the main or the mock session; mock by default."""
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     seen = []
     monkeypatch.setattr(rls, "_run", lambda which="mock": seen.append(which) or 0)
     assert rls.main([]) == 0

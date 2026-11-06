@@ -180,6 +180,7 @@ One posting reaches the app through many links: the company's board, LinkedIn, J
 | `_shared/errors.py` | `BoardNotFoundError` and `raise_if_board_gone` |
 | `_shared/employer_text.py` | Replaces a board's summary with the employer's own description |
 | `_shared/levels_jobs.py` | Reads a levels.fyi job from its page's `__NEXT_DATA__` |
+| `_shared/linkedin_session.py` | Signs the main or mock LinkedIn account in through Playwright, relays LinkedIn's emailed PIN, and saves the cookie jar the LinkedIn sources read. Also the CLI `python -m backend.refresh_linkedin_session` |
 | `_shared/linkedin_lookup.py` | Finds the employer link of LinkedIn listings through the mock account's session, never the user's own. Runs after every scrape. |
 
 ## Extending
@@ -209,6 +210,6 @@ These are places where scraping logic lives outside this package, or where the p
 - **Previews filter with their own code.** `company_pages.preview`, `jobspy.preview` and `levelsfyi.preview` re-implement the filter layers to report a reason per row, instead of calling `_shared/filters.py`. The JobSpy one uses pandas and parses `body_exclusion_phrases` by hand.
 - **Posting-URL parsing in a route.** `api/routes_applications.extract_posting` and its helpers (`_company_from_url`, `_known_posting`) read a posting's title and company from its URL inside the API layer.
 - **Duplicated filters.** `api/routes_jobs.save_from_extension` has its own copy of the title and company filters.
-- **LinkedIn session outside the package.** `backend/refresh_linkedin_session.py` logs in to LinkedIn and is imported by `_shared/linkedin_lookup.py`. The LinkedIn cookie paths are in `accounts/credentials.py`.
+- **LinkedIn cookie paths.** The per-account jar and PIN file paths (`linkedin_*_cookies`, `linkedin_pin_file`) live in `accounts/credentials.py` with the other per-account credential paths.
 - **Smaller items.** `backend/countries.py` is the Indeed and JobSpy country vocabulary. `main.trigger_backfill_descriptions` loops over the private `_fetch_job_description`. Scrape summaries and health rules are in `scheduler.py` (`_format_scrape_summary`, `check_scrape_health`). `models/db.get_existing_external_ids` is only used by sources. `targets.now_utc` has no callers.
 - **Scoring from inside the scraper.** `orchestrator`, `company_pages` and `linkedin_extension` call `analyzer.cv_scorer.analyze_unscored_jobs` themselves rather than leaving it to the caller.

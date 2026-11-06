@@ -1,5 +1,5 @@
 """LinkedIn Extension source — Voyager enrichment for job IDs captured passively by the Chrome extension, received via POST /api/jobs/linkedin-import.
-Runs Voyager from inside a logged-in Playwright browser (not linkedin-api) since password login now hits CHALLENGE and standalone HTTP clients get session-poisoned by LinkedIn's rotating cookies; the session is refreshed by backend/refresh_linkedin_session.py."""
+Runs Voyager from inside a logged-in Playwright browser (not linkedin-api) since password login now hits CHALLENGE and standalone HTTP clients get session-poisoned by LinkedIn's rotating cookies; the session is refreshed by backend/scraper/_shared/linkedin_session.py."""
 import asyncio
 import json
 import logging
@@ -69,7 +69,7 @@ class _PerAccountProgress(MutableMapping):
 _linkedin_import_progress = _PerAccountProgress()
 
 # Persisted (mounted) Playwright session cookies — written by
-# backend/refresh_linkedin_session.py. Survives container restarts.
+# backend/scraper/_shared/linkedin_session.py. Survives container restarts.
 def _session_path() -> str:
     """The jar the LinkedIn import reads: the mock account's session when a mock account is set
     (Settings › LinkedIn), else the main account's. MT-16: the current account's jars (the
@@ -207,7 +207,7 @@ async def enrich(linkedin_ids: list[str], db=None):
         ext_search = db.query(Search).filter(Search.search_mode == "linkedin_extension").first()
 
         # Require a persisted logged-in session (established out-of-band via
-        # backend/refresh_linkedin_session.py). Without it we can't reach Voyager.
+        # backend/scraper/_shared/linkedin_session.py). Without it we can't reach Voyager.
         session_cookies = _load_session_cookies()
         if not session_cookies:
             logger.error("LinkedIn import: no session cookies at %s — run "

@@ -467,7 +467,7 @@ def forget_account_memory(account_id) -> None:
             pass
     acct_auth._clear(account_id)
     acct_auth._touched.pop(key, None)
-    refresh = sys.modules.get("backend.refresh_linkedin_session")
+    refresh = sys.modules.get("backend.scraper._shared.linkedin_session")
     if refresh is not None:
         # keyed (account id, session) since the two LinkedIn sessions split
         for k in [k for k in refresh._MEMBER_STATES if str(k[0] if isinstance(k, tuple) else k) == key]:

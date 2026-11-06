@@ -49,7 +49,7 @@ Which = Annotated[str, Query(pattern="^(mock|main)$")]
 @router.get("/session")
 def session_status(which: Which = "mock"):
     """One session's cookie-jar age, whose sign-in saved it, and the phase of any sign-in running. `shared` is true for a member on 'inherit' LinkedIn: the session shown is the owner's."""
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
 
     shared = _shared_from_owner()
     path = rls.jar(which)   # the caller's cookie jar (MT-16; the owner's when shared)
@@ -104,7 +104,7 @@ def session_status(which: Which = "mock"):
 @router.post("/session/refresh", status_code=202)
 async def session_refresh(which: Which = "mock"):
     """Start one session's interactive login. Poll /session?which= until phase leaves 'running'. Signs in and saves the caller's own session (MT-16)."""
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
 
     _require_session_writer()
     state = rls.state(which)
@@ -121,7 +121,7 @@ async def session_refresh(which: Which = "mock"):
 @router.post("/session/pin")
 def session_pin(body: PinIn, which: Which = "mock"):
     """Hand the emailed PIN to the waiting login (it polls the account's PIN file)."""
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
 
     _require_session_writer()
     digits ="".join(c for c in (body.pin or "") if c.isdigit())

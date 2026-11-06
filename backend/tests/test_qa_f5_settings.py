@@ -429,7 +429,7 @@ def test_linkedin_inherit_uses_the_owner_paths(test_db, accounts, roots):
 
 
 def test_linkedin_inherit_refresh_state_and_creds_are_the_owners(test_db, owner_creds, roots):
-    from backend import refresh_linkedin_session as rls
+    from backend.scraper._shared import linkedin_session as rls
     a, b = owner_creds
     rls.STATES["main"].update(phase="idle", detail="")
     rls._MEMBER_STATES.clear()

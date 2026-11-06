@@ -7,7 +7,7 @@
 There is no switch any more: a Sign in names its session."""
 import pytest
 
-from backend import refresh_linkedin_session as rls
+from backend.scraper._shared import linkedin_session as rls
 from backend.models.db import Setting
 
 
@@ -162,3 +162,9 @@ def test_a_member_on_inherit_does_not_see_the_owners_email(test_db, api_client, 
     monkeypatch.setattr(rl, "_shared_from_owner", lambda: True)
     body = api_client.get("/api/linkedin/session?which=mock").json()
     assert body["shared"] is True and body["signed_in_as"] is None
+
+
+def test_the_documented_cli_path_runs_the_session_module():
+    """`python -m backend.refresh_linkedin_session` is what error messages tell users to run."""
+    from backend import refresh_linkedin_session as cli
+    assert cli.main is rls.main
