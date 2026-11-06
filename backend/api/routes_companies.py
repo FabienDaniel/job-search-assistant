@@ -532,6 +532,10 @@ async def test_scrape_company(company_id: str, db: Session = Depends(get_db)):
         is_amazon as _is_amazon,
         scrape as _scrape_amazon,
     )
+    from backend.scraper.ats.uber import (
+        is_uber as _is_uber,
+        scrape as _scrape_uber,
+    )
     from backend.scraper.ats.meta import (
         is_meta as _is_meta_careers,
         scrape as _scrape_meta_careers,
@@ -633,6 +637,12 @@ async def test_scrape_company(company_id: str, db: Session = Depends(get_db)):
                     all_jobs.extend(jobs)
                     all_rejected.extend(rejected)
                     urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Amazon API)")
+                    continue
+                if _is_uber(target_url):
+                    jobs, rejected = await _scrape_uber(target_url, debug=True)
+                    all_jobs.extend(jobs)
+                    all_rejected.extend(rejected)
+                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Uber API)")
                     continue
                 if _is_meta_careers(target_url):
                     jobs, rejected = await _scrape_meta_careers(target_url, browser=browser, debug=True)
