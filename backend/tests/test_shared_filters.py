@@ -162,3 +162,12 @@ def test_title_kept_exclude_is_a_whole_word_match_in_any_case():
     assert title_kept("Senior Product Manager", [], ["Senior"]) == (False, "Excluded by: Senior")
     assert title_kept("senior product manager", [], ["SENIOR"]) == (False, "Excluded by: SENIOR")
     assert title_kept("Internal Tools PM", [], ["intern"]) == (True, None)
+
+
+def test_title_filter_hit_names_the_rule_and_its_keywords():
+    from backend.scraper._shared.filters import title_filter_hit
+    assert title_filter_hit("Data Engineer", ["manager", "director"], ["intern"]) == ("include", ["manager", "director"])
+    assert title_filter_hit("Contract Intern Manager", ["manager"], ["Intern", "contract", "junior"]) \
+        == ("exclude", ["Intern", "contract"])
+    assert title_filter_hit("Product Manager", ["manager"], ["intern"]) == (None, [])
+    assert title_filter_hit("Product Manager", [], None) == (None, [])

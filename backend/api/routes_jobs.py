@@ -771,7 +771,6 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
     from backend.analyzer.h1b_checker import check_job_h1b
     from backend.models.db import Search
     import uuid as _uuid
-    import re as _re
 
     # str_field answers 400 for a wrongly typed value the same way the blank
     # checks below answer 400 for an empty one (R4-T1-20).
@@ -820,20 +819,17 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
     filter_reject_reason = None
     reject_message = None
     if ext_search is not None:
-        from backend.models.db import get_global_title_exclude
-        title_lower = title.lower()
-        include_kw = ext_search.title_include_keywords or []
-        exclude_kw = list(set((ext_search.title_exclude_keywords or []) + get_global_title_exclude(db)))
-        if include_kw and not any(kw.lower() in title_lower for kw in include_kw):
+        from backend.scraper._shared.filters import search_title_filters, title_filter_hit
+        include_kw, exclude_kw = search_title_filters(ext_search, db)
+        rule, keywords = title_filter_hit(title, include_kw, exclude_kw)
+        if rule == "include":
             filter_reject_reason = f"title-include miss: needed any of {include_kw}"
             reject_message = ("title matches none of the required keywords ("
                               + ", ".join(include_kw) + ")")
-        if not filter_reject_reason and exclude_kw:
-            matched = [kw for kw in exclude_kw if _re.search(r'\b' + _re.escape(kw) + r'\b', title, _re.IGNORECASE)]
-            if matched:
-                filter_reject_reason = f"title-exclude hit: {', '.join(matched)}"
-                reject_message = "title excluded by " + ", ".join(f"'{kw}'" for kw in matched)
-        if not filter_reject_reason:
+        elif rule == "exclude":
+            filter_reject_reason = f"title-exclude hit: {', '.join(keywords)}"
+            reject_message = "title excluded by " + ", ".join(f"'{kw}'" for kw in keywords)
+        else:
             company_lower = company.lower()
             for excl in (ext_search.company_exclude or []):
                 if excl and excl.lower() == company_lower:

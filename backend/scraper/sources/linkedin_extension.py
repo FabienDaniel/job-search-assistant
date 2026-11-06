@@ -173,7 +173,6 @@ async def _voyager_fetch(page, lid: str) -> dict | None:
 
 async def enrich(linkedin_ids: list[str], db=None):
     """Background: fetch LinkedIn job data via in-browser Voyager, create jobs."""
-    import re
     from backend.models.db import Search
 
     logger.info(f"LinkedIn import: fetching {len(linkedin_ids)} jobs via Voyager (browser session)")
@@ -220,9 +219,9 @@ async def enrich(linkedin_ids: list[str], db=None):
         existing_ext_ids = get_existing_external_ids(db)
         company_lookup = build_company_lookup(db)
         # Hoisted per import so these aren't re-read per job in the loop
-        from backend.models.db import get_global_title_exclude
+        from backend.scraper._shared.filters import search_title_filters, title_filter_hit
         from backend.analyzer.h1b_checker import load_exclusion_phrases
-        _global_te = get_global_title_exclude(db)
+        include_kw, exclude_kw = search_title_filters(ext_search, db) if ext_search else ([], [])
         _phrases = load_exclusion_phrases(db)
         imported = 0
         skipped = pre_skipped
@@ -275,20 +274,15 @@ async def enrich(linkedin_ids: list[str], db=None):
 
                     # Apply search filters (title include/exclude, company exclude)
                     if ext_search:
-                        title_lower = title.lower()
-                        include_kw = ext_search.title_include_keywords or []
-                        if include_kw and not any(kw.lower() in title_lower for kw in include_kw):
+                        rule, _ = title_filter_hit(title, include_kw, exclude_kw)
+                        if rule == "include":
                             logger.info(f"LinkedIn {lid}: title '{title}' doesn't match include filter, skipping")
                             skipped += 1
                             continue
-                        # Title exclude filter (merge global — hoisted above loop)
-                        exclude_kw = list(set((ext_search.title_exclude_keywords or []) + _global_te))
-                        if exclude_kw:
-                            pattern = "|".join(r'\b' + re.escape(kw) + r'\b' for kw in exclude_kw)
-                            if re.search(pattern, title, re.IGNORECASE):
-                                logger.info(f"LinkedIn {lid}: title '{title}' matches exclude filter, skipping")
-                                skipped += 1
-                                continue
+                        if rule == "exclude":
+                            logger.info(f"LinkedIn {lid}: title '{title}' matches exclude filter, skipping")
+                            skipped += 1
+                            continue
                         company_excl = ext_search.company_exclude or []
                         if company_excl and company.lower().strip() in {c.lower().strip() for c in company_excl}:
                             logger.info(f"LinkedIn {lid}: company '{company}' excluded, skipping")

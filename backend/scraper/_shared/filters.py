@@ -187,16 +187,27 @@ def search_title_filters(search, db) -> tuple[list, list]:
     return include_kw, exclude_kw
 
 
-def title_kept(title: str, include_kw: list, exclude_kw: list) -> tuple[bool, str | None]:
-    """(kept, reason): include is a substring match on any keyword, exclude a whole-word match.
-    Both ignore case."""
+def title_filter_hit(title: str, include_kw: list, exclude_kw: list) -> tuple[str | None, list]:
+    """The title rule that drops a title, for callers that word their own reason:
+    ("include", include_kw) when no include keyword is a substring of it,
+    ("exclude", the matched keywords) when exclude keywords are whole words of it,
+    (None, []) when it is kept. Both ignore case."""
     tl = title.lower()
     if include_kw and not any(kw.lower() in tl for kw in include_kw):
-        return False, f"No match for: {', '.join(include_kw)}"
-    if exclude_kw:
-        matched = [kw for kw in exclude_kw if re.search(r'\b' + re.escape(kw.lower()) + r'\b', tl)]
-        if matched:
-            return False, f"Excluded by: {', '.join(matched)}"
+        return "include", list(include_kw)
+    matched = [kw for kw in exclude_kw or [] if re.search(r'\b' + re.escape(kw.lower()) + r'\b', tl)]
+    if matched:
+        return "exclude", matched
+    return None, []
+
+
+def title_kept(title: str, include_kw: list, exclude_kw: list) -> tuple[bool, str | None]:
+    """(kept, reason) with the reason the previews show (see title_filter_hit)."""
+    rule, keywords = title_filter_hit(title, include_kw, exclude_kw)
+    if rule == "include":
+        return False, f"No match for: {', '.join(keywords)}"
+    if rule == "exclude":
+        return False, f"Excluded by: {', '.join(keywords)}"
     return True, None
 
 
