@@ -364,22 +364,13 @@ async def run(search: Search) -> dict:
             unique_jobs.append(j)
 
         # Apply search-level + global title filters
-        from backend.models.db import get_global_title_exclude
+        from backend.scraper._shared.filters import search_title_filters, title_kept
         _gte_db = SessionLocal()
         try:
-            _global_title_excl = get_global_title_exclude(_gte_db)
+            include_kw, exclude_kw = search_title_filters(search, _gte_db)
         finally:
             _gte_db.close()
-        include_kw = search.title_include_keywords or []
-        exclude_kw = list(set((search.title_exclude_keywords or []) + _global_title_excl))
-        kept_jobs = []
-        for j in unique_jobs:
-            title_lower = j["title"].lower()
-            if include_kw and not any(kw.lower() in title_lower for kw in include_kw):
-                continue
-            if exclude_kw and any(re.search(r'\b' + re.escape(kw) + r'\b', title_lower) for kw in exclude_kw):
-                continue
-            kept_jobs.append(j)
+        kept_jobs = [j for j in unique_jobs if title_kept(j["title"], include_kw, exclude_kw)[0]]
 
         # Company exclude (global + per-search + active companies if flag on)
         db_excl = SessionLocal()

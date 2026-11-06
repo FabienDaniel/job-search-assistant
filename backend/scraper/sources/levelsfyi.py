@@ -404,22 +404,13 @@ async def run(search: Search, shared=None) -> dict:
         raw_jobs = await (_fetch() if shared is None else shared.get(_fetch))
 
         # Apply search-level + global title filters
-        from backend.models.db import get_global_title_exclude as _gte
+        from backend.scraper._shared.filters import search_title_filters, title_kept
         _gte_db2 = SessionLocal()
         try:
-            _global_title_excl2 = _gte(_gte_db2)
+            include_kw, exclude_kw = search_title_filters(search, _gte_db2)
         finally:
             _gte_db2.close()
-        include_kw = search.title_include_keywords or []
-        exclude_kw = list(set((search.title_exclude_keywords or []) + _global_title_excl2))
-        kept_jobs = []
-        for j in raw_jobs:
-            title_lower = j["title"].lower()
-            if include_kw and not any(kw.lower() in title_lower for kw in include_kw):
-                continue
-            if exclude_kw and any(re.search(r'\b' + re.escape(kw) + r'\b', title_lower) for kw in exclude_kw):
-                continue
-            kept_jobs.append(j)
+        kept_jobs = [j for j in raw_jobs if title_kept(j["title"], include_kw, exclude_kw)[0]]
 
         # Company exclude (global=full match, per-search=full match,
         # plus active companies when search.exclude_active_companies is on)
