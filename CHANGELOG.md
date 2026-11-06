@@ -13,6 +13,7 @@ Releases are named major.minor ("3.2"), with a patch number when needed ("3.2.1"
 - **Test scrape of an Uber company:** Companies › Test sent a jobs.uber.com URL to the generic page reader instead of the Uber handler that the real scrape uses, so the preview found only the "Saved jobs" link. Test now reads Uber URLs through the Uber jobs API, like the scrape does.
 - **Title exclude keywords with capitals:** a search's exclude keyword typed with a capital letter ("Senior") never matched, so those jobs were kept, on every mode except JobSpy keyword searches and the extension. Exclude keywords now ignore case everywhere, as include keywords already did. The global title exclude list is covered too. Test on Jobright, LinkedIn personal and Levels.fyi searches follows the same rule, and a keyword search's Test names the matched keyword instead of "Filtered".
 - **Levels.fyi Test ignored the global title exclude list:** Test kept titles that the Title exclude list in Settings drops, so it showed jobs the run never saves. Test now applies that list too.
+- **LinkedIn personal Test ignored Skip my active companies:** with the box ticked, the run drops jobs at a company you track, but Test kept them. Test now builds its company exclude list as the run does.
 
 ### Added
 

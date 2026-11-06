@@ -1069,14 +1069,9 @@ async def preview(search, db) -> dict:
                 unique_jobs.append(j)
 
         raw_count = len(unique_jobs)
-        from backend.scraper._shared.filters import search_title_filters, title_kept
+        from backend.scraper._shared.filters import build_search_exclude_sets, search_title_filters, title_kept
         include_kw, exclude_kw = search_title_filters(search, db)
-
-        global_exclude_raw = get_setting(db, "company_exclude_global")
-        global_exclude = json.loads(global_exclude_raw) if global_exclude_raw else []
-        global_exclude_set = {e.lower() for e in global_exclude}
-        search_exclude = [e.lower() for e in (search.company_exclude or [])]
-        search_exclude_set = set(search_exclude)
+        global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
         all_exclude = list(global_exclude_set | search_exclude_set)
 
         body_raw = get_setting(db, "body_exclusion_phrases")

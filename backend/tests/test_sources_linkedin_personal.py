@@ -460,3 +460,44 @@ async def test_scrape_collection_reports_an_expired_session(monkeypatch, landing
     with pytest.raises(lp.LinkedInSessionExpiredError, match="session expired"):
         await lp._scrape_collection(_WallPage(), "https://www.linkedin.com/jobs/collections/recommended/",
                                     "recommended")
+
+
+@pytest.mark.asyncio
+async def test_preview_excludes_active_companies_like_the_run(test_db, monkeypatch):
+    """With "exclude active companies" on, the run drops jobs at a tracked company. Test must too."""
+    from backend.models.db import Company, Search
+    from backend.scraper.sources import linkedin_personal as lp
+
+    class _Closeable:
+        async def close(self):
+            return None
+
+        async def stop(self):
+            return None
+
+    async def fake_browser():
+        return _Closeable(), _Closeable(), _Closeable(), _Closeable()
+
+    async def noop(*a, **kw):
+        return None
+
+    async def fake_collection(page, url, name):
+        return [{"job_id": "1", "title": "Product Manager", "company": "Acme",
+                 "url": "https://www.linkedin.com/jobs/view/1", "collection": name},
+                {"job_id": "2", "title": "Product Manager", "company": "Globex",
+                 "url": "https://www.linkedin.com/jobs/view/2", "collection": name}]
+    monkeypatch.setattr(lp, "_check_set_up", lambda email, password: None)
+    monkeypatch.setattr(lp, "_get_linkedin_browser", fake_browser)
+    monkeypatch.setattr(lp, "_ensure_logged_in", noop)
+    monkeypatch.setattr(lp, "_scrape_collection", fake_collection)
+    monkeypatch.setattr(lp, "_enrich_apply_urls", noop)
+    test_db.add(Company(name="Acme", active=True, scrape_urls=["https://acme.example/jobs"]))
+    test_db.commit()
+    search = Search(name="li", search_mode="linkedin_personal", sources=["recommended"],
+                    exclude_active_companies=True)
+
+    out = await lp.preview(search, test_db)
+
+    rows = {j["company"]: j for j in out["jobs"]}
+    assert rows["Globex"]["kept"] is True
+    assert rows["Acme"]["kept"] is False and rows["Acme"]["reason"] == "Company excluded: acme"
