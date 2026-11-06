@@ -25,7 +25,7 @@ backend/scraper/
 | `POST /api/searches/{id}/run` (`api/routes_searches.py`) | `orchestrator._run_search_by_id` | One search, caller's account only, no shared fetch |
 | `POST /api/scrape/company/{id}` (`main.py`) | `company_pages.scrape_single_career_page` + `record_company_scrape_log` | One company |
 | `POST /api/searches/{id}/test` | `sources.<module>.preview(search, db)` | Dry run for the Test button. Writes no jobs |
-| `POST /api/companies/{id}/test-scrape` (`api/routes_companies.py`) | `ats.registry` handlers and its own filter pass (see Known issues) | Dry run of a company |
+| `POST /api/companies/{id}/test-scrape` (`api/routes_companies.py`) | `company_pages.preview(company, db)` | Dry run of a company. Writes no jobs |
 | `POST /api/jobs/linkedin-import` (`api/routes_jobs.py`) | `sources.linkedin_extension.enrich` | LinkedIn job ids pushed by the Chrome extension |
 
 `orchestrator.run_search(search)` dispatches one search to its source module. `orchestrator.run_company(company)` does the same for one company.
@@ -94,12 +94,12 @@ The rule: nothing account-specific goes into the shared part. Filters, dedup and
 
 ## Sources
 
-Every search source exposes `async run(search, ...) -> dict` returning at least `jobs_found`, `new_jobs`, `error` and `duration`, and usually `source_breakdown` (one entry per board). Most also expose `async preview(search, db)` for the Test button.
+Every search source exposes `async run(search, ...) -> dict` returning at least `jobs_found`, `new_jobs`, `error` and `duration`, and usually `source_breakdown` (one entry per board). Each also exposes `async preview(search, db)` for the Test button, which reports what every filter layer would do and saves nothing. `test_search_modes.py` checks both exist for every runnable mode. The keyword Test runs inline in the request. The others run in the background and are polled.
 
 | Module | Notes |
 |---|---|
-| `jobspy.py` | Runs `scrape_jobs` in a worker thread. Known block messages for ZipRecruiter and Google. Fills LinkedIn descriptions through `_shared/employer_text`. Rejected rows are stored as `ignored`. No `preview()`: its Test lives in `api/routes_searches.py`. |
-| `levelsfyi.py` | Playwright, because the site's API responses are encrypted. Retries on zero results. Job text comes from `_shared/levels_jobs`. No `preview()`: its Test is `routes_searches._test_levelsfyi_search`. |
+| `jobspy.py` | Runs `scrape_jobs` in a worker thread. Known block messages for ZipRecruiter and Google. Fills LinkedIn descriptions through `_shared/employer_text`. Rejected rows are stored as `ignored`. |
+| `levelsfyi.py` | Playwright, because the site's API responses are encrypted. Retries on zero results. Job text comes from `_shared/levels_jobs`. |
 | `linkedin_personal.py` | The account's recommended and top-applicant collections. Human-like delays, session-expiry and rate-limit errors. |
 | `linkedin_extension.py` | No `run()`. `enrich(ids)` reads LinkedIn's Voyager API from a logged-in Playwright page. Progress is kept in memory per account for `GET /api/jobs/linkedin-import/progress`. |
 | `jobright.py` | Logs in with the account's credentials. Pages of 20 with a 7 s delay. Replaces Jobright's AI summary with the employer's own text when it can. |
@@ -205,7 +205,7 @@ Use the `test_db` or `api_client` fixture in any test that touches the database.
 
 These are places where scraping logic lives outside this package, or where the package depends on layers above it.
 
-- **Test logic in routes.** The company Test (`routes_companies.test_scrape_company`), the JobSpy Test and the levels.fyi Test (`routes_searches.test_search`, `_test_levelsfyi_search`) implement scraping and filtering in the API layer. The JobSpy Test filters with its own pandas code instead of `_shared/filters.py`.
+- **Previews filter with their own code.** `company_pages.preview`, `jobspy.preview` and `levelsfyi.preview` re-implement the filter layers to report a reason per row, instead of calling `_shared/filters.py`. The JobSpy one uses pandas and parses `body_exclusion_phrases` by hand.
 - **Posting-page fetcher in a route.** `api/routes_applications._cache_job_page`, `_fetch_with_playwright` and `_extract_clean_content` fetch and clean posting pages. `analyzer/cv_scorer.py` and `api/routes_jobs.py` import them from there. `routes_applications.extract_posting` and its helpers parse posting URLs in the same file.
 - **Duplicated filters.** `api/routes_jobs.save_from_extension` has its own copy of the title and company filters.
 - **LinkedIn session outside the package.** `backend/refresh_linkedin_session.py` logs in to LinkedIn and is imported by `_shared/linkedin_lookup.py`. The LinkedIn cookie paths are in `accounts/credentials.py`.

@@ -64,9 +64,7 @@ def test_every_scraper_module_has_run_and_preview():
         if mode.runnable:
             module = importlib.import_module(f"backend.scraper.sources.{mode.module}")
             assert callable(module.run), mode.key
-            # keyword's Test runs inline and levels.fyi's lives in routes_searches
-            if mode.background_test and mode.key != "levels_fyi":
-                assert callable(module.preview), mode.key
+            assert callable(module.preview), mode.key
 
 
 def test_config_error_names_what_is_missing():

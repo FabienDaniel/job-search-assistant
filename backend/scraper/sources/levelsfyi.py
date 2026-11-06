@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 
 from backend.models.db import SessionLocal, Job, Search, get_existing_external_ids
+from backend.accounts.settings import get_setting
 from backend.scraper._shared.dedup import make_external_id, make_content_hash
 from backend.scraper._shared.posting_links import counts_as_new
 from backend.scraper._shared.postings import resolve_short_links
@@ -615,3 +616,197 @@ async def run(search: Search, shared=None) -> dict:
             await browser.close()
         if pw:
             await pw.stop()
+
+
+async def preview(search: Search, db) -> dict:
+    """The Test button: scrape the levels.fyi URL (with the run's retries on zero results)
+    and report what each filter layer would do, without saving."""
+    if not search.direct_url:
+        raise ValueError("No levels.fyi URL configured")
+
+    start = time.time()
+    pw = None
+    browser = None
+    try:
+        pw, browser = await _get_browser()
+        search_max_pages = search.max_pages or 50
+        raw_jobs = await _scrape_levelsfyi(search.direct_url, browser=browser, max_pages=search_max_pages)
+
+        # Retry up to 3 times if 0 results (levels.fyi rate-limiting / slow render)
+        retry_delays = [10, 20, 30]
+        for attempt, delay in enumerate(retry_delays, 1):
+            if raw_jobs:
+                break
+            logger.info(f"levels.fyi test: 0 results, retry {attempt}/3 in {delay}s")
+            await asyncio.sleep(delay)
+            raw_jobs = await _scrape_levelsfyi(search.direct_url, browser=browser, max_pages=search_max_pages)
+    except Exception as e:
+        return {
+            "search_name": search.name,
+            "error": str(e),
+            "config": {
+                "mode": "levels_fyi",
+                "url": search.direct_url,
+            },
+        }
+    finally:
+        if browser:
+            await browser.close()
+        if pw:
+            await pw.stop()
+
+    duration = round(time.time() - start, 1)
+
+    if not raw_jobs:
+        return {
+            "search_name": search.name,
+            "duration": duration,
+            "raw_count": 0,
+            "after_filter": 0,
+            "source_breakdown": {"levels_fyi": 0},
+            "company_breakdown": {},
+            "include_keywords": search.title_include_keywords or [],
+            "exclude_keywords": search.title_exclude_keywords or [],
+            "company_filter": search.company_filter or [],
+            "company_exclude": search.company_exclude or [],
+            "jobs": [],
+            "config": {"mode": "levels_fyi", "url": search.direct_url},
+        }
+
+    raw_count = len(raw_jobs)
+    include_kw = search.title_include_keywords or []
+    exclude_kw = search.title_exclude_keywords or []
+    company_filter = search.company_filter or []
+
+    import json
+    from backend.scraper._shared.filters import build_search_exclude_sets
+    global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
+    search_exclude = list(search_exclude_set)
+    all_exclude = list(global_exclude_set | search_exclude_set)
+
+    body_raw = get_setting(db, "body_exclusion_phrases")
+    body_phrases = []
+    if body_raw:
+        try:
+            body_phrases = json.loads(body_raw)
+        except json.JSONDecodeError:
+            pass
+
+    company_filters = {}  # company_name_lower -> Company object
+    company_names = {j.get("company", "") for j in raw_jobs if j.get("company")}
+    for cn in company_names:
+        from backend.models.db import find_company_by_name
+        co = find_company_by_name(db, cn)
+        if co and (co.title_exclude_keywords or (co.title_include_expr and co.title_include_expr.strip())):
+            company_filters[cn.lower()] = co
+
+    from collections import Counter
+    company_counts = Counter(j["company"] for j in raw_jobs if j.get("company"))
+    company_breakdown = dict(company_counts.most_common(20))
+
+    results = []
+    for j in raw_jobs:
+        title = j["title"]
+        title_lower = title.lower()
+        kept = True
+        reason = None
+
+        if include_kw and not any(kw.lower() in title_lower for kw in include_kw):
+            kept = False
+            reason = f"No match for: {', '.join(include_kw)}"
+        if kept and exclude_kw:
+            matched = [kw for kw in exclude_kw if re.search(r'\b' + re.escape(kw) + r'\b', title_lower)]
+            if matched:
+                kept = False
+                reason = f"Excluded by: {', '.join(matched)}"
+        if kept and company_filter:
+            company_lower = (j.get("company") or "").lower()
+            if company_lower not in {cf.lower() for cf in company_filter}:
+                kept = False
+                reason = f"Company filter: {', '.join(company_filter)}"
+
+        if kept and (global_exclude_set or search_exclude):
+            company_lower = (j.get("company") or "").lower()
+            if company_lower in global_exclude_set:
+                kept = False
+                reason = f"Company excluded (global): {company_lower}"
+            elif company_lower in set(search_exclude):
+                kept = False
+                reason = f"Company excluded: {company_lower}"
+
+        if kept and body_phrases:
+            desc = j.get("description") or ""
+            if desc:
+                from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+                body_result = scan_jd_for_h1b_flags(desc, body_phrases)
+                if body_result["jd_flag"]:
+                    kept = False
+                    reason = f"Body exclusion: {body_result['jd_snippet'][:80] if body_result['jd_snippet'] else 'matched'}"
+
+        if kept:
+            co_name = (j.get("company") or "").lower()
+            co_obj = company_filters.get(co_name)
+            if co_obj:
+                co_kept, co_rej = _apply_company_filters([j], co_obj)
+                if not co_kept:
+                    kept = False
+                    if co_obj.title_exclude_keywords:
+                        matched_kw = [kw for kw in co_obj.title_exclude_keywords if re.search(r'\b' + re.escape(kw.lower()) + r'\b', title_lower)]
+                        if matched_kw:
+                            reason = f"Company '{co_obj.name}' excludes: {', '.join(matched_kw)}"
+                    if not reason and co_obj.title_include_expr:
+                        reason = f"Company '{co_obj.name}' include expr: {co_obj.title_include_expr}"
+                    if not reason:
+                        reason = f"Company '{co_obj.name}' filter"
+
+        salary = None
+        if j.get("salary_min"):
+            salary = f"${j['salary_min']:,}"
+            if j.get("salary_max"):
+                salary += f" – ${j['salary_max']:,}"
+
+        display_url = j.get("application_url") or j.get("url", "")
+        desc = j.get("description") or ""
+        has_desc = bool(desc and len(desc) > 50)
+
+        results.append({
+            "title": title,
+            "company": j.get("company", ""),
+            "url": display_url,
+            "levelsfyi_url": j.get("url", ""),
+            "source": "levels_fyi",
+            "location": j.get("location", ""),
+            "salary": salary,
+            "has_description": has_desc,
+            "desc_length": len(desc) if has_desc else 0,
+            "kept": kept,
+            "reason": reason,
+            "date_posted": j.get("date_posted", ""),
+        })
+
+    after_filter = sum(1 for r in results if r["kept"])
+
+    with_apply_url = sum(1 for j in raw_jobs if j.get("application_url"))
+    with_desc = sum(1 for j in raw_jobs if j.get("description") and len(j["description"]) > 50)
+    with_salary = sum(1 for j in raw_jobs if j.get("salary_min"))
+
+    return {
+        "search_name": search.name,
+        "duration": duration,
+        "raw_count": raw_count,
+        "after_filter": after_filter,
+        "source_breakdown": {"levels_fyi": raw_count},
+        "company_breakdown": company_breakdown,
+        "enrichment": {
+            "with_apply_url": with_apply_url,
+            "with_description": with_desc,
+            "with_salary": with_salary,
+        },
+        "include_keywords": include_kw,
+        "exclude_keywords": exclude_kw,
+        "company_filter": company_filter,
+        "company_exclude": all_exclude,
+        "company_filters_applied": list(company_filters.keys()),
+        "jobs": results,
+        "config": {"mode": "levels_fyi", "url": search.direct_url},
+    }

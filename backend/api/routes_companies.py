@@ -1,7 +1,5 @@
 """Company management endpoints."""
-import base64
 import logging
-import re
 from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -444,172 +442,14 @@ async def test_scrape_company(company_id: str, db: Session = Depends(get_db)):
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    from backend.scraper._shared.browser import _get_browser, _new_page, _close_page
-    from backend.scraper._shared.filters import match_title_expr
-    from backend.scraper.ats.generic import (
-        _extract_all_pages, _wait_for_content, _setup_route_blocks,
-    )
-    from backend.scraper.ats import registry
-
-    urls = company.scrape_urls or []
-    if not urls:
+    if not company.scrape_urls:
         raise HTTPException(status_code=400, detail="No scrape URLs configured")
 
-    include_expr = company.title_include_expr
-    exclude_kws = [kw.lower() for kw in (company.title_exclude_keywords or [])]
-    # Mirrors the live scraper: title_exclude_global is applied at INSERT time (see
-    # scraper/sources/company_pages.py:_apply_company_filters), so this reports what would actually save.
-    from backend.models.db import get_global_title_exclude
-    global_exclude_kws = [kw.lower() for kw in (get_global_title_exclude(db) or [])]
-    # The run also drops jobs whose body matches body_exclusion_phrases (stored as
-    # `ignored`); mirrored here with the same phrase scan, no live MyVisaJobs lookup.
-    from backend.analyzer.h1b_checker import load_exclusion_phrases, scan_jd_for_h1b_flags
-    body_phrases = load_exclusion_phrases(db) or []
-
-    all_jobs = []
-    urls_scraped = []
-    pw = None
-    browser = None
+    from backend.scraper.sources.company_pages import preview
     try:
-        pw, browser = await _get_browser()
-        max_pages = company.max_pages or 5
-
-        all_rejected = []
-        all_pagination_debug = []
-        screenshots = []
-        for target_url in urls:
-            target_url = target_url.strip()
-            if not target_url:
-                continue
-            page = None
-            try:
-                handler = registry.detect(target_url)
-                if handler is not None:
-                    jobs, rejected = await handler.scrape(target_url, debug=True, browser=browser)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via {handler.label})")
-                    continue
-
-                page = await _new_page(browser)
-                await _setup_route_blocks(page)
-                await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
-                await _wait_for_content(page, company.wait_for_selector)
-                png_bytes = await page.screenshot(full_page=True)
-                screenshots.append({
-                    "url": target_url,
-                    "data": base64.b64encode(png_bytes).decode(),
-                })
-                jobs, rejected, pag_debug = await _extract_all_pages(page, target_url, max_pages, debug=True, wait_for_selector=company.wait_for_selector)
-                all_jobs.extend(jobs)
-                all_rejected.extend(rejected)
-                all_pagination_debug.extend(pag_debug)
-                urls_scraped.append(f"{target_url} ({len(jobs)} found, {len(rejected)} rejected)")
-            except Exception as e:
-                urls_scraped.append(f"{target_url[:80]}... (error: {e})")
-            finally:
-                if page:
-                    await _close_page(page)
-
-        # Classify jobs with filter reasons across the layers the live run applies
-        # (per-company title filters, then the global title_exclude_global setting).
-        results = []
-        after_company_count = 0   # passes per-company only
-        would_save_count = 0      # passes per-company, global AND the body scan
-        body_excluded_count = 0   # would be stored as `ignored` by the real run
-        body_unchecked_count = 0  # no description in the preview — can't say
-        for j in all_jobs:
-            title_lower = j["title"].lower()
-            title_orig = j["title"]
-            reason = None
-            global_excluded_by = []
-
-            matched_exclude = [kw for kw in exclude_kws if re.search(r'\b' + re.escape(kw) + r'\b', title_lower)]
-            if matched_exclude:
-                reason = f"Excluded by: {', '.join(matched_exclude)}"
-            elif include_expr and include_expr.strip():
-                    if not match_title_expr(include_expr, j["title"]):
-                        reason = f"No match for: {include_expr}"
-
-            passes_company = reason is None
-            body_excluded_by = None
-            body_checked = False
-            if passes_company:
-                after_company_count += 1
-                global_excluded_by = [
-                    kw for kw in global_exclude_kws
-                    if re.search(r'\b' + re.escape(kw) + r'\b', title_orig, re.IGNORECASE)
-                ]
-                if global_excluded_by:
-                    reason = f"[Global] Excluded by: {', '.join(global_excluded_by)}"
-                else:
-                    # Third layer: the body scan the run performs at insert time.
-                    desc = (j.get("description") or "").strip()
-                    if body_phrases and desc:
-                        body_checked = True
-                        scan = scan_jd_for_h1b_flags(desc, body_phrases)
-                        if scan["jd_flag"]:
-                            body_excluded_by = scan["matched_phrase"] or "matched"
-                            reason = f"Body exclusion: {body_excluded_by}"
-                            body_excluded_count += 1
-                    elif body_phrases:
-                        # The ATS list endpoints don't carry descriptions; the run
-                        # fetches them later. Say so instead of implying a pass.
-                        body_unchecked_count += 1
-                    if reason is None:
-                        would_save_count += 1
-
-            kept = reason is None  # would actually save (passes all three layers)
-
-            results.append({
-                "title": j["title"],
-                "url": j["url"],
-                "kept": kept,
-                "reason": reason,
-                "passes_company_filter": passes_company,
-                "global_excluded_by": global_excluded_by,
-                # The phrase that would make the run store this as `ignored`, or null;
-                # body_checked is false when the preview had no description to scan.
-                "body_excluded_by": body_excluded_by,
-                "body_checked": body_checked,
-            })
-
-        # Append rejected entries at the end so user can see what was dropped
-        for r in all_rejected:
-            results.append({
-                "title": r["title"],
-                "url": r["url"],
-                "kept": False,
-                "reason": f"[Validation] {r['reason']} (via {r['selector']})",
-                "body_excluded_by": None,
-                "body_checked": False,
-            })
-
-        return {
-            "company": company.name,
-            "urls_scraped": urls_scraped,
-            "screenshots": screenshots,
-            "pagination_debug": all_pagination_debug,
-            "include_expr": include_expr,
-            "exclude_keywords": exclude_kws,
-            "global_exclude_keyword_count": len(global_exclude_kws),
-            "total_found": len(all_jobs),
-            "total_rejected": len(all_rejected),
-            "after_company_filter": after_company_count,  # passes per-company only
-            "after_filter": would_save_count,             # passes all three — what'd actually save
-            # Footer arithmetic: kept · title-filtered · would-be-ignored
-            "body_excluded_count": body_excluded_count,
-            "body_unchecked_count": body_unchecked_count,
-            "body_phrase_count": len(body_phrases),
-            "jobs": results,
-        }
+        return await preview(company, db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if browser:
-            await browser.close()
-        if pw:
-            await pw.stop()
 
 
 def _company_to_dict(c: Company, application_count: int = 0, h1b=None,
