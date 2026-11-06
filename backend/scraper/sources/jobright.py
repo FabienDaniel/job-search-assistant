@@ -609,10 +609,8 @@ async def preview(search, db) -> dict:
                 },
             }
 
-        from backend.models.db import get_global_title_exclude
-        _global_title_excl = get_global_title_exclude(db)
-        include_kw = search.title_include_keywords or []
-        exclude_kw = list(set((search.title_exclude_keywords or []) + _global_title_excl))
+        from backend.scraper._shared.filters import search_title_filters, title_kept
+        include_kw, exclude_kw = search_title_filters(search, db)
         min_score = search.min_fit_score or 0
         require_salary = getattr(search, "require_salary", False)
 
@@ -638,19 +636,7 @@ async def preview(search, db) -> dict:
         results = []
         for j in unique_jobs:
             title = j["title"]
-            title_lower = title.lower()
-            kept = True
-            reason = None
-
-            # Title filters
-            if include_kw and not any(kw.lower() in title_lower for kw in include_kw):
-                kept = False
-                reason = f"No match for: {', '.join(include_kw)}"
-            if kept and exclude_kw:
-                matched = [kw for kw in exclude_kw if re.search(r'\b' + re.escape(kw) + r'\b', title_lower)]
-                if matched:
-                    kept = False
-                    reason = f"Excluded by: {', '.join(matched)}"
+            kept, reason = title_kept(title, include_kw, exclude_kw)
 
             # Company exclude
             if kept and (global_exclude_set or search_exclude_set):

@@ -670,7 +670,7 @@ async def preview(search: Search, db) -> dict:
     company_filter = search.company_filter or []
 
     import json
-    from backend.scraper._shared.filters import build_search_exclude_sets
+    from backend.scraper._shared.filters import build_search_exclude_sets, title_kept
     global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
     search_exclude = list(search_exclude_set)
     all_exclude = list(global_exclude_set | search_exclude_set)
@@ -699,17 +699,7 @@ async def preview(search: Search, db) -> dict:
     for j in raw_jobs:
         title = j["title"]
         title_lower = title.lower()
-        kept = True
-        reason = None
-
-        if include_kw and not any(kw.lower() in title_lower for kw in include_kw):
-            kept = False
-            reason = f"No match for: {', '.join(include_kw)}"
-        if kept and exclude_kw:
-            matched = [kw for kw in exclude_kw if re.search(r'\b' + re.escape(kw) + r'\b', title_lower)]
-            if matched:
-                kept = False
-                reason = f"Excluded by: {', '.join(matched)}"
+        kept, reason = title_kept(title, include_kw, exclude_kw)
         if kept and company_filter:
             company_lower = (j.get("company") or "").lower()
             if company_lower not in {cf.lower() for cf in company_filter}:
