@@ -665,12 +665,11 @@ async def preview(search: Search, db) -> dict:
         }
 
     raw_count = len(raw_jobs)
-    include_kw = search.title_include_keywords or []
-    exclude_kw = search.title_exclude_keywords or []
+    from backend.scraper._shared.filters import build_search_exclude_sets, search_title_filters, title_kept
+    include_kw, exclude_kw = search_title_filters(search, db)
     company_filter = search.company_filter or []
 
     import json
-    from backend.scraper._shared.filters import build_search_exclude_sets, title_kept
     global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
     search_exclude = list(search_exclude_set)
     all_exclude = list(global_exclude_set | search_exclude_set)

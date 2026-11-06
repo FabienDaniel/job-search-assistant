@@ -12,6 +12,7 @@ Releases are named major.minor ("3.2"), with a patch number when needed ("3.2.1"
 - **False version warning on patch releases:** on 3.1.1 the dashboard reported itself as v3.1 and warned that it did not match the v3.1.1 backend, even when both were built from the same code, and rebuilding did not clear the warning. The dashboard now keeps the patch number, so the warning only appears for a real mismatch and Settings shows the right version.
 - **Test scrape of an Uber company:** Companies › Test sent a jobs.uber.com URL to the generic page reader instead of the Uber handler that the real scrape uses, so the preview found only the "Saved jobs" link. Test now reads Uber URLs through the Uber jobs API, like the scrape does.
 - **Title exclude keywords with capitals:** a search's exclude keyword typed with a capital letter ("Senior") never matched, so those jobs were kept, on every mode except JobSpy keyword searches and the extension. Exclude keywords now ignore case everywhere, as include keywords already did. The global title exclude list is covered too. Test on Jobright, LinkedIn personal and Levels.fyi searches follows the same rule, and a keyword search's Test names the matched keyword instead of "Filtered".
+- **Levels.fyi Test ignored the global title exclude list:** Test kept titles that the Title exclude list in Settings drops, so it showed jobs the run never saves. Test now applies that list too.
 
 ### Added
 
