@@ -819,7 +819,8 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
     filter_reject_reason = None
     reject_message = None
     if ext_search is not None:
-        from backend.scraper._shared.filters import search_title_filters, title_filter_hit
+        from backend.scraper._shared.filters import (global_company_exclude_set, search_title_filters,
+                                                     title_filter_hit)
         include_kw, exclude_kw = search_title_filters(ext_search, db)
         rule, keywords = title_filter_hit(title, include_kw, exclude_kw)
         if rule == "include":
@@ -836,6 +837,9 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
                     filter_reject_reason = f"company-exclude: {excl}"
                     reject_message = f"company excluded by '{excl}'"
                     break
+            if not filter_reject_reason and company_lower in global_company_exclude_set(db):
+                filter_reject_reason = f"company-exclude (global): {company}"
+                reject_message = "company is on your global Company exclude list"
 
     job = Job(
         external_id=external_id,

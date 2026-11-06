@@ -5,9 +5,8 @@ import re
 from urllib.parse import urlparse
 
 
-def build_search_exclude_sets(db, search) -> tuple[set, set]:
-    """Return (global_exclude_set, search_exclude_set) of lowercased company names; the search set adds every active Company's name+aliases when exclude_active_companies is true."""
-    from backend.models.db import Company
+def global_company_exclude_set(db) -> set:
+    """Lowercased company names on the account's Company exclude list in Settings."""
     from backend.accounts.settings import get_setting
 
     global_raw = get_setting(db, "company_exclude_global")
@@ -17,7 +16,14 @@ def build_search_exclude_sets(db, search) -> tuple[set, set]:
             global_list = json.loads(global_raw or "[]")
         except (ValueError, TypeError):
             global_list = []
-    global_set = {e.lower() for e in global_list if e}
+    return {e.lower() for e in global_list if e}
+
+
+def build_search_exclude_sets(db, search) -> tuple[set, set]:
+    """Return (global_exclude_set, search_exclude_set) of lowercased company names; the search set adds every active Company's name+aliases when exclude_active_companies is true."""
+    from backend.models.db import Company
+
+    global_set = global_company_exclude_set(db)
 
     search_set = {(e or "").lower() for e in (search.company_exclude or []) if e}
     if getattr(search, "exclude_active_companies", False):

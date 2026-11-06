@@ -14,6 +14,7 @@ Releases are named major.minor ("3.2"), with a patch number when needed ("3.2.1"
 - **Title exclude keywords with capitals:** a search's exclude keyword typed with a capital letter ("Senior") never matched, so those jobs were kept, on every mode except JobSpy keyword searches and the extension. Exclude keywords now ignore case everywhere, as include keywords already did. The global title exclude list is covered too. Test on Jobright, LinkedIn personal and Levels.fyi searches follows the same rule, and a keyword search's Test names the matched keyword instead of "Filtered".
 - **Levels.fyi Test ignored the global title exclude list:** Test kept titles that the Title exclude list in Settings drops, so it showed jobs the run never saves. Test now applies that list too.
 - **LinkedIn personal Test ignored Skip my active companies:** with the box ticked, the run drops jobs at a company you track, but Test kept them. Test now builds its company exclude list as the run does.
+- **Company exclude list in Settings and the extension:** jobs saved with the extension's Save to Job Feed button or captured from LinkedIn collections skipped the Company exclude list in Settings, which every scraper applies. Both now drop those companies too. A saved job says "company is on your global Company exclude list" and stays out of the feed.
 
 ### Added
 

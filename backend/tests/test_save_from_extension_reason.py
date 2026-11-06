@@ -87,6 +87,19 @@ async def test_company_exclude_is_explained(test_db, _no_h1b):
 
 
 @pytest.mark.asyncio
+async def test_global_company_exclude_is_explained(test_db, _no_h1b):
+    """The account-wide Company exclude list in Settings drops a saved job, as it does for every scraper."""
+    import json
+    test_db.add(Setting(key="company_exclude_global", value=json.dumps(["Acme"])))
+    test_db.commit()
+    _ext_search(test_db)
+    out = await _save(test_db, company="acme")
+
+    assert out["saved"] is False
+    assert out["reason"] == "company is on your global Company exclude list"
+
+
+@pytest.mark.asyncio
 async def test_body_exclusion_is_explained(test_db, monkeypatch):
     import backend.analyzer.h1b_checker as h1b
 
