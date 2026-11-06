@@ -86,3 +86,21 @@ async def test_import_skips_companies_on_the_global_exclude_list(test_db, monkey
     await enrich(["1", "2"])
 
     assert _imported_companies(test_db) == ["Globex"]
+
+
+@pytest.mark.asyncio
+async def test_import_skips_active_companies_when_the_search_asks(test_db, monkeypatch):
+    """"Skip my active companies": their career pages already bring those jobs in. Aliases count."""
+    from backend.models.db import Company, Search
+    from backend.scraper.sources.linkedin_extension import enrich
+    test_db.add(Search(name="Extension LI", search_mode="linkedin_extension", active=True,
+                       title_exclude_keywords=[], company_exclude=[], auto_scoring_depth="off",
+                       exclude_active_companies=True))
+    test_db.add(Company(name="Acme Corporation", aliases=["Acme"], active=True,
+                        scrape_urls=["https://acme.example/jobs"]))
+    test_db.commit()
+    _fake_voyager(monkeypatch, {"1": _li_job("Acme"), "2": _li_job("Globex")})
+
+    await enrich(["1", "2"])
+
+    assert _imported_companies(test_db) == ["Globex"]
