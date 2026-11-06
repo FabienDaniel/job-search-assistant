@@ -90,9 +90,9 @@ Copy `backend/scraper/sources/trulyremote.py` (shared fetch, detail pages, previ
 Copy `backend/scraper/ats/lever.py` (pure HTTP) or `meta.py` (Playwright) and `backend/tests/test_ats_lever.py`.
 
 1. `backend/scraper/ats/<name>.py`: `def is_<name>(url) -> bool` and `async def scrape(url, debug=False)` returning job dicts with `title` and `url` (optional `location`, `locations`, `arrangement`); with `debug=True` return `(jobs, rejected)`. Check rows with `_validate_job` (`_shared/filters.py`).
-2. Register it in `backend/scraper/sources/company_pages.py`: the import, `_dispatch_ats`, the ATS chain in `_fetch_postings`, and `_needs_browser` if it is pure HTTP.
-3. In `backend/api/routes_companies.py`: `detect_scrape_type` and the Test scrape chain in `test_scrape_company`.
-4. Optional: a description fetcher in `backend/scraper/ats/_descriptions.py`; `detectAts` / `ATS_SLUGS` in `frontend/src/screens/Companies.jsx` for the chip.
+2. Register it in `HANDLERS` in `backend/scraper/ats/registry.py`: its module, its chip label, and `browser=True` if it drives Playwright. Mind the order: a check that can match any host goes before the hostname checks. The run, the Test scrape, target keys and labels all read this list, and `test_ats_registry.py` fails when a handler module is missing from it.
+3. Mirror the check in `detectAts` in `frontend/src/screens/Companies.jsx`.
+4. Optional: a description fetcher in `backend/scraper/ats/_descriptions.py`, and `ATS_SLUGS` in `frontend/src/screens/Companies.jsx` for the chip.
 5. Read its job links in `backend/scraper/_shared/postings.py` (a posting key, then bump `READER_VERSION`). If the API returns the whole board in one go, add it to `_full_board` in `backend/scraper/_shared/missing_postings.py`, so postings that leave the board are marked closed.
 
 ## Add a résumé or cover-letter template

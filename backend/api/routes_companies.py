@@ -11,6 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from backend.models.db import get_db, Company, Job, Application, ScrapeLog, is_acknowledged
 from backend.accounts.settings import default_resume_ids as _default_resume_ids
+from backend.scraper.ats.registry import scrape_type
 
 logger = logging.getLogger("jobnavigator.companies")
 
@@ -21,50 +22,6 @@ async def _fire_h1b_async(company_id: str):
     """Run H-1B lookup (used as BackgroundTasks target)."""
     from backend.analyzer.h1b_checker import fetch_h1b_for_company_id
     await fetch_h1b_for_company_id(company_id)
-
-
-def detect_scrape_type(url: str) -> str:
-    """Detect the ATS/scraper type from a URL via string matching. No network calls."""
-    from backend.scraper.ats.workday import is_workday as _is_workday
-    from backend.scraper.ats.oracle_hcm import is_oracle_hcm as _is_oracle_hcm
-    from backend.scraper.ats.lever import is_lever as _is_lever
-    from backend.scraper.ats.phenom import is_phenom as _is_phenom_post
-    from backend.scraper.ats.talentbrew import is_talentbrew as _is_talentbrew_ajax
-    from backend.scraper.ats.ashby import is_ashby as _is_ashby
-    from backend.scraper.ats.greenhouse import is_greenhouse as _is_greenhouse
-    from backend.scraper.ats.rippling import is_rippling as _is_rippling
-    from backend.scraper.ats.amazon import is_amazon as _is_amazon
-    from backend.scraper.ats.smartrecruiters import is_smartrecruiters as _is_smartrecruiters
-    from backend.scraper.ats.meta import is_meta as _is_meta_careers
-    from backend.scraper.ats.google import is_google as _is_google_careers
-    if _is_workday(url):
-        return "Workday API"
-    if _is_oracle_hcm(url):
-        return "Oracle HCM API"
-    if _is_lever(url):
-        return "Lever API"
-    if _is_phenom_post(url):
-        return "Phenom API"
-    if _is_talentbrew_ajax(url):
-        return "TalentBrew AJAX"
-    if _is_ashby(url):
-        return "Ashby API"
-    if _is_greenhouse(url):
-        return "Greenhouse API"
-    if _is_rippling(url):
-        return "Rippling API"
-    if _is_amazon(url):
-        return "Amazon API"
-    from backend.scraper.ats.uber import is_uber as _is_uber
-    if _is_uber(url):
-        return "Uber API"
-    if _is_smartrecruiters(url):
-        return "SmartRecruiters API"
-    if _is_meta_careers(url):
-        return "Meta Careers (Playwright)"
-    if _is_google_careers(url):
-        return "Google Careers (Playwright)"
-    return "Generic (Playwright)"
 
 
 class CompanyCreate(BaseModel):
@@ -492,58 +449,7 @@ async def test_scrape_company(company_id: str, db: Session = Depends(get_db)):
     from backend.scraper.ats.generic import (
         _extract_all_pages, _wait_for_content, _setup_route_blocks,
     )
-    from backend.scraper.ats.talentbrew import (
-        is_talentbrew as _is_talentbrew_ajax,
-        scrape as _scrape_talentbrew_ajax,
-    )
-    from backend.scraper.ats.oracle_hcm import (
-        is_oracle_hcm as _is_oracle_hcm,
-        scrape as _scrape_oracle_hcm,
-    )
-    from backend.scraper.ats.phenom import (
-        is_phenom as _is_phenom_post,
-        scrape as _scrape_phenom,
-    )
-    from backend.scraper.ats.lever import (
-        is_lever as _is_lever,
-        scrape as _scrape_lever,
-    )
-    from backend.scraper.ats.workday import (
-        is_workday as _is_workday,
-        scrape as _scrape_workday,
-    )
-    from backend.scraper.ats.ashby import (
-        is_ashby as _is_ashby,
-        scrape as _scrape_ashby,
-    )
-    from backend.scraper.ats.greenhouse import (
-        is_greenhouse as _is_greenhouse,
-        scrape as _scrape_greenhouse,
-    )
-    from backend.scraper.ats.rippling import (
-        is_rippling as _is_rippling,
-        scrape as _scrape_rippling,
-    )
-    from backend.scraper.ats.smartrecruiters import (
-        is_smartrecruiters as _is_smartrecruiters,
-        scrape as _scrape_smartrecruiters,
-    )
-    from backend.scraper.ats.amazon import (
-        is_amazon as _is_amazon,
-        scrape as _scrape_amazon,
-    )
-    from backend.scraper.ats.uber import (
-        is_uber as _is_uber,
-        scrape as _scrape_uber,
-    )
-    from backend.scraper.ats.meta import (
-        is_meta as _is_meta_careers,
-        scrape as _scrape_meta_careers,
-    )
-    from backend.scraper.ats.google import (
-        is_google as _is_google_careers,
-        scrape as _scrape_google_careers,
-    )
+    from backend.scraper.ats import registry
 
     urls = company.scrape_urls or []
     if not urls:
@@ -577,84 +483,12 @@ async def test_scrape_company(company_id: str, db: Session = Depends(get_db)):
                 continue
             page = None
             try:
-                # HTTP-based scrapers (no Playwright needed)
-                if _is_phenom_post(target_url):
-                    jobs, rejected = await _scrape_phenom(target_url, debug=True)
+                handler = registry.detect(target_url)
+                if handler is not None:
+                    jobs, rejected = await handler.scrape(target_url, debug=True, browser=browser)
                     all_jobs.extend(jobs)
                     all_rejected.extend(rejected)
-                    urls_scraped.append(f"Phenom POST API ({len(jobs)} found)")
-                    continue
-                if _is_talentbrew_ajax(target_url):
-                    jobs, rejected = await _scrape_talentbrew_ajax(target_url, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via HTTP)")
-                    continue
-                if _is_oracle_hcm(target_url):
-                    jobs, rejected = await _scrape_oracle_hcm(target_url, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Oracle HCM API)")
-                    continue
-                if _is_lever(target_url):
-                    jobs, rejected = await _scrape_lever(target_url, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Lever API)")
-                    continue
-                if _is_workday(target_url):
-                    jobs, rejected = await _scrape_workday(target_url, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Workday API)")
-                    continue
-                if _is_ashby(target_url):
-                    jobs, rejected = await _scrape_ashby(target_url, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Ashby API)")
-                    continue
-                if _is_greenhouse(target_url):
-                    jobs, rejected = await _scrape_greenhouse(target_url, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Greenhouse API)")
-                    continue
-                if _is_rippling(target_url):
-                    jobs, rejected = await _scrape_rippling(target_url, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Rippling API)")
-                    continue
-                if _is_smartrecruiters(target_url):
-                    jobs, rejected = await _scrape_smartrecruiters(target_url, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via SmartRecruiters API)")
-                    continue
-                if _is_amazon(target_url):
-                    jobs, rejected = await _scrape_amazon(target_url, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Amazon API)")
-                    continue
-                if _is_uber(target_url):
-                    jobs, rejected = await _scrape_uber(target_url, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Uber API)")
-                    continue
-                if _is_meta_careers(target_url):
-                    jobs, rejected = await _scrape_meta_careers(target_url, browser=browser, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Meta Careers)")
-                    continue
-                if _is_google_careers(target_url):
-                    jobs, rejected = await _scrape_google_careers(target_url, browser=browser, debug=True)
-                    all_jobs.extend(jobs)
-                    all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via Google Careers)")
+                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via {handler.label})")
                     continue
 
                 page = await _new_page(browser)
@@ -783,7 +617,7 @@ def _company_to_dict(c: Company, application_count: int = 0, h1b=None,
                      last_error=None, last_run_warning: bool = False, last_run_at=None,
                      warning_acknowledged: bool = False) -> dict:
     urls = c.scrape_urls or []
-    detected_types = {url: detect_scrape_type(url) for url in urls if url.strip()}
+    detected_types = {url: scrape_type(url) for url in urls if url.strip()}
     # h1b is a VisaCache row (or None) for this company — H-1B metrics live there now.
     return {
         "id": str(c.id),

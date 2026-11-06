@@ -384,11 +384,11 @@ async def test_scrape_debug_returns_rejected_with_reasons(monkeypatch):
 
 # ── Detect_scrape_type integration ──────────────────────────────────────────
 
-def test_detect_scrape_type_returns_smartrecruiters():
-    from backend.api.routes_companies import detect_scrape_type
-    assert detect_scrape_type(
+def test_scrape_type_returns_smartrecruiters():
+    from backend.scraper.ats.registry import scrape_type
+    assert scrape_type(
         "https://careers.smartrecruiters.com/Avaloq1"
     ) == "SmartRecruiters API"
-    assert detect_scrape_type(
+    assert scrape_type(
         "https://jobs.smartrecruiters.com/Avaloq1"
     ) == "SmartRecruiters API"

@@ -25,7 +25,7 @@ backend/scraper/
 | `POST /api/searches/{id}/run` (`api/routes_searches.py`) | `orchestrator._run_search_by_id` | One search, caller's account only, no shared fetch |
 | `POST /api/scrape/company/{id}` (`main.py`) | `company_pages.scrape_single_career_page` + `record_company_scrape_log` | One company |
 | `POST /api/searches/{id}/test` | `sources.<module>.preview(search, db)` | Dry run for the Test button. Writes no jobs |
-| `POST /api/companies/{id}/test-scrape` (`api/routes_companies.py`) | its own ATS chain (see Known issues) | Dry run of a company |
+| `POST /api/companies/{id}/test-scrape` (`api/routes_companies.py`) | `ats.registry` handlers and its own filter pass (see Known issues) | Dry run of a company |
 | `POST /api/jobs/linkedin-import` (`api/routes_jobs.py`) | `sources.linkedin_extension.enrich` | LinkedIn job ids pushed by the Chrome extension |
 
 `orchestrator.run_search(search)` dispatches one search to its source module. `orchestrator.run_company(company)` does the same for one company.
@@ -129,7 +129,9 @@ Handler contract (`ats/<name>.py`):
 | `meta`, `google` | Playwright DOM scraping with pagination |
 | `generic` | Playwright fallback: link heuristics, pagination, the company's `wait_for_selector` |
 
-Detection order lives in `company_pages._dispatch_ats`. `_needs_browser` decides whether Chromium is launched at all, so a company that only uses API handlers never starts a browser. `_fetch_postings` is the fetch half that a shared company target runs once.
+`ats/registry.py` holds the one ordered list of handlers (`HANDLERS`). `detect(url)` picks the handler, `scrape_type(url)` gives its label for the dashboard chip, target keys and telemetry, and `needs_browser(urls)` decides whether Chromium is launched at all, so a company that only uses API handlers never starts a browser. The order matters: checks that can match any host (Phenom's `POST|` spec, TalentBrew's AJAX path, Oracle's `/sites/` path) come first. `detectAts` in `frontend/src/screens/Companies.jsx` mirrors the list for the live chip.
+
+`company_pages._dispatch_ats` calls the registry's handler or the generic reader. `_fetch_postings` is the fetch half that a shared company target runs once.
 
 `ats/_descriptions.py` fetches a job's description after the listing. `_fetch_job_description` tries the ATS's own detail API first (`_fetch_description_ats`), then falls back to the page HTML through the SSRF guard, rejecting bot walls and script blobs.
 
@@ -181,7 +183,7 @@ One posting reaches the app through many links: the company's board, LinkedIn, J
 
 ## Extending
 
-Follow the recipes in `CONTRIBUTING.md`: "Add a job-board source" and "Add an ATS handler". A new ATS handler currently has to be registered in every detection list, not only `_dispatch_ats` (see Known issues).
+Follow the recipes in `CONTRIBUTING.md`: "Add a job-board source" and "Add an ATS handler". A new ATS handler is registered once, in `ats/registry.HANDLERS`. `test_ats_registry.py` fails when an `ats/<name>.py` with an `is_<name>` check is missing from it.
 
 ## Tests
 
@@ -203,8 +205,6 @@ Use the `test_db` or `api_client` fixture in any test that touches the database.
 
 These are places where scraping logic lives outside this package, or where the package depends on layers above it.
 
-- **ATS detection in the API layer.** `api/routes_companies.detect_scrape_type` labels a URL's ATS. `targets._ats_label` and `company_pages._ats_labels_for` import it from the API router, which is the wrong direction.
-- **ATS detection written out five times.** `company_pages._dispatch_ats`, `_needs_browser`, `_fetch_postings`, `routes_companies.detect_scrape_type` and `routes_companies.test_scrape_company` each list the handlers, and their orders differ. The Test chain has no Uber branch, so a jobs.uber.com URL runs the generic Playwright scraper in Test while a real run uses the Uber API.
 - **Test logic in routes.** The company Test (`routes_companies.test_scrape_company`), the JobSpy Test and the levels.fyi Test (`routes_searches.test_search`, `_test_levelsfyi_search`) implement scraping and filtering in the API layer. The JobSpy Test filters with its own pandas code instead of `_shared/filters.py`.
 - **Posting-page fetcher in a route.** `api/routes_applications._cache_job_page`, `_fetch_with_playwright` and `_extract_clean_content` fetch and clean posting pages. `analyzer/cv_scorer.py` and `api/routes_jobs.py` import them from there. `routes_applications.extract_posting` and its helpers parse posting URLs in the same file.
 - **Duplicated filters.** `api/routes_jobs.save_from_extension` has its own copy of the title and company filters.

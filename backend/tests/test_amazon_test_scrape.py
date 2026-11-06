@@ -57,5 +57,5 @@ async def test_amazon_url_is_read_by_the_amazon_handler(test_db, _fake_amazon):
 
 
 def test_amazon_chip_label_matches_the_row_chip():
-    from backend.api.routes_companies import detect_scrape_type
-    assert detect_scrape_type(URL) == "Amazon API"
+    from backend.scraper.ats.registry import scrape_type
+    assert scrape_type(URL) == "Amazon API"

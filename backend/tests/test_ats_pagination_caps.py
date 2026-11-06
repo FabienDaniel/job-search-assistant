@@ -1,6 +1,8 @@
-"""Pin that Playwright-based ATS scrapers (Google, Meta) honour max_pages, checked via signature + static source inspection since scrape() needs a real browser."""
+"""Pin that Playwright-based ATS scrapers (Google, Meta) honour max_pages. The scrapers need a real browser, so their own caps are checked by signature and source. The dispatch is checked with fakes."""
 import inspect
 import re
+
+import pytest
 
 from backend.scraper.ats import google as google_ats
 from backend.scraper.ats import meta as meta_ats
@@ -45,9 +47,20 @@ def test_meta_pagination_uses_max_pages_not_hardcoded_20():
     )
 
 
-def test_dispatch_ats_forwards_max_pages_to_google_and_meta():
-    """The dispatcher source must show `max_pages=max_pages` in the google + meta branches."""
-    src = inspect.getsource(company_pages._dispatch_ats)
-    # Both calls should pass max_pages= explicitly
-    assert "google.scrape(url, browser=shared_browser, max_pages=max_pages" in src
-    assert "meta.scrape(url, browser=shared_browser, max_pages=max_pages" in src
+@pytest.mark.asyncio
+@pytest.mark.parametrize("module, url", [
+    (google_ats, "https://www.google.com/about/careers/applications/jobs/results/?q=pm"),
+    (meta_ats, "https://www.metacareers.com/jobs?q=pm"),
+])
+async def test_dispatch_ats_forwards_max_pages_and_browser(monkeypatch, module, url):
+    seen = {}
+
+    async def fake_scrape(u, browser=None, max_pages=None, debug=False):
+        seen.update(url=u, browser=browser, max_pages=max_pages)
+        return []
+    monkeypatch.setattr(module, "scrape", fake_scrape)
+    browser = object()
+
+    await company_pages._dispatch_ats(url, shared_browser=browser, max_pages=3)
+
+    assert seen == {"url": url, "browser": browser, "max_pages": 3}

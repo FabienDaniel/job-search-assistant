@@ -13,10 +13,7 @@ from backend.scraper._shared.browser import _get_browser, _new_page, _close_page
 from backend.scraper._shared.filters import _apply_company_filters
 from backend.scraper._shared.dedup import make_external_id, make_content_hash, mark_ignored, _normalize_url
 from backend.scraper._shared.posting_links import counts_as_new
-from backend.scraper.ats import (
-    workday, greenhouse, lever, ashby, oracle_hcm,
-    phenom, talentbrew, rippling, smartrecruiters, meta, google, amazon, uber, generic,
-)
+from backend.scraper.ats import generic, registry
 from backend.scraper.ats._descriptions import _fetch_descriptions_parallel
 
 logger = logging.getLogger("jobnavigator.scraper.sources.company_pages")
@@ -25,34 +22,12 @@ logger = logging.getLogger("jobnavigator.scraper.sources.company_pages")
 # ── ATS dispatcher ───────────────────────────────────────────────────────────
 
 async def _dispatch_ats(url: str, debug: bool = False, shared_browser=None, max_pages: int | None = None):
-    """Detect ATS by URL and call the matching scraper, falling back to generic; order must match the if/elif chain in scrape_single_career_page, and `max_pages` only affects Playwright-paginated scrapers (Google, Meta) since HTTP-only ones are API-driven and unbounded."""
-    if phenom.is_phenom(url):
-        return await phenom.scrape(url, debug=debug)
-    if talentbrew.is_talentbrew(url):
-        return await talentbrew.scrape(url, debug=debug)
-    if oracle_hcm.is_oracle_hcm(url):
-        return await oracle_hcm.scrape(url, debug=debug)
-    if lever.is_lever(url):
-        return await lever.scrape(url, debug=debug)
-    if workday.is_workday(url):
-        return await workday.scrape(url, debug=debug)
-    if ashby.is_ashby(url):
-        return await ashby.scrape(url, debug=debug)
-    if greenhouse.is_greenhouse(url):
-        return await greenhouse.scrape(url, debug=debug)
-    if rippling.is_rippling(url):
-        return await rippling.scrape(url, debug=debug)
-    if smartrecruiters.is_smartrecruiters(url):
-        return await smartrecruiters.scrape(url, debug=debug)
-    if amazon.is_amazon(url):
-        return await amazon.scrape(url, debug=debug)
-    if uber.is_uber(url):
-        return await uber.scrape(url, debug=debug)
-    if meta.is_meta(url):
-        return await meta.scrape(url, browser=shared_browser, max_pages=max_pages, debug=debug)
-    if google.is_google(url):
-        return await google.scrape(url, browser=shared_browser, max_pages=max_pages, debug=debug)
-    # The fallback honours the same per-company page cap as every other handler; None keeps generic's own default.
+    """Call the handler `ats.registry` picks for this URL, or the generic reader. `max_pages`
+    only caps Playwright-paginated readers (Meta, Google, generic). The API handlers read the whole board."""
+    handler = registry.detect(url)
+    if handler is not None:
+        return await handler.scrape(url, debug=debug, browser=shared_browser, max_pages=max_pages)
+    # None keeps generic's own default page cap.
     return await generic.scrape(url, browser=shared_browser, debug=debug, **({'max_pages': max_pages} if max_pages else {}))
 
 
@@ -91,15 +66,14 @@ def _refresh_known_jobs(db, known: dict) -> int:
 
 
 def _ats_labels_for(urls) -> str:
-    """Return a comma-separated list of distinct ATS labels for these URLs, for activity-log messages (e.g. "Acme (Greenhouse): 3 new"); strips the API/AJAX/(Playwright) suffix from detect_scrape_type's labels for compactness."""
-    from backend.api.routes_companies import detect_scrape_type
+    """Return a comma-separated list of distinct ATS labels for these URLs, for activity-log messages (e.g. "Acme (Greenhouse): 3 new"); strips the API/AJAX/(Playwright) suffix from the registry labels for compactness."""
     labels = set()
     for u in urls:
         u = (u or "").strip()
         if not u:
             continue
         # "Workday API" → "Workday"; "Generic (Playwright)" → "Generic"; "TalentBrew AJAX" → "TalentBrew"
-        label = detect_scrape_type(u).split(" ", 1)[0]
+        label = registry.scrape_type(u).split(" ", 1)[0]
         labels.add(label)
     if not labels:
         return "?"
@@ -146,22 +120,6 @@ def record_company_scrape_log(company_id, company_name: str, result: dict, db=No
             db.close()
 
 
-def _needs_browser(urls):
-    """True if any URL requires a real browser (not a pure-API ATS)."""
-    for u in urls:
-        u = (u or "").strip()
-        if not u:
-            continue
-        if (phenom.is_phenom(u) or talentbrew.is_talentbrew(u) or oracle_hcm.is_oracle_hcm(u)
-                or lever.is_lever(u) or workday.is_workday(u) or ashby.is_ashby(u)
-                or greenhouse.is_greenhouse(u) or rippling.is_rippling(u)
-                or smartrecruiters.is_smartrecruiters(u) or amazon.is_amazon(u) or uber.is_uber(u)):
-            continue
-        # Meta, Google, levels.fyi, or generic Playwright — needs browser
-        return True
-    return False
-
-
 # ── Per-company scraper ──────────────────────────────────────────────────────
 
 async def _fetch_postings(company, target_urls: list, browser) -> tuple[list, list]:
@@ -178,13 +136,7 @@ async def _fetch_postings(company, target_urls: list, browser) -> tuple[list, li
         try:
             # Handled explicitly here (not via _dispatch_ats's generic branch) because generic
             # needs company.wait_for_selector + max_pages, not _dispatch_ats's defaults.
-            if (phenom.is_phenom(target_url) or talentbrew.is_talentbrew(target_url)
-                    or oracle_hcm.is_oracle_hcm(target_url) or lever.is_lever(target_url)
-                    or workday.is_workday(target_url) or ashby.is_ashby(target_url)
-                    or greenhouse.is_greenhouse(target_url) or rippling.is_rippling(target_url)
-                    or smartrecruiters.is_smartrecruiters(target_url)
-                    or amazon.is_amazon(target_url) or uber.is_uber(target_url)
-                    or meta.is_meta(target_url) or google.is_google(target_url)):
+            if registry.detect(target_url) is not None:
                 page_jobs = await _dispatch_ats(target_url, debug=False, shared_browser=browser, max_pages=max_pages)
             else:
                 page = await _new_page(browser)
@@ -231,7 +183,7 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
     # Only launch a browser if a URL needs one; API-only ATS batches (Lever, Greenhouse, etc.)
     # skip Chromium, avoiding failures on hosts without Playwright browsers installed (CI).
     # A subscriber whose postings were already fetched needs no browser at all.
-    needs_browser = not prefetched and _needs_browser(target_urls)
+    needs_browser = not prefetched and registry.needs_browser(target_urls)
     own_browser = shared_browser is None and needs_browser
     pw = None
     browser = shared_browser
@@ -534,7 +486,7 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
             + (f", {len(skipped)} active without URLs" if skipped else "")
         )
 
-        any_needs_browser = any(_needs_browser(c.scrape_urls or []) for c in companies)
+        any_needs_browser = any(registry.needs_browser(c.scrape_urls or []) for c in companies)
         if any_needs_browser:
             shared_pw, shared_browser = await _get_browser()
             logger.info("Playwright: launched shared browser for batch scrape")

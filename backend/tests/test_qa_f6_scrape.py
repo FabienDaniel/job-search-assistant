@@ -663,13 +663,15 @@ async def test_fragment_routes_are_two_targets_two_fetches(test_db, accounts, mo
     def _result(url):
         city = url.rsplit("=", 1)[-1]
         return [{"title": f"PM {city}", "url": f"https://careers.x.com/jobs/{city}"}]
-    monkeypatch.setattr(cp, "_needs_browser", lambda urls: False)
+    import backend.scraper.ats.registry as registry
+    monkeypatch.setattr(registry, "needs_browser", lambda urls: False)
     calls = _handler(monkeypatch, result=_result)
     _company(test_db, name="X", url=berlin)
     with use_account(b):
         _company(test_db, name="X", url=austin)
     # the fake handler stands in for every URL
-    monkeypatch.setattr(cp.lever, "is_lever", lambda u: True)
+    import backend.scraper.ats.lever as lever
+    monkeypatch.setattr(lever, "is_lever", lambda u: True)
 
     await cp.scrape_career_pages(force=True)
     assert sorted(calls) == sorted([berlin, austin])

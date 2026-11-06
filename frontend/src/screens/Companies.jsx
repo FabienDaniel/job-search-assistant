@@ -63,18 +63,20 @@ const pathHas = (url, ...needles) => {
   let p; try { p = new URL(url).pathname.toLowerCase() } catch { return false }
   return needles.some((n) => n && p.includes(n))
 }
-// Mirrors backend/api/routes_companies.py:detect_scrape_type (and the scraper/ats/*.is_* predicates)
+// Mirrors backend/scraper/ats/registry.py (HANDLERS order and the ats/*.is_* predicates)
 // so the live chip in the drawer/add modal agrees with the row chip the backend computes.
 const detectAts = (url) => {
   if (!url) return 'Generic'
   if (url.toUpperCase().startsWith('POST|')) return 'Phenom'
-  if (hostMatches(url, 'myworkdayjobs.com')) return 'Workday'
+  if (url.toLowerCase().includes('/search-jobs/results?')) return 'TalentBrew'
   // oracle_hcm.is_oracle_hcm: exact hcmUI path, or /sites/ + /jobs anywhere in the
   // URL (hash included) on an oraclecloud.com host or careers.oracle.com
+  
   if (url.includes('oraclecloud.com/hcmUI/CandidateExperience')) return t`Oracle HCM`
   if (url.includes('/sites/') && url.includes('/jobs') && hostMatches(url, 'oraclecloud.com', 'careers.oracle.com')) return t`Oracle HCM`
   if (url.toLowerCase().includes(t`jobs.lever.co/`)) return 'Lever'
   if (url.toLowerCase().includes('/search-jobs/results?')) return 'TalentBrew'
+  if (hostMatches(url, 'myworkdayjobs.com')) return 'Workday'
   if (hostMatches(url, 'jobs.ashbyhq.com')) return 'Ashby'
   if (hostMatches(url, 'greenhouse.io')) return 'Greenhouse'
   if (hostMatches(url, 'ats.rippling.com') || (hostMatches(url, 'rippling.com') && pathHas(url, '/careers'))) return 'Rippling'

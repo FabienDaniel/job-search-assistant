@@ -249,8 +249,8 @@ def target_url(url: str) -> str:
 
 def _ats_label(url: str) -> str:
     try:
-        from backend.api.routes_companies import detect_scrape_type
-        return detect_scrape_type(url)
+        from backend.scraper.ats.registry import scrape_type
+        return scrape_type(url)
     except Exception:
         return "?"
 
