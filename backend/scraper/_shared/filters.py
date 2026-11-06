@@ -188,12 +188,13 @@ def search_title_filters(search, db) -> tuple[list, list]:
 
 
 def title_kept(title: str, include_kw: list, exclude_kw: list) -> tuple[bool, str | None]:
-    """(kept, reason): include is a substring match on any keyword, exclude a whole-word match."""
+    """(kept, reason): include is a substring match on any keyword, exclude a whole-word match.
+    Both ignore case."""
     tl = title.lower()
     if include_kw and not any(kw.lower() in tl for kw in include_kw):
         return False, f"No match for: {', '.join(include_kw)}"
     if exclude_kw:
-        matched = [kw for kw in exclude_kw if re.search(r'\b' + re.escape(kw) + r'\b', tl)]
+        matched = [kw for kw in exclude_kw if re.search(r'\b' + re.escape(kw.lower()) + r'\b', tl)]
         if matched:
             return False, f"Excluded by: {', '.join(matched)}"
     return True, None

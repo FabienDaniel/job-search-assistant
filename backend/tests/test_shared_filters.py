@@ -147,3 +147,18 @@ def test_apply_company_filters_global_exclude():
     titles = [j["title"] for j in kept]
     assert "Junior Developer" not in titles
     assert "Senior Developer" in titles
+
+
+def test_title_kept_include_is_a_substring_match_in_any_case():
+    from backend.scraper._shared.filters import title_kept
+    assert title_kept("Senior Product Manager", ["product"], []) == (True, None)
+    assert title_kept("Senior Product Manager", ["PRODUCT"], []) == (True, None)
+    assert title_kept("Data Engineer", ["Product", "PM"], []) == (False, "No match for: Product, PM")
+
+
+def test_title_kept_exclude_is_a_whole_word_match_in_any_case():
+    """A keyword typed with capitals ("Senior") excludes the title as a lowercase one does."""
+    from backend.scraper._shared.filters import title_kept
+    assert title_kept("Senior Product Manager", [], ["Senior"]) == (False, "Excluded by: Senior")
+    assert title_kept("senior product manager", [], ["SENIOR"]) == (False, "Excluded by: SENIOR")
+    assert title_kept("Internal Tools PM", [], ["intern"]) == (True, None)
