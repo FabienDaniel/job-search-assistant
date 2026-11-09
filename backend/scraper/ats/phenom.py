@@ -1,5 +1,6 @@
 """Phenom People ATS handler — POST to a custom API endpoint with a JSON payload.
 Company URLs are stored as 'POST|{api_url}|{json_payload}' since Phenom has no public API; each company has its own endpoint and filter schema."""
+
 import json
 import logging
 import re
@@ -22,7 +23,7 @@ def _parse_phenom_url(raw: str) -> tuple[str, dict]:
     endpoint = parts[1].strip()
     if len(parts) > 2:
         # Collapse runs of whitespace (from textarea line-wrapping) before parsing
-        cleaned = re.sub(r'\s+', ' ', parts[2].strip())
+        cleaned = re.sub(r"\s+", " ", parts[2].strip())
         payload = json.loads(cleaned)
     else:
         payload = {}
@@ -103,7 +104,9 @@ async def scrape(raw_url: str, debug: bool = False) -> list[dict] | tuple:
     base_payload.setdefault("ddoKey", ddo_key)
 
     logger.info(f"Phenom API: endpoint={endpoint} ddoKey={ddo_key}")
-    logger.info(f"Phenom API: selected_fields={base_payload.get('selected_fields', 'NONE')}")
+    logger.info(
+        f"Phenom API: selected_fields={base_payload.get('selected_fields', 'NONE')}"
+    )
 
     jobs = []
     rejected = []
@@ -139,12 +142,24 @@ async def scrape(raw_url: str, debug: bool = False) -> list[dict] | tuple:
                     job_url = job_url[:-6]
                 reason = _validate_job(title, job_url)
                 if reason is None:
-                    jobs.append({"title": title, "url": job_url,
-                                 "location": _location_of(j),
-                                 "locations": _locations_of(j),
-                                 "arrangement": _arrangement_of(j)})
+                    jobs.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "location": _location_of(j),
+                            "locations": _locations_of(j),
+                            "arrangement": _arrangement_of(j),
+                        }
+                    )
                 elif debug:
-                    rejected.append({"title": title, "url": job_url, "selector": "phenom_api", "reason": reason})
+                    rejected.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "selector": "phenom_api",
+                            "reason": reason,
+                        }
+                    )
 
             offset += len(job_list)
             if offset >= total:

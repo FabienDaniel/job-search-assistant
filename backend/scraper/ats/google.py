@@ -1,11 +1,12 @@
 """Google Careers scraper (Playwright DOM); job cards are <li class="lLd3Je"> with
 <h3 class="QJPWVe"> titles and <a href="jobs/results/{id}-slug"> links, paginated
 via <a aria-label="Go to next page">."""
+
 import asyncio
 import logging
 import re
 
-from backend.scraper._shared.browser import _get_browser, _new_page, _close_page
+from backend.scraper._shared.browser import _close_page, _get_browser, _new_page
 from backend.scraper._shared.filters import _validate_job
 
 logger = logging.getLogger("jobnavigator.scraper.ats.google")
@@ -61,7 +62,9 @@ def is_google(url: str) -> bool:
     return "google.com/about/careers" in url.lower()
 
 
-async def scrape(url: str, browser=None, max_pages: int | None = None, debug: bool = False) -> list[dict] | tuple:
+async def scrape(
+    url: str, browser=None, max_pages: int | None = None, debug: bool = False
+) -> list[dict] | tuple:
     """Scrape Google Careers using Playwright DOM extraction; max_pages caps how many
     result pages to walk (None defaults to 50)."""
     page_cap = max_pages if (max_pages is not None and max_pages > 0) else 50
@@ -113,8 +116,12 @@ async def scrape(url: str, browser=None, max_pages: int | None = None, debug: bo
                 page_count += 1
 
                 # Title from <h3> in the parent card (h3 is a sibling, not inside <a>)
-                h3_handle = await link.evaluate_handle("el => (el.closest('li') || el.parentElement).querySelector('h3')")
-                title = (await h3_handle.evaluate("el => el ? el.innerText : ''")).strip()
+                h3_handle = await link.evaluate_handle(
+                    "el => (el.closest('li') || el.parentElement).querySelector('h3')"
+                )
+                title = (
+                    await h3_handle.evaluate("el => el ? el.innerText : ''")
+                ).strip()
 
                 job_url = f"https://www.google.com/about/careers/applications/jobs/results/{path_part}"
 
@@ -125,11 +132,23 @@ async def scrape(url: str, browser=None, max_pages: int | None = None, debug: bo
 
                 reason = _validate_job(title, job_url)
                 if reason is None:
-                    jobs.append({"title": title, "url": job_url,
-                                 "location": places[0] if places else None,
-                                 "locations": places})
+                    jobs.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "location": places[0] if places else None,
+                            "locations": places,
+                        }
+                    )
                 elif debug:
-                    rejected.append({"title": title, "url": job_url, "selector": "google_careers", "reason": reason})
+                    rejected.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "selector": "google_careers",
+                            "reason": reason,
+                        }
+                    )
 
             logger.info(f"Google Careers: page {page_num} — {page_count} new jobs")
 
@@ -146,7 +165,14 @@ async def scrape(url: str, browser=None, max_pages: int | None = None, debug: bo
     except Exception as e:
         logger.error(f"Google Careers scraper error: {e}")
         if debug:
-            rejected.append({"title": "(error)", "url": url, "selector": "google_careers", "reason": str(e)})
+            rejected.append(
+                {
+                    "title": "(error)",
+                    "url": url,
+                    "selector": "google_careers",
+                    "reason": str(e),
+                }
+            )
     finally:
         if page:
             await _close_page(page)

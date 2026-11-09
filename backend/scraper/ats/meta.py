@@ -1,11 +1,12 @@
 """Meta Careers scraper (Playwright DOM) — job cards render client-side via React, so this scrapes the DOM instead of an API."""
+
 import asyncio
 import logging
 import re
 
-from backend.scraper._shared.browser import _get_browser, _new_page, _close_page
-from backend.scraper._shared.urls import host_matches
+from backend.scraper._shared.browser import _close_page, _get_browser, _new_page
 from backend.scraper._shared.filters import _validate_job
+from backend.scraper._shared.urls import host_matches
 
 logger = logging.getLogger("jobnavigator.scraper.ats.meta")
 
@@ -75,7 +76,9 @@ def is_meta(url: str) -> bool:
     return host_matches(url, "metacareers.com")
 
 
-async def scrape(url: str, browser=None, max_pages: int | None = None, debug: bool = False) -> list[dict] | tuple:
+async def scrape(
+    url: str, browser=None, max_pages: int | None = None, debug: bool = False
+) -> list[dict] | tuple:
     """Scrape Meta Careers via Playwright DOM extraction; `max_pages` caps pages walked (default 20 if unset)."""
     page_cap = max_pages if (max_pages is not None and max_pages > 0) else 20
     own_browser = browser is None
@@ -91,7 +94,9 @@ async def scrape(url: str, browser=None, max_pages: int | None = None, debug: bo
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)
 
         try:
-            await page.wait_for_selector('a[href*="/profile/job_details/"]', timeout=15000)
+            await page.wait_for_selector(
+                'a[href*="/profile/job_details/"]', timeout=15000
+            )
         except Exception:
             logger.warning("Meta: job card selector timed out, trying fallback wait")
             await asyncio.sleep(5)
@@ -115,7 +120,9 @@ async def scrape(url: str, browser=None, max_pages: int | None = None, debug: bo
 
             for link in links:
                 href = await link.get_attribute("href") or ""
-                job_id = href.split("/profile/job_details/")[-1].rstrip("/").split("?")[0]
+                job_id = (
+                    href.split("/profile/job_details/")[-1].rstrip("/").split("?")[0]
+                )
                 if not job_id or job_id in seen_ids:
                     continue
                 seen_ids.add(job_id)
@@ -132,11 +139,23 @@ async def scrape(url: str, browser=None, max_pages: int | None = None, debug: bo
 
                 reason = _validate_job(title, job_url)
                 if reason is None:
-                    jobs.append({"title": title, "url": job_url,
-                                 "location": places[0] if places else None,
-                                 "locations": places})
+                    jobs.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "location": places[0] if places else None,
+                            "locations": places,
+                        }
+                    )
                 elif debug:
-                    rejected.append({"title": title, "url": job_url, "selector": "meta_careers", "reason": reason})
+                    rejected.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "selector": "meta_careers",
+                            "reason": reason,
+                        }
+                    )
 
             logger.info(f"Meta: page {page_num} — {page_count} new jobs")
 
@@ -150,14 +169,23 @@ async def scrape(url: str, browser=None, max_pages: int | None = None, debug: bo
             await next_btn.evaluate("el => el.click()")
             await asyncio.sleep(2)
             try:
-                await page.wait_for_selector('a[href*="/profile/job_details/"]', timeout=10000)
+                await page.wait_for_selector(
+                    'a[href*="/profile/job_details/"]', timeout=10000
+                )
             except Exception:
                 pass
 
     except Exception as e:
         logger.error(f"Meta scraper error: {e}")
         if debug:
-            rejected.append({"title": "(error)", "url": url, "selector": "meta_careers", "reason": str(e)})
+            rejected.append(
+                {
+                    "title": "(error)",
+                    "url": url,
+                    "selector": "meta_careers",
+                    "reason": str(e),
+                }
+            )
     finally:
         if page:
             await _close_page(page)

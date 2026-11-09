@@ -1,11 +1,15 @@
 """PATCH /api/settings must reject values it can't parse back; the guard lives in seed.invalid_setting_values()."""
+
 import importlib.util
 
 import pytest
 
 from backend.models.db import Setting
 from backend.seed import (
-    DEFAULT_SETTINGS, ENUM_SETTING_VALUES, INT_SETTING_KEYS, invalid_setting_values,
+    DEFAULT_SETTINGS,
+    ENUM_SETTING_VALUES,
+    INT_SETTING_KEYS,
+    invalid_setting_values,
 )
 
 
@@ -26,6 +30,7 @@ needs_apscheduler = pytest.mark.skipif(
 
 
 # ── the derived key sets ────────────────────────────────────────────────────
+
 
 def test_int_keys_match_the_rows_settings_marks_int():
     """Derived from the seeded defaults; must equal what Settings.jsx types as numeric."""
@@ -50,12 +55,16 @@ def test_every_validated_key_is_a_real_setting():
 
 def test_every_seeded_default_passes_its_own_guard():
     """The shipped defaults must survive a round-trip through the validator."""
-    updates = {k: v for k, (v, _d) in DEFAULT_SETTINGS.items()
-               if k in INT_SETTING_KEYS or k in ENUM_SETTING_VALUES or k.endswith("_cron")}
+    updates = {
+        k: v
+        for k, (v, _d) in DEFAULT_SETTINGS.items()
+        if k in INT_SETTING_KEYS or k in ENUM_SETTING_VALUES or k.endswith("_cron")
+    }
     assert invalid_setting_values(updates) == []
 
 
 # ── integers ────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.parametrize("value", ["", "abc", "1.5", "60m", None, [], True])
 def test_non_integer_interval_rejected(value):
@@ -75,6 +84,7 @@ def test_valid_integer_accepted(value):
 
 
 # ── cron ────────────────────────────────────────────────────────────────────
+
 
 def test_empty_cron_accepted():
     """Empty disables the job — the seeded help text says so."""
@@ -109,6 +119,7 @@ def test_valid_cron_accepted():
 
 # ── enums ───────────────────────────────────────────────────────────────────
 
+
 def test_unknown_provider_rejected():
     problems = invalid_setting_values({"llm_provider": "gemini"})
     assert len(problems) == 1
@@ -118,7 +129,9 @@ def test_unknown_provider_rejected():
 
 def test_unknown_depth_rejected():
     problems = invalid_setting_values({"scoring_default_depth": "deep"})
-    assert problems == ["scoring_default_depth: must be one of full, light (got 'deep')"]
+    assert problems == [
+        "scoring_default_depth: must be one of full, light (got 'deep')"
+    ]
 
 
 def test_empty_provider_accepted_it_means_inherit():
@@ -137,20 +150,24 @@ def test_enum_is_case_insensitive():
 
 # ── one message, every offender ─────────────────────────────────────────────
 
+
 def test_all_offenders_listed_in_one_pass():
-    problems = invalid_setting_values({
-        "scrape_interval_minutes": "soon",
-        "backup_cron": "nope",
-        "llm_provider": "gemini",
-        "fit_score_threshold": "60",      # fine — must not appear
-    })
+    problems = invalid_setting_values(
+        {
+            "scrape_interval_minutes": "soon",
+            "backup_cron": "nope",
+            "llm_provider": "gemini",
+            "fit_score_threshold": "60",  # fine — must not appear
+        }
+    )
     assert len(problems) == 3
     keys = [p.split(":")[0] for p in problems]
-    assert keys == sorted(keys)           # deterministic order
+    assert keys == sorted(keys)  # deterministic order
     assert "fit_score_threshold" not in keys
 
 
 # ── the endpoint ────────────────────────────────────────────────────────────
+
 
 @needs_container
 def test_patch_rejects_non_integer_interval(api_client, test_db):
@@ -158,8 +175,10 @@ def test_patch_rejects_non_integer_interval(api_client, test_db):
     resp = api_client.patch("/api/settings", json={"scrape_interval_minutes": "abc"})
     assert resp.status_code == 400
     assert "scrape_interval_minutes" in resp.json()["detail"]
-    assert test_db.query(Setting).filter(
-        Setting.key == "scrape_interval_minutes").first() is None
+    assert (
+        test_db.query(Setting).filter(Setting.key == "scrape_interval_minutes").first()
+        is None
+    )
 
 
 @needs_container
@@ -189,11 +208,14 @@ def test_patch_rejects_unknown_enum(api_client, test_db):
 @needs_container
 def test_patch_lists_every_invalid_key_in_one_message(api_client, test_db):
     _seed_first_run(test_db)
-    resp = api_client.patch("/api/settings", json={
-        "scrape_interval_minutes": "abc",
-        "backup_cron": "nope",
-        "llm_provider": "gemini",
-    })
+    resp = api_client.patch(
+        "/api/settings",
+        json={
+            "scrape_interval_minutes": "abc",
+            "backup_cron": "nope",
+            "llm_provider": "gemini",
+        },
+    )
     assert resp.status_code == 400
     detail = resp.json()["detail"]
     assert detail.startswith("Invalid setting value — ")
@@ -206,14 +228,20 @@ def test_patch_lists_every_invalid_key_in_one_message(api_client, test_db):
 @needs_container
 def test_patch_accepts_valid_values(api_client, test_db):
     _seed_first_run(test_db)
-    resp = api_client.patch("/api/settings", json={
-        "scrape_interval_minutes": "15",
-        "backup_cron": "0 3 * * *",
-        "scoring_default_depth": "full",
-    })
+    resp = api_client.patch(
+        "/api/settings",
+        json={
+            "scrape_interval_minutes": "15",
+            "backup_cron": "0 3 * * *",
+            "scoring_default_depth": "full",
+        },
+    )
     assert resp.status_code == 200
     assert sorted(resp.json()["updated"]) == [
-        "backup_cron", "scoring_default_depth", "scrape_interval_minutes"]
+        "backup_cron",
+        "scoring_default_depth",
+        "scrape_interval_minutes",
+    ]
 
 
 @needs_container

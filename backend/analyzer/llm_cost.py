@@ -1,36 +1,65 @@
 """LLM pricing and cost calculation, in USD per million tokens, keyed by (provider, model) since the same model can be billed differently across providers (e.g. Anthropic API vs. Claude Code subscription).
 claude_api/openai use static tables (update when models change); openrouter is fetched live (refresh_openrouter_prices); claude_code/codex_cli/antigravity_cli/opencode_go/ollama/lmstudio are always $0."""
-import time as _time
+
 import logging
+import time as _time
 from typing import Optional
 
 logger = logging.getLogger("jobnavigator.llm_cost")
 
 # ── Anthropic (cache read = 10% input, 5m cache write = 125% input) ──────────
-_CLAUDE_FABLE_5 = {"input_per_mtok": 10.0, "output_per_mtok": 50.0, "cache_read_per_mtok": 1.00, "cache_write_per_mtok": 12.50}
+_CLAUDE_FABLE_5 = {
+    "input_per_mtok": 10.0,
+    "output_per_mtok": 50.0,
+    "cache_read_per_mtok": 1.00,
+    "cache_write_per_mtok": 12.50,
+}
 _CLAUDE_FABLE_51 = {  # Fable 5.1 — Fable 5's card, but cache reads are $0.25
-    "input_per_mtok": 10.0, "output_per_mtok": 50.0, "cache_read_per_mtok": 0.25, "cache_write_per_mtok": 12.50,
+    "input_per_mtok": 10.0,
+    "output_per_mtok": 50.0,
+    "cache_read_per_mtok": 0.25,
+    "cache_write_per_mtok": 12.50,
 }
 _CLAUDE_OPUS_55 = {  # Opus 5.5 — $4/$20
-    "input_per_mtok": 4.0, "output_per_mtok": 20.0, "cache_read_per_mtok": 0.20, "cache_write_per_mtok": 5.00,
+    "input_per_mtok": 4.0,
+    "output_per_mtok": 20.0,
+    "cache_read_per_mtok": 0.20,
+    "cache_write_per_mtok": 5.00,
 }
 _CLAUDE_OPUS = {  # Opus 5 / 4.8 / 4.7 / 4.6 / 4.5 share the $5/$25 card
-    "input_per_mtok": 5.0, "output_per_mtok": 25.0, "cache_read_per_mtok": 0.50, "cache_write_per_mtok": 6.25,
+    "input_per_mtok": 5.0,
+    "output_per_mtok": 25.0,
+    "cache_read_per_mtok": 0.50,
+    "cache_write_per_mtok": 6.25,
 }
 _CLAUDE_SONNET_5 = {  # Sonnet 5 — $2/$10 is now the standard price
-    "input_per_mtok": 2.0, "output_per_mtok": 10.0, "cache_read_per_mtok": 0.20, "cache_write_per_mtok": 2.50,
+    "input_per_mtok": 2.0,
+    "output_per_mtok": 10.0,
+    "cache_read_per_mtok": 0.20,
+    "cache_write_per_mtok": 2.50,
 }
 _CLAUDE_SONNET_46 = {  # Sonnet 4.6 / 4.5 — $3/$15
-    "input_per_mtok": 3.0, "output_per_mtok": 15.0, "cache_read_per_mtok": 0.30, "cache_write_per_mtok": 3.75,
+    "input_per_mtok": 3.0,
+    "output_per_mtok": 15.0,
+    "cache_read_per_mtok": 0.30,
+    "cache_write_per_mtok": 3.75,
 }
-_CLAUDE_HAIKU = {"input_per_mtok": 1.0, "output_per_mtok": 5.0, "cache_read_per_mtok": 0.10, "cache_write_per_mtok": 1.25}
+_CLAUDE_HAIKU = {
+    "input_per_mtok": 1.0,
+    "output_per_mtok": 5.0,
+    "cache_read_per_mtok": 0.10,
+    "cache_write_per_mtok": 1.25,
+}
 
 
 def _oa(inp: float, out: float, cache_read: Optional[float] = None) -> dict:
     """OpenAI entry — no separate cache-write charge; cache read = cached-input price."""
-    return {"input_per_mtok": inp, "output_per_mtok": out,
-            "cache_read_per_mtok": cache_read if cache_read is not None else inp,
-            "cache_write_per_mtok": inp}
+    return {
+        "input_per_mtok": inp,
+        "output_per_mtok": out,
+        "cache_read_per_mtok": cache_read if cache_read is not None else inp,
+        "cache_write_per_mtok": inp,
+    }
 
 
 # Per million tokens, USD.
@@ -72,10 +101,17 @@ PRICING: dict[str, dict[str, dict]] = {
 }
 
 # Providers whose calls are covered by flat subscription / local compute — always $0.
-FREE_PROVIDERS: set[str] = {"claude_code", "codex_cli", "antigravity_cli", "opencode_go", "ollama", "lmstudio"}
+FREE_PROVIDERS: set[str] = {
+    "claude_code",
+    "codex_cli",
+    "antigravity_cli",
+    "opencode_go",
+    "ollama",
+    "lmstudio",
+}
 
 # ── OpenRouter live pricing ──────────────────────────────────────────────────
-_OR_PRICES: dict[str, dict] = {}   # slug -> per-Mtok pricing dict
+_OR_PRICES: dict[str, dict] = {}  # slug -> per-Mtok pricing dict
 _OR_FETCHED_AT: float = 0.0
 _OR_TTL = 12 * 3600  # refresh at most every 12h
 
@@ -87,6 +123,7 @@ async def refresh_openrouter_prices(force: bool = False) -> None:
         return
     try:
         import httpx
+
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get("https://openrouter.ai/api/v1/models")
             resp.raise_for_status()
@@ -124,11 +161,14 @@ def get_pricing(provider: str, model: str) -> Optional[dict]:
     return PRICING.get(provider, {}).get(model)
 
 
-def calc_cost(provider: str, model: str,
-              input_tokens: int = 0,
-              output_tokens: int = 0,
-              cache_read_tokens: int = 0,
-              cache_write_tokens: int = 0) -> float:
+def calc_cost(
+    provider: str,
+    model: str,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+) -> float:
     """Calculate USD cost for a single LLM call; returns 0.0 for subscription/local providers or an unpriced (provider, model) combo."""
     if provider in FREE_PROVIDERS:
         return 0.0

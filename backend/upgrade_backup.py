@@ -23,6 +23,7 @@ plain SQL on the engine (the scoping listeners only see ORM queries). It is not 
 `settings` row because settings carry sections, policies and per-account copies,
 and must not be read before the settings table is migrated.
 """
+
 from __future__ import annotations
 
 import logging
@@ -42,8 +43,8 @@ MARKER_TABLE = "app_meta"
 MARKER_KEY = "app_version"
 SKIP_ENV = "JN_SKIP_UPGRADE_BACKUP"
 PREFIX = "pre_upgrade_"
-DUMP_TIMEOUT = 3600       # seconds; a large install may take minutes, never block forever
-HEARTBEAT = 15            # seconds between "still dumping" lines
+DUMP_TIMEOUT = 3600  # seconds; a large install may take minutes, never block forever
+HEARTBEAT = 15  # seconds between "still dumping" lines
 
 
 class UpgradeBackupFailed(RuntimeError):
@@ -52,15 +53,15 @@ class UpgradeBackupFailed(RuntimeError):
 
 @dataclass(frozen=True)
 class DbState:
-    marker: Optional[str]     # the app_meta release, None when absent
-    has_settings: bool        # any JobNavigator schema at all
-    has_accounts: bool        # 3.0 schema (the accounts table is new in 3.0)
+    marker: Optional[str]  # the app_meta release, None when absent
+    has_settings: bool  # any JobNavigator schema at all
+    has_accounts: bool  # 3.0 schema (the accounts table is new in 3.0)
 
 
 @dataclass(frozen=True)
 class Decision:
     backup: bool
-    old: Optional[str]        # the release the database is on ("2.x" when inferred)
+    old: Optional[str]  # the release the database is on ("2.x" when inferred)
     new: str
     reason: str
 
@@ -82,6 +83,7 @@ def decide(state: DbState, code_version: str = APP_VERSION) -> Decision:
 def _engine():
     # read at call time: the tests rebind backend.models.db.engine to their own DB
     import backend.models.db as db_mod
+
     return db_mod.engine
 
 
@@ -91,23 +93,36 @@ def read_state(engine=None) -> DbState:
     marker = None
     if insp.has_table(MARKER_TABLE):
         with engine.connect() as conn:
-            marker = conn.execute(text(f"SELECT value FROM {MARKER_TABLE} WHERE key = :k"),
-                                  {"k": MARKER_KEY}).scalar()
-    return DbState(marker=marker or None, has_settings=insp.has_table("settings"),
-                   has_accounts=insp.has_table("accounts"))
+            marker = conn.execute(
+                text(f"SELECT value FROM {MARKER_TABLE} WHERE key = :k"),
+                {"k": MARKER_KEY},
+            ).scalar()
+    return DbState(
+        marker=marker or None,
+        has_settings=insp.has_table("settings"),
+        has_accounts=insp.has_table("accounts"),
+    )
 
 
 def mark_booted(engine=None, version: str = APP_VERSION) -> None:
     """Record that this release booted successfully against the database."""
     engine = engine or _engine()
     with engine.begin() as conn:
-        conn.execute(text(f"CREATE TABLE IF NOT EXISTS {MARKER_TABLE} "
-                          "(key VARCHAR(64) PRIMARY KEY, value TEXT NOT NULL)"))
-        updated = conn.execute(text(f"UPDATE {MARKER_TABLE} SET value = :v WHERE key = :k"),
-                               {"k": MARKER_KEY, "v": version}).rowcount
+        conn.execute(
+            text(
+                f"CREATE TABLE IF NOT EXISTS {MARKER_TABLE} "
+                "(key VARCHAR(64) PRIMARY KEY, value TEXT NOT NULL)"
+            )
+        )
+        updated = conn.execute(
+            text(f"UPDATE {MARKER_TABLE} SET value = :v WHERE key = :k"),
+            {"k": MARKER_KEY, "v": version},
+        ).rowcount
         if not updated:
-            conn.execute(text(f"INSERT INTO {MARKER_TABLE} (key, value) VALUES (:k, :v)"),
-                         {"k": MARKER_KEY, "v": version})
+            conn.execute(
+                text(f"INSERT INTO {MARKER_TABLE} (key, value) VALUES (:k, :v)"),
+                {"k": MARKER_KEY, "v": version},
+            )
 
 
 def _skip_requested() -> bool:
@@ -116,12 +131,15 @@ def _skip_requested() -> bool:
 
 def _dump(prefix: str) -> dict:
     from backend.db_backup import run_pg_dump
+
     return run_pg_dump(prefix=prefix, rotate=False, timeout=DUMP_TIMEOUT)
 
 
-def prepare_upgrade(state: Optional[DbState] = None,
-                    dump: Callable[[str], dict] = _dump,
-                    code_version: str = APP_VERSION) -> Decision:
+def prepare_upgrade(
+    state: Optional[DbState] = None,
+    dump: Callable[[str], dict] = _dump,
+    code_version: str = APP_VERSION,
+) -> Decision:
     """Startup hook, before any migration. Takes the backup when the release changed;
     raises UpgradeBackupFailed (stop startup) when that backup fails, unless
     JN_SKIP_UPGRADE_BACKUP is set."""
@@ -135,31 +153,51 @@ def prepare_upgrade(state: Optional[DbState] = None,
     label = f"{decision.old} → {decision.new}"
     prefix = f"{PREFIX}{decision.old}_to_{decision.new}_"
     if _skip_requested():
-        logger.warning("%s is set: migrating the database %s WITHOUT a pre-upgrade backup.", SKIP_ENV, label)
+        logger.warning(
+            "%s is set: migrating the database %s WITHOUT a pre-upgrade backup.",
+            SKIP_ENV,
+            label,
+        )
         return decision
-    logger.warning("Upgrading the database %s: backing it up first to backups/%s<timestamp>.sql "
-                   "(pg_dump; a large database can take a minute).", label, prefix)
+    logger.warning(
+        "Upgrading the database %s: backing it up first to backups/%s<timestamp>.sql "
+        "(pg_dump; a large database can take a minute).",
+        label,
+        prefix,
+    )
     started = time.monotonic()
     done = threading.Event()
 
     def heartbeat():
         while not done.wait(HEARTBEAT):
-            logger.info("Pre-upgrade backup still running (%ds)…", int(time.monotonic() - started))
+            logger.info(
+                "Pre-upgrade backup still running (%ds)…",
+                int(time.monotonic() - started),
+            )
 
-    beat = threading.Thread(target=heartbeat, name="upgrade-backup-heartbeat", daemon=True)
+    beat = threading.Thread(
+        target=heartbeat, name="upgrade-backup-heartbeat", daemon=True
+    )
     beat.start()
     try:
         result = dump(prefix)
     except Exception as error:
         done.set()
         detail = (str(error).strip() or error.__class__.__name__).splitlines()[-1][:300]
-        message = (f"Pre-upgrade backup FAILED ({detail}). The database was NOT migrated ({label}) "
-                   f"and the backend will not start without a backup. Check that backups/ is mounted "
-                   f"and writable and the disk has room, then restart; or set {SKIP_ENV}=1 in .env to "
-                   f"migrate without one.")
+        message = (
+            f"Pre-upgrade backup FAILED ({detail}). The database was NOT migrated ({label}) "
+            f"and the backend will not start without a backup. Check that backups/ is mounted "
+            f"and writable and the disk has room, then restart; or set {SKIP_ENV}=1 in .env to "
+            f"migrate without one."
+        )
         logger.error(message)
         raise UpgradeBackupFailed(message) from error
     done.set()
-    logger.warning("Pre-upgrade backup written: backups/%s (%.1f MB, %ds). Migrating %s.",
-                   result.get("file"), result.get("size_mb") or 0, int(time.monotonic() - started), label)
+    logger.warning(
+        "Pre-upgrade backup written: backups/%s (%.1f MB, %ds). Migrating %s.",
+        result.get("file"),
+        result.get("size_mb") or 0,
+        int(time.monotonic() - started),
+        label,
+    )
     return decision

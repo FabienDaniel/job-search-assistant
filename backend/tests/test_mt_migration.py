@@ -4,12 +4,26 @@ The fixture DB is SQLite: the Postgres ALTERs are skipped there (create_all alre
 built the column from the model), but the owner creation and the backfill UPDATEs
 are dialect-neutral and run for real.
 """
+
 import pytest
 
 import backend.seed as seed
 from backend.models.db import (
-    Account, ActivityLog, Application, Company, CoverLetter, Interview, Job, JobRun,
-    LlmCallLog, Persona, Resume, ScrapeLog, Search, TracerLink, get_owner_id,
+    Account,
+    ActivityLog,
+    Application,
+    Company,
+    CoverLetter,
+    Interview,
+    Job,
+    JobRun,
+    LlmCallLog,
+    Persona,
+    Resume,
+    ScrapeLog,
+    Search,
+    TracerLink,
+    get_owner_id,
 )
 from backend.tests.r4_support import make_job
 
@@ -22,24 +36,45 @@ def _seed_one_of_each(db):
     job = make_job(db)
     app = Application(job_id=job.id)
     resume = Resume(name="R")
-    db.add_all([Search(name="S"), Company(name="C"), app, resume,
-                CoverLetter(name="L"), JobRun(job_type="t", trigger="manual"),
-                ScrapeLog(), LlmCallLog(purpose="p"), ActivityLog(type="t", message="m")])
+    db.add_all(
+        [
+            Search(name="S"),
+            Company(name="C"),
+            app,
+            resume,
+            CoverLetter(name="L"),
+            JobRun(job_type="t", trigger="manual"),
+            ScrapeLog(),
+            LlmCallLog(purpose="p"),
+            ActivityLog(type="t", message="m"),
+        ]
+    )
     db.commit()
-    db.add_all([Interview(application_id=app.id, what="Call"),
-                TracerLink(token="abc", destination_url="u", source_label="s", resume_id=resume.id)])
+    db.add_all(
+        [
+            Interview(application_id=app.id, what="Call"),
+            TracerLink(
+                token="abc", destination_url="u", source_label="s", resume_id=resume.id
+            ),
+        ]
+    )
     if not db.query(Persona).first():
         db.add(Persona(id=1))
     db.commit()
 
 
 def _null_counts(db):
-    return {t: db.execute(seed.text(f"select count(*) from {t} where account_id is null")).scalar()
-            for t in seed.ACCOUNT_TABLES}
+    return {
+        t: db.execute(
+            seed.text(f"select count(*) from {t} where account_id is null")
+        ).scalar()
+        for t in seed.ACCOUNT_TABLES
+    }
 
 
 def test_every_listed_table_has_the_column_in_the_model(test_db):
     from backend.models.db import Base
+
     for t in seed.ACCOUNT_TABLES:
         assert "account_id" in Base.metadata.tables[t].c, t
 
@@ -98,8 +133,14 @@ def test_rows_that_already_belong_to_an_account_are_left_alone(test_db):
 
     owner_id = get_owner_id(test_db)
     assert owner_id != other.id
-    assert test_db.query(Search).filter(Search.name == "Theirs").one().account_id == other.id
-    assert test_db.query(Search).filter(Search.name == "Orphan").one().account_id == owner_id
+    assert (
+        test_db.query(Search).filter(Search.name == "Theirs").one().account_id
+        == other.id
+    )
+    assert (
+        test_db.query(Search).filter(Search.name == "Orphan").one().account_id
+        == owner_id
+    )
 
 
 def test_get_owner_id_is_none_before_the_migration(test_db):

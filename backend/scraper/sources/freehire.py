@@ -2,24 +2,34 @@
 
 Configured via the Search's `direct_url` (a freehire URL whose query params are forwarded verbatim, `limit`/`offset`/`page` ignored since we paginate) and/or `search_term` (used as `q=`, overriding any q in direct_url); at least one must be set.
 """
+
 import logging
 import time
 from datetime import datetime, timezone
-from urllib.parse import urlparse, parse_qsl
+from urllib.parse import parse_qsl, urlparse
 
 import httpx
 from sqlalchemy.exc import IntegrityError
 
-from backend.models.db import (
-    SessionLocal, Job, Search, get_existing_external_ids,
-    find_company_by_name,
-)
 from backend.accounts.settings import get_setting
-from backend.scraper._shared.dedup import make_external_id, make_content_hash
-from backend.scraper._shared.posting_links import counts_as_new
-from backend.scraper._shared.filters import build_search_exclude_sets, search_title_filters, title_kept
+from backend.models.db import (
+    Job,
+    Search,
+    SessionLocal,
+    find_company_by_name,
+    get_existing_external_ids,
+)
 from backend.scraper._shared.analysis import analyze_inline, prefetch_h1b
-from backend.scraper._shared.html_text import html_to_text as _strip_html  # freehire descriptions are HTML
+from backend.scraper._shared.dedup import make_content_hash, make_external_id
+from backend.scraper._shared.filters import (
+    build_search_exclude_sets,
+    search_title_filters,
+    title_kept,
+)
+from backend.scraper._shared.html_text import (
+    html_to_text as _strip_html,
+)  # freehire descriptions are HTML
+from backend.scraper._shared.posting_links import counts_as_new
 
 logger = logging.getLogger("jobnavigator.freehire")
 
@@ -80,7 +90,9 @@ async def _fetch_all(search: Search, wanted: int | None = None) -> list[dict]:
     wanted = wanted or search.results_wanted or 100
     out: list[dict] = []
     offset = 0
-    async with httpx.AsyncClient(timeout=30, headers={"User-Agent": "JobNavigator/1.0 (+freehire source)"}) as client:
+    async with httpx.AsyncClient(
+        timeout=30, headers={"User-Agent": "JobNavigator/1.0 (+freehire source)"}
+    ) as client:
         for _ in range(_MAX_PAGES):
             if len(out) >= wanted:
                 break
@@ -125,24 +137,36 @@ async def run(search: Search, shared=None) -> dict:
         if shared is None:
             unique = await _collect(search)
         else:
-            raw = await shared.get(lambda: _fetch_all(search, shared.params.get("results_wanted")))
-            unique = await _collect(search, raw_list=raw[: (search.results_wanted or 100)])
+            raw = await shared.get(
+                lambda: _fetch_all(search, shared.params.get("results_wanted"))
+            )
+            unique = await _collect(
+                search, raw_list=raw[: (search.results_wanted or 100)]
+            )
         logger.info(f"freehire '{search.name}': {len(unique)} jobs fetched")
 
         db = SessionLocal()
         new_jobs = 0
         try:
             include_kw, exclude_kw = search_title_filters(search, db)
-            global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
+            global_exclude_set, search_exclude_set = build_search_exclude_sets(
+                db, search
+            )
             existing_ids = get_existing_external_ids(db)
 
             # The loop below writes rows; H-1B lookups for the new jobs happen before it (S2-01).
-            await prefetch_h1b([
-                j.get("company") for j in unique
-                if j["url"] and title_kept(j["title"], include_kw, exclude_kw)[0]
-                and (j.get("company") or "").lower() not in global_exclude_set | search_exclude_set
-                and make_external_id(j["company"], j["title"], j["url"]) not in existing_ids
-            ])
+            await prefetch_h1b(
+                [
+                    j.get("company")
+                    for j in unique
+                    if j["url"]
+                    and title_kept(j["title"], include_kw, exclude_kw)[0]
+                    and (j.get("company") or "").lower()
+                    not in global_exclude_set | search_exclude_set
+                    and make_external_id(j["company"], j["title"], j["url"])
+                    not in existing_ids
+                ]
+            )
 
             kept = 0
             for j in unique:
@@ -150,7 +174,10 @@ async def run(search: Search, shared=None) -> dict:
                 if not ok:
                     continue
                 company_lower = (j.get("company") or "").lower()
-                if company_lower in global_exclude_set or company_lower in search_exclude_set:
+                if (
+                    company_lower in global_exclude_set
+                    or company_lower in search_exclude_set
+                ):
                     continue
                 kept += 1
 
@@ -188,10 +215,14 @@ async def run(search: Search, shared=None) -> dict:
                 try:
                     await analyze_inline(job, db=db)
                 except Exception as e:
-                    logger.warning(f"freehire inline analysis failed for {j['title']}: {e}")
+                    logger.warning(
+                        f"freehire inline analysis failed for {j['title']}: {e}"
+                    )
 
                 if job.h1b_jd_flag:
-                    logger.info(f"Skipping (body exclusion): {j['title']} @ {job.company or j.get('company') or '?'}")
+                    logger.info(
+                        f"Skipping (body exclusion): {j['title']} @ {job.company or j.get('company') or '?'}"
+                    )
                     continue
 
                 try:
@@ -201,10 +232,14 @@ async def run(search: Search, shared=None) -> dict:
                     new_jobs += counts_as_new(job)
                     existing_ids.add(ext_id)
                 except IntegrityError:
-                    logger.debug(f"Duplicate external_id for '{j['title']}' @ {j.get('company')}, skipping")
+                    logger.debug(
+                        f"Duplicate external_id for '{j['title']}' @ {j.get('company')}, skipping"
+                    )
                     continue
                 except Exception as e:
-                    logger.warning(f"Insert failed for '{j['title']}' @ {j.get('company')} ({job_url}): {e}")
+                    logger.warning(
+                        f"Insert failed for '{j['title']}' @ {j.get('company')} ({job_url}): {e}"
+                    )
                     continue
 
             search_obj = db.query(Search).filter(Search.id == search.id).first()
@@ -216,13 +251,23 @@ async def run(search: Search, shared=None) -> dict:
 
         duration = time.time() - start
         from backend.activity import log_activity
-        log_activity("scrape", f"freehire '{search.name}': {new_jobs} new / {kept} kept in {duration:.1f}s")
-        return {"jobs_found": kept, "new_jobs": new_jobs, "error": None, "duration": duration}
+
+        log_activity(
+            "scrape",
+            f"freehire '{search.name}': {new_jobs} new / {kept} kept in {duration:.1f}s",
+        )
+        return {
+            "jobs_found": kept,
+            "new_jobs": new_jobs,
+            "error": None,
+            "duration": duration,
+        }
 
     except Exception as e:
         duration = time.time() - start
         logger.error(f"freehire scrape failed for '{search.name}': {e}")
         from backend.activity import log_activity
+
         log_activity("scrape", f"freehire '{search.name}' failed: {e}")
         return {"jobs_found": 0, "new_jobs": 0, "error": str(e), "duration": duration}
 
@@ -238,6 +283,7 @@ async def preview(search: Search, db) -> dict:
         all_exclude = list(global_exclude_set | search_exclude_set)
 
         import json
+
         body_raw = get_setting(db, "body_exclusion_phrases")
         body_phrases = []
         if body_raw:
@@ -247,7 +293,10 @@ async def preview(search: Search, db) -> dict:
                 pass
 
         from collections import Counter
-        company_breakdown = dict(Counter(j["company"] for j in unique if j.get("company")).most_common(20))
+
+        company_breakdown = dict(
+            Counter(j["company"] for j in unique if j.get("company")).most_common(20)
+        )
 
         results = []
         for j in unique:
@@ -260,6 +309,7 @@ async def preview(search: Search, db) -> dict:
                     kept, reason = False, f"Company excluded: {cl}"
             if kept and body_phrases and j.get("description"):
                 from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+
                 br = scan_jd_for_h1b_flags(j["description"], body_phrases)
                 if br["jd_flag"]:
                     kept = False
@@ -274,20 +324,22 @@ async def preview(search: Search, db) -> dict:
                     salary += f" – {sal_max:,}"
 
             desc = j.get("description") or ""
-            results.append({
-                "title": j["title"],
-                "company": j.get("company", ""),
-                "url": j.get("url", ""),
-                "source": "freehire",
-                "location": j.get("location", ""),
-                "salary": salary,  # structured salary from enrichment (annual); else JD extractor at save
-                "has_description": bool(desc and len(desc) > 50),
-                "desc_length": len(desc),
-                "kept": kept,
-                "reason": reason if not kept else None,
-                "seniority": j.get("seniority"),
-                "posted": j.get("posted"),
-            })
+            results.append(
+                {
+                    "title": j["title"],
+                    "company": j.get("company", ""),
+                    "url": j.get("url", ""),
+                    "source": "freehire",
+                    "location": j.get("location", ""),
+                    "salary": salary,  # structured salary from enrichment (annual); else JD extractor at save
+                    "has_description": bool(desc and len(desc) > 50),
+                    "desc_length": len(desc),
+                    "kept": kept,
+                    "reason": reason if not kept else None,
+                    "seniority": j.get("seniority"),
+                    "posted": j.get("posted"),
+                }
+            )
 
         after_filter = sum(1 for r in results if r["kept"])
         return {

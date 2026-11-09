@@ -11,6 +11,7 @@ re-check; the answer is kept on the job for a day (`open_state`, `open_reason`, 
 
 A check never deletes a job or changes its status or an application.
 """
+
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -24,27 +25,48 @@ FRESH_FOR = timedelta(hours=24)
 
 # Lower-case phrases a closed posting's page says.
 CLOSED_PHRASES = (
-    "no longer accepting applications", "this job is no longer available", "job is no longer available",
-    "this position has been filled", "position has been filled", "this position is no longer available",
-    "position is closed", "this job has expired", "job posting has expired", "this job is closed",
-    "the job you are looking for is no longer", "this posting is no longer", "no longer open for applications",
-    "job is no longer open", "this requisition is no longer", "job not found",
+    "no longer accepting applications",
+    "this job is no longer available",
+    "job is no longer available",
+    "this position has been filled",
+    "position has been filled",
+    "this position is no longer available",
+    "position is closed",
+    "this job has expired",
+    "job posting has expired",
+    "this job is closed",
+    "the job you are looking for is no longer",
+    "this posting is no longer",
+    "no longer open for applications",
+    "job is no longer open",
+    "this requisition is no longer",
+    "job not found",
 )
 _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36"
 # A browser's request headers: Meta answers 400 to a request without Accept-Language and the
 # Sec-Fetch-* headers (and 200 / 404 to one with them).
-_HEADERS = {"User-Agent": _UA, "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9", "Sec-Fetch-Dest": "document", "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none", "Sec-Fetch-User": "?1", "Upgrade-Insecure-Requests": "1"}
+_HEADERS = {
+    "User-Agent": _UA,
+    "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+}
 _TAG = re.compile(r"<[^>]+>")
 # Scripts, styles and templates hold a site's UI strings (Dayforce ships "This job is no longer
 # accepting applications" on every page): only the visible text counts.
-_HIDDEN = re.compile(r"<(script|style|template|noscript)\b[^>]*>.*?</\1\s*>", re.S | re.I)
+_HIDDEN = re.compile(
+    r"<(script|style|template|noscript)\b[^>]*>.*?</\1\s*>", re.S | re.I
+)
 
 
 async def _fetch(url):
     """(status, final url, text) through the SSRF-checked fetch, or None when it fails."""
     from backend.scraper._shared.url_safety import safe_get
+
     try:
         resp = await safe_get(url, timeout=15, headers=_HEADERS)
     except Exception:
@@ -62,8 +84,14 @@ def _greenhouse_api(url):
         board = (parse_qs(p.query).get("for") or [None])[0]
         if not board and "jobs" in seg and seg.index("jobs") > 0:
             board = seg[seg.index("jobs") - 1]
-    api = "boards-api.eu.greenhouse.io" if host_matches(url, "eu.greenhouse.io") else "boards-api.greenhouse.io"
-    return f"https://{api}/v1/boards/{board}/jobs/{job_id}" if board and job_id else None
+    api = (
+        "boards-api.eu.greenhouse.io"
+        if host_matches(url, "eu.greenhouse.io")
+        else "boards-api.greenhouse.io"
+    )
+    return (
+        f"https://{api}/v1/boards/{board}/jobs/{job_id}" if board and job_id else None
+    )
 
 
 def _lever_api(url):
@@ -82,11 +110,16 @@ def _workday_api(url):
     if not host_matches(url, "myworkdayjobs.com"):
         return None
     from backend.scraper.ats.workday import _LOCALE_PATH_RE, _parse_workday_url
+
     try:
         origin, tenant, site, _ = _parse_workday_url(url)
     except Exception:
         return None
-    parts = [p for p in urlparse(url).path.strip("/").split("/") if p and not _LOCALE_PATH_RE.match(p)]
+    parts = [
+        p
+        for p in urlparse(url).path.strip("/").split("/")
+        if p and not _LOCALE_PATH_RE.match(p)
+    ]
     if not (origin and tenant and site) or len(parts) < 2:
         return None
     return f"{origin}/wday/cxs/{tenant}/{site}/" + "/".join(parts[1:])
@@ -121,14 +154,22 @@ async def check_link(url, fetch=None):
         return UNKNOWN, "no link"
     key = posting_key(url) or ""
     kind = key.split(":", 1)[0] if key else ""
-    api = {"greenhouse": _greenhouse_api, "lever": _lever_api, "workday": _workday_api}.get(kind)
+    api = {
+        "greenhouse": _greenhouse_api,
+        "lever": _lever_api,
+        "workday": _workday_api,
+    }.get(kind)
     if api:
         endpoint = api(url)
         if endpoint:
-            answer = await _by_api(endpoint, kind.capitalize() if kind != "workday" else "Workday", fetch)
+            answer = await _by_api(
+                endpoint, kind.capitalize() if kind != "workday" else "Workday", fetch
+            )
             if answer:
                 return answer
-            if kind == "workday":   # its page is an app shell that always loads: it proves nothing
+            if (
+                kind == "workday"
+            ):  # its page is an app shell that always loads: it proves nothing
                 return UNKNOWN, "Workday did not answer"
     if kind == "linkedin":
         page = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{key.split(':', 1)[1]}"
@@ -145,17 +186,26 @@ async def check_link(url, fetch=None):
         return UNKNOWN, "the page could not be reached"
     status, final, text = got
     from backend.scraper._shared.bot_wall import is_bot_wall
-    if is_bot_wall(text):   # before the status: a bot check can be served with a 404
+
+    if is_bot_wall(text):  # before the status: a bot check can be served with a 404
         return UNKNOWN, "the site shows a bot check"
     if status in (404, 410):
         return CLOSED, f"the page returns {status}"
     if status >= 400:
         return UNKNOWN, f"the page returns {status}"
     posting_id = key.rsplit(":", 1)[-1] if key else ""
-    if (key and final and posting_key(final) != key and urlparse(final).path != urlparse(url).path
-            and posting_id.lower() not in final.lower()):
+    if (
+        key
+        and final
+        and posting_key(final) != key
+        and urlparse(final).path != urlparse(url).path
+        and posting_id.lower() not in final.lower()
+    ):
         p = urlparse(final)
-        return CLOSED, f"redirected to {(p.hostname or '').removeprefix('www.')}{p.path}"
+        return (
+            CLOSED,
+            f"redirected to {(p.hostname or '').removeprefix('www.')}{p.path}",
+        )
     page = " ".join(_TAG.sub(" ", _HIDDEN.sub(" ", text or "")).lower().split())
     for phrase in CLOSED_PHRASES:
         if phrase in page:
@@ -164,18 +214,28 @@ async def check_link(url, fetch=None):
 
 
 def _as_dict(job) -> dict:
-    return {"open_state": job.open_state, "open_reason": job.open_reason,
-            "open_checked_at": job.open_checked_at.isoformat() if job.open_checked_at else None}
+    return {
+        "open_state": job.open_state,
+        "open_reason": job.open_reason,
+        "open_checked_at": job.open_checked_at.isoformat()
+        if job.open_checked_at
+        else None,
+    }
 
 
 async def ensure_checked(db, job, force: bool = False) -> dict:
     """The job's open state, checked again when the last answer is older than a day (or `force`)."""
     from backend.models.db import LinkedinLookup
     from backend.scraper._shared.link_kinds import job_link
+
     checked = job.open_checked_at
     if checked is not None and checked.tzinfo is None:
         checked = checked.replace(tzinfo=timezone.utc)
-    if not force and checked is not None and datetime.now(timezone.utc) - checked < FRESH_FOR:
+    if (
+        not force
+        and checked is not None
+        and datetime.now(timezone.utc) - checked < FRESH_FOR
+    ):
         return _as_dict(job)
     state = reason = None
     if (job.posting_key or "").startswith("linkedin:") and not job.apply_url:
@@ -184,8 +244,12 @@ async def ensure_checked(db, job, force: bool = False) -> dict:
             state, reason = CLOSED, "LinkedIn: the listing is gone"
     if state is None:
         link = job_link(job)
-        db.commit()   # end the transaction: no pooled connection waits on an outside site
+        db.commit()  # end the transaction: no pooled connection waits on an outside site
         state, reason = await check_link(link)
-    job.open_state, job.open_reason, job.open_checked_at = state, reason or None, datetime.now(timezone.utc)
+    job.open_state, job.open_reason, job.open_checked_at = (
+        state,
+        reason or None,
+        datetime.now(timezone.utc),
+    )
     db.commit()
     return _as_dict(job)

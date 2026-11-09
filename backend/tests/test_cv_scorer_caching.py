@@ -1,5 +1,7 @@
 """Tests for cv_scorer prompt split into cached_prefix + per-job JD."""
+
 import asyncio
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -16,17 +18,21 @@ class FakeJob:
 @pytest.fixture
 def scorer_db(monkeypatch):
     """In-memory SQLite with Setting rows needed for scoring."""
-    from backend.models.db import Setting, Base
+    from backend.models.db import Base, Setting
+
     engine = create_engine("sqlite:///:memory:")
     Setting.__table__.create(engine)
     Session = sessionmaker(bind=engine)
 
     s = Session()
     s.add(Setting(key="scoring_rubric", value="RUBRIC TEXT"))
-    s.add(Setting(key="scoring_output_light",
-                  value='OUTPUT JSON: {"scores": {CV_NAMES_HERE}, "best_cv": "CV_NAME"}'))
-    s.add(Setting(key="scoring_output_full",
-                  value='FULL JSON SCHEMA HERE'))
+    s.add(
+        Setting(
+            key="scoring_output_light",
+            value='OUTPUT JSON: {"scores": {CV_NAMES_HERE}, "best_cv": "CV_NAME"}',
+        )
+    )
+    s.add(Setting(key="scoring_output_full", value="FULL JSON SCHEMA HERE"))
     s.add(Setting(key="llm_model", value="claude-sonnet-4-6"))
     s.add(Setting(key="llm_provider", value="claude_api"))
     s.commit()
@@ -34,11 +40,13 @@ def scorer_db(monkeypatch):
 
     # Patch SessionLocal in cv_scorer
     from backend.analyzer import cv_scorer
+
     monkeypatch.setattr(cv_scorer, "SessionLocal", Session)
 
     # Fresh semaphore per test
-    monkeypatch.setattr(cv_scorer, "_get_scoring_semaphore",
-                        lambda: asyncio.Semaphore(1))
+    monkeypatch.setattr(
+        cv_scorer, "_get_scoring_semaphore", lambda: asyncio.Semaphore(1)
+    )
     return Session
 
 
@@ -53,8 +61,12 @@ async def test_score_job_sends_cached_prefix_with_rubric_and_cv(scorer_db, monke
         captured["system"] = system
         return {
             "text": '{"scores":{"PM":72},"best_cv":"PM"}',
-            "usage": {"input_tokens": 100, "output_tokens": 20,
-                      "cache_read_tokens": 0, "cache_write_tokens": 2400},
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 2400,
+            },
         }
 
     monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm", fake_call_llm)
@@ -62,11 +74,15 @@ async def test_score_job_sends_cached_prefix_with_rubric_and_cv(scorer_db, monke
     monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call", lambda **kw: None)
 
     from backend.analyzer import cv_scorer
+
     job = FakeJob(description="SENIOR PM ROLE job description here.")
     cv_texts = {"PM": "I am a PM with 5 years experience at scale."}
 
     result = await cv_scorer.score_job_sync(
-        job, cv_texts, db=None, depth="light",
+        job,
+        cv_texts,
+        db=None,
+        depth="light",
         preloaded_text="SENIOR PM ROLE description",
     )
 
@@ -90,8 +106,12 @@ async def test_score_job_logs_usage(scorer_db, monkeypatch):
     async def fake_call_llm(prompt, system, max_tokens, cached_prefix=None, **kwargs):
         return {
             "text": '{"scores":{"PM":80},"best_cv":"PM"}',
-            "usage": {"input_tokens": 500, "output_tokens": 30,
-                      "cache_read_tokens": 2400, "cache_write_tokens": 0},
+            "usage": {
+                "input_tokens": 500,
+                "output_tokens": 30,
+                "cache_read_tokens": 2400,
+                "cache_write_tokens": 0,
+            },
         }
 
     def fake_log(**kwargs):
@@ -101,9 +121,11 @@ async def test_score_job_logs_usage(scorer_db, monkeypatch):
     monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call", fake_log)
 
     from backend.analyzer import cv_scorer
+
     job = FakeJob()
-    await cv_scorer.score_job_sync(job, {"PM": "CV text"}, db=None, depth="light",
-                                    preloaded_text="JD text")
+    await cv_scorer.score_job_sync(
+        job, {"PM": "CV text"}, db=None, depth="light", preloaded_text="JD text"
+    )
 
     assert captured_log.get("purpose") == "score_light"
     assert captured_log.get("usage", {}).get("input_tokens") == 500
@@ -120,18 +142,25 @@ async def test_score_job_full_depth_uses_score_full_purpose(scorer_db, monkeypat
     async def fake_call_llm(prompt, system, max_tokens, cached_prefix=None, **kwargs):
         return {
             "text": '{"scores":{"PM":80},"best_cv":"PM","summary":"good"}',
-            "usage": {"input_tokens": 500, "output_tokens": 100,
-                      "cache_read_tokens": 0, "cache_write_tokens": 0},
+            "usage": {
+                "input_tokens": 500,
+                "output_tokens": 100,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            },
         }
 
     monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm", fake_call_llm)
-    monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call",
-                        lambda **kw: captured_log.update(kw))
+    monkeypatch.setattr(
+        "backend.analyzer.cv_scorer.log_llm_call", lambda **kw: captured_log.update(kw)
+    )
 
     from backend.analyzer import cv_scorer
+
     job = FakeJob()
-    await cv_scorer.score_job_sync(job, {"PM": "CV"}, db=None, depth="full",
-                                    preloaded_text="JD")
+    await cv_scorer.score_job_sync(
+        job, {"PM": "CV"}, db=None, depth="full", preloaded_text="JD"
+    )
 
     assert captured_log.get("purpose") == "score_full"
 
@@ -141,6 +170,7 @@ async def test_score_job_respects_prompt_caching_disabled(scorer_db, monkeypatch
     """When prompt_caching_enabled='false' in settings, cached_prefix is passed as None and the
     résumés, rubric and schema are in the prompt itself (they used to be dropped with it)."""
     from backend.models.db import Setting
+
     s = scorer_db()
     s.add(Setting(key="prompt_caching_enabled", value="false"))
     s.commit()
@@ -153,17 +183,23 @@ async def test_score_job_respects_prompt_caching_disabled(scorer_db, monkeypatch
         captured["prompt"] = prompt
         return {
             "text": '{"scores":{"PM":75},"best_cv":"PM"}',
-            "usage": {"input_tokens": 100, "output_tokens": 20,
-                      "cache_read_tokens": 0, "cache_write_tokens": 0},
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            },
         }
 
     monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm", fake_call_llm)
     monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call", lambda **kw: None)
 
     from backend.analyzer import cv_scorer
+
     job = FakeJob()
-    await cv_scorer.score_job_sync(job, {"PM": "CV text"}, db=None, depth="light",
-                                    preloaded_text="JD text")
+    await cv_scorer.score_job_sync(
+        job, {"PM": "CV text"}, db=None, depth="light", preloaded_text="JD text"
+    )
 
     assert captured["cached_prefix"] is None
     assert "CV text" in captured["prompt"] and "JD text" in captured["prompt"]
@@ -179,17 +215,23 @@ async def test_score_job_caching_enabled_by_default(scorer_db, monkeypatch):
         captured["cached_prefix"] = cached_prefix
         return {
             "text": '{"scores":{"PM":75},"best_cv":"PM"}',
-            "usage": {"input_tokens": 100, "output_tokens": 20,
-                      "cache_read_tokens": 0, "cache_write_tokens": 0},
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            },
         }
 
     monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm", fake_call_llm)
     monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call", lambda **kw: None)
 
     from backend.analyzer import cv_scorer
+
     job = FakeJob()
-    await cv_scorer.score_job_sync(job, {"PM": "CV text"}, db=None, depth="light",
-                                    preloaded_text="JD text")
+    await cv_scorer.score_job_sync(
+        job, {"PM": "CV text"}, db=None, depth="light", preloaded_text="JD text"
+    )
 
     assert captured["cached_prefix"] is not None
     assert "RUBRIC TEXT" in captured["cached_prefix"]
@@ -204,13 +246,16 @@ async def test_score_job_logs_failure_when_call_llm_raises(scorer_db, monkeypatc
         raise RuntimeError("simulated provider outage")
 
     monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm", fake_call_llm)
-    monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call",
-                        lambda **kw: captured_log.update(kw))
+    monkeypatch.setattr(
+        "backend.analyzer.cv_scorer.log_llm_call", lambda **kw: captured_log.update(kw)
+    )
 
     from backend.analyzer import cv_scorer
+
     job = FakeJob()
-    result = await cv_scorer.score_job_sync(job, {"PM": "CV"}, db=None, depth="light",
-                                             preloaded_text="JD")
+    result = await cv_scorer.score_job_sync(
+        job, {"PM": "CV"}, db=None, depth="light", preloaded_text="JD"
+    )
 
     assert result is None
     assert captured_log.get("success") is False
@@ -223,21 +268,29 @@ async def test_score_job_logs_failure_when_call_llm_raises(scorer_db, monkeypatc
 async def test_score_job_no_cvs_returns_none(scorer_db, monkeypatch):
     """Empty cv_texts dict → _score_job_inner returns None (no scoring attempted)."""
     from backend.analyzer import cv_scorer
+
     job = FakeJob()
     # Don't stub call_llm — if it's reached, the test should fail
     result = await cv_scorer.score_job_sync(
-        job, {}, db=None, depth="light", preloaded_text="JD text",
+        job,
+        {},
+        db=None,
+        depth="light",
+        preloaded_text="JD text",
     )
     assert result is None
 
 
 @pytest.mark.asyncio
-async def test_score_job_llm_error_returns_none_without_skipped_marker(scorer_db, monkeypatch):
+async def test_score_job_llm_error_returns_none_without_skipped_marker(
+    scorer_db, monkeypatch
+):
     """LLM exception → result is None AND no _skipped sentinel persisted.
 
     This is the key contract: a transient LLM failure must NOT permanently mark the
     job as un-rescoreable. The scheduler retries None-result jobs on the next pass.
     """
+
     async def broken_llm(prompt, system, max_tokens, cached_prefix=None, **kwargs):
         raise RuntimeError("simulated LLM outage")
 
@@ -245,9 +298,14 @@ async def test_score_job_llm_error_returns_none_without_skipped_marker(scorer_db
     monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call", lambda **kw: None)
 
     from backend.analyzer import cv_scorer
+
     job = FakeJob()
     result = await cv_scorer.score_job_sync(
-        job, {"PM": "CV text"}, db=None, depth="light", preloaded_text="JD text",
+        job,
+        {"PM": "CV text"},
+        db=None,
+        depth="light",
+        preloaded_text="JD text",
     )
 
     assert result is None

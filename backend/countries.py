@@ -29,7 +29,11 @@ def _aliases(member) -> list:
     from jobspy import model
 
     name = str(member.value)
-    extra = [alias for alias, target in getattr(model, "country_aliases", {}).items() if target == name]
+    extra = [
+        alias
+        for alias, target in getattr(model, "country_aliases", {}).items()
+        if target == name
+    ]
     return [name] + extra
 
 

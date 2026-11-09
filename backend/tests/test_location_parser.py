@@ -7,43 +7,50 @@ a careless reader moves a job between two countries. The rule under test: the
 code is read only when something else in the string pins the country, and the
 parse is marked ambiguous otherwise.
 """
+
 import pytest
 
 from backend.analyzer.location import canonical, parse
 
-
 # ── Workday, one field per tenant (live) ─────────────────────────────────────
 
-@pytest.mark.parametrize("text,expected", [
-    # nvidia: comma, country first
-    ("US, CA, Santa Clara", "Santa Clara, CA, United States"),
-    ("Japan, Tokyo", "Tokyo, Japan"),
-    ("Israel, Yokneam", "Yokneam, Israel"),
-    ("Switzerland, Zurich", "Zurich, Switzerland"),
-    # salesforce: spaced dash, country OR state first
-    ("Ireland - Dublin", "Dublin, Ireland"),
-    ("Canada - Toronto", "Toronto, Canada"),
-    ("California - San Francisco", "San Francisco, CA, United States"),
-    ("United Kingdom - London", "London, United Kingdom"),
-    ("Mexico - Mexico City", "Mexico City, Mexico"),
-    # workday: dot separator
-    ("USA.VA.Reston", "Reston, VA, United States"),
-    ("USA, CA, Pleasanton", "Pleasanton, CA, United States"),
-    ("USA, GA, Atlanta", "Atlanta, GA, United States"),
-    ("Costa Rica", "Costa Rica"),
-])
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        # nvidia: comma, country first
+        ("US, CA, Santa Clara", "Santa Clara, CA, United States"),
+        ("Japan, Tokyo", "Tokyo, Japan"),
+        ("Israel, Yokneam", "Yokneam, Israel"),
+        ("Switzerland, Zurich", "Zurich, Switzerland"),
+        # salesforce: spaced dash, country OR state first
+        ("Ireland - Dublin", "Dublin, Ireland"),
+        ("Canada - Toronto", "Toronto, Canada"),
+        ("California - San Francisco", "San Francisco, CA, United States"),
+        ("United Kingdom - London", "London, United Kingdom"),
+        ("Mexico - Mexico City", "Mexico City, Mexico"),
+        # workday: dot separator
+        ("USA.VA.Reston", "Reston, VA, United States"),
+        ("USA, CA, Pleasanton", "Pleasanton, CA, United States"),
+        ("USA, GA, Atlanta", "Atlanta, GA, United States"),
+        ("Costa Rica", "Costa Rica"),
+    ],
+)
 def test_workday_tenant_formats(text, expected):
     assert canonical(text) == expected
 
 
 def test_the_order_of_the_parts_does_not_matter():
     """The same place, written three ways by three tenants."""
-    assert (canonical("US, CA, Santa Clara")
-            == canonical("Santa Clara, CA, USA")
-            == canonical("California - Santa Clara"))
+    assert (
+        canonical("US, CA, Santa Clara")
+        == canonical("Santa Clara, CA, USA")
+        == canonical("California - Santa Clara")
+    )
 
 
 # ── the CA trap ──────────────────────────────────────────────────────────────
+
 
 def test_ca_is_california_when_a_country_token_pins_it():
     result = parse("US, CA, Santa Clara")
@@ -61,16 +68,19 @@ def test_ca_is_canada_when_a_province_code_pins_it():
     assert result["ambiguous"] is False
 
 
-@pytest.mark.parametrize("text", [
-    "CA",
-    # Richmond is a city in California and a city in British Columbia, so the
-    # gazetteer refuses it the way it refuses a name it has never seen.
-    "Richmond, CA",
-    "Petropolis, CA",
-    # Ontario is a Canadian province AND a city in California, so the province
-    # name alone must not settle the country.
-    "Ontario, CA",
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "CA",
+        # Richmond is a city in California and a city in British Columbia, so the
+        # gazetteer refuses it the way it refuses a name it has never seen.
+        "Richmond, CA",
+        "Petropolis, CA",
+        # Ontario is a Canadian province AND a city in California, so the province
+        # name alone must not settle the country.
+        "Ontario, CA",
+    ],
+)
 def test_ca_stays_unread_without_a_strong_signal(text):
     result = parse(text)
     assert result["ambiguous"] is True
@@ -80,10 +90,14 @@ def test_ca_stays_unread_without_a_strong_signal(text):
 def test_a_city_in_only_one_of_the_two_settles_ca():
     """The held-out code yields to a city the gazetteer places: three quarters
     of the "<city>, CA" strings in the database are Californian."""
-    assert (parse("San Francisco, CA")["country"], parse("San Francisco, CA")["region"]) \
-        == ("US", "CA")
-    assert (parse("Burnaby, CA")["country"], parse("Burnaby, CA")["region"]) \
-        == ("CA", "BC")
+    assert (
+        parse("San Francisco, CA")["country"],
+        parse("San Francisco, CA")["region"],
+    ) == ("US", "CA")
+    assert (parse("Burnaby, CA")["country"], parse("Burnaby, CA")["region"]) == (
+        "CA",
+        "BC",
+    )
 
 
 def test_an_ambiguous_parse_keeps_the_board_text():
@@ -99,16 +113,20 @@ def test_a_written_out_country_settles_ca():
 
 # ── the other twenty-five colliding codes ────────────────────────────────────
 
-@pytest.mark.parametrize("text,region,country", [
-    ("Atlanta, GA", "GA", "US"),      # not Gabon
-    ("Wilmington, DE", "DE", "US"),   # not Germany
-    ("Indianapolis, IN", "IN", "US"),  # not India
-    ("New Orleans, LA", "LA", "US"),  # not Laos
-    ("Baltimore, MD", "MD", "US"),    # not Moldova
-    ("Portland, ME", "ME", "US"),     # not Montenegro
-    ("Philadelphia, PA", "PA", "US"),  # not Panama
-    ("Richmond, VA", "VA", "US"),     # not the Vatican
-])
+
+@pytest.mark.parametrize(
+    "text,region,country",
+    [
+        ("Atlanta, GA", "GA", "US"),  # not Gabon
+        ("Wilmington, DE", "DE", "US"),  # not Germany
+        ("Indianapolis, IN", "IN", "US"),  # not India
+        ("New Orleans, LA", "LA", "US"),  # not Laos
+        ("Baltimore, MD", "MD", "US"),  # not Moldova
+        ("Portland, ME", "ME", "US"),  # not Montenegro
+        ("Philadelphia, PA", "PA", "US"),  # not Panama
+        ("Richmond, VA", "VA", "US"),  # not the Vatican
+    ],
+)
 def test_city_plus_code_reads_as_the_us_state(text, region, country):
     """`City, XX` is the dominant board convention; the country reading of
     these codes is vanishingly rare in that shape."""
@@ -123,6 +141,7 @@ def test_the_us_state_assumption_is_not_applied_to_ca():
     settles it; a city it cannot place leaves it unread, where the "City, XX"
     convention would have made it California."""
     from backend.analyzer.location import COUNTRY_FIRST_CODES
+
     assert COUNTRY_FIRST_CODES == {"CA"}
     assert parse("Richmond, CA")["ambiguous"] is True
 
@@ -135,11 +154,15 @@ def test_a_written_out_country_beats_the_assumption():
 
 # ── a city that shares its name with a region ────────────────────────────────
 
-@pytest.mark.parametrize("text,city,region", [
-    ("New York, NY", "New York", "NY"),
-    ("Washington, DC", "Washington", "DC"),
-    ("New York, New York", "New York", "NY"),
-])
+
+@pytest.mark.parametrize(
+    "text,city,region",
+    [
+        ("New York, NY", "New York", "NY"),
+        ("Washington, DC", "Washington", "DC"),
+        ("New York, New York", "New York", "NY"),
+    ],
+)
 def test_the_first_of_two_regions_is_the_city(text, city, region):
     """A place sits in one region, so a string naming two puts the city first."""
     result = parse(text)
@@ -154,16 +177,22 @@ def test_a_lone_region_name_stays_a_region():
 
 # ── the formats already in the database ──────────────────────────────────────
 
-@pytest.mark.parametrize("text,expected", [
-    ("Vancouver, British Columbia, Canada", "Vancouver, BC, Canada"),
-    ("Vancouver,British Columbia,Canada", "Vancouver, BC, Canada"),
-    ("Vancouver, British Columbia , Canada", "Vancouver, BC, Canada"),
-    ("Greater Vancouver Metropolitan Area", "Vancouver, BC, Canada"),
-    ("British Columbia, Canada", "BC, Canada"),
-    ("Québec, Quebec, Canada", "Québec, QC, Canada"),
-    ("Saint-Jean-sur-Richelieu, Quebec, Canada",
-     "Saint-Jean-sur-Richelieu, QC, Canada"),
-])
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Vancouver, British Columbia, Canada", "Vancouver, BC, Canada"),
+        ("Vancouver,British Columbia,Canada", "Vancouver, BC, Canada"),
+        ("Vancouver, British Columbia , Canada", "Vancouver, BC, Canada"),
+        ("Greater Vancouver Metropolitan Area", "Vancouver, BC, Canada"),
+        ("British Columbia, Canada", "BC, Canada"),
+        ("Québec, Quebec, Canada", "Québec, QC, Canada"),
+        (
+            "Saint-Jean-sur-Richelieu, Quebec, Canada",
+            "Saint-Jean-sur-Richelieu, QC, Canada",
+        ),
+    ],
+)
 def test_database_formats(text, expected):
     assert canonical(text) == expected
 
@@ -180,12 +209,16 @@ def test_the_extra_location_count_is_kept_apart():
 
 # ── arrangement and junk ─────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("text,arrangement", [
-    ("UK, Remote", "remote"),
-    ("Remote - US", "remote"),
-    ("Virginia - Washington DC Metro - Remote", "remote"),
-    ("Toronto, Ontario, Canada | Hybrid", "hybrid"),
-])
+
+@pytest.mark.parametrize(
+    "text,arrangement",
+    [
+        ("UK, Remote", "remote"),
+        ("Remote - US", "remote"),
+        ("Virginia - Washington DC Metro - Remote", "remote"),
+        ("Toronto, Ontario, Canada | Hybrid", "hybrid"),
+    ],
+)
 def test_arrangement_is_lifted_out(text, arrangement):
     assert parse(text)["arrangement"] == arrangement
 
@@ -199,35 +232,54 @@ def test_a_count_or_junk_carries_no_place(text):
 
 def test_the_text_joiner_rejoins_a_split_city_name():
     """A Workday URL segment splits one city name across tokens."""
-    assert canonical("US, CA, Santa, Clara", text_joiner=" ") == \
-        "Santa Clara, CA, United States"
+    assert (
+        canonical("US, CA, Santa, Clara", text_joiner=" ")
+        == "Santa Clara, CA, United States"
+    )
 
 
 # ── rejoining dash-split pieces ──────────────────────────────────────────────
 
-@pytest.mark.parametrize("pieces,expected", [
-    (["New", "York", "New", "York"], ["New York", "New York"]),
-    (["United", "Kingdom", "London"], ["United Kingdom", "London"]),
-    (["Costa", "Rica"], ["Costa Rica"]),
-    (["British", "Columbia", "Vancouver"], ["British Columbia", "Vancouver"]),
-    (["US", "CA", "Santa", "Clara"], ["US", "CA", "Santa", "Clara"]),
-    (["Germany", "Munich"], ["Germany", "Munich"]),
-])
+
+@pytest.mark.parametrize(
+    "pieces,expected",
+    [
+        (["New", "York", "New", "York"], ["New York", "New York"]),
+        (["United", "Kingdom", "London"], ["United Kingdom", "London"]),
+        (["Costa", "Rica"], ["Costa Rica"]),
+        (["British", "Columbia", "Vancouver"], ["British Columbia", "Vancouver"]),
+        (["US", "CA", "Santa", "Clara"], ["US", "CA", "Santa", "Clara"]),
+        (["Germany", "Munich"], ["Germany", "Munich"]),
+    ],
+)
 def test_group_pieces(pieces, expected):
     from backend.analyzer.location import group_pieces
+
     assert group_pieces(pieces) == expected
 
 
-@pytest.mark.parametrize("path,stored,place", [
-    # "New-York-New-York" would otherwise read as one city, "New York New York".
-    ("/job/New-York-New-York/E_JR1", "New York, NY, United States",
-     ("US", "NY", "new york")),
-    ("/job/United-Kingdom-London/E_JR2", "London, United Kingdom",
-     ("GB", None, "london")),
-    ("/job/Costa-Rica/E_JR3", "Costa Rica", ("CR", None, None)),
-    ("/job/British-Columbia-Vancouver/E_JR7", "Vancouver, BC, Canada",
-     ("CA", "BC", "vancouver")),
-])
+@pytest.mark.parametrize(
+    "path,stored,place",
+    [
+        # "New-York-New-York" would otherwise read as one city, "New York New York".
+        (
+            "/job/New-York-New-York/E_JR1",
+            "New York, NY, United States",
+            ("US", "NY", "new york"),
+        ),
+        (
+            "/job/United-Kingdom-London/E_JR2",
+            "London, United Kingdom",
+            ("GB", None, "london"),
+        ),
+        ("/job/Costa-Rica/E_JR3", "Costa Rica", ("CR", None, None)),
+        (
+            "/job/British-Columbia-Vancouver/E_JR7",
+            "Vancouver, BC, Canada",
+            ("CA", "BC", "vancouver"),
+        ),
+    ],
+)
 def test_workday_path_fallback_rejoins_names(path, stored, place):
     """A count carries no place, so the primary site comes from the URL.
 
@@ -236,21 +288,25 @@ def test_workday_path_fallback_rejoins_names(path, stored, place):
     """
     from backend.analyzer.location import _places_of
     from backend.scraper.ats.workday import _board_location_of
+
     text = _board_location_of({"locationsText": "2 Locations", "externalPath": path})
     assert text == stored
     assert _places_of([text]) == [place]
 
 
-@pytest.mark.parametrize("text,expected", [
-    ("Saudi Arabia, Riyadh", "Riyadh, Saudi Arabia"),
-    ("Morocco, Casablanca", "Casablanca, Morocco"),
-    # some tenants write the three-letter form
-    ("VNM, Da Nang", "Da Nang, Vietnam"),
-    ("POL", "Poland"),
-    # "Dockline" is the building, not part of the city; an unknown trailing
-    # token is dropped rather than glued onto the city name.
-    ("IRL, Dublin, Dockline", "Dublin, Ireland"),
-])
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Saudi Arabia, Riyadh", "Riyadh, Saudi Arabia"),
+        ("Morocco, Casablanca", "Casablanca, Morocco"),
+        # some tenants write the three-letter form
+        ("VNM, Da Nang", "Da Nang, Vietnam"),
+        ("POL", "Poland"),
+        # "Dockline" is the building, not part of the city; an unknown trailing
+        # token is dropped rather than glued onto the city name.
+        ("IRL, Dublin, Dockline", "Dublin, Ireland"),
+    ],
+)
 def test_countries_seen_on_live_boards(text, expected):
     assert canonical(text) == expected
 
@@ -265,19 +321,38 @@ def test_a_run_together_value_is_returned_as_written(text):
 
 # ── the Workday handler uses all of it ───────────────────────────────────────
 
-@pytest.mark.parametrize("posting,stored,place", [
-    # The board's own text is stored, whatever order the tenant writes it in.
-    ({"locationsText": "US, CA, Santa Clara", "externalPath": "/job/x/y"},
-     "US, CA, Santa Clara", ("US", "CA", "santa clara")),
-    ({"locationsText": "California - San Francisco", "externalPath": "/job/x/y"},
-     "California - San Francisco", ("US", "CA", "san francisco")),
-    ({"locationsText": "USA.VA.Reston", "externalPath": "/job/x/y"},
-     "USA.VA.Reston", ("US", "VA", "reston")),
-    # a count is not a place, so the URL supplies the primary site
-    ({"locationsText": "2 Locations", "externalPath": "/job/Germany-Munich/E_JR3"},
-     "Munich, Germany", ("DE", None, "munich")),
-    ({"locationsText": None, "externalPath": None}, None, None),
-])
+
+@pytest.mark.parametrize(
+    "posting,stored,place",
+    [
+        # The board's own text is stored, whatever order the tenant writes it in.
+        (
+            {"locationsText": "US, CA, Santa Clara", "externalPath": "/job/x/y"},
+            "US, CA, Santa Clara",
+            ("US", "CA", "santa clara"),
+        ),
+        (
+            {"locationsText": "California - San Francisco", "externalPath": "/job/x/y"},
+            "California - San Francisco",
+            ("US", "CA", "san francisco"),
+        ),
+        (
+            {"locationsText": "USA.VA.Reston", "externalPath": "/job/x/y"},
+            "USA.VA.Reston",
+            ("US", "VA", "reston"),
+        ),
+        # a count is not a place, so the URL supplies the primary site
+        (
+            {
+                "locationsText": "2 Locations",
+                "externalPath": "/job/Germany-Munich/E_JR3",
+            },
+            "Munich, Germany",
+            ("DE", None, "munich"),
+        ),
+        ({"locationsText": None, "externalPath": None}, None, None),
+    ],
+)
 def test_workday_keeps_the_board_text(posting, stored, place):
     """Workday must not rewrite `location`; the canonical form lives in the
     parsed columns alone, as it does for every other handler. The end-to-end
@@ -285,12 +360,14 @@ def test_workday_keeps_the_board_text(posting, stored, place):
     """
     from backend.analyzer.location import _places_of
     from backend.scraper.ats.workday import _board_location_of
+
     text = _board_location_of(posting)
     assert text == stored
     assert _places_of([t for t in [text] if t]) == ([place] if place else [])
 
 
 # ── review findings on PR #10 ────────────────────────────────────────────────
+
 
 def test_a_sibling_never_files_a_place_in_the_wrong_country():
     """The hint may only settle a code the hinted country actually owns.
@@ -302,22 +379,30 @@ def test_a_sibling_never_files_a_place_in_the_wrong_country():
     country.
     """
     from backend.analyzer.location import _places_of
+
     assert _places_of(["Vancouver, BC", "San Francisco, CA"]) == [
-        ("CA", "BC", "vancouver"), ("US", "CA", "san francisco")]
+        ("CA", "BC", "vancouver"),
+        ("US", "CA", "san francisco"),
+    ]
     # the US sibling still settles it, because CA is a US region code
     assert _places_of(["Miami, FL", "San Francisco, CA"]) == [
-        ("US", "FL", "miami"), ("US", "CA", "san francisco")]
+        ("US", "FL", "miami"),
+        ("US", "CA", "san francisco"),
+    ]
 
 
-@pytest.mark.parametrize("text,country,region", [
-    ("Tbilisi, Georgia", "GE", None),   # the country, from the city beside it
-    ("Batumi, Georgia", "GE", None),
-    ("Atlanta, Georgia", "US", "GA"),   # the state, which is what boards mean
-    ("Atlanta, Georgia, United States", "US", "GA"),
-    ("Georgia, US", "US", "GA"),
-    ("Georgia", "US", "GA"),            # bare, and still the state
-    ("Atlanta, GA", "US", "GA"),        # the code form is unaffected
-])
+@pytest.mark.parametrize(
+    "text,country,region",
+    [
+        ("Tbilisi, Georgia", "GE", None),  # the country, from the city beside it
+        ("Batumi, Georgia", "GE", None),
+        ("Atlanta, Georgia", "US", "GA"),  # the state, which is what boards mean
+        ("Atlanta, Georgia, United States", "US", "GA"),
+        ("Georgia, US", "US", "GA"),
+        ("Georgia", "US", "GA"),  # bare, and still the state
+        ("Atlanta, GA", "US", "GA"),  # the code form is unaffected
+    ],
+)
 def test_georgia_is_read_from_the_city_beside_it(text, country, region):
     """Georgia is both a country and a US state, and both readings are ordinary
     on a job board. The state is what these boards mean nearly every time, so it
@@ -330,19 +415,31 @@ def test_georgia_is_read_from_the_city_beside_it(text, country, region):
 
 def test_a_us_sibling_settles_georgia():
     from backend.analyzer.location import _places_of
+
     assert _places_of(["Miami, FL", "Atlanta, Georgia"]) == [
-        ("US", "FL", "miami"), ("US", "GA", "atlanta")]
+        ("US", "FL", "miami"),
+        ("US", "GA", "atlanta"),
+    ]
 
 
-@pytest.mark.parametrize("text,expected", [
-    ("San Francisco, CA; New York, NY", [("US", "CA", "san francisco"),
-                                         ("US", "NY", "new york")]),
-    ("Vancouver, BC; Toronto, ON", [("CA", "BC", "vancouver"), ("CA", "ON", "toronto")]),
-])
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        (
+            "San Francisco, CA; New York, NY",
+            [("US", "CA", "san francisco"), ("US", "NY", "new york")],
+        ),
+        (
+            "Vancouver, BC; Toronto, ON",
+            [("CA", "BC", "vancouver"), ("CA", "ON", "toronto")],
+        ),
+    ],
+)
 def test_a_semicolon_separates_places_not_the_parts_of_one(text, expected):
     """Greenhouse writes several places into one field. Treating the semicolon
     as an inner separator merged three cities into one."""
     from backend.analyzer.location import _places_of
+
     assert sorted(_places_of([text])) == sorted(expected)
 
 
@@ -353,12 +450,15 @@ def test_a_non_string_carries_no_place_and_does_not_raise(text):
     assert result["city"] is None and result["country"] is None
 
 
-@pytest.mark.parametrize("text,arrangement", [
-    ("Fully Remote", "remote"),
-    ("Anywhere", "remote"),
-    ("Global", "remote"),
-    ("Remote First", "remote"),
-])
+@pytest.mark.parametrize(
+    "text,arrangement",
+    [
+        ("Fully Remote", "remote"),
+        ("Anywhere", "remote"),
+        ("Global", "remote"),
+        ("Remote First", "remote"),
+    ],
+)
 def test_a_written_out_arrangement_is_not_a_city(text, arrangement):
     """These reached the facet menu as cities named "Fully Remote"."""
     result = parse(text)
@@ -370,12 +470,16 @@ def test_a_metro_alias_is_not_a_city():
     assert parse("SF Bay Area")["city"] == "San Francisco"
 
 
-@pytest.mark.parametrize("text,city,country", [
-    ("Bengaluru, Karnataka, India", "Bengaluru", "IN"),
-    ("Sao Paulo, Sao Paulo, Brazil", "Sao Paulo", "BR"),
-])
+@pytest.mark.parametrize(
+    "text,city,country",
+    [
+        ("Bengaluru, Karnataka, India", "Bengaluru", "IN"),
+        ("Sao Paulo, Sao Paulo, Brazil", "Sao Paulo", "BR"),
+    ],
+)
 def test_a_region_outside_the_gazetteer_is_dropped_not_glued_to_the_city(
-        text, city, country):
+    text, city, country
+):
     """The city was becoming "Bengaluru, Karnataka"."""
     result = parse(text)
     assert (result["city"], result["country"]) == (city, country)
@@ -387,6 +491,7 @@ def test_a_city_too_long_for_the_index_is_cut_not_dropped():
     limit rather than refused: the country and region it names are still worth
     filtering on, and a job with a truncated city still answers its country."""
     from backend.analyzer.location import MAX_CITY, MAX_PART, _place_of
+
     assert MAX_CITY == MAX_PART == 120
     country, region, city = _place_of("%s, Ontario, Canada" % ("x" * (MAX_CITY + 50)))
     assert (country, region) == ("CA", "ON")
@@ -395,13 +500,26 @@ def test_a_city_too_long_for_the_index_is_cut_not_dropped():
 
 # ── the bare cities boards write without a state ─────────────────────────────
 
-@pytest.mark.parametrize("text,region", [
-    ("Cupertino", "CA"), ("Sunnyvale", "CA"), ("Santa Clara", "CA"),
-    ("Mountain View", "CA"), ("Menlo Park", "CA"), ("Palo Alto", "CA"),
-    ("Redwood City", "CA"), ("San Jose", "CA"), ("San Mateo", "CA"),
-    ("Fremont", "CA"), ("Milpitas", "CA"),
-    ("Redmond", "WA"), ("Bellevue", "WA"), ("Kirkland", "WA"),
-])
+
+@pytest.mark.parametrize(
+    "text,region",
+    [
+        ("Cupertino", "CA"),
+        ("Sunnyvale", "CA"),
+        ("Santa Clara", "CA"),
+        ("Mountain View", "CA"),
+        ("Menlo Park", "CA"),
+        ("Palo Alto", "CA"),
+        ("Redwood City", "CA"),
+        ("San Jose", "CA"),
+        ("San Mateo", "CA"),
+        ("Fremont", "CA"),
+        ("Milpitas", "CA"),
+        ("Redmond", "WA"),
+        ("Bellevue", "WA"),
+        ("Kirkland", "WA"),
+    ],
+)
 def test_a_bare_bay_area_city_carries_its_state(text, region):
     """These are the names a board writes with nothing beside them - 36 live
     rows say "Cupertino" and nothing else - and each answered no filter."""
@@ -423,59 +541,88 @@ def test_a_bare_city_still_has_to_be_unambiguous():
 
 # ── remote plus a country, with no separator between them ────────────────────
 
-@pytest.mark.parametrize("text,country", [
-    ("Remote US", "US"),
-    ("Remote USA", "US"),
-    ("Remote in United States", "US"),
-    ("Remote - United States", "US"),
-    ("Remote, US", "US"),
-    ("Remote (US)", "US"),
-    ("Remote in Canada", "CA"),
-    ("Remote - Germany", "DE"),
-    ("Remote within Ireland", "IE"),
-    ("Fully Remote - United Kingdom", "GB"),
-])
+
+@pytest.mark.parametrize(
+    "text,country",
+    [
+        ("Remote US", "US"),
+        ("Remote USA", "US"),
+        ("Remote in United States", "US"),
+        ("Remote - United States", "US"),
+        ("Remote, US", "US"),
+        ("Remote (US)", "US"),
+        ("Remote in Canada", "CA"),
+        ("Remote - Germany", "DE"),
+        ("Remote within Ireland", "IE"),
+        ("Fully Remote - United Kingdom", "GB"),
+    ],
+)
 def test_remote_and_a_country_is_the_country_and_the_flag(text, country):
-    """"Remote US" reached the feed as a city called "Remote US"."""
+    """ "Remote US" reached the feed as a city called "Remote US"."""
     result = parse(text)
-    assert (result["country"], result["region"], result["city"]) == (country, None, None)
+    assert (result["country"], result["region"], result["city"]) == (
+        country,
+        None,
+        None,
+    )
     assert result["arrangement"] == "remote"
 
 
-@pytest.mark.parametrize("text", [
-    # a held-out code is not a country, here as anywhere else
-    "Remote CA",
-    # and a place is not one either: the city keeps its own path
-    "Remote - Anywhere",
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        # a held-out code is not a country, here as anywhere else
+        "Remote CA",
+        # and a place is not one either: the city keeps its own path
+        "Remote - Anywhere",
+    ],
+)
 def test_remote_and_a_non_country_is_not_read_as_one(text):
     assert parse(text)["country"] is None
 
 
-@pytest.mark.parametrize("text,mirror,country", [
-    ("USA Remote", "Remote USA", "US"),
-    ("US Remote", "Remote US", "US"),
-    ("United States Remote", "Remote United States", "US"),
-    ("Canada Remote", "Remote Canada", "CA"),
-    ("USA - Remote", "Remote - USA", "US"),
-])
-def test_a_country_written_before_remote_reads_the_same_as_after_it(text, mirror, country):
+@pytest.mark.parametrize(
+    "text,mirror,country",
+    [
+        ("USA Remote", "Remote USA", "US"),
+        ("US Remote", "Remote US", "US"),
+        ("United States Remote", "Remote United States", "US"),
+        ("Canada Remote", "Remote Canada", "CA"),
+        ("USA - Remote", "Remote - USA", "US"),
+    ],
+)
+def test_a_country_written_before_remote_reads_the_same_as_after_it(
+    text, mirror, country
+):
     """Boards write the pair in either order. "USA Remote" is the country
     first, and it answers exactly as "Remote US" does: the country, no city,
     remote. "USAVAReston" carries no arrangement word, so the run-together
     Workday segment is still left alone."""
     result = parse(text)
-    assert (result["country"], result["region"], result["city"]) == (country, None, None)
+    assert (result["country"], result["region"], result["city"]) == (
+        country,
+        None,
+        None,
+    )
     assert result["arrangement"] == "remote"
     assert result == parse(mirror)
 
 
 # ── "Multiple Locations" is never a city ─────────────────────────────────────
 
-@pytest.mark.parametrize("text", [
-    "Multiple Locations", "Multiple locations", "multiple locations",
-    "Various locations", "Various", "Multiple Offices", "Several Locations",
-])
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Multiple Locations",
+        "Multiple locations",
+        "multiple locations",
+        "Various locations",
+        "Various",
+        "Multiple Offices",
+        "Several Locations",
+    ],
+)
 def test_a_multiple_locations_phrase_carries_no_place(text):
     result = parse(text)
     assert (result["country"], result["region"], result["city"]) == (None, None, None)
@@ -490,8 +637,11 @@ def test_the_phrase_is_stripped_as_a_token_and_leaves_the_country():
 
 # ── a bare board label is not a place ────────────────────────────────────────
 
-@pytest.mark.parametrize("text", ["Location:", "Locations:", "Office:",
-                                  "Job Location:", "Location", "Offices:"])
+
+@pytest.mark.parametrize(
+    "text",
+    ["Location:", "Locations:", "Office:", "Job Location:", "Location", "Offices:"],
+)
 def test_a_bare_label_carries_no_place(text):
     """A scraper that read the label cell and not the place beside it wrote
     "Location:" into seven live rows."""
@@ -501,50 +651,67 @@ def test_a_bare_label_carries_no_place(text):
 
 def test_a_label_in_front_of_a_place_leaves_the_place():
     result = parse("Location: Austin, TX")
-    assert (result["country"], result["region"], result["city"]) == ("US", "TX", "Austin")
+    assert (result["country"], result["region"], result["city"]) == (
+        "US",
+        "TX",
+        "Austin",
+    )
 
 
-@pytest.mark.parametrize("text,expected", [
-    ("Location: Austin, TX", "Austin, TX"),
-    ("Locations: Austin, TX", "Austin, TX"),
-    ("Location - Sunnyvale", "Sunnyvale"),
-    ("Location\nSunnyvale", "Sunnyvale"),
-    ("Location:", ""),
-    ("Locations:", ""),
-    ("Office:", ""),
-    ("", ""),
-    (None, ""),
-    # not a label, and not touched
-    ("Austin, TX", "Austin, TX"),
-    ("Locarno", "Locarno"),
-])
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Location: Austin, TX", "Austin, TX"),
+        ("Locations: Austin, TX", "Austin, TX"),
+        ("Location - Sunnyvale", "Sunnyvale"),
+        ("Location\nSunnyvale", "Sunnyvale"),
+        ("Location:", ""),
+        ("Locations:", ""),
+        ("Office:", ""),
+        ("", ""),
+        (None, ""),
+        # not a label, and not touched
+        ("Austin, TX", "Austin, TX"),
+        ("Locarno", "Locarno"),
+    ],
+)
 def test_the_card_helper_strips_the_label_before_the_place_is_stored(text, expected):
     from backend.scraper.ats.generic import strip_place_label
+
     assert strip_place_label(text) == expected
 
 
 # ── a comma between two places, not inside one ───────────────────────────────
 
-@pytest.mark.parametrize("text,expected", [
-    ("New York, San Francisco, Seattle",
-     ["New York", "San Francisco", "Seattle"]),
-    ("London, Paris, Berlin", ["London", "Paris", "Berlin"]),
-    ("Austin, TX, Dallas, TX", ["Austin, TX", "Dallas, TX"]),
-    # a country written first claims every city behind it
-    ("IRL, Dublin, Cork", ["IRL, Dublin", "IRL, Cork"]),
-])
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("New York, San Francisco, Seattle", ["New York", "San Francisco", "Seattle"]),
+        ("London, Paris, Berlin", ["London", "Paris", "Berlin"]),
+        ("Austin, TX, Dallas, TX", ["Austin, TX", "Dallas, TX"]),
+        # a country written first claims every city behind it
+        ("IRL, Dublin, Cork", ["IRL, Dublin", "IRL, Cork"]),
+    ],
+)
 def test_a_comma_list_of_places_is_split(text, expected):
     from backend.analyzer.location import split_places
+
     assert split_places(text) == expected
 
 
 def test_every_place_in_a_comma_list_answers_its_own_filter():
     from backend.analyzer.location import _places_of
+
     assert _places_of(["New York, San Francisco, Seattle"]) == [
-        ("US", "NY", "new york"), ("US", "CA", "san francisco"),
-        ("US", "WA", "seattle")]
+        ("US", "NY", "new york"),
+        ("US", "CA", "san francisco"),
+        ("US", "WA", "seattle"),
+    ]
     assert _places_of(["IRL, Dublin, Cork"]) == [
-        ("IE", None, "dublin"), ("IE", None, "cork")]
+        ("IE", None, "dublin"),
+        ("IE", None, "cork"),
+    ]
 
 
 def test_a_comma_list_parses_to_the_first_of_its_places():
@@ -552,16 +719,27 @@ def test_a_comma_list_parses_to_the_first_of_its_places():
     assert parse("Austin, TX, Dallas, TX")["city"] == "Austin"
 
 
-@pytest.mark.parametrize("text", [
-    # every one of these is one place whose parts are separated by commas
-    "Washington, DC", "Austin, TX", "Cambridge, MA USA", "IN, KA, Bengaluru",
-    "Bay Area, CA, United States of America", "Bengaluru, Karnataka, India",
-    "New York, New York, United States", "Costa Mesa, California, United States",
-    "Saint-Jean-sur-Richelieu, Quebec, Canada", "US, CA, Santa Clara",
-    "Frankfurt, Hesse, Germany", "Sao Paulo, Sao Paulo, Brazil",
-    # the trailing name is the building, not a second city
-    "IRL, Dublin, Dockline",
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        # every one of these is one place whose parts are separated by commas
+        "Washington, DC",
+        "Austin, TX",
+        "Cambridge, MA USA",
+        "IN, KA, Bengaluru",
+        "Bay Area, CA, United States of America",
+        "Bengaluru, Karnataka, India",
+        "New York, New York, United States",
+        "Costa Mesa, California, United States",
+        "Saint-Jean-sur-Richelieu, Quebec, Canada",
+        "US, CA, Santa Clara",
+        "Frankfurt, Hesse, Germany",
+        "Sao Paulo, Sao Paulo, Brazil",
+        # the trailing name is the building, not a second city
+        "IRL, Dublin, Dockline",
+    ],
+)
 def test_a_comma_inside_one_place_is_not_a_split(text):
     from backend.analyzer.location import split_places
+
     assert split_places(text) == [text]

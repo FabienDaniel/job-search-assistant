@@ -1,4 +1,5 @@
 """Tests for the Telegram webhook secret-token validation."""
+
 from backend.models.db import Setting
 
 
@@ -85,7 +86,9 @@ def test_rotate_webhook_secret_changes_value(api_client, test_db):
     new_secret = data["webhook_secret"]
     assert new_secret and new_secret != "old-secret"
     # Persisted in DB
-    row = test_db.query(Setting).filter(Setting.key == "telegram_webhook_secret").first()
+    row = (
+        test_db.query(Setting).filter(Setting.key == "telegram_webhook_secret").first()
+    )
     assert row.value == new_secret
 
 
@@ -104,7 +107,10 @@ def test_seed_generates_random_webhook_secret(test_db):
     """First run: seed_settings populates telegram_webhook_secret with a
     cryptographically random value when the row is empty."""
     from backend.seed import seed_settings
+
     seed_settings(test_db)
-    row = test_db.query(Setting).filter(Setting.key == "telegram_webhook_secret").first()
+    row = (
+        test_db.query(Setting).filter(Setting.key == "telegram_webhook_secret").first()
+    )
     assert row is not None
     assert row.value and len(row.value) >= 32

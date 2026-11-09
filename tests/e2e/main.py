@@ -5,29 +5,30 @@
 Import order is run order — `case_flows` is last so its `flows-sweep` case, which
 asserts no ZZE scratch row survived, closes the run.
 """
+
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import _suite                                       # noqa: E402
-import case_smoke                                   # noqa: E402,F401
-import case_theme                                   # noqa: E402,F401
-import case_cron                                    # noqa: E402,F401
-import case_welcome                                 # noqa: E402,F401
-import case_newui                                   # noqa: E402,F401
-import case_persona_import                          # noqa: E402,F401
-import case_feed_collapse                           # noqa: E402,F401
-import case_feed_zoom                                # noqa: E402,F401
-import case_feed_filter_paging                      # noqa: E402,F401
-import case_modals                                  # noqa: E402,F401
-import case_apps_select                             # noqa: E402,F401
-import case_apps_bulk                               # noqa: E402,F401
-import case_mt_switch                               # noqa: E402,F401
-import case_mt_settings                             # noqa: E402,F401
-import case_mt_flows                                # noqa: E402,F401
-import case_new_modes                               # noqa: E402,F401
-import case_flows                             # noqa: E402,F401
+import _suite  # noqa: E402
+import case_apps_bulk  # noqa: E402,F401
+import case_apps_select  # noqa: E402,F401
+import case_cron  # noqa: E402,F401
+import case_feed_collapse  # noqa: E402,F401
+import case_feed_filter_paging  # noqa: E402,F401
+import case_feed_zoom  # noqa: E402,F401
+import case_flows  # noqa: E402,F401
+import case_modals  # noqa: E402,F401
+import case_mt_flows  # noqa: E402,F401
+import case_mt_settings  # noqa: E402,F401
+import case_mt_switch  # noqa: E402,F401
+import case_new_modes  # noqa: E402,F401
+import case_newui  # noqa: E402,F401
+import case_persona_import  # noqa: E402,F401
+import case_smoke  # noqa: E402,F401
+import case_theme  # noqa: E402,F401
+import case_welcome  # noqa: E402,F401
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(_suite.main())

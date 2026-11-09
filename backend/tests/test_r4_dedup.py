@@ -7,6 +7,7 @@ company+title arriving from two different sources.
 Tests marked xfail(strict=True) pin the CORRECT behaviour for a defect found in
 this pass — see tests/round4/T1.md for the finding they belong to.
 """
+
 import pytest
 
 from backend.scraper._shared import dedup
@@ -53,8 +54,11 @@ SPELLINGS = [
     ("application-suffix", CANON + "/application"),
     ("thanks-suffix", CANON + "/thanks"),
     ("apply-suffix-upper", CANON + "/Apply"),
-    ("everything", "HTTP://WWW.boards.greenhouse.io/ACME/jobs/4012345/apply/"
-                   "?utm_source=li&fbclid=z#top"),
+    (
+        "everything",
+        "HTTP://WWW.boards.greenhouse.io/ACME/jobs/4012345/apply/"
+        "?utm_source=li&fbclid=z#top",
+    ),
 ]
 
 
@@ -66,18 +70,35 @@ def test_twenty_spellings_are_exactly_twenty():
 
 # ── Spellings that already converge (current contract) ───────────────────────
 
-@pytest.mark.parametrize("label", [
-    "plain", "scheme-upper", "host-upper", "path-upper", "fragment",
-    "fragment-and-slash", "utm-source", "utm-bundle", "fbclid", "gclid",
-    "gh_src", "mixed-tracking", "apply-suffix", "application-suffix",
-    "thanks-suffix", "apply-suffix-upper",
-])
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "plain",
+        "scheme-upper",
+        "host-upper",
+        "path-upper",
+        "fragment",
+        "fragment-and-slash",
+        "utm-source",
+        "utm-bundle",
+        "fbclid",
+        "gclid",
+        "gh_src",
+        "mixed-tracking",
+        "apply-suffix",
+        "application-suffix",
+        "thanks-suffix",
+        "apply-suffix-upper",
+    ],
+)
 def test_spelling_collapses_onto_canonical_id(label):
     url = dict(SPELLINGS)[label]
     assert _id(url) == _id(CANON), f"{label}: {_normalize_url(url)!r}"
 
 
 # ── Spellings that do NOT converge — defects pinned to the right behaviour ────
+
 
 def test_trailing_slash_is_the_same_posting():
     """`/jobs/123` and `/jobs/123/` are one posting on every board we scrape."""
@@ -86,8 +107,9 @@ def test_trailing_slash_is_the_same_posting():
 
 def test_www_prefix_is_the_same_host():
     """`www.host` and `host` serve the same posting."""
-    assert _id("https://www.example.com/jobs/4012345") == \
-           _id("https://example.com/jobs/4012345")
+    assert _id("https://www.example.com/jobs/4012345") == _id(
+        "https://example.com/jobs/4012345"
+    )
 
 
 def test_http_and_https_are_the_same_posting():
@@ -125,30 +147,40 @@ def test_current_spelling_fanout_is_bounded():
 
 # ── Regression: the STORED url is not folded, only the hash is ───────────────
 
+
 def test_normalize_url_keeps_the_trailing_slash_the_board_gave_us():
     """`_normalize_url` feeds Job.url on the company-page path; some ATS WAFs
     403 without the exact path they linked, so folding belongs to the hash only."""
     assert _normalize_url("https://x.com/jobs/1/") == "https://x.com/jobs/1/"
     assert _normalize_url("https://www.x.com/jobs/1") == "https://www.x.com/jobs/1"
     assert _normalize_url("http://x.com/jobs/1") == "http://x.com/jobs/1"
-    assert _normalize_url("https://x.com/jobs/9?loc=us&gh_jid=9") == \
-           "https://x.com/jobs/9?loc=us&gh_jid=9"
+    assert (
+        _normalize_url("https://x.com/jobs/9?loc=us&gh_jid=9")
+        == "https://x.com/jobs/9?loc=us&gh_jid=9"
+    )
 
 
-@pytest.mark.parametrize("a,b", [
-    ("https://x.com/jobs/1/", "https://x.com/jobs/1"),
-    ("https://www.x.com/jobs/1", "https://x.com/jobs/1"),
-    ("http://x.com/jobs/1", "https://x.com/jobs/1"),
-    ("https://x.com/jobs/1/apply/", "https://x.com/jobs/1"),
-    ("https://x.com/jobs/1/Apply/", "https://x.com/jobs/1"),
-    ("https://x.com/jobs/9?loc=us&gh_jid=9", "https://x.com/jobs/9?gh_jid=9&loc=us"),
-    ("HTTP://WWW.X.COM/Jobs/1/thanks/#top", "https://x.com/jobs/1"),
-])
+@pytest.mark.parametrize(
+    "a,b",
+    [
+        ("https://x.com/jobs/1/", "https://x.com/jobs/1"),
+        ("https://www.x.com/jobs/1", "https://x.com/jobs/1"),
+        ("http://x.com/jobs/1", "https://x.com/jobs/1"),
+        ("https://x.com/jobs/1/apply/", "https://x.com/jobs/1"),
+        ("https://x.com/jobs/1/Apply/", "https://x.com/jobs/1"),
+        (
+            "https://x.com/jobs/9?loc=us&gh_jid=9",
+            "https://x.com/jobs/9?gh_jid=9&loc=us",
+        ),
+        ("HTTP://WWW.X.COM/Jobs/1/thanks/#top", "https://x.com/jobs/1"),
+    ],
+)
 def test_hash_folds_the_spellings_that_mean_one_posting(a, b):
     assert _id(a) == _id(b)
 
 
 # ── Identity params survive normalisation ────────────────────────────────────
+
 
 def test_indeed_jk_is_identity_not_tracking():
     a = _id("https://www.indeed.com/viewjob?jk=aaaaaaaaaaaaaaaa")
@@ -163,8 +195,9 @@ def test_indeed_jk_survives_tracking_noise():
 
 
 def test_indeed_vjk_is_identity():
-    assert _id("https://www.indeed.com/jobs?vjk=1111") != \
-           _id("https://www.indeed.com/jobs?vjk=2222")
+    assert _id("https://www.indeed.com/jobs?vjk=1111") != _id(
+        "https://www.indeed.com/jobs?vjk=2222"
+    )
 
 
 def test_glassdoor_and_dice_and_monster_identity_params():
@@ -198,11 +231,13 @@ def test_identity_params_match_subdomains_only_not_lookalikes():
     assert "jk=abc" in fake  # jk is not in the tracking list at all
     # …but the identity guard must only fire for the real host.
     from urllib.parse import urlparse
+
     assert dedup._identity_params_for(urlparse(real)) == {"jk", "vjk"}
     assert dedup._identity_params_for(urlparse(fake)) == set()
 
 
 # ── Different postings must not collide ──────────────────────────────────────
+
 
 def test_distinct_postings_get_distinct_ids():
     urls = [
@@ -222,7 +257,9 @@ def test_distinct_postings_get_distinct_ids():
 
 def test_empty_url_falls_back_to_company_plus_title():
     assert make_external_id("Acme", "PM", "") != make_external_id("Acme", "SWE", "")
-    assert make_external_id("Acme", "PM", "") == make_external_id("Acme", "PM", None or "")
+    assert make_external_id("Acme", "PM", "") == make_external_id(
+        "Acme", "PM", None or ""
+    )
 
 
 def test_external_id_is_sha256_hex():
@@ -230,22 +267,26 @@ def test_external_id_is_sha256_hex():
     assert len(v) == 64 and all(c in "0123456789abcdef" for c in v)
 
 
-@pytest.mark.parametrize("bad", [
-    "not a url at all",
-    "://missing-scheme",
-    "https://",
-    "javascript:alert(1)",
-    "https://x.com/jobs/éèê",
-    "https://x.com/jobs/\U0001f600",
-    " " * 10,
-    "https://x.com/" + "a" * 4000,
-])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "not a url at all",
+        "://missing-scheme",
+        "https://",
+        "javascript:alert(1)",
+        "https://x.com/jobs/éèê",
+        "https://x.com/jobs/\U0001f600",
+        " " * 10,
+        "https://x.com/" + "a" * 4000,
+    ],
+)
 def test_malformed_urls_never_raise(bad):
     v = make_external_id("Acme", "PM", bad)
     assert isinstance(v, str) and len(v) == 64
 
 
 # ── content_hash ─────────────────────────────────────────────────────────────
+
 
 def test_content_hash_merges_two_sources_for_one_posting():
     """The same posting seen on LinkedIn and on the career page → one content hash."""
@@ -267,10 +308,14 @@ def test_content_hash_distinguishes_company_and_title():
 
 def test_content_hash_handles_none_and_unicode():
     assert len(make_content_hash(None, None)) == 64
-    assert make_content_hash("Acéme", "PM \U0001f680") != make_content_hash("Acme", "PM")
+    assert make_content_hash("Acéme", "PM \U0001f680") != make_content_hash(
+        "Acme", "PM"
+    )
 
 
 @pytest.mark.xfail(strict=True, reason="R4-T1-06")
 def test_content_hash_collapses_internal_whitespace():
     """'Senior  PM' (double space) is the same posting as 'Senior PM'."""
-    assert make_content_hash("Acme", "Senior  PM") == make_content_hash("Acme", "Senior PM")
+    assert make_content_hash("Acme", "Senior  PM") == make_content_hash(
+        "Acme", "Senior PM"
+    )

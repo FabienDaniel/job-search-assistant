@@ -1,11 +1,16 @@
 """Tests that call_llm/call_email_llm/call_cv_tailor_llm return dicts and pass cached_prefix through."""
-import pytest
+
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 
 @pytest.mark.asyncio
-async def test_call_llm_returns_dict(monkeypatch, mock_anthropic_client, mock_anthropic_response):
+async def test_call_llm_returns_dict(
+    monkeypatch, mock_anthropic_client, mock_anthropic_response
+):
     """call_llm returns {text, usage}."""
+
     def fake_get_setting(db, key, default=""):
         return {
             "llm_provider": "claude_api",
@@ -15,10 +20,13 @@ async def test_call_llm_returns_dict(monkeypatch, mock_anthropic_client, mock_an
 
     monkeypatch.setattr("backend.analyzer.llm_client._get_setting", fake_get_setting)
     mock_anthropic_client.messages.create.return_value = mock_anthropic_response(
-        text="ok", input_tokens=100, output_tokens=10,
+        text="ok",
+        input_tokens=100,
+        output_tokens=10,
     )
 
     from backend.analyzer.llm_client import call_llm
+
     result = await call_llm("prompt", "system", 100)
 
     assert isinstance(result, dict)
@@ -27,8 +35,11 @@ async def test_call_llm_returns_dict(monkeypatch, mock_anthropic_client, mock_an
 
 
 @pytest.mark.asyncio
-async def test_call_llm_passes_cached_prefix(monkeypatch, mock_anthropic_client, mock_anthropic_response):
+async def test_call_llm_passes_cached_prefix(
+    monkeypatch, mock_anthropic_client, mock_anthropic_response
+):
     """call_llm forwards cached_prefix through _dispatch."""
+
     def fake_get_setting(db, key, default=""):
         return {
             "llm_provider": "claude_api",
@@ -40,6 +51,7 @@ async def test_call_llm_passes_cached_prefix(monkeypatch, mock_anthropic_client,
     mock_anthropic_client.messages.create.return_value = mock_anthropic_response()
 
     from backend.analyzer.llm_client import call_llm
+
     await call_llm("JD text", "system", 100, cached_prefix="CACHED RUBRIC")
 
     # Verify the prefix made it to the anthropic call
@@ -65,9 +77,11 @@ async def test_openai_provider_returns_dict(monkeypatch):
         return fake_client
 
     import openai
+
     monkeypatch.setattr(openai, "AsyncOpenAI", fake_ctor)
 
     from backend.analyzer.llm_client import _call_openai
+
     result = await _call_openai("prompt", "system", "gpt-4o", "sk-test", 100)
     assert isinstance(result, dict)
     assert result["text"] == "openai result"

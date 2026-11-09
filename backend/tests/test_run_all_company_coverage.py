@@ -1,4 +1,5 @@
 """A manual run-all must cover every active company with scrape URLs: active+URLs is the whole gate (playwright_enabled is not consulted), force=True ignores per-company intervals, one company's failure does not end the batch, and the summary names every company that did not run with the reason."""
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -20,6 +21,7 @@ def no_sleep(monkeypatch):
 def _fake_scraper(monkeypatch, results=None, raises=()):
     """Stub scrape_single_career_page: no network, no browser."""
     import backend.scraper.sources.company_pages as cp
+
     seen = []
 
     async def fake(company, **kw):
@@ -27,7 +29,8 @@ def _fake_scraper(monkeypatch, results=None, raises=()):
         if company.name in raises:
             raise RuntimeError("boom")
         return (results or {}).get(
-            company.name, {"jobs_found": 1, "new_jobs": 0, "error": None, "duration": 0.1}
+            company.name,
+            {"jobs_found": 1, "new_jobs": 0, "error": None, "duration": 0.1},
         )
 
     monkeypatch.setattr(cp, "scrape_single_career_page", fake)
@@ -46,11 +49,13 @@ def _company(db, name, **kw):
 
 
 @pytest.mark.asyncio
-async def test_manual_run_covers_companies_with_playwright_disabled(test_db, monkeypatch, no_sleep):
+async def test_manual_run_covers_companies_with_playwright_disabled(
+    test_db, monkeypatch, no_sleep
+):
     from backend.scraper.sources.company_pages import scrape_career_pages
 
     _company(test_db, "Enabled")
-    _company(test_db, "Anthropic", playwright_enabled=False)   # created by "applied"
+    _company(test_db, "Anthropic", playwright_enabled=False)  # created by "applied"
     seen = _fake_scraper(monkeypatch)
 
     summary = await scrape_career_pages(force=True)
@@ -58,16 +63,23 @@ async def test_manual_run_covers_companies_with_playwright_disabled(test_db, mon
     assert sorted(seen) == ["Anthropic", "Enabled"]
     assert summary["scraped"] == 2 and summary["skipped"] == []
     assert {r.source for r in test_db.query(ScrapeLog).all()} == {
-        "playwright_Enabled", "playwright_Anthropic",
+        "playwright_Enabled",
+        "playwright_Anthropic",
     }
 
 
 @pytest.mark.asyncio
-async def test_manual_run_ignores_the_per_company_interval(test_db, monkeypatch, no_sleep):
+async def test_manual_run_ignores_the_per_company_interval(
+    test_db, monkeypatch, no_sleep
+):
     from backend.scraper.sources.company_pages import scrape_career_pages
 
-    _company(test_db, "JustRan", scrape_interval_minutes=600,
-             last_scraped_at=datetime.now(timezone.utc) - timedelta(minutes=5))
+    _company(
+        test_db,
+        "JustRan",
+        scrape_interval_minutes=600,
+        last_scraped_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+    )
     seen = _fake_scraper(monkeypatch)
 
     summary = await scrape_career_pages(force=True)
@@ -76,13 +88,23 @@ async def test_manual_run_ignores_the_per_company_interval(test_db, monkeypatch,
 
 
 @pytest.mark.asyncio
-async def test_scheduled_run_still_honours_the_interval_and_says_so(test_db, monkeypatch, no_sleep):
+async def test_scheduled_run_still_honours_the_interval_and_says_so(
+    test_db, monkeypatch, no_sleep
+):
     from backend.scraper.sources.company_pages import scrape_career_pages
 
-    _company(test_db, "JustRan", scrape_interval_minutes=600,
-             last_scraped_at=datetime.now(timezone.utc) - timedelta(minutes=5))
-    _company(test_db, "Due", scrape_interval_minutes=10,
-             last_scraped_at=datetime.now(timezone.utc) - timedelta(minutes=90))
+    _company(
+        test_db,
+        "JustRan",
+        scrape_interval_minutes=600,
+        last_scraped_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+    )
+    _company(
+        test_db,
+        "Due",
+        scrape_interval_minutes=10,
+        last_scraped_at=datetime.now(timezone.utc) - timedelta(minutes=90),
+    )
     seen = _fake_scraper(monkeypatch)
 
     summary = await scrape_career_pages(force=False)
@@ -92,7 +114,9 @@ async def test_scheduled_run_still_honours_the_interval_and_says_so(test_db, mon
 
 
 @pytest.mark.asyncio
-async def test_one_company_failure_does_not_stop_the_others(test_db, monkeypatch, no_sleep):
+async def test_one_company_failure_does_not_stop_the_others(
+    test_db, monkeypatch, no_sleep
+):
     from backend.scraper.sources.company_pages import scrape_career_pages
 
     _company(test_db, "AAA")
@@ -111,7 +135,9 @@ async def test_one_company_failure_does_not_stop_the_others(test_db, monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_summary_names_active_companies_without_urls(test_db, monkeypatch, no_sleep):
+async def test_summary_names_active_companies_without_urls(
+    test_db, monkeypatch, no_sleep
+):
     from backend.scraper.sources.company_pages import scrape_career_pages
 
     _company(test_db, "HasUrls")

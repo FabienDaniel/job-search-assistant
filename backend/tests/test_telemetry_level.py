@@ -1,4 +1,5 @@
 """telemetry/level.py and GET /api/telemetry: the owner's choice, the JN_TELEMETRY override."""
+
 import pytest
 from fastapi import HTTPException
 
@@ -34,8 +35,16 @@ def test_setting_full_and_essentials(test_db, value):
     assert L.effective_level(test_db) == value and L.sends_anything(value)
 
 
-@pytest.mark.parametrize("env,expected", [("full", "full"), ("essentials", "essentials"),
-                                          ("limited", "essentials"), ("OFF", "off"), (" off ", "off")])
+@pytest.mark.parametrize(
+    "env,expected",
+    [
+        ("full", "full"),
+        ("essentials", "essentials"),
+        ("limited", "essentials"),
+        ("OFF", "off"),
+        (" off ", "off"),
+    ],
+)
 def test_env_overrides_and_locks(test_db, monkeypatch, env, expected):
     set_setting(test_db, "telemetry_level", "full")
     monkeypatch.setenv("JN_TELEMETRY", env)
@@ -51,7 +60,10 @@ def test_garbage_env_is_ignored(test_db, monkeypatch):
 def test_install_id_is_created_once(test_db):
     first = L.install_id(test_db)
     assert len(first) == 36 and L.install_id(test_db) == first
-    assert test_db.query(Setting).filter(Setting.key == "telemetry_install_id").count() == 1
+    assert (
+        test_db.query(Setting).filter(Setting.key == "telemetry_install_id").count()
+        == 1
+    )
 
 
 def test_owner_sets_the_level_and_only_known_values(test_db, accounts):
@@ -59,7 +71,7 @@ def test_owner_sets_the_level_and_only_known_values(test_db, accounts):
     with use_account(a):
         R.update_settings({"telemetry_level": "essentials"}, db=test_db)
         with pytest.raises(HTTPException) as e:
-            R.update_settings({"telemetry_level": "off"}, db=test_db)   # off is env-only
+            R.update_settings({"telemetry_level": "off"}, db=test_db)  # off is env-only
     assert e.value.status_code == 400
     assert L.chosen_level(test_db) == "essentials"
 
@@ -74,7 +86,12 @@ def test_member_cannot_write_telemetry_level(test_db, accounts):
 
 def test_route_reports_level_locked_asked(client, test_db, monkeypatch):
     r = client.get("/api/telemetry").json()
-    assert r["level"] == "unset" and r["asked"] is False and r["locked"] is False and r["owner"] is True
+    assert (
+        r["level"] == "unset"
+        and r["asked"] is False
+        and r["locked"] is False
+        and r["owner"] is True
+    )
     set_setting(test_db, "telemetry_level", "full")
     monkeypatch.setenv("JN_TELEMETRY", "off")
     r = client.get("/api/telemetry").json()
@@ -89,11 +106,18 @@ def test_common_off_spellings_are_off(test_db, monkeypatch, env):
 
 
 def test_the_browser_is_never_told_where_umami_is(client):
-    assert set(client.get("/api/telemetry").json()) == {"level", "locked", "asked", "owner"}
+    assert set(client.get("/api/telemetry").json()) == {
+        "level",
+        "locked",
+        "asked",
+        "owner",
+    }
 
 
 def test_install_state_is_never_served(client, test_db):
     L.install_id(test_db)
     set_setting(test_db, "telemetry_last_sent_at", "2026-10-26T00:00:00+00:00")
     served = client.get("/api/settings").json()
-    assert "telemetry_install_id" not in served and "telemetry_last_sent_at" not in served
+    assert (
+        "telemetry_install_id" not in served and "telemetry_last_sent_at" not in served
+    )

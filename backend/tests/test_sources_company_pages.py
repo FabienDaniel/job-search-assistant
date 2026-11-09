@@ -1,6 +1,8 @@
 """Tests for sources/company_pages.py — ATS dispatch logic."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 
 @pytest.mark.asyncio
@@ -20,6 +22,7 @@ async def test_dispatch_routes_workday_url(monkeypatch):
     monkeypatch.setattr("backend.scraper.ats.greenhouse.scrape", fake_greenhouse)
 
     from backend.scraper.sources.company_pages import _dispatch_ats
+
     await _dispatch_ats("https://nvidia.wd5.myworkdayjobs.com/Site")
     assert called["which"] == "workday"
 
@@ -35,6 +38,7 @@ async def test_dispatch_routes_greenhouse_url(monkeypatch):
     monkeypatch.setattr("backend.scraper.ats.greenhouse.scrape", fake_greenhouse)
 
     from backend.scraper.sources.company_pages import _dispatch_ats
+
     await _dispatch_ats("https://boards.greenhouse.io/acme")
     assert called["which"] == "greenhouse"
 
@@ -42,11 +46,15 @@ async def test_dispatch_routes_greenhouse_url(monkeypatch):
 @pytest.mark.asyncio
 async def test_dispatch_routes_lever_url(monkeypatch):
     called = {"which": None}
+
     async def fake_lever(url, **kw):
-        called["which"] = "lever"; return []
+        called["which"] = "lever"
+        return []
+
     monkeypatch.setattr("backend.scraper.ats.lever.scrape", fake_lever)
 
     from backend.scraper.sources.company_pages import _dispatch_ats
+
     await _dispatch_ats("https://jobs.lever.co/acme")
     assert called["which"] == "lever"
 
@@ -54,11 +62,15 @@ async def test_dispatch_routes_lever_url(monkeypatch):
 @pytest.mark.asyncio
 async def test_dispatch_routes_ashby_url(monkeypatch):
     called = {"which": None}
+
     async def fake_ashby(url, **kw):
-        called["which"] = "ashby"; return []
+        called["which"] = "ashby"
+        return []
+
     monkeypatch.setattr("backend.scraper.ats.ashby.scrape", fake_ashby)
 
     from backend.scraper.sources.company_pages import _dispatch_ats
+
     await _dispatch_ats("https://jobs.ashbyhq.com/acme")
     assert called["which"] == "ashby"
 
@@ -66,11 +78,15 @@ async def test_dispatch_routes_ashby_url(monkeypatch):
 @pytest.mark.asyncio
 async def test_dispatch_routes_rippling_url(monkeypatch):
     called = {"which": None}
+
     async def fake_rippling(url, **kw):
-        called["which"] = "rippling"; return []
+        called["which"] = "rippling"
+        return []
+
     monkeypatch.setattr("backend.scraper.ats.rippling.scrape", fake_rippling)
 
     from backend.scraper.sources.company_pages import _dispatch_ats
+
     await _dispatch_ats("https://ats.rippling.com/acme/jobs")
     assert called["which"] == "rippling"
 
@@ -88,9 +104,12 @@ async def test_dispatch_falls_back_to_generic(monkeypatch):
     monkeypatch.setattr("backend.scraper.ats.generic.scrape", fake_generic)
 
     from backend.scraper.sources.company_pages import _dispatch_ats
+
     await _dispatch_ats("https://unknown-ats-vendor.example.com/careers")
     assert called["which"] == "generic"
-    assert "max_pages" not in called["kw"]  # no cap given: generic keeps its own default
+    assert (
+        "max_pages" not in called["kw"]
+    )  # no cap given: generic keeps its own default
 
     await _dispatch_ats("https://unknown-ats-vendor.example.com/careers", max_pages=12)
     assert called["kw"]["max_pages"] == 12  # the company's cap reaches the fallback too
@@ -99,6 +118,7 @@ async def test_dispatch_falls_back_to_generic(monkeypatch):
 def test_company_pages_module_exports():
     """Module re-exports the orchestrator functions."""
     from backend.scraper.sources import company_pages
+
     assert hasattr(company_pages, "scrape_single_career_page")
     assert hasattr(company_pages, "scrape_career_pages")
     assert hasattr(company_pages, "_dispatch_ats")

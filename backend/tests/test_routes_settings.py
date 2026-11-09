@@ -1,14 +1,18 @@
 """Tests for PATCH /api/settings reconfig error surfacing."""
+
 import pytest
 
 
 def _seed_first_run(db):
     from backend.models.db import Setting
+
     db.add(Setting(key="dashboard_api_key", value=""))
     db.commit()
 
 
-def test_patch_settings_reports_scheduler_reconfig_error(api_client, test_db, monkeypatch):
+def test_patch_settings_reports_scheduler_reconfig_error(
+    api_client, test_db, monkeypatch
+):
     """configure_scheduler raises → response body contains warnings with the error."""
     _seed_first_run(test_db)
 

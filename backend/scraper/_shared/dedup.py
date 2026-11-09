@@ -1,39 +1,100 @@
 """SHA256 deduplication logic with URL normalization."""
+
 import hashlib
 import json
 import logging
 import re
-from urllib.parse import urlparse, parse_qs, parse_qsl, urlencode, urlunparse
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlunparse
 
 logger = logging.getLogger("jobnavigator.dedup")
 
 # Hardcoded fallback — used until DB setting is loaded
 _DEFAULT_TRACKING_PARAMS = {
-    "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "mode",
-    "src", "source", "ref", "refid", "refsrc", "refsource",
-    "origin", "from", "channel", "medium",
-    "gns", "gnk", "gni",
-    "trk", "trackingid", "tracking_id", "currentjobid",
-    "ebp", "recommendedflavor",
-    "gh_src", "lever_source", "lever_origin",
-    "lever-source", "lever-origin", "lever-source[]", "lever-source%5b%5d",
-    "visitid", "impid",
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_content",
+    "utm_term",
+    "mode",
+    "src",
+    "source",
+    "ref",
+    "refid",
+    "refsrc",
+    "refsource",
+    "origin",
+    "from",
+    "channel",
+    "medium",
+    "gns",
+    "gnk",
+    "gni",
+    "trk",
+    "trackingid",
+    "tracking_id",
+    "currentjobid",
+    "ebp",
+    "recommendedflavor",
+    "gh_src",
+    "lever_source",
+    "lever_origin",
+    "lever-source",
+    "lever-origin",
+    "lever-source[]",
+    "lever-source%5b%5d",
+    "visitid",
+    "impid",
     "jz",
-    "iis", "iisn",
-    "fbclid", "gclid", "msclkid", "mc_cid", "mc_eid",
-    "_ga", "_gl", "dclid", "zanpid",
-    "igshid", "yclid", "twclid",
-    "_hsenc", "_hsmi", "mkt_tok",
-    "jclickid", "publisher",
-    "p_sid", "p_uid", "ss",
-    "__jvsd", "__jvst", "jobpipeline", "cmpid", "codes", "feedid",
-    "partnerid", "siteid", "bid", "customredirect",
-    "chnlid", "v", "ccd", "frd", "r", "a",
+    "iis",
+    "iisn",
+    "fbclid",
+    "gclid",
+    "msclkid",
+    "mc_cid",
+    "mc_eid",
+    "_ga",
+    "_gl",
+    "dclid",
+    "zanpid",
+    "igshid",
+    "yclid",
+    "twclid",
+    "_hsenc",
+    "_hsmi",
+    "mkt_tok",
+    "jclickid",
+    "publisher",
+    "p_sid",
+    "p_uid",
+    "ss",
+    "__jvsd",
+    "__jvst",
+    "jobpipeline",
+    "cmpid",
+    "codes",
+    "feedid",
+    "partnerid",
+    "siteid",
+    "bid",
+    "customredirect",
+    "chnlid",
+    "v",
+    "ccd",
+    "frd",
+    "r",
+    "a",
     # "jk" is gone from this list — it is Indeed's entire job identity, not
     # tracking. _IDENTITY_PARAMS below is the real guard, protecting it even if
     # an operator's editable `dedup_tracking_params` setting still contains it.
     # Search-context noise (career page filters that leak into job hrefs):
-    "categories", "cities", "locations", "departments", "teams", "regions", "country", "category",
+    "categories",
+    "cities",
+    "locations",
+    "departments",
+    "teams",
+    "regions",
+    "country",
+    "category",
 }
 
 # A query param can be pure tracking on one board and the posting's whole identity
@@ -67,7 +128,9 @@ def _identity_params_for(parsed) -> set:
     host = _host_of(parsed)
     for domain, keys in _IDENTITY_PARAMS.items():
         if host == domain or host.endswith("." + domain):
-            if domain == "linkedin.com" and _LINKEDIN_ID_IN_PATH.search(parsed.path or ""):
+            if domain == "linkedin.com" and _LINKEDIN_ID_IN_PATH.search(
+                parsed.path or ""
+            ):
                 return set()
             return keys
     return set()
@@ -88,15 +151,18 @@ def _get_tracking_params() -> set:
     if _tracking_params_cache is not None:
         return _tracking_params_cache
     try:
-        from backend.models.db import SessionLocal
         from backend.accounts.settings import get_install_setting
+        from backend.models.db import SessionLocal
+
         db = SessionLocal()
         try:
             raw = get_install_setting(db, "dedup_tracking_params")
             if raw:
                 params = json.loads(raw)
                 _tracking_params_cache = {p.lower() for p in params}
-                logger.info(f"Loaded {len(_tracking_params_cache)} dedup tracking params from DB")
+                logger.info(
+                    f"Loaded {len(_tracking_params_cache)} dedup tracking params from DB"
+                )
                 return _tracking_params_cache
         finally:
             db.close()
@@ -125,7 +191,7 @@ def _normalize_url(url: str) -> str:
         # match so we don't miss /Apply or /APPLY variants, but preserve the rest.
         for suffix in ("/application", "/apply", "/thanks"):
             if path.lower().endswith(suffix):
-                path = path[:-len(suffix)]
+                path = path[: -len(suffix)]
         qs = parse_qs(parsed.query, keep_blank_values=False)
         # Remove tracking params + utm_* except the ones that ARE the posting's
         # identity on this host — stripping those merges unrelated jobs onto one id.
@@ -133,9 +199,12 @@ def _normalize_url(url: str) -> str:
         if _is_identity_only_host(parsed) and keep & {k.lower() for k in qs}:
             cleaned = {k: v for k, v in qs.items() if k.lower() in keep}
         else:
-            cleaned = {k: v for k, v in qs.items()
-                       if k.lower() in keep
-                       or (k.lower() not in params and not k.lower().startswith("utm_"))}
+            cleaned = {
+                k: v
+                for k, v in qs.items()
+                if k.lower() in keep
+                or (k.lower() not in params and not k.lower().startswith("utm_"))
+            }
         # Param ORDER is deliberately preserved here: this value is stored as
         # Job.url by the company-page scraper, and a board can be picky about the
         # URL it handed out. Order-independence belongs to the hash, and is done
@@ -163,7 +232,7 @@ def _fold_path(path: str) -> str:
             path = path[:-1]
         for suffix in _ATS_SUFFIXES:
             if path.endswith(suffix):
-                path = path[:-len(suffix)]
+                path = path[: -len(suffix)]
                 break
         if path == before:
             break

@@ -4,6 +4,7 @@ its full description and the employer's apply link. So the roster is one request
 kept jobs need a detail fetch. Every role is screened worldwide-remote, so the search needs no
 term or URL — the title and company filters do the narrowing.
 """
+
 import asyncio
 import copy
 import json
@@ -16,24 +17,35 @@ from datetime import datetime, timezone
 import httpx
 from sqlalchemy.exc import IntegrityError
 
-from backend.models.db import (
-    SessionLocal, Job, Search, get_existing_external_ids,
-)
 from backend.accounts.settings import get_setting
 from backend.analyzer import salary_extractor
-from backend.scraper._shared.dedup import make_external_id, make_content_hash, mark_ignored
-from backend.scraper._shared.posting_links import counts_as_new
-from backend.scraper._shared.filters import (build_search_exclude_sets, company_included,
-                                             search_title_filters, title_kept)
+from backend.models.db import (
+    Job,
+    Search,
+    SessionLocal,
+    get_existing_external_ids,
+)
 from backend.scraper._shared.analysis import analyze_inline, prefetch_h1b
+from backend.scraper._shared.dedup import (
+    make_content_hash,
+    make_external_id,
+    mark_ignored,
+)
+from backend.scraper._shared.filters import (
+    build_search_exclude_sets,
+    company_included,
+    search_title_filters,
+    title_kept,
+)
+from backend.scraper._shared.posting_links import counts_as_new
 
 logger = logging.getLogger("jobnavigator.trulyremote")
 
 BASE = "https://trulyremotework.com"
 ROSTER_URL = f"{BASE}/llms-full.txt"
 _UA = "JobNavigator/1.0 (+https://github.com/vesaias/JobNavigator)"
-_DETAIL_CONCURRENCY = 2              # gentle: the board is small and invites ingestion
-_DETAIL_DELAY = (0.8, 1.2)           # seconds between detail fetches (jittered)
+_DETAIL_CONCURRENCY = 2  # gentle: the board is small and invites ingestion
+_DETAIL_DELAY = (0.8, 1.2)  # seconds between detail fetches (jittered)
 _RATE_LIMIT_TRIES = 3
 # A Test reads at most this many detail pages, so one click can't fetch the whole corpus.
 PREVIEW_DETAIL_LIMIT = 20
@@ -86,7 +98,12 @@ def _is_usd_annual(text: str, low: int | None = None, high: int | None = None) -
     currency = "USD" if salary_extractor.is_usd(text) else "other"
     if low is None:
         low, high = _parse_salary(text)
-    return salary_extractor.yearly_usd(low, high, currency, salary_extractor.salary_period(text))[0] is not None
+    return (
+        salary_extractor.yearly_usd(
+            low, high, currency, salary_extractor.salary_period(text)
+        )[0]
+        is not None
+    )
 
 
 def _salary_fields(text: str) -> dict:
@@ -123,20 +140,24 @@ def _parse_roster(text: str) -> list[dict]:
         if not m:
             continue
         fields = dict(re.findall(r"^-\s+([A-Za-z][\w /]*):\s*(.*)$", block, flags=re.M))
-        out.append({
-            "title": _md_text(m.group(1)),
-            "company": _md_text(m.group(2)),
-            "url": (fields.get("URL") or "").strip(),
-            "location": (fields.get("Location") or "").strip(),
-            "description": _block_description(block),
-            "employment_type": (fields.get("Type") or "").strip(),
-            "posted": (fields.get("Posted") or "").strip(),
-            **_salary_fields(fields.get("Salary", "")),
-        })
+        out.append(
+            {
+                "title": _md_text(m.group(1)),
+                "company": _md_text(m.group(2)),
+                "url": (fields.get("URL") or "").strip(),
+                "location": (fields.get("Location") or "").strip(),
+                "description": _block_description(block),
+                "employment_type": (fields.get("Type") or "").strip(),
+                "posted": (fields.get("Posted") or "").strip(),
+                **_salary_fields(fields.get("Salary", "")),
+            }
+        )
     return out
 
 
-_DETAIL_FIELD_RE = re.compile(r"^\*\*(Company|Location|Category|Posted|Page|Apply|Tags|Salary):\*\*\s*(.*)$", re.M)
+_DETAIL_FIELD_RE = re.compile(
+    r"^\*\*(Company|Location|Category|Posted|Page|Apply|Tags|Salary):\*\*\s*(.*)$", re.M
+)
 _DESCRIPTION_RE = re.compile(r"^##\s+Description\s*$", re.M)
 _POSTED_FORMATS = ("%a %b %d %Y", "%b %d %Y", "%B %d %Y", "%d %b %Y", "%d %B %Y")
 
@@ -197,7 +218,7 @@ async def _get(client: httpx.AsyncClient, url: str, params: dict | None = None):
     for attempt in range(_RATE_LIMIT_TRIES - 1):
         if resp.status_code != 429:
             return resp
-        wait = _retry_after(resp) or 5.0 * (2 ** attempt)
+        wait = _retry_after(resp) or 5.0 * (2**attempt)
         logger.warning(f"trulyremote rate-limited (429); waiting {wait:.0f}s")
         await asyncio.sleep(wait)
         resp = await client.get(url, params=params)
@@ -210,7 +231,9 @@ def _cache_ttl(headers) -> int:
     cc = ((headers or {}).get("Cache-Control") or "").lower()
     if "no-store" in cc or "no-cache" in cc:
         return 0
-    m = re.search(r"(?<![\w-])max-age\s*=\s*(\d+)", cc) or re.search(r"\bs-maxage\s*=\s*(\d+)", cc)
+    m = re.search(r"(?<![\w-])max-age\s*=\s*(\d+)", cc) or re.search(
+        r"\bs-maxage\s*=\s*(\d+)", cc
+    )
     return min(int(m.group(1)), _ROSTER_TTL_CAP) if m else 0
 
 
@@ -236,8 +259,12 @@ async def _fetch_roster_standalone() -> list[dict]:
         return await _fetch_roster(client)
 
 
-async def _fetch_details(client: httpx.AsyncClient, candidates: list[dict], cache: dict | None = None,
-                         halt: dict | None = None) -> dict:
+async def _fetch_details(
+    client: httpx.AsyncClient,
+    candidates: list[dict],
+    cache: dict | None = None,
+    halt: dict | None = None,
+) -> dict:
     """Fetch each kept job's `.md` twin (bounded concurrency) for the full description. Keyed by
     URL. Only a page that answered 200 with a `## Description` section is returned: a job
     whose page failed, is gone (404/410) or came back in another shape is left out, and the run
@@ -268,8 +295,10 @@ async def _fetch_details(client: httpx.AsyncClient, candidates: list[dict], cach
                 resp = await _get(client, _get_url(job["url"]))
                 if resp.status_code == 429:
                     if not halt.get("reason"):
-                        logger.warning("trulyremote still rate-limited after retries; "
-                                       "the remaining job pages wait for the next run")
+                        logger.warning(
+                            "trulyremote still rate-limited after retries; "
+                            "the remaining job pages wait for the next run"
+                        )
                     halt["reason"] = "still rate-limited (429) after retries"
                     return
                 if resp.status_code == 200 and _DESCRIPTION_RE.search(resp.text or ""):
@@ -277,11 +306,15 @@ async def _fetch_details(client: httpx.AsyncClient, candidates: list[dict], cach
                     if cache is not None:
                         cache[job["url"]] = dict(details[job["url"]])
                 elif resp.status_code in _GONE:
-                    logger.debug(f"trulyremote job page gone (HTTP {resp.status_code}): {job['url']}")
+                    logger.debug(
+                        f"trulyremote job page gone (HTTP {resp.status_code}): {job['url']}"
+                    )
                 else:
-                    logger.info(f"trulyremote job page not read (HTTP {resp.status_code}"
-                                f"{', no Description section' if resp.status_code == 200 else ''}): "
-                                f"{job['url']}; tried again next run")
+                    logger.info(
+                        f"trulyremote job page not read (HTTP {resp.status_code}"
+                        f"{', no Description section' if resp.status_code == 200 else ''}): "
+                        f"{job['url']}; tried again next run"
+                    )
                 await asyncio.sleep(random.uniform(*_DETAIL_DELAY))
             except Exception as e:
                 logger.debug(f"trulyremote detail failed for {job['url']}: {e}")
@@ -337,7 +370,9 @@ async def run(search: Search, shared=None) -> dict:
         db = SessionLocal()
         try:
             include_kw, exclude_kw = search_title_filters(search, db)
-            global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
+            global_exclude_set, search_exclude_set = build_search_exclude_sets(
+                db, search
+            )
             existing_ids = get_existing_external_ids(db)
             detail_cache = halt = None
             if shared is not None:
@@ -346,7 +381,9 @@ async def run(search: Search, shared=None) -> dict:
                 # A throttle stop holds for every later subscriber of this fetch (R30 S-05).
                 halt = shared.memo.setdefault("trulyremote_halt", {})
 
-            async with httpx.AsyncClient(timeout=30, headers={"User-Agent": _UA}) as client:
+            async with httpx.AsyncClient(
+                timeout=30, headers={"User-Agent": _UA}
+            ) as client:
                 # The roster is the whole corpus and is not query-filtered, so the title and
                 # company filters do the narrowing — slice only after they run, or a keyword
                 # search could miss its matches entirely.
@@ -363,23 +400,42 @@ async def run(search: Search, shared=None) -> dict:
                     if not company_included(j.get("company"), search.company_filter)[0]:
                         continue
                     company_lower = (j.get("company") or "").lower()
-                    if company_lower in global_exclude_set or company_lower in search_exclude_set:
+                    if (
+                        company_lower in global_exclude_set
+                        or company_lower in search_exclude_set
+                    ):
                         continue
-                    seen += 1   # rows the board lists that our filters keep, before dedup
-                    if make_external_id(j["company"], j["title"], j["url"]) in existing_ids:
+                    seen += (
+                        1  # rows the board lists that our filters keep, before dedup
+                    )
+                    if (
+                        make_external_id(j["company"], j["title"], j["url"])
+                        in existing_ids
+                    ):
                         continue
                     candidates.append(j)
-                candidates = candidates[:search.results_wanted or 100]
+                candidates = candidates[: search.results_wanted or 100]
                 # A single search calls exactly as before; only a shared fetch passes its cache
                 # and its stop.
-                extra = {"cache": detail_cache, "halt": halt} if detail_cache is not None else {}
+                extra = (
+                    {"cache": detail_cache, "halt": halt}
+                    if detail_cache is not None
+                    else {}
+                )
                 details = await _fetch_details(client, candidates, **extra)
 
-            logger.info(f"trulyremote '{search.name}': {len(listings)} rows / {seen} seen / {len(candidates)} new to fetch")
+            logger.info(
+                f"trulyremote '{search.name}': {len(listings)} rows / {seen} seen / {len(candidates)} new to fetch"
+            )
 
             # The loop below writes rows; H-1B lookups happen before it (S2-01).
-            await prefetch_h1b([(details[j["url"]].get("company") or j.get("company"))
-                                for j in candidates if j["url"] in details])
+            await prefetch_h1b(
+                [
+                    (details[j["url"]].get("company") or j.get("company"))
+                    for j in candidates
+                    if j["url"] in details
+                ]
+            )
 
             new_jobs = 0
             ignored_jobs = 0
@@ -396,12 +452,19 @@ async def run(search: Search, shared=None) -> dict:
                 # filters over it too (preview already does this).
                 kept, why = title_kept(j["title"], include_kw, exclude_kw)
                 if kept:
-                    kept, why = company_included(j.get("company"), search.company_filter)
+                    kept, why = company_included(
+                        j.get("company"), search.company_filter
+                    )
                 company_lower = (j.get("company") or "").lower()
-                if kept and (company_lower in global_exclude_set or company_lower in search_exclude_set):
+                if kept and (
+                    company_lower in global_exclude_set
+                    or company_lower in search_exclude_set
+                ):
                     kept, why = False, "company excluded"
                 if not kept:
-                    logger.info(f"trulyremote: '{j['title']}' @ {j.get('company')} ignored after the detail page ({why})")
+                    logger.info(
+                        f"trulyremote: '{j['title']}' @ {j.get('company')} ignored after the detail page ({why})"
+                    )
                     if _remember_ignored(db, j, search, existing_ids):
                         ignored_jobs += 1
                     continue
@@ -420,7 +483,9 @@ async def run(search: Search, shared=None) -> dict:
                 local_salary = None if usd_min else (j.get("salary_text") or None)
                 description = j.get("description") or ""
                 if local_salary:
-                    description = f"{description}\n\nSalary (as posted): {local_salary}".strip()
+                    description = (
+                        f"{description}\n\nSalary (as posted): {local_salary}".strip()
+                    )
                 job = Job(
                     external_id=ext_id,
                     content_hash=make_content_hash(j["company"], j["title"]),
@@ -447,7 +512,9 @@ async def run(search: Search, shared=None) -> dict:
                     # own fact, not left to the location text ("Worldwide (no restrictions)").
                     await analyze_inline(job, db=db, arrangement=True)
                 except Exception as e:
-                    logger.warning(f"trulyremote inline analysis failed for {j['title']}: {e}")
+                    logger.warning(
+                        f"trulyremote inline analysis failed for {j['title']}: {e}"
+                    )
 
                 if local_salary and job.salary_source == "posting":
                     # The JD extractor reads any "$" as USD; on a posting whose salary is in
@@ -458,7 +525,9 @@ async def run(search: Search, shared=None) -> dict:
                 if job.h1b_jd_flag:
                     # Kept as "ignored" (as company scrapes do), so its URL is in the dedup set
                     # and its page is read once rather than on every run. Not a new job.
-                    logger.info(f"Ignored (body exclusion): {j['title']} @ {j.get('company', '?')}")
+                    logger.info(
+                        f"Ignored (body exclusion): {j['title']} @ {j.get('company', '?')}"
+                    )
                     mark_ignored(job)
 
                 try:
@@ -471,10 +540,14 @@ async def run(search: Search, shared=None) -> dict:
                         ignored_jobs += 1
                     existing_ids.add(ext_id)
                 except IntegrityError:
-                    logger.debug(f"Duplicate external_id for '{j['title']}' @ {j.get('company')}, skipping")
+                    logger.debug(
+                        f"Duplicate external_id for '{j['title']}' @ {j.get('company')}, skipping"
+                    )
                     continue
                 except Exception as e:
-                    logger.warning(f"Insert failed for '{j['title']}' @ {j.get('company')} ({j['url']}): {e}")
+                    logger.warning(
+                        f"Insert failed for '{j['title']}' @ {j.get('company')} ({j['url']}): {e}"
+                    )
                     continue
 
             search_obj = db.query(Search).filter(Search.id == search.id).first()
@@ -486,17 +559,35 @@ async def run(search: Search, shared=None) -> dict:
 
         duration = time.time() - start
         from backend.activity import log_activity
-        log_activity("scrape", f"trulyremote '{search.name}': {new_jobs} new / {seen} seen"
-                     + (f" ({ignored_jobs} filtered out after the job page)" if ignored_jobs else "")
-                     + (f" ({unread} job pages not read; the next run tries them again)" if unread else "")
-                     + f" in {duration:.1f}s")
-        return {"jobs_found": seen, "new_jobs": new_jobs, "ignored_jobs": ignored_jobs,
-                "error": None, "duration": duration}
+
+        log_activity(
+            "scrape",
+            f"trulyremote '{search.name}': {new_jobs} new / {seen} seen"
+            + (
+                f" ({ignored_jobs} filtered out after the job page)"
+                if ignored_jobs
+                else ""
+            )
+            + (
+                f" ({unread} job pages not read; the next run tries them again)"
+                if unread
+                else ""
+            )
+            + f" in {duration:.1f}s",
+        )
+        return {
+            "jobs_found": seen,
+            "new_jobs": new_jobs,
+            "ignored_jobs": ignored_jobs,
+            "error": None,
+            "duration": duration,
+        }
 
     except Exception as e:
         duration = time.time() - start
         logger.error(f"trulyremote scrape failed for '{search.name}': {e}")
         from backend.activity import log_activity
+
         log_activity("scrape", f"trulyremote '{search.name}' failed: {e}")
         return {"jobs_found": 0, "new_jobs": 0, "error": str(e), "duration": duration}
 
@@ -514,7 +605,10 @@ async def preview(search: Search, db) -> dict:
             survivors = []
             for j in unique:
                 kept, _ = title_kept(j["title"], include_kw, exclude_kw)
-                if kept and company_included(j.get("company"), search.company_filter)[0]:
+                if (
+                    kept
+                    and company_included(j.get("company"), search.company_filter)[0]
+                ):
                     cl = (j.get("company") or "").lower()
                     if cl not in global_exclude_set and cl not in search_exclude_set:
                         survivors.append(j)
@@ -525,7 +619,10 @@ async def preview(search: Search, db) -> dict:
 
         raw_count = len(unique)
         from collections import Counter
-        company_breakdown = dict(Counter(j["company"] for j in unique if j.get("company")).most_common(20))
+
+        company_breakdown = dict(
+            Counter(j["company"] for j in unique if j.get("company")).most_common(20)
+        )
 
         body_raw = get_setting(db, "body_exclusion_phrases")
         body_phrases = []
@@ -551,6 +648,7 @@ async def preview(search: Search, db) -> dict:
                     kept, reason = False, f"Company excluded: {cl}"
             if kept and body_phrases and j.get("description"):
                 from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+
                 br = scan_jd_for_h1b_flags(j["description"], body_phrases)
                 if br["jd_flag"]:
                     kept = False
@@ -564,28 +662,32 @@ async def preview(search: Search, db) -> dict:
             if unread and kept and body_phrases:
                 # No job page read for this row: the body scan saw only the blurb.
                 row_extra["body_checked"] = False
-            results.append({
-                **row_extra,
-                "title": j["title"],
-                "company": j.get("company", ""),
-                "url": j.get("url", ""),
-                "source": "trulyremote",
-                "location": j.get("location", ""),
-                "salary": salary,
-                "has_description": bool(desc and len(desc) > 50),
-                "desc_length": len(desc),
-                "kept": kept,
-                "reason": reason if not kept else None,
-                "employment_type": j.get("employment_type") or None,
-                "posted": j.get("posted"),
-            })
+            results.append(
+                {
+                    **row_extra,
+                    "title": j["title"],
+                    "company": j.get("company", ""),
+                    "url": j.get("url", ""),
+                    "source": "trulyremote",
+                    "location": j.get("location", ""),
+                    "salary": salary,
+                    "has_description": bool(desc and len(desc) > 50),
+                    "desc_length": len(desc),
+                    "kept": kept,
+                    "reason": reason if not kept else None,
+                    "employment_type": j.get("employment_type") or None,
+                    "posted": j.get("posted"),
+                }
+            )
 
         after_filter = sum(1 for r in results if r["kept"])
         preview_note = None
         if len(survivors) > len(sampled):
-            preview_note = (f"Details sampled: the job pages of the first {len(sampled)} of "
-                            f"{len(survivors)} jobs that passed the title and company filters were read. "
-                            f"The rest show the listing's short blurb; a run reads every new job's page.")
+            preview_note = (
+                f"Details sampled: the job pages of the first {len(sampled)} of "
+                f"{len(survivors)} jobs that passed the title and company filters were read. "
+                f"The rest show the listing's short blurb; a run reads every new job's page."
+            )
         return {
             "search_name": search.name,
             "duration": round(time.time() - start, 1),

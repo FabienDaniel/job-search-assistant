@@ -3,13 +3,19 @@
 Every test here runs with MT_STRICT=1, so a query on an account-owned model with no
 account context raises instead of falling back to the owner.
 """
+
 import uuid
 
 import pytest
 from sqlalchemy import delete, func, select, update
 
 from backend.accounts.context import (
-    AccountContextMissing, as_owner, current_account, owner_context, unscoped, use_account,
+    AccountContextMissing,
+    as_owner,
+    current_account,
+    owner_context,
+    unscoped,
+    use_account,
 )
 from backend.models.db import Account, Application, Job, JobLocation, JobRun, Search
 from backend.tests.r4_support import client, make_job  # noqa: F401 (client is a fixture)
@@ -65,7 +71,10 @@ def test_joined_entities_are_scoped_too(test_db, accounts):
     test_db.expunge_all()
     with use_account(a):
         assert test_db.query(Application).join(Job).count() == 0
-        assert test_db.query(Job).join(Application, Application.job_id == Job.id).count() == 0
+        assert (
+            test_db.query(Job).join(Application, Application.job_id == Job.id).count()
+            == 0
+        )
 
 
 def test_child_table_joined_to_an_owned_table_is_scoped(test_db, accounts):
@@ -95,7 +104,9 @@ def test_an_explicit_account_is_kept(test_db, accounts):
         test_db.add(s)
         test_db.commit()
     with unscoped():
-        assert test_db.query(Search).filter(Search.name == "for B").one().account_id == b
+        assert (
+            test_db.query(Search).filter(Search.name == "for B").one().account_id == b
+        )
 
 
 def test_bulk_update_and_delete_only_touch_the_current_account(test_db, accounts):
@@ -144,12 +155,15 @@ def test_query_without_a_context_raises_in_strict_mode(test_db, accounts):
 
 def test_unowned_tables_need_no_context(test_db, accounts):
     from backend.models.db import Setting
+
     with use_account(None):
         assert test_db.query(Setting).count() == 0
         assert test_db.query(Account).count() == 2
 
 
-def test_no_context_falls_back_to_the_owner_when_not_strict(test_db, accounts, monkeypatch):
+def test_no_context_falls_back_to_the_owner_when_not_strict(
+    test_db, accounts, monkeypatch
+):
     a, b = accounts
     _seed_both(test_db, a, b)
     monkeypatch.delenv("MT_STRICT")
@@ -162,13 +176,17 @@ def test_no_context_falls_back_to_the_owner_when_not_strict(test_db, accounts, m
         assert s.account_id == a
 
 
-def test_no_owner_and_no_context_is_unscoped_when_not_strict(test_db, accounts, monkeypatch):
+def test_no_owner_and_no_context_is_unscoped_when_not_strict(
+    test_db, accounts, monkeypatch
+):
     """Before the migration has created an owner nothing is filtered (fresh install boot)."""
     from backend.accounts import context
+
     a, b = accounts
     _seed_both(test_db, a, b)
     monkeypatch.delenv("MT_STRICT")
     from backend.accounts import scoping
+
     monkeypatch.setattr(context, "owner_id_for_session", lambda session: None)
     monkeypatch.setattr(scoping, "owner_id_for_session", lambda session: None)
     with use_account(None):
@@ -212,19 +230,25 @@ async def test_as_owner_runs_a_job_with_no_context_as_the_owner(test_db, account
 @pytest.mark.asyncio
 async def test_tracked_run_without_a_context_writes_an_owner_row(test_db, accounts):
     import backend.job_monitor as jm
+
     a, b = accounts
     jm._running.clear()
     with use_account(None):
         async with jm.tracked_run("mt_probe", "scheduler"):
             assert current_account.get() == a
     with use_account(a):
-        assert test_db.query(JobRun).filter(JobRun.job_type == "mt_probe").one().account_id == a
+        assert (
+            test_db.query(JobRun).filter(JobRun.job_type == "mt_probe").one().account_id
+            == a
+        )
 
 
 @pytest.mark.asyncio
 async def test_launch_background_keeps_the_callers_account(test_db, accounts):
     import asyncio
+
     import backend.job_monitor as jm
+
     a, b = accounts
     jm._running.clear()
     seen = []
@@ -234,11 +258,16 @@ async def test_launch_background_keeps_the_callers_account(test_db, accounts):
 
     with use_account(b):
         jm.launch_background("mt_bg", work)
-        task = jm._running[jm._make_key("mt_bg", None, b)].task   # a member's key carries its account (MT-6)
+        task = jm._running[
+            jm._make_key("mt_bg", None, b)
+        ].task  # a member's key carries its account (MT-6)
     await asyncio.wait_for(task, 5)
     assert seen == [b]
     with use_account(b):
-        assert test_db.query(JobRun).filter(JobRun.job_type == "mt_bg").one().account_id == b
+        assert (
+            test_db.query(JobRun).filter(JobRun.job_type == "mt_bg").one().account_id
+            == b
+        )
 
 
 def test_requests_run_as_the_owner(client, test_db, accounts):
@@ -253,7 +282,9 @@ def test_requests_run_as_the_owner(client, test_db, accounts):
     r = client.post("/api/searches", json={"name": "via api", "search_mode": "keyword"})
     assert r.status_code in (200, 201), r.text
     with unscoped():
-        assert test_db.query(Search).filter(Search.name == "via api").one().account_id == a
+        assert (
+            test_db.query(Search).filter(Search.name == "via api").one().account_id == a
+        )
 
 
 def test_session_get_identity_map_hit_is_not_scoped(test_db, accounts):

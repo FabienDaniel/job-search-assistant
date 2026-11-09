@@ -1,4 +1,5 @@
 """Job execution monitor — tracks running state and run history (Hangfire-style)."""
+
 import asyncio
 import contextvars
 import logging
@@ -9,9 +10,14 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
-from backend.accounts.context import current_account, owner_account_id, owner_context, owner_unlocked
-from backend.models.db import SessionLocal, JobRun
+from backend.accounts.context import (
+    current_account,
+    owner_account_id,
+    owner_context,
+    owner_unlocked,
+)
 from backend.accounts.settings import get_setting
+from backend.models.db import JobRun, SessionLocal
 
 logger = logging.getLogger("jobnavigator.monitor")
 
@@ -122,8 +128,11 @@ def get_limiter(name: str) -> TaskLimiter:
     if limiter is None:
         limiter = TaskLimiter(name, _resolve_limit(name))
         _limiters[name] = limiter
-        logger.info("Background limiter '%s' initialized: max %d concurrent",
-                    name, limiter.value)
+        logger.info(
+            "Background limiter '%s' initialized: max %d concurrent",
+            name,
+            limiter.value,
+        )
     return limiter
 
 
@@ -138,6 +147,7 @@ def reset_limiter(name: Optional[str] = None) -> None:
 def limiter_for_job_type(job_type: str) -> Optional[TaskLimiter]:
     name = _JOB_TYPE_LIMITER.get(job_type)
     return get_limiter(name) if name else None
+
 
 # ── In-memory running state ────────────────────────────────────────────────
 
@@ -177,7 +187,9 @@ _running: dict[str, RunningJob] = {}
 
 # Runs that act on the whole install: one at a time for everyone, keyed and shown as
 # the owner's. Everything else is per account.
-INSTALL_WIDE_JOB_TYPES = frozenset({"db_backup", "h1b_refresh"})   # LinkedIn session refresh is per account since MT-16
+INSTALL_WIDE_JOB_TYPES = frozenset(
+    {"db_backup", "h1b_refresh"}
+)  # LinkedIn session refresh is per account since MT-16
 
 
 # Job types whose run writes into every account's rows (R2-08).
@@ -191,7 +203,7 @@ ALL_ACCOUNT_JOB_TYPES = frozenset({"h1b_refresh"})
 # the accounts it is about to visit (`fanning_out`), so a scheduled per-account sweep
 # counts as busy for an account it has not reached yet.
 _removing: set = set()
-_fanouts: dict = {}          # id(token) -> frozenset of account ids still to visit or visiting
+_fanouts: dict = {}  # id(token) -> frozenset of account ids still to visit or visiting
 
 
 def begin_removal(account_id) -> None:
@@ -252,7 +264,11 @@ def _viewer_account() -> Optional[uuid.UUID]:
     return _run_account()
 
 
-def _make_key(job_type: str, scope_key: Optional[str] = None, account_id: Optional[uuid.UUID] = None) -> str:
+def _make_key(
+    job_type: str,
+    scope_key: Optional[str] = None,
+    account_id: Optional[uuid.UUID] = None,
+) -> str:
     """Dedup key. The owner keeps the pre-MT-6 keys ("scrape_all", "company_scrape:<id>");
     a member's key adds "@<account>", so account B can start the same job for itself
     while A's run is going (409 only within one account)."""
@@ -329,6 +345,7 @@ class JobAlreadyRunningError(Exception):
 class AccountBeingRemovedError(JobAlreadyRunningError):
     """A run would write into an account that is being removed (R2-08). A subclass of
     JobAlreadyRunningError so every caller's 409 / "Scheduler skipped" path handles it."""
+
     def __init__(self, job_type: str):
         Exception.__init__(self, f"{job_type} not started: an account is being removed")
         self.job_type = job_type
@@ -355,6 +372,7 @@ SCHEDULED_SCRAPE_SCOPE = "scheduled"
 
 class ScheduledScrapeRunningError(JobAlreadyRunningError):
     """A manual scrape was asked for while the scheduled scrape_all is live (R4-01)."""
+
     code = "scheduled_scrape_running"
 
     def __init__(self, job_type: str, elapsed_seconds: float):
@@ -364,8 +382,10 @@ class ScheduledScrapeRunningError(JobAlreadyRunningError):
 
 
 def _scheduled_scrape_message(job_type: str, elapsed_seconds: float) -> str:
-    return (f"{job_type} not started: the scheduled scrape is running "
-            f"({elapsed_seconds:.0f}s elapsed); try again when it finishes")
+    return (
+        f"{job_type} not started: the scheduled scrape is running "
+        f"({elapsed_seconds:.0f}s elapsed); try again when it finishes"
+    )
 
 
 def scheduled_scrape_run() -> Optional[RunningJob]:
@@ -389,20 +409,26 @@ def scheduled_scrape_conflict_response(e: JobAlreadyRunningError):
     """The 409 body of a refused manual scrape: `scheduled_scrape_running` for the R4-01
     case (the dashboard tells the user to wait), the usual text otherwise."""
     from fastapi.responses import JSONResponse
+
     if isinstance(e, ScheduledScrapeRunningError):
         # Rebuilt from the fields, not str(e): no exception text goes to a client.
         message = _scheduled_scrape_message(str(e.job_type), float(e.elapsed_seconds))
-        return JSONResponse(status_code=409, content={
-            "detail": ScheduledScrapeRunningError.code, "message": message})
-    return JSONResponse(status_code=409, content={"detail": f"{e.job_type} is already running"})
+        return JSONResponse(
+            status_code=409,
+            content={"detail": ScheduledScrapeRunningError.code, "message": message},
+        )
+    return JSONResponse(
+        status_code=409, content={"detail": f"{e.job_type} is already running"}
+    )
 
 
 @dataclass
 class ManualScrapeScopes:
     """What manual scrapes are fetching right now, for the scheduled tick to leave out."""
-    accounts: set            # accounts with a manual Run all in flight (owner = its real id)
-    company_ids: set         # companies with a manual single-company scrape in flight
-    search_ids: set          # searches with a manual single-search run in flight
+
+    accounts: set  # accounts with a manual Run all in flight (owner = its real id)
+    company_ids: set  # companies with a manual single-company scrape in flight
+    search_ids: set  # searches with a manual single-search run in flight
 
     def __bool__(self):
         return bool(self.accounts or self.company_ids or self.search_ids)
@@ -447,7 +473,11 @@ def get_all_running(all_accounts: bool = False) -> list[dict]:
 
 def _get_running_by_job_type(job_type: str) -> Optional[dict]:
     """Check if any of the current account's jobs with the given job_type is running (ignoring scope_key)."""
-    runs = list(_running.values()) if job_type in INSTALL_WIDE_JOB_TYPES else visible_running()
+    runs = (
+        list(_running.values())
+        if job_type in INSTALL_WIDE_JOB_TYPES
+        else visible_running()
+    )
     for r in runs:
         if r.job_type == job_type:
             now = datetime.now(timezone.utc)
@@ -494,12 +524,16 @@ def _restart_job_run(run_id: uuid.UUID, started_at: datetime) -> None:
     """Move a queued run's start to the moment it got its slot."""
     db = SessionLocal()
     try:
-        run = (db.query(JobRun).filter(JobRun.id == run_id)
-               .execution_options(jn_unscoped=True).first())
+        run = (
+            db.query(JobRun)
+            .filter(JobRun.id == run_id)
+            .execution_options(jn_unscoped=True)
+            .first()
+        )
         if run:
             run.started_at = started_at
             db.commit()
-    except Exception as e:   # bookkeeping only; the run itself goes on
+    except Exception as e:  # bookkeeping only; the run itself goes on
         logger.warning(f"Could not restart the clock of run {run_id}: {e}")
     finally:
         db.close()
@@ -545,19 +579,29 @@ async def _gated(limiter: Optional["TaskLimiter"], running_job: "RunningJob"):
             _scrape_finished()
 
 
-def _finish_job_run(run_id: uuid.UUID, status: str, result_summary: Optional[str], error: Optional[str]) -> None:
+def _finish_job_run(
+    run_id: uuid.UUID, status: str, result_summary: Optional[str], error: Optional[str]
+) -> None:
     db = SessionLocal()
     try:
         # By its own (random, unique) id: an install-wide run belongs to the owner even
         # when a member's context finishes it (R1-07).
-        run = (db.query(JobRun).filter(JobRun.id == run_id)
-               .execution_options(jn_unscoped=True).first())
+        run = (
+            db.query(JobRun)
+            .filter(JobRun.id == run_id)
+            .execution_options(jn_unscoped=True)
+            .first()
+        )
         if run:
             now = datetime.now(timezone.utc)
             run.status = status
             run.finished_at = now
             # SQLite (tests) hands back naive datetimes; treat them as UTC
-            started = run.started_at if run.started_at.tzinfo else run.started_at.replace(tzinfo=timezone.utc)
+            started = (
+                run.started_at
+                if run.started_at.tzinfo
+                else run.started_at.replace(tzinfo=timezone.utc)
+            )
             run.duration_seconds = round((now - started).total_seconds(), 1)
             run.result_summary = result_summary
             run.error = sanitize_run_error(error)
@@ -576,7 +620,11 @@ def cleanup_stale_runs() -> int:
         for run in stale:
             run.status = "failed"
             run.finished_at = now
-            run.duration_seconds = round((now - run.started_at).total_seconds(), 1) if run.started_at else 0
+            run.duration_seconds = (
+                round((now - run.started_at).total_seconds(), 1)
+                if run.started_at
+                else 0
+            )
             run.error = "Process restarted"
         db.commit()
         if count:
@@ -605,14 +653,16 @@ async def tracked_run(
     # its dedup key and its rows belong to that account; with no context (install-level
     # jobs, direct calls) it acts for the owner.
     with owner_context():
-        async with _tracked_run(job_type, trigger, scope_key, meta, target_job_id, company_id,
-                                all_accounts) as rj:
+        async with _tracked_run(
+            job_type, trigger, scope_key, meta, target_job_id, company_id, all_accounts
+        ) as rj:
             yield rj
 
 
 @asynccontextmanager
-async def _tracked_run(job_type, trigger, scope_key, meta, target_job_id, company_id,
-                       all_accounts=False):
+async def _tracked_run(
+    job_type, trigger, scope_key, meta, target_job_id, company_id, all_accounts=False
+):
     account = _run_account(job_type)
     key = _make_key(job_type, scope_key, account)
     all_accounts = all_accounts or job_type in ALL_ACCOUNT_JOB_TYPES
@@ -649,8 +699,9 @@ async def _tracked_run(job_type, trigger, scope_key, meta, target_job_id, compan
         async with _gated(limiter, running_job):
             yield running_job
         reason = _take_run_failure()
-        _finish_job_run(run_id, "failed" if reason else "completed",
-                        running_job.summary, reason)
+        _finish_job_run(
+            run_id, "failed" if reason else "completed", running_job.summary, reason
+        )
     except Exception as e:
         _finish_job_run(run_id, "failed", None, str(e))
         raise
@@ -718,10 +769,14 @@ def launch_background(
             async with _gated(limiter_for_job_type(job_type), running_job):
                 result = await coro_func(*(func_args or ()), **(func_kwargs or {}))
             # A coroutine that returns a string is describing what it did.
-            summary = result.strip() if isinstance(result, str) and result.strip() else None
+            summary = (
+                result.strip() if isinstance(result, str) and result.strip() else None
+            )
             # …but it may also have reported a failure it handled itself.
             reason = _take_run_failure()
-            _finish_job_run(run_id, "failed" if reason else "completed", summary, reason)
+            _finish_job_run(
+                run_id, "failed" if reason else "completed", summary, reason
+            )
         except Exception as e:
             logger.error(f"Background job {job_type} failed: {e}")
             _finish_job_run(run_id, "failed", None, str(e))

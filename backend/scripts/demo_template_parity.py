@@ -5,6 +5,7 @@
 
 Compares visible text only (style/script/tags removed, entities decoded, whitespace collapsed). Exits 1 on any difference.
 """
+
 import html as html_lib
 import json
 import re
@@ -24,13 +25,17 @@ def visible(doc: str) -> str:
 
 
 def main(out_dir: Path) -> int:
-    fixture = json.loads((ROOT / "frontend/src/demo/fixture.json").read_text(encoding="utf-8"))
+    fixture = json.loads(
+        (ROOT / "frontend/src/demo/fixture.json").read_text(encoding="utf-8")
+    )
     resume = fixture["resumes"][0]["json_data"]
     letter = json.loads((out_dir / "letter.json").read_text(encoding="utf-8"))
     bad = 0
     checked = 0
-    for kind, render, data in (("resume", routes_resumes._render_html, resume),
-                               ("letter", routes_cover_letters._render_html, letter)):
+    for kind, render, data in (
+        ("resume", routes_resumes._render_html, resume),
+        ("letter", routes_cover_letters._render_html, letter),
+    ):
         for f in sorted(out_dir.glob(f"{kind}_*.html")):
             tpl = f.stem.split("_", 1)[1]
             want = visible(render(data, tpl, "a4" if kind == "letter" else "letter"))
@@ -40,8 +45,13 @@ def main(out_dir: Path) -> int:
                 print(f"OK    {kind} {tpl}")
             else:
                 bad += 1
-                i = next((n for n, (a, b) in enumerate(zip(want, got)) if a != b), min(len(want), len(got)))
-                print(f"DIFF  {kind} {tpl} at {i}:\n   jinja:    {want[max(0, i - 40):i + 80]!r}\n   nunjucks: {got[max(0, i - 40):i + 80]!r}")
+                i = next(
+                    (n for n, (a, b) in enumerate(zip(want, got)) if a != b),
+                    min(len(want), len(got)),
+                )
+                print(
+                    f"DIFF  {kind} {tpl} at {i}:\n   jinja:    {want[max(0, i - 40) : i + 80]!r}\n   nunjucks: {got[max(0, i - 40) : i + 80]!r}"
+                )
     print(f"{checked} templates compared, {bad} differ")
     return 1 if bad or not checked else 0
 

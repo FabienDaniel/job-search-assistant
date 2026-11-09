@@ -4,6 +4,7 @@ refresh token for .env's GMAIL_REFRESH_TOKEN, catching the redirect via a tempor
 Since MT-19 every account connects its own mailbox in the app (Settings › Email classification ›
 Gmail); this script stays for the owner: GMAIL_REFRESH_TOKEN in .env is the owner's mailbox
 whenever the owner has not connected one in the app. Members never use it."""
+
 import http.server
 import json
 import os
@@ -28,16 +29,15 @@ REDIRECT_PORT = 8090
 REDIRECT_URI = f"http://localhost:{REDIRECT_PORT}"
 SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 
-AUTH_URL = (
-    "https://accounts.google.com/o/oauth2/v2/auth?"
-    + urllib.parse.urlencode({
+AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(
+    {
         "client_id": CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
         "response_type": "code",
         "scope": SCOPE,
         "access_type": "offline",
         "prompt": "consent",
-    })
+    }
 )
 
 # Will be set by the callback handler
@@ -67,7 +67,9 @@ class OAuthHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(400)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
-            self.wfile.write(f"<html><body><h1>Error: {server_error}</h1></body></html>".encode())
+            self.wfile.write(
+                f"<html><body><h1>Error: {server_error}</h1></body></html>".encode()
+            )
         else:
             self.send_response(400)
             self.end_headers()
@@ -117,15 +119,19 @@ if not auth_code:
 
 print("Authorization code received! Exchanging for tokens...")
 
-data = urllib.parse.urlencode({
-    "client_id": CLIENT_ID,
-    "client_secret": CLIENT_SECRET,
-    "code": auth_code,
-    "grant_type": "authorization_code",
-    "redirect_uri": REDIRECT_URI,
-}).encode()
+data = urllib.parse.urlencode(
+    {
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "code": auth_code,
+        "grant_type": "authorization_code",
+        "redirect_uri": REDIRECT_URI,
+    }
+).encode()
 
-req = urllib.request.Request("https://oauth2.googleapis.com/token", data=data, method="POST")
+req = urllib.request.Request(
+    "https://oauth2.googleapis.com/token", data=data, method="POST"
+)
 req.add_header("Content-Type", "application/x-www-form-urlencoded")
 
 try:

@@ -11,7 +11,14 @@ Usage inside a test script:
         hov = hover_delta(pg, '.v2-card >> nth=0', ['borderColor','backgroundColor','color'])
         snap(pg, 'feed-dark')                # /tmp/v2t/shots/feed-dark.png
 """
-import json, os, contextlib, urllib.request, urllib.error, time
+
+import contextlib
+import json
+import os
+import time
+import urllib.error
+import urllib.request
+
 from playwright.sync_api import sync_playwright
 
 BASE = os.environ.get("JN_BASE", "http://caddy")
@@ -37,7 +44,9 @@ def _raw(method, path, body=None, headers=None, key=KEY, timeout=60):
     data = None if body is None else json.dumps(body).encode()
     hd = {"X-API-Key": key, "Content-Type": "application/json"}
     hd.update(headers or {})
-    req = urllib.request.Request(BASE + "/api" + path, data=data, method=method, headers=hd)
+    req = urllib.request.Request(
+        BASE + "/api" + path, data=data, method=method, headers=hd
+    )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.status, r.read().decode("utf-8", "replace")
@@ -94,7 +103,9 @@ def owner_cookie(ctx, key=KEY):
     body = {"account_id": str(owner_account(key=key)["id"])}
     if OWNER_PIN:
         body["pin"] = OWNER_PIN
-    r = ctx.request.post(BASE + "/api/auth/switch", data=body, headers={"X-API-Key": key})
+    r = ctx.request.post(
+        BASE + "/api/auth/switch", data=body, headers={"X-API-Key": key}
+    )
     if r.status != 200:
         raise RuntimeError(f"auth/switch to the owner: {r.status} {r.text()[:200]}")
     return True
@@ -131,10 +142,20 @@ def api(method, path, body=None, key=KEY, raw=False, timeout=120, headers=None):
         return st, txt
 
 
-def get(path, **kw): return api("GET", path, **kw)
-def post(path, body=None, **kw): return api("POST", path, body, **kw)
-def patch(path, body=None, **kw): return api("PATCH", path, body, **kw)
-def delete(path, **kw): return api("DELETE", path, **kw)
+def get(path, **kw):
+    return api("GET", path, **kw)
+
+
+def post(path, body=None, **kw):
+    return api("POST", path, body, **kw)
+
+
+def patch(path, body=None, **kw):
+    return api("PATCH", path, body, **kw)
+
+
+def delete(path, **kw):
+    return api("DELETE", path, **kw)
 
 
 # ── browser ──────────────────────────────────────────────────────────────
@@ -148,7 +169,9 @@ def browser(headless=True):
             b.close()
 
 
-NEWUI_VERSION = "3.1"   # frontend/src/onboarding.js NEWUI_VERSION: the upgrade notice is seen
+NEWUI_VERSION = (
+    "3.1"  # frontend/src/onboarding.js NEWUI_VERSION: the upgrade notice is seen
+)
 
 
 def telemetry_answer(ctx, **over):
@@ -164,21 +187,48 @@ def telemetry_answer(ctx, **over):
             route.fulfill(response=resp, json=data)
         except Exception:
             route.continue_()
+
     ctx.route("**/api/telemetry", _handle)
 
 
-def context(b, appearance="light", width=1440, height=900, dsf=1, key=KEY, extra_ls=None, ask_telemetry=False):
-    ctx = b.new_context(viewport={"width": width, "height": height}, device_scale_factor=dsf)
-    ls = {"jobnavigator_api_key": key, "jobnavigator_dark_mode": "true" if appearance == "dark" else "false",
-          "jobnavigator_welcome_seen": "true", "jobnavigator_v2_welcome_seen": "true",
-          "jobnavigator_welcomed": "1", "jobnavigator_newui_seen": NEWUI_VERSION}
+def context(
+    b,
+    appearance="light",
+    width=1440,
+    height=900,
+    dsf=1,
+    key=KEY,
+    extra_ls=None,
+    ask_telemetry=False,
+):
+    ctx = b.new_context(
+        viewport={"width": width, "height": height}, device_scale_factor=dsf
+    )
+    ls = {
+        "jobnavigator_api_key": key,
+        "jobnavigator_dark_mode": "true" if appearance == "dark" else "false",
+        "jobnavigator_welcome_seen": "true",
+        "jobnavigator_v2_welcome_seen": "true",
+        "jobnavigator_welcomed": "1",
+        "jobnavigator_newui_seen": NEWUI_VERSION,
+    }
     ls.update(extra_ls or {})
-    ctx.add_init_script("try{" + "".join(f"localStorage.setItem({json.dumps(k)},{json.dumps(v)});" for k, v in ls.items()) + "}catch(e){}")
+    ctx.add_init_script(
+        "try{"
+        + "".join(
+            f"localStorage.setItem({json.dumps(k)},{json.dumps(v)});"
+            for k, v in ls.items()
+        )
+        + "}catch(e){}"
+    )
     if not ask_telemetry:
         telemetry_answer(ctx)
-    owner_cookie(ctx, key=key)   # 2+ accounts: open as the owner, no picker
+    owner_cookie(ctx, key=key)  # 2+ accounts: open as the owner, no picker
     # warm-up: lets App.jsx sync the cookie session so /api hrefs work
-    w = ctx.new_page(); w.goto(BASE + "/feed", wait_until="networkidle"); w.wait_for_timeout(500); w.close()
+    w = ctx.new_page()
+    w.goto(BASE + "/feed", wait_until="networkidle")
+    w.wait_for_timeout(500)
+    w.close()
     return ctx
 
 
@@ -192,22 +242,49 @@ def page(b, appearance="light", **kw):
 
 def attach_log(pg):
     log = {"console": [], "pageerrors": [], "http": [], "reqfailed": []}
+
     # only our own frames: postings are framed cross-origin and log their own errors
     def _ours_url(u):
         return (not u) or u.startswith(BASE) or u.startswith("about:")
+
     def _on_console(m):
-        if m.type not in ("error", "warning"): return
-        try: u = (m.location or {}).get("url", "")
-        except Exception: u = ""
-        if _ours_url(u): log["console"].append({"type": m.type, "text": m.text[:400]})
+        if m.type not in ("error", "warning"):
+            return
+        try:
+            u = (m.location or {}).get("url", "")
+        except Exception:
+            u = ""
+        if _ours_url(u):
+            log["console"].append({"type": m.type, "text": m.text[:400]})
+
     def _on_pageerror(e):
         st = str(getattr(e, "stack", "") or "")
-        if "://" in st and BASE not in st: return
+        if "://" in st and BASE not in st:
+            return
         log["pageerrors"].append(str(e)[:400])
+
     pg.on("console", _on_console)
     pg.on("pageerror", _on_pageerror)
-    pg.on("response", lambda r: log["http"].append({"status": r.status, "url": r.url[-140:], "method": r.request.method}) if r.status >= 400 else None)
-    pg.on("requestfailed", lambda r: log["reqfailed"].append({"url": r.url[-140:], "err": (r.failure or "")[:100]}) if "favicon" not in r.url and not r.url.startswith("blob:") else None)
+    pg.on(
+        "response",
+        lambda r: (
+            log["http"].append(
+                {"status": r.status, "url": r.url[-140:], "method": r.request.method}
+            )
+            if r.status >= 400
+            else None
+        ),
+    )
+    pg.on(
+        "requestfailed",
+        lambda r: (
+            log["reqfailed"].append(
+                {"url": r.url[-140:], "err": (r.failure or "")[:100]}
+            )
+            if "favicon" not in r.url and not r.url.startswith("blob:")
+            else None
+        ),
+    )
     pg.jn_log = log
     return log
 
@@ -219,14 +296,26 @@ def go(pg, route, settle=800, wait="networkidle", timeout=45000):
 
 
 def set_appearance(pg, appearance):
-    pg.evaluate(f"localStorage.setItem('jobnavigator_dark_mode', '{'true' if appearance == 'dark' else 'false'}')")
-    pg.reload(wait_until="networkidle"); pg.wait_for_timeout(600)
+    pg.evaluate(
+        f"localStorage.setItem('jobnavigator_dark_mode', '{'true' if appearance == 'dark' else 'false'}')"
+    )
+    pg.reload(wait_until="networkidle")
+    pg.wait_for_timeout(600)
 
 
 # ── measurement ──────────────────────────────────────────────────────────
 def rect(pg, sel):
-    return pg.evaluate("""(sel) => { const el = typeof sel === 'string' ? document.querySelector(sel) : sel; if (!el) return null;
-        const r = el.getBoundingClientRect(); return {x: r.x, y: r.y, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right}; }""", sel) if not hasattr(sel, "evaluate") else sel.evaluate("el => { const r = el.getBoundingClientRect(); return {x: r.x, y: r.y, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right}; }")
+    return (
+        pg.evaluate(
+            """(sel) => { const el = typeof sel === 'string' ? document.querySelector(sel) : sel; if (!el) return null;
+        const r = el.getBoundingClientRect(); return {x: r.x, y: r.y, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right}; }""",
+            sel,
+        )
+        if not hasattr(sel, "evaluate")
+        else sel.evaluate(
+            "el => { const r = el.getBoundingClientRect(); return {x: r.x, y: r.y, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right}; }"
+        )
+    )
 
 
 def style(pg_or_loc, sel_or_props, props=None):
@@ -242,14 +331,23 @@ def hover_delta(pg, sel, props, settle=250):
     """Computed style before vs after hover for the first match of sel. Returns {'before':{},'after':{},'changed':[...]}"""
     loc = pg.locator(sel).first
     before = style(loc, props)
-    loc.hover(); pg.wait_for_timeout(settle)
+    loc.hover()
+    pg.wait_for_timeout(settle)
     after = style(loc, props)
-    pg.mouse.move(0, 0); pg.wait_for_timeout(120)
-    return {"before": before, "after": after, "changed": [p for p in props if before[p] != after[p]]}
+    pg.mouse.move(0, 0)
+    pg.wait_for_timeout(120)
+    return {
+        "before": before,
+        "after": after,
+        "changed": [p for p in props if before[p] != after[p]],
+    }
 
 
 def tops(pg, sel):
-    return pg.evaluate("(sel) => [...document.querySelectorAll(sel)].map(e => e.getBoundingClientRect().top)", sel)
+    return pg.evaluate(
+        "(sel) => [...document.querySelectorAll(sel)].map(e => e.getBoundingClientRect().top)",
+        sel,
+    )
 
 
 def assert_int_tops(pg, sel):
@@ -275,8 +373,11 @@ def px_stats(path):
     """Mean RGB + count of distinct colours of a PNG (needs PIL; falls back to None)."""
     try:
         from PIL import Image
-        im = Image.open(path).convert("RGB"); px = list(im.getdata())
-        n = len(px); mean = tuple(sum(c[i] for c in px) // n for i in range(3))
+
+        im = Image.open(path).convert("RGB")
+        px = list(im.getdata())
+        n = len(px)
+        mean = tuple(sum(c[i] for c in px) // n for i in range(3))
         return {"mean": mean, "distinct": len(set(px)), "size": im.size}
     except Exception as e:
         return {"error": str(e)[:100]}

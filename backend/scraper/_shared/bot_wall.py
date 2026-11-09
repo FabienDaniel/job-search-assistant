@@ -3,6 +3,7 @@
 Such a page is never content: stored as a job's page cache it becomes the text an
 LLM tailors a résumé against, and read as metadata it becomes the job title.
 """
+
 import re
 
 # Checked against pages seen in the wild: Cloudflare's managed challenge
@@ -12,8 +13,8 @@ _WALL_TITLE_RE = re.compile(
     re.IGNORECASE,
 )
 _WALL_MARKERS = (
-    "_cf_chl_opt",          # Cloudflare challenge bootstrap
-    "from=bot-detection",   # Indeed sends a suspected bot to its login page
+    "_cf_chl_opt",  # Cloudflare challenge bootstrap
+    "from=bot-detection",  # Indeed sends a suspected bot to its login page
 )
 
 

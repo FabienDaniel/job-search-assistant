@@ -1,5 +1,7 @@
 """Resume scoring reads résumés from the Resume table."""
+
 import pytest
+
 from backend.models.db import Resume, Setting
 
 
@@ -12,7 +14,11 @@ def _seed_resume(test_db, name, summary):
         json_data={
             "summary": summary,
             "experience": [
-                {"company": "Acme", "title": f"{name} Lead", "bullets": [f"shipped {name} platform"]}
+                {
+                    "company": "Acme",
+                    "title": f"{name} Lead",
+                    "bullets": [f"shipped {name} platform"],
+                }
             ],
             "skills": {"core": ["Python", "SQL"]},
         },
@@ -24,6 +30,7 @@ def _seed_resume(test_db, name, summary):
 
 def test_get_resume_texts_returns_dict_keyed_by_name(test_db):
     from backend.analyzer.cv_scorer import _get_resume_texts
+
     _seed_resume(test_db, "PM", "Product manager focused on fintech")
     _seed_resume(test_db, "TPgM", "Technical program manager")
 
@@ -36,14 +43,17 @@ def test_get_resume_texts_returns_dict_keyed_by_name(test_db):
 def test_get_resume_texts_skips_tailored_resumes(test_db):
     """is_base=False rows must NOT show up in scoring."""
     from backend.analyzer.cv_scorer import _get_resume_texts
+
     base = _seed_resume(test_db, "PM", "summary")
-    test_db.add(Resume(
-        name="PM → Acme tailored",
-        is_base=False,
-        parent_id=base.id,
-        template="inter",
-        json_data={"summary": "tailored", "experience": [], "skills": {}},
-    ))
+    test_db.add(
+        Resume(
+            name="PM → Acme tailored",
+            is_base=False,
+            parent_id=base.id,
+            template="inter",
+            json_data={"summary": "tailored", "experience": [], "skills": {}},
+        )
+    )
     test_db.commit()
 
     texts = _get_resume_texts(test_db)
@@ -52,6 +62,7 @@ def test_get_resume_texts_skips_tailored_resumes(test_db):
 
 def test_get_default_resume_reads_from_setting(test_db):
     from backend.analyzer.cv_scorer import _get_default_resume
+
     pm = _seed_resume(test_db, "PM", "summary")
     test_db.add(Setting(key="default_resume_id", value=str(pm.id)))
     test_db.commit()

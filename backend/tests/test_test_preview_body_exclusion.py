@@ -1,4 +1,5 @@
 """The test previews must show the body-exclusion layer, not just the title layers."""
+
 import json
 import types
 
@@ -18,8 +19,10 @@ def _phrases(db, phrases=(PHRASE,)):
 
 # ── Searches preview ────────────────────────────────────────────────────────
 
+
 def _fake_jobspy(rows):
     import sys
+
     import pandas as pd
 
     mod = types.ModuleType("jobspy")
@@ -28,9 +31,16 @@ def _fake_jobspy(rows):
 
 
 def _jrow(title, description):
-    return {"site": "indeed", "title": title, "company": "Acme",
-            "job_url": f"https://indeed.test/{title}", "description": description,
-            "location": "Remote", "min_amount": None, "max_amount": None}
+    return {
+        "site": "indeed",
+        "title": title,
+        "company": "Acme",
+        "job_url": f"https://indeed.test/{title}",
+        "description": description,
+        "location": "Remote",
+        "min_amount": None,
+        "max_amount": None,
+    }
 
 
 @pytest.mark.asyncio
@@ -38,13 +48,21 @@ async def test_search_preview_marks_the_body_excluded_row(test_db):
     from backend.api.routes_searches import test_search
 
     _phrases(test_db)
-    _fake_jobspy([
-        _jrow("Program Manager", BODY_CLEAN),
-        _jrow("Delivery Manager", BODY_HIT),
-    ])
-    search = Search(name="ZZ", search_mode="keyword", sources=["indeed"],
-                    title_include_keywords=[], title_exclude_keywords=[],
-                    company_filter=[], company_exclude=[])
+    _fake_jobspy(
+        [
+            _jrow("Program Manager", BODY_CLEAN),
+            _jrow("Delivery Manager", BODY_HIT),
+        ]
+    )
+    search = Search(
+        name="ZZ",
+        search_mode="keyword",
+        sources=["indeed"],
+        title_include_keywords=[],
+        title_exclude_keywords=[],
+        company_filter=[],
+        company_exclude=[],
+    )
     test_db.add(search)
     test_db.commit()
 
@@ -74,9 +92,15 @@ async def test_search_preview_says_when_it_cannot_check(test_db):
 
     _phrases(test_db)
     _fake_jobspy([_jrow("Program Manager", "")])
-    search = Search(name="ZZ", search_mode="keyword", sources=["indeed"],
-                    title_include_keywords=[], title_exclude_keywords=[],
-                    company_filter=[], company_exclude=[])
+    search = Search(
+        name="ZZ",
+        search_mode="keyword",
+        sources=["indeed"],
+        title_include_keywords=[],
+        title_exclude_keywords=[],
+        company_filter=[],
+        company_exclude=[],
+    )
     test_db.add(search)
     test_db.commit()
 
@@ -93,9 +117,15 @@ async def test_search_preview_unchanged_with_no_phrases_configured(test_db):
     from backend.api.routes_searches import test_search
 
     _fake_jobspy([_jrow("Program Manager", BODY_HIT)])
-    search = Search(name="ZZ", search_mode="keyword", sources=["indeed"],
-                    title_include_keywords=[], title_exclude_keywords=[],
-                    company_filter=[], company_exclude=[])
+    search = Search(
+        name="ZZ",
+        search_mode="keyword",
+        sources=["indeed"],
+        title_include_keywords=[],
+        title_exclude_keywords=[],
+        company_filter=[],
+        company_exclude=[],
+    )
     test_db.add(search)
     test_db.commit()
 
@@ -107,6 +137,7 @@ async def test_search_preview_unchanged_with_no_phrases_configured(test_db):
 
 
 # ── Companies preview ───────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def _fake_board(monkeypatch):
@@ -131,6 +162,7 @@ def _fake_board(monkeypatch):
     def _set_jobs(jobs):
         async def fake_scrape(url, debug=False, **kw):
             return list(jobs), []
+
         monkeypatch.setattr(gh, "scrape", fake_scrape)
 
     return _set_jobs
@@ -148,10 +180,16 @@ async def test_company_preview_marks_the_body_excluded_row(test_db, _fake_board)
     from backend.api.routes_companies import test_scrape_company
 
     _phrases(test_db)
-    _fake_board([_cjob("SOX Manager", BODY_CLEAN), _cjob("Accounting Manager", BODY_HIT)])
-    c = Company(name="ZZ Co", active=True,
-                scrape_urls=["https://job-boards.greenhouse.io/zz"],
-                title_include_expr="manager", title_exclude_keywords=[])
+    _fake_board(
+        [_cjob("SOX Manager", BODY_CLEAN), _cjob("Accounting Manager", BODY_HIT)]
+    )
+    c = Company(
+        name="ZZ Co",
+        active=True,
+        scrape_urls=["https://job-boards.greenhouse.io/zz"],
+        title_include_expr="manager",
+        title_exclude_keywords=[],
+    )
     test_db.add(c)
     test_db.commit()
 
@@ -166,8 +204,8 @@ async def test_company_preview_marks_the_body_excluded_row(test_db, _fake_board)
     assert hit["body_excluded_by"] == PHRASE
     assert hit["reason"] == f"Body exclusion: {PHRASE}"
 
-    assert out["after_filter"] == 1              # what would actually save
-    assert out["after_company_filter"] == 2      # both pass the title layers
+    assert out["after_filter"] == 1  # what would actually save
+    assert out["after_company_filter"] == 2  # both pass the title layers
     assert out["body_excluded_count"] == 1
     assert out["body_unchecked_count"] == 0
 
@@ -178,10 +216,14 @@ async def test_company_preview_says_when_it_cannot_check(test_db, _fake_board):
     from backend.api.routes_companies import test_scrape_company
 
     _phrases(test_db)
-    _fake_board([_cjob("SOX Manager")])   # no description key at all
-    c = Company(name="ZZ Co", active=True,
-                scrape_urls=["https://job-boards.greenhouse.io/zz"],
-                title_include_expr="manager", title_exclude_keywords=[])
+    _fake_board([_cjob("SOX Manager")])  # no description key at all
+    c = Company(
+        name="ZZ Co",
+        active=True,
+        scrape_urls=["https://job-boards.greenhouse.io/zz"],
+        title_include_expr="manager",
+        title_exclude_keywords=[],
+    )
     test_db.add(c)
     test_db.commit()
 
@@ -195,15 +237,21 @@ async def test_company_preview_says_when_it_cannot_check(test_db, _fake_board):
 
 
 @pytest.mark.asyncio
-async def test_company_preview_body_scan_runs_after_the_title_layers(test_db, _fake_board):
+async def test_company_preview_body_scan_runs_after_the_title_layers(
+    test_db, _fake_board
+):
     """A title-filtered row is never body-scanned — the run never gets that far."""
     from backend.api.routes_companies import test_scrape_company
 
     _phrases(test_db)
     _fake_board([_cjob("Software Engineer", BODY_HIT)])
-    c = Company(name="ZZ Co", active=True,
-                scrape_urls=["https://job-boards.greenhouse.io/zz"],
-                title_include_expr="manager", title_exclude_keywords=[])
+    c = Company(
+        name="ZZ Co",
+        active=True,
+        scrape_urls=["https://job-boards.greenhouse.io/zz"],
+        title_include_expr="manager",
+        title_exclude_keywords=[],
+    )
     test_db.add(c)
     test_db.commit()
 
@@ -212,6 +260,6 @@ async def test_company_preview_body_scan_runs_after_the_title_layers(test_db, _f
     row = out["jobs"][0]
     assert row["kept"] is False
     assert row["passes_company_filter"] is False
-    assert row["body_excluded_by"] is None       # not reached
+    assert row["body_excluded_by"] is None  # not reached
     assert out["body_excluded_count"] == 0
     assert out["body_unchecked_count"] == 0

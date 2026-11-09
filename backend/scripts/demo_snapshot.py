@@ -7,6 +7,7 @@ images inlined as data URIs and every script, frame and event handler removed. W
 <out_dir>/snapshots/<job_id>.html and <out_dir>/snapshots/index.json (ok ids in order, failures with reasons).
 Failures are listed, never fatal; the run stops once --want snapshots succeeded.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,14 +24,22 @@ from bs4 import BeautifulSoup, Comment, NavigableString
 from backend.scripts.demo_export import sanitize
 
 # Boards that keep the URL alive after a posting closes (Greenhouse shows "The job you are looking for is no longer open").
-EXPIRED = re.compile(r"no longer (?:open|available|accepting)|(?:job|position|posting) (?:has been|is) (?:closed|filled)", re.I)
+EXPIRED = re.compile(
+    r"no longer (?:open|available|accepting)|(?:job|position|posting) (?:has been|is) (?:closed|filled)",
+    re.I,
+)
 
-CSP = ("default-src 'none'; style-src 'unsafe-inline' data:; img-src data:; font-src data:; "
-       "media-src 'none'; frame-src 'none'; form-action 'none'")
+CSP = (
+    "default-src 'none'; style-src 'unsafe-inline' data:; img-src data:; font-src data:; "
+    "media-src 'none'; frame-src 'none'; form-action 'none'"
+)
 MAX_RESOURCE = 2_500_000
 MAX_FONT = 700_000
 MAX_SNAPSHOT = 4_500_000
-BAD_NODES = re.compile(r"cookie|consent|onetrust|cookiebot|gdpr|truste|intercom|drift-|hubspot-messages|chat-widget", re.I)
+BAD_NODES = re.compile(
+    r"cookie|consent|onetrust|cookiebot|gdpr|truste|intercom|drift-|hubspot-messages|chat-widget",
+    re.I,
+)
 URL_RE = re.compile(r"url\(\s*(['\"]?)(.*?)\1\s*\)", re.I)
 EMPTY = "data:,"
 
@@ -46,12 +55,14 @@ def _lookup(resources, url):
 
 def rewrite_css(css: str, css_url: str, resources: dict) -> str:
     """Inline every url() in a stylesheet that was captured; point the rest at an empty data URI."""
+
     def sub(m):
         ref = m.group(2).strip()
         if not ref or ref.startswith(("data:", "#")):
             return m.group(0)
         res = _lookup(resources, urljoin(css_url, ref))
         return f'url("{_data_uri(res)}")' if res else f'url("{EMPTY}")'
+
     css = re.sub(r"@import\s+(?:url\([^)]*\)|['\"][^'\"]*['\"])[^;]*;", "", css)
     return URL_RE.sub(sub, css)
 
@@ -59,7 +70,11 @@ def rewrite_css(css: str, css_url: str, resources: dict) -> str:
 def _scrub(soup) -> None:
     """Strip contact details and names from text nodes and from descriptive attributes; drop mailto links."""
     for text in soup.find_all(string=True):
-        if isinstance(text, NavigableString) and text.parent and text.parent.name not in ("style", "title"):
+        if (
+            isinstance(text, NavigableString)
+            and text.parent
+            and text.parent.name not in ("style", "title")
+        ):
             clean = sanitize(str(text))
             if clean != str(text):
                 text.replace_with(clean)
@@ -67,7 +82,9 @@ def _scrub(soup) -> None:
         for attr in ("content", "alt", "title", "aria-label", "placeholder", "value"):
             if isinstance(tag.get(attr), str):
                 tag[attr] = sanitize(tag[attr])
-        if tag.name == "a" and str(tag.get("href", "")).lower().startswith(("mailto:", "tel:")):
+        if tag.name == "a" and str(tag.get("href", "")).lower().startswith(
+            ("mailto:", "tel:")
+        ):
             del tag["href"]
 
 
@@ -84,11 +101,28 @@ def inline_snapshot(html: str, base_url: str, resources: dict) -> str:
 
     for c in soup.find_all(string=lambda s: isinstance(s, Comment)):
         c.extract()
-    for tag in soup.find_all(["script", "noscript", "iframe", "frame", "object", "embed", "video", "audio", "base", "template"]):
+    for tag in soup.find_all(
+        [
+            "script",
+            "noscript",
+            "iframe",
+            "frame",
+            "object",
+            "embed",
+            "video",
+            "audio",
+            "base",
+            "template",
+        ]
+    ):
         tag.decompose()
-    for tag in soup.find_all("meta", attrs={"http-equiv": re.compile("refresh|content-security", re.I)}):
+    for tag in soup.find_all(
+        "meta", attrs={"http-equiv": re.compile("refresh|content-security", re.I)}
+    ):
         tag.decompose()
-    for node in soup.find_all(attrs={"id": BAD_NODES}) + soup.find_all(attrs={"class": BAD_NODES}):
+    for node in soup.find_all(attrs={"id": BAD_NODES}) + soup.find_all(
+        attrs={"class": BAD_NODES}
+    ):
         if node.name not in ("html", "body", "main"):
             node.decompose()
 
@@ -100,7 +134,9 @@ def inline_snapshot(html: str, base_url: str, resources: dict) -> str:
             res = _lookup(resources, url)
             if res:
                 style = soup.new_tag("style")
-                style.string = rewrite_css(res[1].decode("utf-8", "replace"), url, resources)
+                style.string = rewrite_css(
+                    res[1].decode("utf-8", "replace"), url, resources
+                )
                 link.replace_with(style)
                 continue
         link.decompose()
@@ -116,7 +152,11 @@ def inline_snapshot(html: str, base_url: str, resources: dict) -> str:
             tag["style"] = rewrite_css(tag["style"], base_url, resources)
         if tag.name in ("img", "source"):
             src = tag.get("src") or tag.get("data-src") or ""
-            res = None if not src or src.startswith("data:") else _lookup(resources, urljoin(base_url, src))
+            res = (
+                None
+                if not src or src.startswith("data:")
+                else _lookup(resources, urljoin(base_url, src))
+            )
             if src.startswith("data:"):
                 pass
             elif res:
@@ -150,19 +190,28 @@ def inline_snapshot(html: str, base_url: str, resources: dict) -> str:
 
 
 def _title_ok(text: str, title: str) -> bool:
-    words = [w for w in re.findall(r"[a-z0-9&]+", title.lower()) if len(w) > 2 and w not in ("the", "and", "for", "senior")]
+    words = [
+        w
+        for w in re.findall(r"[a-z0-9&]+", title.lower())
+        if len(w) > 2 and w not in ("the", "and", "for", "senior")
+    ]
     low = text.lower()
     return bool(words) and sum(1 for w in words if w in low) / len(words) >= 0.7
 
 
-async def capture(page_ctx, url: str, title: str, delay: float) -> tuple[str, str | None]:
+async def capture(
+    page_ctx, url: str, title: str, delay: float
+) -> tuple[str, str | None]:
     """(html, error). Opens one page and returns the offline snapshot."""
     resources: dict = {}
     page = await page_ctx.new_page()
 
     async def on_response(resp):
         try:
-            if resp.request.resource_type not in ("stylesheet", "font", "image") or resp.status != 200:
+            if (
+                resp.request.resource_type not in ("stylesheet", "font", "image")
+                or resp.status != 200
+            ):
                 return
             body = await resp.body()
             limit = MAX_FONT if resp.request.resource_type == "font" else MAX_RESOURCE
@@ -178,7 +227,9 @@ async def capture(page_ctx, url: str, title: str, delay: float) -> tuple[str, st
             await page.goto(url, wait_until="networkidle", timeout=45_000)
         except Exception:
             await page.wait_for_timeout(4000)
-        await page.evaluate("async () => { for (let y = 0; y < document.body.scrollHeight; y += 600) { window.scrollTo(0, y); await new Promise(r => setTimeout(r, 120)); } window.scrollTo(0, 0); }")
+        await page.evaluate(
+            "async () => { for (let y = 0; y < document.body.scrollHeight; y += 600) { window.scrollTo(0, y); await new Promise(r => setTimeout(r, 120)); } window.scrollTo(0, 0); }"
+        )
         await page.wait_for_timeout(1200)
         text = await page.evaluate("document.body ? document.body.innerText : ''")
         if len(text) < 800 or not _title_ok(text, title) or EXPIRED.search(text):
@@ -190,21 +241,31 @@ async def capture(page_ctx, url: str, title: str, delay: float) -> tuple[str, st
     return inline_snapshot(html, final_url, resources), None
 
 
-async def run(export_path: Path, out_dir: Path, want: int, prefer: list[str], delay: float) -> dict:
+async def run(
+    export_path: Path, out_dir: Path, want: int, prefer: list[str], delay: float
+) -> dict:
     from playwright.async_api import async_playwright
 
     data = json.loads(export_path.read_text(encoding="utf-8"))
     pool = data["featured_pool"]
-    def rank(job):  # a company matches a preferred name by prefix ("Scribd" -> "Scribd, Inc.")
+
+    def rank(
+        job,
+    ):  # a company matches a preferred name by prefix ("Scribd" -> "Scribd, Inc.")
         c = job["company"].lower()
-        return next((i for i, n in enumerate(prefer) if c.startswith(n.lower())), len(prefer))
+        return next(
+            (i for i, n in enumerate(prefer) if c.startswith(n.lower())), len(prefer)
+        )
+
     pool = sorted(pool, key=rank) if prefer else pool
     snaps = out_dir / "snapshots"
     snaps.mkdir(parents=True, exist_ok=True)
     ok, failed = [], []
     async with async_playwright() as pw:
         browser = await pw.chromium.launch()
-        ctx = await browser.new_context(viewport={"width": 1280, "height": 1600}, locale="en-US")
+        ctx = await browser.new_context(
+            viewport={"width": 1280, "height": 1600}, locale="en-US"
+        )
         for job in pool:
             if len(ok) >= want:
                 break
@@ -215,7 +276,9 @@ async def run(export_path: Path, out_dir: Path, want: int, prefer: list[str], de
             except Exception as e:  # noqa: BLE001 - one bad page must not stop the run
                 html, err = "", f"{type(e).__name__}: {e}"[:200]
             if err:
-                failed.append({"id": job["id"], "company": job["company"], "reason": err})
+                failed.append(
+                    {"id": job["id"], "company": job["company"], "reason": err}
+                )
                 print(f"FAIL {job['company']}: {err}")
             else:
                 (snaps / f"{job['id']}.html").write_text(html, encoding="utf-8")
@@ -235,14 +298,20 @@ def main(argv=None) -> int:
     ap.add_argument("--want", type=int, default=15)
     ap.add_argument("--prefer", default="")
     ap.add_argument("--delay", type=float, default=1.5)
-    ap.add_argument("--rescrub", action="store_true", help="re-run the scrub over the saved snapshots in out_dir/snapshots and exit")
+    ap.add_argument(
+        "--rescrub",
+        action="store_true",
+        help="re-run the scrub over the saved snapshots in out_dir/snapshots and exit",
+    )
     a = ap.parse_args(argv)
     if a.rescrub:
         for f in (Path(a.out_dir) / "snapshots").glob("*.html"):
             f.write_text(rescrub(f.read_text(encoding="utf-8")), encoding="utf-8")
         return 0
     prefer = [p.strip() for p in a.prefer.split(",") if p.strip()]
-    idx = asyncio.run(run(Path(a.export_json), Path(a.out_dir), a.want, prefer, a.delay))
+    idx = asyncio.run(
+        run(Path(a.export_json), Path(a.out_dir), a.want, prefer, a.delay)
+    )
     print(f"{len(idx['ok'])} snapshots, {len(idx['failed'])} failed")
     return 0 if len(idx["ok"]) >= a.want else 1
 

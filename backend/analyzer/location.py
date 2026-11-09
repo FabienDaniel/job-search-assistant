@@ -26,32 +26,80 @@ A third table, `BARE_CITIES`, places a string that is nothing but a city name
 ("San Francisco", "Frankfurt Rhine-Main Metropolitan Area"). It is consulted
 only for the whole string, where no other token can contradict it.
 """
+
 import re
 import unicodedata
 
 CA_REGIONS = {
-    "alberta": "AB", "british columbia": "BC", "manitoba": "MB",
-    "new brunswick": "NB", "newfoundland and labrador": "NL",
-    "newfoundland": "NL", "nova scotia": "NS", "ontario": "ON",
-    "prince edward island": "PE", "quebec": "QC", "saskatchewan": "SK",
-    "northwest territories": "NT", "nunavut": "NU", "yukon": "YT",
+    "alberta": "AB",
+    "british columbia": "BC",
+    "manitoba": "MB",
+    "new brunswick": "NB",
+    "newfoundland and labrador": "NL",
+    "newfoundland": "NL",
+    "nova scotia": "NS",
+    "ontario": "ON",
+    "prince edward island": "PE",
+    "quebec": "QC",
+    "saskatchewan": "SK",
+    "northwest territories": "NT",
+    "nunavut": "NU",
+    "yukon": "YT",
 }
 US_REGIONS = {
-    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
-    "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
-    "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID",
-    "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS",
-    "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
-    "massachusetts": "MA", "michigan": "MI", "minnesota": "MN",
-    "mississippi": "MS", "missouri": "MO", "montana": "MT", "nebraska": "NE",
-    "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ",
-    "new mexico": "NM", "new york": "NY", "north carolina": "NC",
-    "north dakota": "ND", "ohio": "OH", "oklahoma": "OK", "oregon": "OR",
-    "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
-    "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT",
-    "vermont": "VT", "virginia": "VA", "washington": "WA",
-    "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY",
-    "district of columbia": "DC", "d.c.": "DC", "washington dc": "DC",
+    "alabama": "AL",
+    "alaska": "AK",
+    "arizona": "AZ",
+    "arkansas": "AR",
+    "california": "CA",
+    "colorado": "CO",
+    "connecticut": "CT",
+    "delaware": "DE",
+    "florida": "FL",
+    "georgia": "GA",
+    "hawaii": "HI",
+    "idaho": "ID",
+    "illinois": "IL",
+    "indiana": "IN",
+    "iowa": "IA",
+    "kansas": "KS",
+    "kentucky": "KY",
+    "louisiana": "LA",
+    "maine": "ME",
+    "maryland": "MD",
+    "massachusetts": "MA",
+    "michigan": "MI",
+    "minnesota": "MN",
+    "mississippi": "MS",
+    "missouri": "MO",
+    "montana": "MT",
+    "nebraska": "NE",
+    "nevada": "NV",
+    "new hampshire": "NH",
+    "new jersey": "NJ",
+    "new mexico": "NM",
+    "new york": "NY",
+    "north carolina": "NC",
+    "north dakota": "ND",
+    "ohio": "OH",
+    "oklahoma": "OK",
+    "oregon": "OR",
+    "pennsylvania": "PA",
+    "rhode island": "RI",
+    "south carolina": "SC",
+    "south dakota": "SD",
+    "tennessee": "TN",
+    "texas": "TX",
+    "utah": "UT",
+    "vermont": "VT",
+    "virginia": "VA",
+    "washington": "WA",
+    "west virginia": "WV",
+    "wisconsin": "WI",
+    "wyoming": "WY",
+    "district of columbia": "DC",
+    "d.c.": "DC",
+    "washington dc": "DC",
     "washington d.c.": "DC",
 }
 REGION_NAMES = {"CA": CA_REGIONS, "US": US_REGIONS}
@@ -59,101 +107,312 @@ REGION_CODES = {cc: set(names.values()) for cc, names in REGION_NAMES.items()}
 ALL_REGION_CODES = REGION_CODES["CA"] | REGION_CODES["US"]
 
 COUNTRY_NAMES = {
-    "canada": "CA", "united states": "US", "united states of america": "US",
-    "usa": "US", "u.s.": "US", "u.s.a.": "US", "america": "US",
-    "united kingdom": "GB", "uk": "GB", "great britain": "GB",
-    "england": "GB", "scotland": "GB", "wales": "GB",
-    "northern ireland": "GB", "ireland": "IE", "germany": "DE",
-    "france": "FR", "spain": "ES", "portugal": "PT", "netherlands": "NL",
-    "belgium": "BE", "poland": "PL", "ukraine": "UA", "romania": "RO",
-    "czechia": "CZ", "czech republic": "CZ", "switzerland": "CH",
-    "austria": "AT", "sweden": "SE", "norway": "NO", "denmark": "DK",
-    "finland": "FI", "italy": "IT", "greece": "GR", "india": "IN",
-    "israel": "IL", "singapore": "SG", "japan": "JP", "south korea": "KR",
-    "korea": "KR", "china": "CN", "taiwan": "TW", "australia": "AU",
-    "new zealand": "NZ", "mexico": "MX", "brazil": "BR", "argentina": "AR",
-    "costa rica": "CR", "colombia": "CO", "chile": "CL", "peru": "PE",
-    "south africa": "ZA", "egypt": "EG", "turkey": "TR",
-    "united arab emirates": "AE", "philippines": "PH", "malaysia": "MY",
-    "indonesia": "ID", "vietnam": "VN", "thailand": "TH",
-    "saudi arabia": "SA", "morocco": "MA", "nigeria": "NG", "kenya": "KE",
-    "pakistan": "PK", "bangladesh": "BD", "hungary": "HU", "bulgaria": "BG",
-    "serbia": "RS", "croatia": "HR", "lithuania": "LT", "latvia": "LV",
-    "estonia": "EE", "slovakia": "SK", "slovenia": "SI", "luxembourg": "LU",
-    "iceland": "IS", "hong kong": "HK", "qatar": "QA", "kuwait": "KW",
-    "jordan": "JO", "uruguay": "UY", "ecuador": "EC", "panama": "PA",
-    "guatemala": "GT", "dominican republic": "DO", "puerto rico": "PR",
-    "russia": "RU", "belarus": "BY", "kazakhstan": "KZ", "armenia": "AM",
-    "georgia (country)": "GE", "cyprus": "CY", "malta": "MT",
+    "canada": "CA",
+    "united states": "US",
+    "united states of america": "US",
+    "usa": "US",
+    "u.s.": "US",
+    "u.s.a.": "US",
+    "america": "US",
+    "united kingdom": "GB",
+    "uk": "GB",
+    "great britain": "GB",
+    "england": "GB",
+    "scotland": "GB",
+    "wales": "GB",
+    "northern ireland": "GB",
+    "ireland": "IE",
+    "germany": "DE",
+    "france": "FR",
+    "spain": "ES",
+    "portugal": "PT",
+    "netherlands": "NL",
+    "belgium": "BE",
+    "poland": "PL",
+    "ukraine": "UA",
+    "romania": "RO",
+    "czechia": "CZ",
+    "czech republic": "CZ",
+    "switzerland": "CH",
+    "austria": "AT",
+    "sweden": "SE",
+    "norway": "NO",
+    "denmark": "DK",
+    "finland": "FI",
+    "italy": "IT",
+    "greece": "GR",
+    "india": "IN",
+    "israel": "IL",
+    "singapore": "SG",
+    "japan": "JP",
+    "south korea": "KR",
+    "korea": "KR",
+    "china": "CN",
+    "taiwan": "TW",
+    "australia": "AU",
+    "new zealand": "NZ",
+    "mexico": "MX",
+    "brazil": "BR",
+    "argentina": "AR",
+    "costa rica": "CR",
+    "colombia": "CO",
+    "chile": "CL",
+    "peru": "PE",
+    "south africa": "ZA",
+    "egypt": "EG",
+    "turkey": "TR",
+    "united arab emirates": "AE",
+    "philippines": "PH",
+    "malaysia": "MY",
+    "indonesia": "ID",
+    "vietnam": "VN",
+    "thailand": "TH",
+    "saudi arabia": "SA",
+    "morocco": "MA",
+    "nigeria": "NG",
+    "kenya": "KE",
+    "pakistan": "PK",
+    "bangladesh": "BD",
+    "hungary": "HU",
+    "bulgaria": "BG",
+    "serbia": "RS",
+    "croatia": "HR",
+    "lithuania": "LT",
+    "latvia": "LV",
+    "estonia": "EE",
+    "slovakia": "SK",
+    "slovenia": "SI",
+    "luxembourg": "LU",
+    "iceland": "IS",
+    "hong kong": "HK",
+    "qatar": "QA",
+    "kuwait": "KW",
+    "jordan": "JO",
+    "uruguay": "UY",
+    "ecuador": "EC",
+    "panama": "PA",
+    "guatemala": "GT",
+    "dominican republic": "DO",
+    "puerto rico": "PR",
+    "russia": "RU",
+    "belarus": "BY",
+    "kazakhstan": "KZ",
+    "armenia": "AM",
+    "georgia (country)": "GE",
+    "cyprus": "CY",
+    "malta": "MT",
 }
 # Two-letter codes that are also a region code, so they may not be read as a
 # country until the rest of the string settles it.
 AMBIGUOUS_CODES = {
-    "CA": "CA", "DE": "DE", "IN": "IN", "LA": "LA", "MD": "MD", "ME": "ME",
-    "MT": "MT", "NE": "NE", "PA": "PA", "AL": "AL", "AR": "AR", "CO": "CO",
-    "GA": "GA", "MO": "MO", "MS": "MS", "SC": "SC", "SD": "SD", "TN": "TN",
-    "VA": "VA", "ID": "ID", "IL": "IL", "MN": "MN", "KY": "KY", "NC": "NC",
-    "MA": "MA", "SK": "SK", "NU": "NU", "PE": "PE",
+    "CA": "CA",
+    "DE": "DE",
+    "IN": "IN",
+    "LA": "LA",
+    "MD": "MD",
+    "ME": "ME",
+    "MT": "MT",
+    "NE": "NE",
+    "PA": "PA",
+    "AL": "AL",
+    "AR": "AR",
+    "CO": "CO",
+    "GA": "GA",
+    "MO": "MO",
+    "MS": "MS",
+    "SC": "SC",
+    "SD": "SD",
+    "TN": "TN",
+    "VA": "VA",
+    "ID": "ID",
+    "IL": "IL",
+    "MN": "MN",
+    "KY": "KY",
+    "NC": "NC",
+    "MA": "MA",
+    "SK": "SK",
+    "NU": "NU",
+    "PE": "PE",
 }
 # Two-letter codes that are no region's code, so they are safe to read as a
 # country wherever they appear.
 SAFE_COUNTRY_CODES = {
-    "US": "US", "GB": "GB", "FR": "FR", "JP": "JP", "UA": "UA", "CN": "CN",
-    "BR": "BR", "MX": "MX", "AU": "AU", "NZ": "NZ", "ZA": "ZA", "SG": "SG",
-    "KR": "KR", "TW": "TW", "PH": "PH", "MY": "MY", "VN": "VN", "TH": "TH",
-    "AE": "AE", "TR": "TR", "EG": "EG", "PL": "PL", "RO": "RO", "CZ": "CZ",
-    "CH": "CH", "AT": "AT", "SE": "SE", "NO": "NO", "DK": "DK", "FI": "FI",
-    "IT": "IT", "GR": "GR", "ES": "ES", "PT": "PT", "BE": "BE", "IE": "IE",
-    "CR": "CR", "CL": "CL",
+    "US": "US",
+    "GB": "GB",
+    "FR": "FR",
+    "JP": "JP",
+    "UA": "UA",
+    "CN": "CN",
+    "BR": "BR",
+    "MX": "MX",
+    "AU": "AU",
+    "NZ": "NZ",
+    "ZA": "ZA",
+    "SG": "SG",
+    "KR": "KR",
+    "TW": "TW",
+    "PH": "PH",
+    "MY": "MY",
+    "VN": "VN",
+    "TH": "TH",
+    "AE": "AE",
+    "TR": "TR",
+    "EG": "EG",
+    "PL": "PL",
+    "RO": "RO",
+    "CZ": "CZ",
+    "CH": "CH",
+    "AT": "AT",
+    "SE": "SE",
+    "NO": "NO",
+    "DK": "DK",
+    "FI": "FI",
+    "IT": "IT",
+    "GR": "GR",
+    "ES": "ES",
+    "PT": "PT",
+    "BE": "BE",
+    "IE": "IE",
+    "CR": "CR",
+    "CL": "CL",
 }
 # Workday tenants also write the three-letter form ("VNM, Da Nang", "POL").
 ISO3 = {
-    "CAN": "CA", "USA": "US", "GBR": "GB", "DEU": "DE", "IND": "IN",
-    "AUS": "AU", "MEX": "MX", "BRA": "BR", "FRA": "FR", "JPN": "JP",
-    "IRL": "IE", "VNM": "VN", "POL": "PL", "ESP": "ES", "PRT": "PT",
-    "NLD": "NL", "BEL": "BE", "CHE": "CH", "AUT": "AT", "SWE": "SE",
-    "NOR": "NO", "DNK": "DK", "FIN": "FI", "ITA": "IT", "GRC": "GR",
-    "CZE": "CZ", "ROU": "RO", "HUN": "HU", "BGR": "BG", "UKR": "UA",
-    "ISR": "IL", "SGP": "SG", "KOR": "KR", "CHN": "CN", "TWN": "TW",
-    "NZL": "NZ", "ZAF": "ZA", "EGY": "EG", "TUR": "TR", "ARE": "AE",
-    "PHL": "PH", "MYS": "MY", "THA": "TH", "IDN": "ID", "ARG": "AR",
-    "CHL": "CL", "COL": "CO", "PER": "PE", "CRI": "CR", "SAU": "SA",
-    "MAR": "MA", "NGA": "NG", "KEN": "KE", "PAK": "PK", "BGD": "BD",
-    "HKG": "HK", "QAT": "QA", "LUX": "LU", "LTU": "LT", "LVA": "LV",
-    "EST": "EE", "SVK": "SK", "SVN": "SI", "HRV": "HR", "SRB": "RS",
+    "CAN": "CA",
+    "USA": "US",
+    "GBR": "GB",
+    "DEU": "DE",
+    "IND": "IN",
+    "AUS": "AU",
+    "MEX": "MX",
+    "BRA": "BR",
+    "FRA": "FR",
+    "JPN": "JP",
+    "IRL": "IE",
+    "VNM": "VN",
+    "POL": "PL",
+    "ESP": "ES",
+    "PRT": "PT",
+    "NLD": "NL",
+    "BEL": "BE",
+    "CHE": "CH",
+    "AUT": "AT",
+    "SWE": "SE",
+    "NOR": "NO",
+    "DNK": "DK",
+    "FIN": "FI",
+    "ITA": "IT",
+    "GRC": "GR",
+    "CZE": "CZ",
+    "ROU": "RO",
+    "HUN": "HU",
+    "BGR": "BG",
+    "UKR": "UA",
+    "ISR": "IL",
+    "SGP": "SG",
+    "KOR": "KR",
+    "CHN": "CN",
+    "TWN": "TW",
+    "NZL": "NZ",
+    "ZAF": "ZA",
+    "EGY": "EG",
+    "TUR": "TR",
+    "ARE": "AE",
+    "PHL": "PH",
+    "MYS": "MY",
+    "THA": "TH",
+    "IDN": "ID",
+    "ARG": "AR",
+    "CHL": "CL",
+    "COL": "CO",
+    "PER": "PE",
+    "CRI": "CR",
+    "SAU": "SA",
+    "MAR": "MA",
+    "NGA": "NG",
+    "KEN": "KE",
+    "PAK": "PK",
+    "BGD": "BD",
+    "HKG": "HK",
+    "QAT": "QA",
+    "LUX": "LU",
+    "LTU": "LT",
+    "LVA": "LV",
+    "EST": "EE",
+    "SVK": "SK",
+    "SVN": "SI",
+    "HRV": "HR",
+    "SRB": "RS",
 }
 
-ARRANGEMENT_WORDS = {"remote": "remote", "hybrid": "hybrid",
-                     "on-site": "onsite", "onsite": "onsite",
-                     "in office": "onsite", "in-office": "onsite",
-                     "work from home": "remote", "wfh": "remote",
-                     # Amazon writes "IN, KA, Bangalore - Virtual" for a job
-                     # attached to an office but worked from home.
-                     "virtual": "remote",
-                     "telecommute": "remote", "distributed": "remote",
-                     "fully distributed": "remote", "remote first": "remote",
-                     "remote-first": "remote", "remote (global)": "remote",
-                     "remote - global": "remote",
-                     # A whole-token phrase, never a place: "Fully Remote" and
-                     # "Remote - Anywhere" have to leave the city empty, or the
-                     # feed grows a city called "Anywhere".
-                     "fully remote": "remote", "100% remote": "remote",
-                     "anywhere": "remote", "remote anywhere": "remote",
-                     "anywhere in the world": "remote", "worldwide": "remote",
-                     # "Global" on its own is where the work is done from, not a
-                     # place it is done in. Inside a longer name ("Global
-                     # Technology Center") the token is that name, not this one.
-                     "global": "remote"}
+ARRANGEMENT_WORDS = {
+    "remote": "remote",
+    "hybrid": "hybrid",
+    "on-site": "onsite",
+    "onsite": "onsite",
+    "in office": "onsite",
+    "in-office": "onsite",
+    "work from home": "remote",
+    "wfh": "remote",
+    # Amazon writes "IN, KA, Bangalore - Virtual" for a job
+    # attached to an office but worked from home.
+    "virtual": "remote",
+    "telecommute": "remote",
+    "distributed": "remote",
+    "fully distributed": "remote",
+    "remote first": "remote",
+    "remote-first": "remote",
+    "remote (global)": "remote",
+    "remote - global": "remote",
+    # A whole-token phrase, never a place: "Fully Remote" and
+    # "Remote - Anywhere" have to leave the city empty, or the
+    # feed grows a city called "Anywhere".
+    "fully remote": "remote",
+    "100% remote": "remote",
+    "anywhere": "remote",
+    "remote anywhere": "remote",
+    "anywhere in the world": "remote",
+    "worldwide": "remote",
+    # "Global" on its own is where the work is done from, not a
+    # place it is done in. Inside a longer name ("Global
+    # Technology Center") the token is that name, not this one.
+    "global": "remote",
+}
 
-JUNK = {"", "-", "--", "n/a", "na", "none", "unknown", "tbd", "various",
-        "multiple", "location", "locations", "multiple locations",
-        "various locations", "multiple location", "several locations",
-        "multiple offices",
-        # office labels boards append in brackets: "New York, NY (HQ)"
-        "hq", "headquarters", "head office", "office", "corporate", "main office",
-        # a region of the world, not a place: "Americas-United States-Boston"
-        # ("global" is not here: it is an arrangement word, see above)
-        "americas", "emea", "apac", "latam", "north america", "nationwide"}
+JUNK = {
+    "",
+    "-",
+    "--",
+    "n/a",
+    "na",
+    "none",
+    "unknown",
+    "tbd",
+    "various",
+    "multiple",
+    "location",
+    "locations",
+    "multiple locations",
+    "various locations",
+    "multiple location",
+    "several locations",
+    "multiple offices",
+    # office labels boards append in brackets: "New York, NY (HQ)"
+    "hq",
+    "headquarters",
+    "head office",
+    "office",
+    "corporate",
+    "main office",
+    # a region of the world, not a place: "Americas-United States-Boston"
+    # ("global" is not here: it is an arrangement word, see above)
+    "americas",
+    "emea",
+    "apac",
+    "latam",
+    "north america",
+    "nationwide",
+}
 
 # "6 Locations" is a count, not a place.
 COUNT_ONLY = re.compile(r"^\d+\s+locations?$", re.I)
@@ -162,8 +421,10 @@ _ALT = re.compile(r"\s*\+\s*(\d+)\s+more\s*$", re.I)
 # semicolon, or a dot inside a word ("USA.VA.Reston"). A bare dash is not: it
 # lives inside "Saint-Jean" and "Wilkes-Barre". The dot rule needs two letters
 # on one side of it, so an initialism ("U.S.", "Washington, D.C.") stays whole.
-_SPLIT = re.compile(r"\s*[,;·•|()]\s*|\s+[-–—]\s+"
-                    r"|(?<=\w\w)\.(?=\w)|(?<=\w)\.(?=\w\w)")
+_SPLIT = re.compile(
+    r"\s*[,;·•|()]\s*|\s+[-–—]\s+"
+    r"|(?<=\w\w)\.(?=\w)|(?<=\w)\.(?=\w\w)"
+)
 # One string, several places: "New York; London; Tokyo" is three postings'
 # worth of filter answers, not a city called "New York, London, Tokyo". The
 # "or" is deliberately case-sensitive: "OR" is Oregon, "or" is a separator.
@@ -187,11 +448,11 @@ _LABEL_HEAD = re.compile(r"^\s*(job\s+)?(locations?|offices?|sites?)\s*:\s*", re
 # "Remote US", "Remote in Canada", "Remote - Germany": an arrangement word and a
 # country, with nothing between them that `_SPLIT` would cut.
 _REMOTE_COUNTRY = re.compile(
-    r"^(?:fully\s+|100%\s+)?remote(?:\s+(?:in|from|within))?\s*[-–—:,]?\s+(.+)$", re.I)
+    r"^(?:fully\s+|100%\s+)?remote(?:\s+(?:in|from|within))?\s*[-–—:,]?\s+(.+)$", re.I
+)
 # The same pair written the other way round: "USA Remote", "Canada Remote".
 # A separator would have split these too, so only the spaced form reaches here.
-_COUNTRY_REMOTE = re.compile(
-    r"^(.+?)\s*[-–—:,]?\s+(?:fully\s+|100%\s+)?remote$", re.I)
+_COUNTRY_REMOTE = re.compile(r"^(.+?)\s*[-–—:,]?\s+(?:fully\s+|100%\s+)?remote$", re.I)
 
 # A metro name maps to its anchor city. `None` for the city means the phrase
 # names an area too wide for one city - it still answers the country filter,
@@ -234,8 +495,16 @@ METROS = {
 # Georgia is a country and a US state. The state is the overwhelmingly more
 # common reading on these boards ("Atlanta, Georgia"), so the country wins only
 # when the string also names a city that is unmistakably Georgian.
-GEORGIAN_CITIES = {"tbilisi", "batumi", "kutaisi", "rustavi", "zugdidi",
-                   "gori", "poti", "telavi"}
+GEORGIAN_CITIES = {
+    "tbilisi",
+    "batumi",
+    "kutaisi",
+    "rustavi",
+    "zugdidi",
+    "gori",
+    "poti",
+    "telavi",
+}
 
 # The longest city or region name the indexed columns hold. `loc_city` is
 # indexed and Postgres refuses an oversized btree entry, and a board
@@ -246,10 +515,18 @@ MAX_PART = 120
 MAX_CITY = MAX_PART
 
 COUNTRY_LABELS = {code: name.title() for name, code in COUNTRY_NAMES.items()}
-COUNTRY_LABELS.update({"CA": "Canada", "US": "United States",
-                       "GB": "United Kingdom", "IE": "Ireland", "KR": "South Korea",
-                       "AE": "United Arab Emirates", "CZ": "Czechia",
-                       "GE": "Georgia"})
+COUNTRY_LABELS.update(
+    {
+        "CA": "Canada",
+        "US": "United States",
+        "GB": "United Kingdom",
+        "IE": "Ireland",
+        "KR": "South Korea",
+        "AE": "United Arab Emirates",
+        "CZ": "Czechia",
+        "GE": "Georgia",
+    }
+)
 
 # `City, XX` with a US state code is the dominant convention on job boards, so
 # an unsettled code is read as that state. CA is held out: California and Canada
@@ -278,60 +555,193 @@ def fold(text: str) -> str:
 
 _CALIFORNIA = [
     # the Bay Area
-    "San Francisco", "South San Francisco", "Oakland", "Berkeley", "Emeryville",
-    "Alameda", "Brisbane", "Daly City", "San Bruno", "Burlingame", "Millbrae",
-    "San Mateo", "Foster City", "Belmont", "San Carlos", "Redwood City",
-    "Menlo Park", "Palo Alto", "Mountain View", "Sunnyvale", "Santa Clara",
-    "San Jose", "Cupertino", "Campbell", "Los Gatos", "Saratoga", "Milpitas",
-    "Fremont", "Hayward", "San Leandro", "Union City", "Dublin",
-    "Pleasanton", "Livermore", "San Ramon", "Danville", "Walnut Creek",
-    "Concord", "San Rafael", "Novato", "Sausalito",
-    "Mill Valley", "Petaluma", "Santa Rosa", "Napa", "Sonoma", "Vallejo",
-    "Stanford", "Half Moon Bay", "Santa Cruz", "Scotts Valley",
+    "San Francisco",
+    "South San Francisco",
+    "Oakland",
+    "Berkeley",
+    "Emeryville",
+    "Alameda",
+    "Brisbane",
+    "Daly City",
+    "San Bruno",
+    "Burlingame",
+    "Millbrae",
+    "San Mateo",
+    "Foster City",
+    "Belmont",
+    "San Carlos",
+    "Redwood City",
+    "Menlo Park",
+    "Palo Alto",
+    "Mountain View",
+    "Sunnyvale",
+    "Santa Clara",
+    "San Jose",
+    "Cupertino",
+    "Campbell",
+    "Los Gatos",
+    "Saratoga",
+    "Milpitas",
+    "Fremont",
+    "Hayward",
+    "San Leandro",
+    "Union City",
+    "Dublin",
+    "Pleasanton",
+    "Livermore",
+    "San Ramon",
+    "Danville",
+    "Walnut Creek",
+    "Concord",
+    "San Rafael",
+    "Novato",
+    "Sausalito",
+    "Mill Valley",
+    "Petaluma",
+    "Santa Rosa",
+    "Napa",
+    "Sonoma",
+    "Vallejo",
+    "Stanford",
+    "Half Moon Bay",
+    "Santa Cruz",
+    "Scotts Valley",
     # the Central Valley and the capital
-    "Sacramento", "West Sacramento", "Roseville", "Folsom", "Davis", "Stockton",
-    "Modesto", "Fresno", "Bakersfield", "California City",
+    "Sacramento",
+    "West Sacramento",
+    "Roseville",
+    "Folsom",
+    "Davis",
+    "Stockton",
+    "Modesto",
+    "Fresno",
+    "Bakersfield",
+    "California City",
     # greater Los Angeles
-    "Los Angeles", "Santa Monica", "Culver City", "Marina del Rey", "Venice",
-    "Playa Vista", "El Segundo", "Manhattan Beach", "Redondo Beach", "Torrance",
-    "Carson", "Long Beach", "Inglewood", "Hawthorne", "Burbank", "Glendale",
-    "Pasadena", "Universal City", "North Hollywood", "Studio City",
-    "West Hollywood", "Beverly Hills", "Woodland Hills", "Sherman Oaks",
-    "Calabasas", "Thousand Oaks", "Santa Clarita", "Valencia", "Palmdale",
-    "Lancaster", "City of Industry", "El Monte", "Monrovia",
+    "Los Angeles",
+    "Santa Monica",
+    "Culver City",
+    "Marina del Rey",
+    "Venice",
+    "Playa Vista",
+    "El Segundo",
+    "Manhattan Beach",
+    "Redondo Beach",
+    "Torrance",
+    "Carson",
+    "Long Beach",
+    "Inglewood",
+    "Hawthorne",
+    "Burbank",
+    "Glendale",
+    "Pasadena",
+    "Universal City",
+    "North Hollywood",
+    "Studio City",
+    "West Hollywood",
+    "Beverly Hills",
+    "Woodland Hills",
+    "Sherman Oaks",
+    "Calabasas",
+    "Thousand Oaks",
+    "Santa Clarita",
+    "Valencia",
+    "Palmdale",
+    "Lancaster",
+    "City of Industry",
+    "El Monte",
+    "Monrovia",
     # Orange County and the south
-    "Irvine", "Costa Mesa", "Newport Beach", "Santa Ana", "Tustin", "Orange",
-    "Anaheim", "Garden Grove", "Fullerton", "Yorba Linda", "Huntington Beach",
-    "Fountain Valley", "Aliso Viejo", "Lake Forest", "Mission Viejo",
-    "Laguna Niguel", "San Clemente", "San Diego", "La Jolla", "Carlsbad",
-    "Encinitas", "Oceanside", "Chula Vista", "Escondido", "Temecula",
-    "Riverside", "San Bernardino", "Rancho Cucamonga", "Corona",
+    "Irvine",
+    "Costa Mesa",
+    "Newport Beach",
+    "Santa Ana",
+    "Tustin",
+    "Orange",
+    "Anaheim",
+    "Garden Grove",
+    "Fullerton",
+    "Yorba Linda",
+    "Huntington Beach",
+    "Fountain Valley",
+    "Aliso Viejo",
+    "Lake Forest",
+    "Mission Viejo",
+    "Laguna Niguel",
+    "San Clemente",
+    "San Diego",
+    "La Jolla",
+    "Carlsbad",
+    "Encinitas",
+    "Oceanside",
+    "Chula Vista",
+    "Escondido",
+    "Temecula",
+    "Riverside",
+    "San Bernardino",
+    "Rancho Cucamonga",
+    "Corona",
     # the central coast
-    "Santa Barbara", "Goleta", "Ventura", "San Luis Obispo", "Arroyo Grande",
-    "Salinas", "Monterey",
+    "Santa Barbara",
+    "Goleta",
+    "Ventura",
+    "San Luis Obispo",
+    "Arroyo Grande",
+    "Salinas",
+    "Monterey",
     # in both countries, so listed in both: they must stay unresolved
-    "Richmond", "Windsor",
+    "Richmond",
+    "Windsor",
 ]
 CALIFORNIA_CITIES = {fold(name): name for name in _CALIFORNIA}
 
 _CANADA = [
-    ("Toronto", "ON"), ("Mississauga", "ON"), ("Brampton", "ON"),
-    ("Markham", "ON"), ("Vaughan", "ON"), ("Oakville", "ON"),
-    ("Burlington", "ON"), ("Milton", "ON"), ("Whitby", "ON"), ("Oshawa", "ON"),
-    ("Richmond Hill", "ON"), ("Waterloo", "ON"), ("Kitchener", "ON"),
-    ("Guelph", "ON"), ("Barrie", "ON"), ("Hamilton", "ON"), ("Ottawa", "ON"),
-    ("Kanata", "ON"), ("Kingston", "ON"),
+    ("Toronto", "ON"),
+    ("Mississauga", "ON"),
+    ("Brampton", "ON"),
+    ("Markham", "ON"),
+    ("Vaughan", "ON"),
+    ("Oakville", "ON"),
+    ("Burlington", "ON"),
+    ("Milton", "ON"),
+    ("Whitby", "ON"),
+    ("Oshawa", "ON"),
+    ("Richmond Hill", "ON"),
+    ("Waterloo", "ON"),
+    ("Kitchener", "ON"),
+    ("Guelph", "ON"),
+    ("Barrie", "ON"),
+    ("Hamilton", "ON"),
+    ("Ottawa", "ON"),
+    ("Kanata", "ON"),
+    ("Kingston", "ON"),
     # London and Windsor are Ontario cities and famously not only that, so they
     # resolve only from the "CA" beside them - never on their own.
-    ("London", "ON"), ("Windsor", "ON"),
-    ("Montreal", "QC"), ("Laval", "QC"), ("Gatineau", "QC"),
-    ("Quebec City", "QC"), ("Sherbrooke", "QC"),
-    ("Vancouver", "BC"), ("North Vancouver", "BC"), ("West Vancouver", "BC"),
-    ("Burnaby", "BC"), ("Richmond", "BC"), ("Surrey", "BC"),
-    ("Coquitlam", "BC"), ("Langley", "BC"), ("Victoria", "BC"),
-    ("Kelowna", "BC"), ("Calgary", "AB"), ("Edmonton", "AB"),
-    ("Winnipeg", "MB"), ("Saskatoon", "SK"), ("Regina", "SK"),
-    ("Halifax", "NS"), ("Moncton", "NB"), ("Fredericton", "NB"),
+    ("London", "ON"),
+    ("Windsor", "ON"),
+    ("Montreal", "QC"),
+    ("Laval", "QC"),
+    ("Gatineau", "QC"),
+    ("Quebec City", "QC"),
+    ("Sherbrooke", "QC"),
+    ("Vancouver", "BC"),
+    ("North Vancouver", "BC"),
+    ("West Vancouver", "BC"),
+    ("Burnaby", "BC"),
+    ("Richmond", "BC"),
+    ("Surrey", "BC"),
+    ("Coquitlam", "BC"),
+    ("Langley", "BC"),
+    ("Victoria", "BC"),
+    ("Kelowna", "BC"),
+    ("Calgary", "AB"),
+    ("Edmonton", "AB"),
+    ("Winnipeg", "MB"),
+    ("Saskatoon", "SK"),
+    ("Regina", "SK"),
+    ("Halifax", "NS"),
+    ("Moncton", "NB"),
+    ("Fredericton", "NB"),
     ("St. John's", "NL"),
 ]
 CANADA_CITIES = {fold(name): (region, name) for name, region in _CANADA}
@@ -342,48 +752,99 @@ CANADA_CITIES = {fold(name): (region, name) for name, region in _CANADA}
 # short on purpose - one entry per name that means one place worldwide in a job
 # posting. It is consulted only when the whole string is that name.
 _BARE = [
-    ("San Francisco", "US", "CA"), ("Los Angeles", "US", "CA"),
-    ("San Diego", "US", "CA"), ("New York", "US", "NY"),
-    ("Brooklyn", "US", "NY"), ("Seattle", "US", "WA"), ("Austin", "US", "TX"),
-    ("Dallas", "US", "TX"), ("Houston", "US", "TX"), ("Chicago", "US", "IL"),
-    ("Boston", "US", "MA"), ("Denver", "US", "CO"), ("Atlanta", "US", "GA"),
-    ("Miami", "US", "FL"), ("Philadelphia", "US", "PA"),
-    ("Pittsburgh", "US", "PA"), ("Detroit", "US", "MI"),
-    ("Minneapolis", "US", "MN"), ("Phoenix", "US", "AZ"),
-    ("Portland", "US", "OR"), ("Nashville", "US", "TN"),
+    ("San Francisco", "US", "CA"),
+    ("Los Angeles", "US", "CA"),
+    ("San Diego", "US", "CA"),
+    ("New York", "US", "NY"),
+    ("Brooklyn", "US", "NY"),
+    ("Seattle", "US", "WA"),
+    ("Austin", "US", "TX"),
+    ("Dallas", "US", "TX"),
+    ("Houston", "US", "TX"),
+    ("Chicago", "US", "IL"),
+    ("Boston", "US", "MA"),
+    ("Denver", "US", "CO"),
+    ("Atlanta", "US", "GA"),
+    ("Miami", "US", "FL"),
+    ("Philadelphia", "US", "PA"),
+    ("Pittsburgh", "US", "PA"),
+    ("Detroit", "US", "MI"),
+    ("Minneapolis", "US", "MN"),
+    ("Phoenix", "US", "AZ"),
+    ("Portland", "US", "OR"),
+    ("Nashville", "US", "TN"),
     ("Washington DC", "US", "DC"),
     # The Bay Area and the Seattle east side, which boards write bare far more
     # often than any other US city: "Cupertino", "Sunnyvale", "Redmond". Each of
     # these names one place in a job posting, which is what this table asks.
-    ("Cupertino", "US", "CA"), ("Sunnyvale", "US", "CA"),
-    ("Santa Clara", "US", "CA"), ("Mountain View", "US", "CA"),
-    ("Menlo Park", "US", "CA"), ("Palo Alto", "US", "CA"),
-    ("Redwood City", "US", "CA"), ("San Jose", "US", "CA"),
-    ("San Mateo", "US", "CA"), ("Fremont", "US", "CA"),
+    ("Cupertino", "US", "CA"),
+    ("Sunnyvale", "US", "CA"),
+    ("Santa Clara", "US", "CA"),
+    ("Mountain View", "US", "CA"),
+    ("Menlo Park", "US", "CA"),
+    ("Palo Alto", "US", "CA"),
+    ("Redwood City", "US", "CA"),
+    ("San Jose", "US", "CA"),
+    ("San Mateo", "US", "CA"),
+    ("Fremont", "US", "CA"),
     ("Milpitas", "US", "CA"),
-    ("Redmond", "US", "WA"), ("Bellevue", "US", "WA"),
+    ("Redmond", "US", "WA"),
+    ("Bellevue", "US", "WA"),
     ("Kirkland", "US", "WA"),
-    ("Toronto", "CA", "ON"), ("Vancouver", "CA", "BC"), ("Montreal", "CA", "QC"),
-    ("Ottawa", "CA", "ON"), ("Calgary", "CA", "AB"),
-    ("London", "GB", None), ("Manchester", "GB", None),
-    ("Edinburgh", "GB", None), ("Dublin", "IE", None), ("Cork", "IE", None),
+    ("Toronto", "CA", "ON"),
+    ("Vancouver", "CA", "BC"),
+    ("Montreal", "CA", "QC"),
+    ("Ottawa", "CA", "ON"),
+    ("Calgary", "CA", "AB"),
+    ("London", "GB", None),
+    ("Manchester", "GB", None),
+    ("Edinburgh", "GB", None),
+    ("Dublin", "IE", None),
+    ("Cork", "IE", None),
     ("Berlin", "DE", None),
-    ("Munich", "DE", None), ("Frankfurt", "DE", None), ("Hamburg", "DE", None),
-    ("Cologne", "DE", None), ("Paris", "FR", None), ("Amsterdam", "NL", None),
-    ("Brussels", "BE", None), ("Zurich", "CH", None), ("Geneva", "CH", None),
-    ("Vienna", "AT", None), ("Stockholm", "SE", None),
-    ("Copenhagen", "DK", None), ("Oslo", "NO", None), ("Helsinki", "FI", None),
-    ("Madrid", "ES", None), ("Barcelona", "ES", None), ("Lisbon", "PT", None),
-    ("Milan", "IT", None), ("Rome", "IT", None), ("Warsaw", "PL", None),
-    ("Krakow", "PL", None), ("Prague", "CZ", None), ("Budapest", "HU", None),
-    ("Bucharest", "RO", None), ("Singapore", "SG", None), ("Tokyo", "JP", None),
-    ("Seoul", "KR", None), ("Hong Kong", "HK", None), ("Sydney", "AU", None),
-    ("Melbourne", "AU", None), ("Auckland", "NZ", None),
-    ("Bengaluru", "IN", None), ("Bangalore", "IN", None),
-    ("Hyderabad", "IN", None), ("Mumbai", "IN", None), ("Pune", "IN", None),
-    ("Chennai", "IN", None), ("New Delhi", "IN", None),
-    ("Tel Aviv", "IL", None), ("Dubai", "AE", None), ("Mexico City", "MX", None),
-    ("Sao Paulo", "BR", None), ("Buenos Aires", "AR", None),
+    ("Munich", "DE", None),
+    ("Frankfurt", "DE", None),
+    ("Hamburg", "DE", None),
+    ("Cologne", "DE", None),
+    ("Paris", "FR", None),
+    ("Amsterdam", "NL", None),
+    ("Brussels", "BE", None),
+    ("Zurich", "CH", None),
+    ("Geneva", "CH", None),
+    ("Vienna", "AT", None),
+    ("Stockholm", "SE", None),
+    ("Copenhagen", "DK", None),
+    ("Oslo", "NO", None),
+    ("Helsinki", "FI", None),
+    ("Madrid", "ES", None),
+    ("Barcelona", "ES", None),
+    ("Lisbon", "PT", None),
+    ("Milan", "IT", None),
+    ("Rome", "IT", None),
+    ("Warsaw", "PL", None),
+    ("Krakow", "PL", None),
+    ("Prague", "CZ", None),
+    ("Budapest", "HU", None),
+    ("Bucharest", "RO", None),
+    ("Singapore", "SG", None),
+    ("Tokyo", "JP", None),
+    ("Seoul", "KR", None),
+    ("Hong Kong", "HK", None),
+    ("Sydney", "AU", None),
+    ("Melbourne", "AU", None),
+    ("Auckland", "NZ", None),
+    ("Bengaluru", "IN", None),
+    ("Bangalore", "IN", None),
+    ("Hyderabad", "IN", None),
+    ("Mumbai", "IN", None),
+    ("Pune", "IN", None),
+    ("Chennai", "IN", None),
+    ("New Delhi", "IN", None),
+    ("Tel Aviv", "IL", None),
+    ("Dubai", "AE", None),
+    ("Mexico City", "MX", None),
+    ("Sao Paulo", "BR", None),
+    ("Buenos Aires", "AR", None),
 ]
 BARE_CITIES = {fold(name): (country, region, name) for name, country, region in _BARE}
 # "Bangalore" is the same place under its older name.
@@ -475,8 +936,7 @@ def _leading_country(tokens: list):
         return None
     # A country code in the second slot means a different shape entirely
     # ("GA, US, Atlanta"), and this rule must keep its hands off it.
-    if (second in SAFE_COUNTRY_CODES or second in ISO3
-            or fold(second) in COUNTRY_NAMES):
+    if second in SAFE_COUNTRY_CODES or second in ISO3 or fold(second) in COUNTRY_NAMES:
         return None
     # A region code of the country itself is one the parser already knows how to
     # normalise, so "US, NY, New York" and "CA, ON, Toronto" keep their path.
@@ -488,8 +948,15 @@ def _leading_country(tokens: list):
 def _known_city(name: str) -> bool:
     """True when some gazetteer knows this name as a city."""
     folded = _base_city(name)
-    return bool(folded and (folded in BARE_CITIES or folded in CALIFORNIA_CITIES
-                            or folded in CANADA_CITIES or folded in METROS))
+    return bool(
+        folded
+        and (
+            folded in BARE_CITIES
+            or folded in CALIFORNIA_CITIES
+            or folded in CANADA_CITIES
+            or folded in METROS
+        )
+    )
 
 
 def _metro_of(token: str):
@@ -505,8 +972,7 @@ def _metro_of(token: str):
     trimmed = fold(_OFFICE_TAIL.sub("", _METRO_TAIL.sub("", token.strip())))
     # "LA Metro Area" loses only its "Area" here: "LA" alone is Louisiana.
     area_only = re.sub(r"\s+area$", "", folded)
-    for candidate in (folded, area_only, trimmed,
-                      re.sub(r"^greater\s+", "", trimmed)):
+    for candidate in (folded, area_only, trimmed, re.sub(r"^greater\s+", "", trimmed)):
         if candidate in METROS:
             return METROS[candidate]
     return None
@@ -538,8 +1004,11 @@ def _plain_country(token: str) -> str | None:
     """
     text = (token or "").strip()
     upper = text.upper()
-    return (COUNTRY_NAMES.get(fold(text)) or ISO3.get(upper)
-            or SAFE_COUNTRY_CODES.get(upper))
+    return (
+        COUNTRY_NAMES.get(fold(text))
+        or ISO3.get(upper)
+        or SAFE_COUNTRY_CODES.get(upper)
+    )
 
 
 def _remote_country(text: str) -> str | None:
@@ -608,7 +1077,9 @@ def _classify(token: str) -> tuple[str, object]:
     return "text", re.sub(r"^[Gg]reater\s+", "", token.strip())
 
 
-def _resolve(code: str, country: str | None, region: str | None) -> tuple[str, object] | None:
+def _resolve(
+    code: str, country: str | None, region: str | None
+) -> tuple[str, object] | None:
     """Settle one ambiguous two-letter code from what the string already fixed.
 
     | already known        | reading of the code            |
@@ -627,16 +1098,30 @@ def _resolve(code: str, country: str | None, region: str | None) -> tuple[str, o
         return None
     if region is not None:
         # A region is already fixed, so this code cannot be a second one.
-        return ("country", COUNTRY_NAMES.get(fold(code))
+        return (
+            (
+                "country",
+                COUNTRY_NAMES.get(fold(code))
                 or SAFE_COUNTRY_CODES.get(code)
-                or AMBIGUOUS_CODES.get(code)) if code in AMBIGUOUS_CODES else None
+                or AMBIGUOUS_CODES.get(code),
+            )
+            if code in AMBIGUOUS_CODES
+            else None
+        )
     return None
 
 
 def _empty() -> dict:
-    return {"city": None, "region": None, "country": None,
-            "arrangement": None, "alt": 0, "ambiguous": False,
-            "assumed": None, "note": None}
+    return {
+        "city": None,
+        "region": None,
+        "country": None,
+        "arrangement": None,
+        "alt": 0,
+        "ambiguous": False,
+        "assumed": None,
+        "note": None,
+    }
 
 
 def _has_place(result: dict) -> bool:
@@ -651,10 +1136,14 @@ def _geo_piece(piece: str) -> bool:
     """
     folded = fold(piece)
     upper = piece.strip().upper()
-    return bool(folded in COUNTRY_NAMES or upper in ISO3 or folded in JUNK
-                or folded in CA_REGIONS or folded in US_REGIONS
-                or (len(upper) == 2 and upper.isalpha()
-                    and upper in ALL_REGION_CODES))
+    return bool(
+        folded in COUNTRY_NAMES
+        or upper in ISO3
+        or folded in JUNK
+        or folded in CA_REGIONS
+        or folded in US_REGIONS
+        or (len(upper) == 2 and upper.isalpha() and upper in ALL_REGION_CODES)
+    )
 
 
 def _split_dashed(tokens: list) -> list:
@@ -701,8 +1190,7 @@ def _comma_groups(parts: list) -> list | None:
     """
     groups, index = [], 0
     while index < len(parts):
-        if (index + 1 < len(parts)
-                and _city_region_pair(parts[index], parts[index + 1])):
+        if index + 1 < len(parts) and _city_region_pair(parts[index], parts[index + 1]):
             groups.append("%s, %s" % (parts[index], parts[index + 1]))
             index += 2
         elif _known_city(parts[index]):
@@ -750,8 +1238,9 @@ def split_places(text: str) -> list:
     cleaned = re.sub(r"\s+", " ", unicodedata.normalize("NFKC", text)).strip()
     if _is_junk(cleaned):
         return []
-    segments = _expand([s.strip() for s in _LIST_SPLIT.split(cleaned)
-                        if s and s.strip()])
+    segments = _expand(
+        [s.strip() for s in _LIST_SPLIT.split(cleaned) if s and s.strip()]
+    )
     if len(segments) < 2:
         return [cleaned]
     carrying = [s for s in segments if _has_place(_parse_one(s))]
@@ -790,19 +1279,22 @@ def parse(text, text_joiner: str = ", ", country_hint: str = None) -> dict:
     if COUNT_ONLY.match(cleaned) or _is_junk(cleaned):
         return result
 
-    segments = _expand([s.strip() for s in _LIST_SPLIT.split(cleaned)
-                        if s and s.strip()])
+    segments = _expand(
+        [s.strip() for s in _LIST_SPLIT.split(cleaned) if s and s.strip()]
+    )
     parsed = [_parse_one(s, text_joiner, country_hint) for s in segments]
     # The first place the list settles. A place whose code stayed unread is
     # skipped while another one in the same list can be read: "San Francisco,
     # CA | New York City, NY" answers under New York rather than nothing.
-    chosen = next((p for p in parsed if _has_place(p) and not p["ambiguous"]),
-                  next((p for p in parsed if _has_place(p)),
-                       parsed[0] if parsed else result))
+    chosen = next(
+        (p for p in parsed if _has_place(p) and not p["ambiguous"]),
+        next((p for p in parsed if _has_place(p)), parsed[0] if parsed else result),
+    )
     chosen["alt"] = result["alt"]
     if chosen["arrangement"] is None:
         chosen["arrangement"] = next(
-            (p["arrangement"] for p in parsed if p["arrangement"]), None)
+            (p["arrangement"] for p in parsed if p["arrangement"]), None
+        )
     return chosen
 
 
@@ -826,8 +1318,9 @@ def _parse_one(cleaned: str, text_joiner: str = ", ", country_hint: str = None) 
         result["country"], result["region"], result["city"] = bare
         return result
 
-    tokens = _split_dashed([t.strip() for t in _SPLIT.split(cleaned)
-                            if t and t.strip()])
+    tokens = _split_dashed(
+        [t.strip() for t in _SPLIT.split(cleaned) if t and t.strip()]
+    )
     # "MA USA" is a code plus the country it pins, not one name: split it so
     # each half can be read on its own.
     expanded = []
@@ -846,11 +1339,16 @@ def _parse_one(cleaned: str, text_joiner: str = ", ", country_hint: str = None) 
         forced_country, forced_region, tokens = lead
         if not tokens:
             result["country"], result["region"] = forced_country, forced_region
-            result["assumed"] = "country code written first, region as the board wrote it"
+            result["assumed"] = (
+                "country code written first, region as the board wrote it"
+            )
             return result
 
-    classified = [(t, _classify(t)) for t in tokens
-                  if not _is_junk(t) and not _CODE_ONLY.fullmatch(t.strip())]
+    classified = [
+        (t, _classify(t))
+        for t in tokens
+        if not _is_junk(t) and not _CODE_ONLY.fullmatch(t.strip())
+    ]
     if not classified:
         if forced_country:
             result["country"], result["region"] = forced_country, forced_region
@@ -863,8 +1361,9 @@ def _parse_one(cleaned: str, text_joiner: str = ", ", country_hint: str = None) 
     # Unless the country came first. "US, NY, New York" is country, region,
     # city, so there the FIRST region token is the region and the rest is the
     # city - reading it the other way named the city "NY".
-    region_slots = [i for i, (_, (k, _v)) in enumerate(classified)
-                    if k in ("region", "ambiguous")]
+    region_slots = [
+        i for i, (_, (k, _v)) in enumerate(classified) if k in ("region", "ambiguous")
+    ]
     country_slots = [i for i, (_, (k, _v)) in enumerate(classified) if k == "country"]
     if country_slots and region_slots and min(country_slots) < min(region_slots):
         demote = set(region_slots[1:])
@@ -877,8 +1376,8 @@ def _parse_one(cleaned: str, text_joiner: str = ", ", country_hint: str = None) 
     pending = []
     text_parts = []
     metro_city = None
-    region_named = None      # the region token as the board wrote it
-    country_slot = -1        # where the country token sat, if there was one
+    region_named = None  # the region token as the board wrote it
+    country_slot = -1  # where the country token sat, if there was one
     text_slots = []
     # A hint is another place named by the same posting. "San Francisco, CA"
     # beside "Miami, FL" is California, because one posting sits in one country.
@@ -933,7 +1432,9 @@ def _parse_one(cleaned: str, text_joiner: str = ", ", country_hint: str = None) 
                 country, region, display = reading
                 result["country"] = result["country"] or country
                 result["region"] = result["region"] or region
-                result["assumed"] = "CA read from %s, a city in one of the two" % display
+                result["assumed"] = (
+                    "CA read from %s, a city in one of the two" % display
+                )
                 text_parts = [display]
                 continue
             # Nothing in the string pins the country, so CA stays unread.
@@ -941,11 +1442,14 @@ def _parse_one(cleaned: str, text_joiner: str = ", ", country_hint: str = None) 
             result["note"] = "%s is both a region code and a country code" % code
             continue
         settled = _resolve(code, result["country"], result["region"])
-        if (settled is None and code not in COUNTRY_FIRST_CODES
-                and code in REGION_CODES["US"]
-                # Only when nothing has fixed another country. "Canada, NC" is
-                # not Canada's state of North Carolina.
-                and result["country"] in (None, "US")):
+        if (
+            settled is None
+            and code not in COUNTRY_FIRST_CODES
+            and code in REGION_CODES["US"]
+            # Only when nothing has fixed another country. "Canada, NC" is
+            # not Canada's state of North Carolina.
+            and result["country"] in (None, "US")
+        ):
             # "Atlanta, GA" - the US convention, not Gabon.
             settled = ("region", ("US", code))
             result["assumed"] = "%s read as a US state" % code
@@ -981,17 +1485,25 @@ def _parse_one(cleaned: str, text_joiner: str = ", ", country_hint: str = None) 
     # tenants write the building after the city, and gluing it on invents a city
     # no map has. A trailing name the gazetteers do know is a place, not a
     # label, and is left alone.
-    if (result["country"] and text_slots and len(text_parts) >= 2
-            and not result["region"]
-            and result["country"] not in REGION_NAMES
-            and country_slot > max(text_slots)):
+    if (
+        result["country"]
+        and text_slots
+        and len(text_parts) >= 2
+        and not result["region"]
+        and result["country"] not in REGION_NAMES
+        and country_slot > max(text_slots)
+    ):
         result["region"] = text_parts[1][:MAX_PART]
         text_parts = text_parts[:1]
-    elif (result["country"] and text_slots and len(text_parts) >= 2
-            and 0 <= country_slot < min(text_slots)
-            # A space joiner means the caller split one name into pieces
-            # ("US, CA, Santa, Clara"), so none of them is a label.
-            and text_joiner.strip()):
+    elif (
+        result["country"]
+        and text_slots
+        and len(text_parts) >= 2
+        and 0 <= country_slot < min(text_slots)
+        # A space joiner means the caller split one name into pieces
+        # ("US, CA, Santa, Clara"), so none of them is a label.
+        and text_joiner.strip()
+    ):
         text_parts = [text_parts[0]] + [t for t in text_parts[1:] if _known_city(t)]
 
     if text_parts:
@@ -1012,9 +1524,12 @@ def _parse_one(cleaned: str, text_joiner: str = ", ", country_hint: str = None) 
     # boards mean nearly every time ("Atlanta, Georgia"), so the country wins
     # only when the city beside it is unmistakably Georgian - "Tbilisi,
     # Georgia". Bare "Georgia" stays the state, on purpose.
-    if (result["region"] == "GA" and result["country"] == "US"
-            and (region_named or "").strip().lower() == "georgia"
-            and fold(result["city"] or "") in GEORGIAN_CITIES):
+    if (
+        result["region"] == "GA"
+        and result["country"] == "US"
+        and (region_named or "").strip().lower() == "georgia"
+        and fold(result["city"] or "") in GEORGIAN_CITIES
+    ):
         result["country"], result["region"] = "GE", None
         result["assumed"] = "Georgia read as the country, from the city beside it"
 
@@ -1045,7 +1560,7 @@ def group_pieces(pieces: list, max_span: int = 4) -> list:
     index = 0
     while index < len(pieces):
         for span in range(min(max_span, len(pieces) - index), 1, -1):
-            run = " ".join(pieces[index:index + span])
+            run = " ".join(pieces[index : index + span])
             if fold(run) in _gazetteer_names():
                 grouped.append(run)
                 index += span
@@ -1106,10 +1621,14 @@ def _places_of(texts) -> list:
     # Two candidates that both fit means the code stays unread.
     countries = sorted({place[0] for place in resolved if place[0]})
     for text in leftover:
-        fits = [(country, _place_of(text, country_hint=country))
-                for country in countries]
-        fits = [(country, place) for country, place in fits
-                if place and place[1] in REGION_CODES.get(country, set())]
+        fits = [
+            (country, _place_of(text, country_hint=country)) for country in countries
+        ]
+        fits = [
+            (country, place)
+            for country, place in fits
+            if place and place[1] in REGION_CODES.get(country, set())
+        ]
         if len(fits) == 1:
             resolved.append(fits[0][1])
         # No fallback for a code that fits none of them as a region. Reading it
@@ -1145,8 +1664,10 @@ def apply_location_to_job(job, extra=None) -> None:
     texts = [job.location] + [t for t in (extra or []) if t]
     # Both columns are indexed and a board occasionally writes a whole address
     # into the field, so every part is cut to what the index can hold.
-    places = [tuple(p[:MAX_PART] if isinstance(p, str) else p for p in place)
-              for place in _places_of([t for t in texts if t])]
+    places = [
+        tuple(p[:MAX_PART] if isinstance(p, str) else p for p in place)
+        for place in _places_of([t for t in texts if t])
+    ]
     if places:
         job.loc_country, job.loc_region, job.loc_city = places[0]
 
@@ -1154,8 +1675,11 @@ def apply_location_to_job(job, extra=None) -> None:
     for index, (country, region, city) in enumerate(places):
         if (country, region, city) in known:
             continue
-        job.locations.append(JobLocation(country=country, region=region, city=city,
-                                         is_primary=index == 0))
+        job.locations.append(
+            JobLocation(
+                country=country, region=region, city=city, is_primary=index == 0
+            )
+        )
 
 
 # Quebec place names keep these lower-case: "Saint-Jean-sur-Richelieu".

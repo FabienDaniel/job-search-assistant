@@ -1,18 +1,27 @@
 """Tests for Job.cache_error column + _cache_job_page populating it on failure."""
-import pytest
+
 from unittest.mock import AsyncMock
+
+import pytest
 
 
 def test_cache_error_column_exists(test_db):
     from backend.models.db import Job
+
     assert hasattr(Job, "cache_error")
 
 
 def test_cache_error_stores_text(test_db):
     from backend.models.db import Job
-    job = Job(external_id="x1", content_hash="c1",
-              company="Acme", title="Senior PM", url="https://x.com/1",
-              cache_error="timeout after 30s")
+
+    job = Job(
+        external_id="x1",
+        content_hash="c1",
+        company="Acme",
+        title="Senior PM",
+        url="https://x.com/1",
+        cache_error="timeout after 30s",
+    )
     test_db.add(job)
     test_db.commit()
     back = test_db.query(Job).filter(Job.external_id == "x1").first()
@@ -20,23 +29,40 @@ def test_cache_error_stores_text(test_db):
 
 
 @pytest.mark.asyncio
-async def test_cache_job_page_populates_cache_error_on_playwright_failure(monkeypatch, test_db):
+async def test_cache_job_page_populates_cache_error_on_playwright_failure(
+    monkeypatch, test_db
+):
     """When the Playwright fetch inside _cache_job_page raises, cache_error should be set on Job."""
     from backend.models.db import Job
-    job = Job(external_id="x2", content_hash="c2",
-              company="Acme", title="Senior PM", url="https://x.com/2")
+
+    job = Job(
+        external_id="x2",
+        content_hash="c2",
+        company="Acme",
+        title="Senior PM",
+        url="https://x.com/2",
+    )
     test_db.add(job)
     test_db.commit()
 
     from sqlalchemy.orm import sessionmaker
+
     TestSession = sessionmaker(bind=test_db.get_bind())
-    monkeypatch.setattr("backend.scraper._shared.page_cache.SessionLocal", TestSession, raising=False)
+    monkeypatch.setattr(
+        "backend.scraper._shared.page_cache.SessionLocal", TestSession, raising=False
+    )
 
     async def broken_fetch(*a, **kw):
         raise RuntimeError("browser connection refused")
 
-    for attr in ("_fetch_with_playwright", "_cache_with_playwright", "_playwright_fetch"):
-        if hasattr(__import__("backend.scraper._shared.page_cache", fromlist=[""]), attr):
+    for attr in (
+        "_fetch_with_playwright",
+        "_cache_with_playwright",
+        "_playwright_fetch",
+    ):
+        if hasattr(
+            __import__("backend.scraper._shared.page_cache", fromlist=[""]), attr
+        ):
             monkeypatch.setattr(
                 f"backend.scraper._shared.page_cache.{attr}",
                 broken_fetch,
@@ -45,6 +71,7 @@ async def test_cache_job_page_populates_cache_error_on_playwright_failure(monkey
             break
     else:
         import httpx
+
         client = AsyncMock()
         client.get = AsyncMock(side_effect=RuntimeError("network error"))
         client.__aenter__ = AsyncMock(return_value=client)
@@ -53,6 +80,7 @@ async def test_cache_job_page_populates_cache_error_on_playwright_failure(monkey
 
     # Also make httpx fail so we hit the Playwright fallback path
     import httpx
+
     client = AsyncMock()
     client.get = AsyncMock(side_effect=RuntimeError("network error"))
     client.__aenter__ = AsyncMock(return_value=client)
@@ -60,6 +88,7 @@ async def test_cache_job_page_populates_cache_error_on_playwright_failure(monkey
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: client)
 
     from backend.scraper._shared.page_cache import _cache_job_page
+
     try:
         await _cache_job_page(str(job.id), job.url)
     except Exception:

@@ -4,15 +4,24 @@ Both routers share a shape: a Pydantic create model, a PATCH that silently drops
 keys outside an allow-list, a DELETE that orphans audit rows, and a 202 trigger
 that answers 409 while a run with the same scope key is live.
 """
+
 import pytest
 
 from backend.tests.r4_support import (  # noqa: F401
-    client, _clear_running_state, _no_outbound, assert_clean, assert_no_leak,
-    make_company, make_search, big_string, EMOJI, MISSING_UUID,
+    EMOJI,
+    MISSING_UUID,
+    _clear_running_state,
+    _no_outbound,
+    assert_clean,
+    assert_no_leak,
+    big_string,
+    client,
+    make_company,
+    make_search,
 )
 
-
 # ══ Searches ═════════════════════════════════════════════════════════════════
+
 
 def test_create_search_requires_a_name(client):
     assert_clean(client.post("/api/searches", json={}), 422)
@@ -38,8 +47,12 @@ def test_create_search_applies_every_documented_default(client):
 
 def test_create_search_drops_unknown_fields(client):
     """extra='ignore' — a stray key must never reach Search(**model_dump())."""
-    assert_clean(client.post("/api/searches",
-                             json={"name": "S", "id": MISSING_UUID, "bogus": 1}), 200)
+    assert_clean(
+        client.post(
+            "/api/searches", json={"name": "S", "id": MISSING_UUID, "bogus": 1}
+        ),
+        200,
+    )
 
 
 def test_create_search_unicode_name(client):
@@ -48,39 +61,64 @@ def test_create_search_unicode_name(client):
 
 
 def test_create_search_ten_megabyte_search_term(client):
-    r = client.post("/api/searches", json={"name": "Big", "search_term": big_string(10)})
+    r = client.post(
+        "/api/searches", json={"name": "Big", "search_term": big_string(10)}
+    )
     assert_clean(r, 200, 400, 413, 422)
 
 
-@pytest.mark.parametrize("field,value", [
-    ("max_pages", -1), ("max_pages", 0), ("min_fit_score", -5), ("min_fit_score", 1000),
-    ("hours_old", -24), ("results_wanted", -1), ("results_wanted", 10 ** 9),
-    ("run_interval_minutes", -1),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("max_pages", -1),
+        ("max_pages", 0),
+        ("min_fit_score", -5),
+        ("min_fit_score", 1000),
+        ("hours_old", -24),
+        ("results_wanted", -1),
+        ("results_wanted", 10**9),
+        ("run_interval_minutes", -1),
+    ],
+)
 def test_create_search_stores_out_of_range_numbers_verbatim(client, field, value):
     """Current contract: plain ints with no bounds. Recorded so a later guard is a visible change."""
-    r = assert_clean(client.post("/api/searches", json={"name": f"S{field}{value}", field: value}), 200)
+    r = assert_clean(
+        client.post("/api/searches", json={"name": f"S{field}{value}", field: value}),
+        200,
+    )
     assert r.json().get(field, value) == value
 
 
 @pytest.mark.xfail(strict=True, reason="R4-T1-17")
 def test_create_search_rejects_a_negative_interval(client):
     """A negative run_interval_minutes silently disables the per-search schedule."""
-    assert client.post("/api/searches",
-                       json={"name": "Neg", "run_interval_minutes": -30}).status_code == 422
+    assert (
+        client.post(
+            "/api/searches", json={"name": "Neg", "run_interval_minutes": -30}
+        ).status_code
+        == 422
+    )
 
 
-@pytest.mark.parametrize("mode", ["keyword", "levels_fyi", "linkedin_personal",
-                                  "jobright", "freehire", ""])
+@pytest.mark.parametrize(
+    "mode", ["keyword", "levels_fyi", "linkedin_personal", "jobright", "freehire", ""]
+)
 def test_create_search_accepts_every_known_search_mode(client, mode):
-    """"" is the column default, keyword."""
-    assert_clean(client.post("/api/searches", json={"name": f"m-{mode}", "search_mode": mode}), 200)
+    """ "" is the column default, keyword."""
+    assert_clean(
+        client.post("/api/searches", json={"name": f"m-{mode}", "search_mode": mode}),
+        200,
+    )
 
 
 def test_create_search_rejects_an_unknown_search_mode(client):
     """R4-T1-18 / R30 P0-02: the mode list is backend/scraper/search_modes.py."""
-    assert client.post("/api/searches",
-                       json={"name": "M", "search_mode": "banana"}).status_code == 400
+    assert (
+        client.post(
+            "/api/searches", json={"name": "M", "search_mode": "banana"}
+        ).status_code
+        == 400
+    )
 
 
 def test_patch_search_missing_id_is_404(client):
@@ -89,10 +127,20 @@ def test_patch_search_missing_id_is_404(client):
 
 def test_patch_search_drops_keys_outside_the_allow_list(client, test_db):
     from backend.models.db import Search
+
     s = make_search(test_db, name="S")
-    assert_clean(client.patch(f"/api/searches/{s.id}",
-                              json={"id": MISSING_UUID, "last_run_at": "2020-01-01",
-                                    "warning_acknowledged_at": "2020-01-01", "name": "kept"}), 200)
+    assert_clean(
+        client.patch(
+            f"/api/searches/{s.id}",
+            json={
+                "id": MISSING_UUID,
+                "last_run_at": "2020-01-01",
+                "warning_acknowledged_at": "2020-01-01",
+                "name": "kept",
+            },
+        ),
+        200,
+    )
     test_db.refresh(s)
     assert s.name == "kept"
     assert str(s.id) != MISSING_UUID
@@ -131,6 +179,7 @@ def test_extension_searches_refuse_delete_run_and_acknowledge(client, test_db, m
 def test_delete_search_orphans_its_jobs_and_scrape_logs(client, test_db):
     from backend.models.db import Job, ScrapeLog
     from backend.tests.r4_support import make_job
+
     s = make_search(test_db)
     job = make_job(test_db, search_id=s.id)
     test_db.add(ScrapeLog(search_id=s.id, source="test", jobs_found=1, new_jobs=0))
@@ -146,14 +195,19 @@ def test_run_search_missing_id_is_404(client):
     assert_clean(client.post(f"/api/searches/{MISSING_UUID}/run"), 404)
 
 
-def test_run_search_second_trigger_on_the_same_scope_is_409(client, test_db, monkeypatch):
+def test_run_search_second_trigger_on_the_same_scope_is_409(
+    client, test_db, monkeypatch
+):
     import asyncio
+
     import backend.scraper.orchestrator as orch
+
     gate = asyncio.Event()
 
     async def _slow(search_id, auto_score=None):
         await gate.wait()
         return {}
+
     monkeypatch.setattr(orch, "_run_search_by_id", _slow, raising=False)
 
     s = make_search(test_db)
@@ -164,12 +218,15 @@ def test_run_search_second_trigger_on_the_same_scope_is_409(client, test_db, mon
 
 def test_run_two_different_searches_at_once_is_allowed(client, test_db, monkeypatch):
     import asyncio
+
     import backend.scraper.orchestrator as orch
+
     gate = asyncio.Event()
 
     async def _slow(search_id, auto_score=None):
         await gate.wait()
         return {}
+
     monkeypatch.setattr(orch, "_run_search_by_id", _slow, raising=False)
 
     a = make_search(test_db, name="A")
@@ -189,6 +246,7 @@ def test_acknowledge_search_missing_id_is_404(client):
 
 # ══ Companies ════════════════════════════════════════════════════════════════
 
+
 def test_create_company_requires_a_name(client):
     assert_clean(client.post("/api/companies", json={}), 422)
 
@@ -200,10 +258,17 @@ def test_create_company_duplicate_name_is_409_case_insensitively(client):
 
 
 def test_create_company_strips_blank_urls_and_aliases(client):
-    r = assert_clean(client.post("/api/companies", json={
-        "name": "Trim", "scrape_urls": ["", "  ", "https://x.com/careers"],
-        "aliases": ["", "  ", "Trim Inc"],
-    }), 200)
+    r = assert_clean(
+        client.post(
+            "/api/companies",
+            json={
+                "name": "Trim",
+                "scrape_urls": ["", "  ", "https://x.com/careers"],
+                "aliases": ["", "  ", "Trim Inc"],
+            },
+        ),
+        200,
+    )
     assert r.json()["scrape_urls"] == ["https://x.com/careers"]
     assert r.json()["aliases"] == ["Trim Inc"]
 
@@ -213,13 +278,22 @@ def test_create_company_rejects_a_wrongly_typed_name(client, bad):
     assert_clean(client.post("/api/companies", json={"name": bad}), 422)
 
 
-@pytest.mark.parametrize("field,bad", [
-    ("scrape_urls", "https://x.com"), ("scrape_urls", [1, 2]),
-    ("selected_resume_ids", "abc"), ("aliases", "x"),
-    ("tier", "one"), ("max_pages", "many"), ("scrape_interval_minutes", "soon"),
-])
+@pytest.mark.parametrize(
+    "field,bad",
+    [
+        ("scrape_urls", "https://x.com"),
+        ("scrape_urls", [1, 2]),
+        ("selected_resume_ids", "abc"),
+        ("aliases", "x"),
+        ("tier", "one"),
+        ("max_pages", "many"),
+        ("scrape_interval_minutes", "soon"),
+    ],
+)
 def test_create_company_rejects_wrongly_typed_fields(client, field, bad):
-    assert_clean(client.post("/api/companies", json={"name": f"C-{field}", field: bad}), 422)
+    assert_clean(
+        client.post("/api/companies", json={"name": f"C-{field}", field: bad}), 422
+    )
 
 
 def test_create_company_unicode_name(client):
@@ -234,27 +308,42 @@ def test_create_company_ten_megabyte_notes(client):
 
 @pytest.mark.parametrize("value", [-1, 0])
 def test_create_company_stores_a_non_positive_interval_verbatim(client, value):
-    r = assert_clean(client.post("/api/companies",
-                                json={"name": f"I{value}", "scrape_interval_minutes": value}), 200)
+    r = assert_clean(
+        client.post(
+            "/api/companies",
+            json={"name": f"I{value}", "scrape_interval_minutes": value},
+        ),
+        200,
+    )
     assert r.json()["scrape_interval_minutes"] == value
 
 
 @pytest.mark.xfail(strict=True, reason="R4-T1-17")
 def test_create_company_rejects_a_zero_scrape_interval(client):
     """0 means "every 0 minutes" to /api/scheduler/jobs, which is not a schedule."""
-    assert client.post("/api/companies",
-                       json={"name": "Zero", "scrape_interval_minutes": 0}).status_code == 422
+    assert (
+        client.post(
+            "/api/companies", json={"name": "Zero", "scrape_interval_minutes": 0}
+        ).status_code
+        == 422
+    )
 
 
 def test_patch_company_missing_id_is_404(client):
-    assert_clean(client.patch(f"/api/companies/{MISSING_UUID}", json={"name": "x"}), 404)
+    assert_clean(
+        client.patch(f"/api/companies/{MISSING_UUID}", json={"name": "x"}), 404
+    )
 
 
 def test_patch_company_drops_keys_outside_the_allow_list(client, test_db):
     c = make_company(test_db, name="Acme")
-    assert_clean(client.patch(f"/api/companies/{c.id}",
-                              json={"id": MISSING_UUID, "last_scraped_at": "2020-01-01",
-                                    "notes": "kept"}), 200)
+    assert_clean(
+        client.patch(
+            f"/api/companies/{c.id}",
+            json={"id": MISSING_UUID, "last_scraped_at": "2020-01-01", "notes": "kept"},
+        ),
+        200,
+    )
     test_db.refresh(c)
     assert c.notes == "kept"
     assert c.last_scraped_at is None
@@ -284,8 +373,11 @@ def test_delete_company_missing_id_is_404(client):
 
 def test_delete_company_orphans_its_scrape_logs(client, test_db):
     from backend.models.db import ScrapeLog
+
     c = make_company(test_db)
-    test_db.add(ScrapeLog(company_id=c.id, source="career_page", jobs_found=0, new_jobs=0))
+    test_db.add(
+        ScrapeLog(company_id=c.id, source="career_page", jobs_found=0, new_jobs=0)
+    )
     test_db.commit()
     assert_clean(client.delete(f"/api/companies/{c.id}"), 200)
     test_db.expire_all()
@@ -307,14 +399,18 @@ def test_bulk_activate_requires_the_active_flag(client):
     assert_clean(client.post("/api/companies/bulk-activate", json={}), 422)
 
 
-@pytest.mark.parametrize("body", [{"active": None}, {"active": [True]}, {"active": "maybe"}])
+@pytest.mark.parametrize(
+    "body", [{"active": None}, {"active": [True]}, {"active": "maybe"}]
+)
 def test_bulk_activate_rejects_a_wrongly_typed_flag(client, body):
     assert_clean(client.post("/api/companies/bulk-activate", json=body), 422)
 
 
 def test_bulk_activate_coerces_boolish_strings(client):
     """Pydantic accepts "yes"/"no" for a bool — recorded, not a defect."""
-    r = assert_clean(client.post("/api/companies/bulk-activate", json={"active": "yes"}), 200)
+    r = assert_clean(
+        client.post("/api/companies/bulk-activate", json={"active": "yes"}), 200
+    )
     assert r.json()["active"] is True
 
 
@@ -322,28 +418,44 @@ def test_bulk_activate_coerces_boolish_strings(client):
 def test_bulk_activate_rejects_a_non_numeric_tier(client, test_db, tiers):
     """`int(t)` on a free-text tier is an unguarded ValueError -> 500."""
     make_company(test_db, name="Acme", tier=1)
-    assert client.post("/api/companies/bulk-activate",
-                       json={"active": False, "tiers": tiers}).status_code in (400, 422)
+    assert client.post(
+        "/api/companies/bulk-activate", json={"active": False, "tiers": tiers}
+    ).status_code in (400, 422)
 
 
 def test_bulk_activate_non_numeric_tier_never_leaks_internals(client, test_db):
     make_company(test_db, name="Acme", tier=1)
-    assert_no_leak(client.post("/api/companies/bulk-activate",
-                               json={"active": False, "tiers": ["banana"]}))
+    assert_no_leak(
+        client.post(
+            "/api/companies/bulk-activate", json={"active": False, "tiers": ["banana"]}
+        )
+    )
 
 
 def test_bulk_activate_none_tier_selects_untiered_companies(client, test_db):
     make_company(test_db, name="Acme", tier=None)
     make_company(test_db, name="Beta", tier=1)
-    r = assert_clean(client.post("/api/companies/bulk-activate",
-                                json={"active": False, "tiers": ["none"]}), 200)
+    r = assert_clean(
+        client.post(
+            "/api/companies/bulk-activate", json={"active": False, "tiers": ["none"]}
+        ),
+        200,
+    )
     assert r.json()["updated"] == 1
 
 
-@pytest.mark.parametrize("qs,expected", [
-    ("", 200), ("active=true", 200), ("active=false", 200),
-    ("tier=1", 200), ("tier=99", 200), ("tier=abc", 422), ("active=maybe", 422),
-])
+@pytest.mark.parametrize(
+    "qs,expected",
+    [
+        ("", 200),
+        ("active=true", 200),
+        ("active=false", 200),
+        ("tier=1", 200),
+        ("tier=99", 200),
+        ("tier=abc", 422),
+        ("active=maybe", 422),
+    ],
+)
 def test_list_companies_query_contract(client, qs, expected):
     assert_clean(client.get(f"/api/companies?{qs}"), expected)
 
@@ -352,16 +464,23 @@ def test_scrape_company_missing_id_is_404(client):
     assert_clean(client.post(f"/api/scrape/company/{MISSING_UUID}"), 404)
 
 
-def test_scrape_company_second_trigger_on_the_same_scope_is_409(client, test_db, monkeypatch):
+def test_scrape_company_second_trigger_on_the_same_scope_is_409(
+    client, test_db, monkeypatch
+):
     import asyncio
+
     import backend.scraper.sources.company_pages as cp
+
     gate = asyncio.Event()
 
     async def _slow(company):
         await gate.wait()
         return {}
+
     monkeypatch.setattr(cp, "scrape_single_career_page", _slow, raising=False)
-    monkeypatch.setattr(cp, "record_company_scrape_log", lambda *a, **k: None, raising=False)
+    monkeypatch.setattr(
+        cp, "record_company_scrape_log", lambda *a, **k: None, raising=False
+    )
 
     c = make_company(test_db)
     assert_clean(client.post(f"/api/scrape/company/{c.id}"), 202)
@@ -371,15 +490,26 @@ def test_scrape_company_second_trigger_on_the_same_scope_is_409(client, test_db,
 
 # ── R4 fix-loop regression (R4-T1-19) ────────────────────────────────────────
 
-@pytest.mark.parametrize("tiers", [["banana"], ["1", "x"], [""], ["1.5"], ["none", "x"]])
+
+@pytest.mark.parametrize(
+    "tiers", [["banana"], ["1", "x"], [""], ["1.5"], ["none", "x"]]
+)
 def test_bulk_activate_rejects_every_non_numeric_tier(client, test_db, tiers):
     make_company(test_db, name="Acme", tier=1)
-    assert_clean(client.post("/api/companies/bulk-activate",
-                             json={"active": False, "tiers": tiers}), 422)
+    assert_clean(
+        client.post(
+            "/api/companies/bulk-activate", json={"active": False, "tiers": tiers}
+        ),
+        422,
+    )
 
 
 @pytest.mark.parametrize("tiers", [["1"], ["1", "2"], ["none"], ["none", "1"]])
 def test_bulk_activate_still_accepts_real_tiers(client, test_db, tiers):
     make_company(test_db, name="Acme", tier=1)
-    assert_clean(client.post("/api/companies/bulk-activate",
-                             json={"active": True, "tiers": tiers}), 200)
+    assert_clean(
+        client.post(
+            "/api/companies/bulk-activate", json={"active": True, "tiers": tiers}
+        ),
+        200,
+    )

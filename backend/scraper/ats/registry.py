@@ -9,13 +9,25 @@ A URL no handler claims goes to `ats.generic`.
 
 `frontend/src/screens/Companies.jsx` (`detectAts`) mirrors this list for the live chip.
 """
+
 from dataclasses import dataclass
 from types import ModuleType
 from typing import Optional
 
 from backend.scraper.ats import (
-    amazon, ashby, google, greenhouse, lever, meta, oracle_hcm, phenom, rippling,
-    smartrecruiters, talentbrew, uber, workday,
+    amazon,
+    ashby,
+    google,
+    greenhouse,
+    lever,
+    meta,
+    oracle_hcm,
+    phenom,
+    rippling,
+    smartrecruiters,
+    talentbrew,
+    uber,
+    workday,
 )
 
 GENERIC_LABEL = "Generic (Playwright)"
@@ -24,8 +36,10 @@ GENERIC_LABEL = "Generic (Playwright)"
 @dataclass(frozen=True)
 class Handler:
     module: ModuleType
-    label: str              # shown on the ATS chip and in activity lines
-    browser: bool = False   # scrape() drives Playwright and takes browser= and max_pages=
+    label: str  # shown on the ATS chip and in activity lines
+    browser: bool = (
+        False  # scrape() drives Playwright and takes browser= and max_pages=
+    )
 
     @property
     def name(self) -> str:
@@ -35,10 +49,17 @@ class Handler:
     def matches(self, url: str) -> bool:
         return getattr(self.module, f"is_{self.name}")(url)
 
-    async def scrape(self, url: str, debug: bool = False, browser=None,
-                     max_pages: Optional[int] = None):
+    async def scrape(
+        self,
+        url: str,
+        debug: bool = False,
+        browser=None,
+        max_pages: Optional[int] = None,
+    ):
         if self.browser:
-            return await self.module.scrape(url, browser=browser, max_pages=max_pages, debug=debug)
+            return await self.module.scrape(
+                url, browser=browser, max_pages=max_pages, debug=debug
+            )
         return await self.module.scrape(url, debug=debug)
 
 

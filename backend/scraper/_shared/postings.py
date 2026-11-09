@@ -14,6 +14,7 @@ guessing an identity from an unknown path would merge different jobs.
 `unwrap()` reads a link wrapped in a click tracker (LinkedIn's DoubleClick ads) without a
 request; `resolve_short_link()` follows a known short-link host (grnh.se) to the posting.
 """
+
 import logging
 import re
 from typing import Optional
@@ -131,7 +132,11 @@ def _workday(parsed, host, seg, qs):
         return None
     if _is(host, "myworkdayjobs.com"):
         tenant = host.split(".")[0]
-    elif _is(host, "myworkdaysite.com") and "recruiting" in seg[:2] and seg.index("recruiting") + 1 < len(seg):
+    elif (
+        _is(host, "myworkdaysite.com")
+        and "recruiting" in seg[:2]
+        and seg.index("recruiting") + 1 < len(seg)
+    ):
         # /recruiting/<tenant>/… or /<locale>/recruiting/<tenant>/…
         tenant = seg[seg.index("recruiting") + 1].lower()
     else:
@@ -149,7 +154,12 @@ _ICIMS_SITES = {
 
 
 def _icims(parsed, host, seg, qs):
-    if _is(host, "icims.com") and len(seg) >= 2 and seg[0] == "jobs" and seg[1].isdigit():
+    if (
+        _is(host, "icims.com")
+        and len(seg) >= 2
+        and seg[0] == "jobs"
+        and seg[1].isdigit()
+    ):
         return f"icims:{host.split('.')[0]}:{seg[1]}"
     if host in _ICIMS_SITES:
         portal, pattern = _ICIMS_SITES[host]
@@ -206,7 +216,12 @@ def _dayforce(parsed, host, seg, qs):
         return None
     lower = [x.lower() for x in seg]
     i = seg.index("jobs")
-    if "candidateportal" in lower and lower.index("candidateportal") > 0 and i + 1 < len(seg) and seg[i + 1].isdigit():
+    if (
+        "candidateportal" in lower
+        and lower.index("candidateportal") > 0
+        and i + 1 < len(seg)
+        and seg[i + 1].isdigit()
+    ):
         return f"dayforce:{lower[lower.index('candidateportal') - 1]}:{seg[i + 1]}"
     return None
 
@@ -251,7 +266,7 @@ def _career_platforms(parsed, host, seg, qs):
     lower = [x.lower() for x in seg]
     for marker in ("jobdetail", "folderdetail"):
         if marker in lower:
-            tail = seg[lower.index(marker) + 1:]
+            tail = seg[lower.index(marker) + 1 :]
             if tail and tail[-1].isdigit():
                 return f"avature:{host}:{tail[-1]}"
     # Oracle Taleo: …/jobdetail.ftl?job=<id>
@@ -288,9 +303,19 @@ def _hosted_ats(parsed, host, seg, qs):
     if _is(host, "applytojob.com") and len(seg) >= 2 and seg[0] == "apply":
         return f"jazzhr:{seg[1]}"
     # Jibe: <tenant>.jibeapply.com/jobs/<id>, or the company domain's /careers-home/jobs/<id>
-    if _is(host, "jibeapply.com") and len(seg) >= 2 and seg[0] == "jobs" and seg[1].isdigit():
+    if (
+        _is(host, "jibeapply.com")
+        and len(seg) >= 2
+        and seg[0] == "jobs"
+        and seg[1].isdigit()
+    ):
         return f"jibe:{host.split('.')[0]}:{seg[1]}"
-    if host in _JIBE_SITES and len(seg) >= 3 and seg[:2] == ["careers-home", "jobs"] and seg[2].isdigit():
+    if (
+        host in _JIBE_SITES
+        and len(seg) >= 3
+        and seg[:2] == ["careers-home", "jobs"]
+        and seg[2].isdigit()
+    ):
         return f"jibe:{_JIBE_SITES[host]}:{seg[2]}"
     # ContactHR: <tenant>.contacthr.com/<id>
     if _is(host, "contacthr.com") and len(seg) == 1 and seg[0].isdigit():
@@ -309,13 +334,17 @@ _SITE_PATHS = {
     "jobs.uber.com": re.compile(r"^/(?:[a-z]{2}(?:-[a-z]{2})?/)?jobs/(\d+)"),
     "coinbase.com": re.compile(r"/careers/positions/(\d+)"),
     "joinbytedance.com": re.compile(r"^/search/(\d{10,})"),
-    "revolut.com": re.compile(r"^/careers/position/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"),
+    "revolut.com": re.compile(
+        r"^/careers/position/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+    ),
     "capgemini.com": re.compile(r"^/jobs/(\d+)-"),
     "ibegin.tcsapps.com": re.compile(r"^/candidate/jobs/(\w+)"),
 }
 
 
-_PHENOM_PATH = re.compile(r"^/(?:[a-z]{2}|global)/[a-z]{2}/job/([A-Za-z0-9_-]{4,})(?:/|$)")
+_PHENOM_PATH = re.compile(
+    r"^/(?:[a-z]{2}|global)/[a-z]{2}/job/([A-Za-z0-9_-]{4,})(?:/|$)"
+)
 
 
 def _phenom(parsed, host, seg, qs):
@@ -342,7 +371,9 @@ def _first_party(parsed, host, seg, qs):
     return f"site:{_SITE_KEY_HOST.get(host, host)}:{m.group(1)}" if m else None
 
 
-_TALENTBREW_PATH = re.compile(r"^/(?:[a-z]{2}(?:-[a-z]{2})?/)?job/[^/]+/[^/]+/(\d+)/(\d+)/?$", re.I)
+_TALENTBREW_PATH = re.compile(
+    r"^/(?:[a-z]{2}(?:-[a-z]{2})?/)?job/[^/]+/[^/]+/(\d+)/(\d+)/?$", re.I
+)
 
 
 def _talentbrew(parsed, host, seg, qs):
@@ -411,9 +442,30 @@ def _indeed(parsed, host, seg, qs):
     return None
 
 
-_READERS = (_greenhouse, _lever, _ashby, _workday, _icims, _oracle, _smartrecruiters, _rippling,
-            _workable, _jobvite, _dayforce, _ultipro, _eightfold, _big_boards, _first_party,
-            _phenom, _adp, _linkedin, _indeed, _talentbrew, _hosted_ats, _career_platforms)
+_READERS = (
+    _greenhouse,
+    _lever,
+    _ashby,
+    _workday,
+    _icims,
+    _oracle,
+    _smartrecruiters,
+    _rippling,
+    _workable,
+    _jobvite,
+    _dayforce,
+    _ultipro,
+    _eightfold,
+    _big_boards,
+    _first_party,
+    _phenom,
+    _adp,
+    _linkedin,
+    _indeed,
+    _talentbrew,
+    _hosted_ats,
+    _career_platforms,
+)
 
 # Keys that name the listing on a job board rather than the employer's own posting.
 BOARD_KEY_PREFIXES = ("linkedin:", "indeed:")
@@ -456,7 +508,7 @@ def unwrap(url: str) -> str:
         return url
     if not any(_is(host, t) for t in _TRACKER_HOSTS):
         return url
-    found = _EMBEDDED.findall(url[url.index(host) + len(host):])
+    found = _EMBEDDED.findall(url[url.index(host) + len(host) :])
     if not found:
         return url
     inner = found[-1]
@@ -466,8 +518,15 @@ def unwrap(url: str) -> str:
 # Hosts that only redirect to a posting: Greenhouse's and LinkedIn's short links, and the
 # Appcast and Phenom click trackers job ads go through.
 # Short links and job-ad redirectors (Joveo's jometer.com, Recruitics, eQuest): followed to the posting.
-SHORT_LINK_HOSTS = ("grnh.se", "lnkd.in", "click.appcast.io", "prng.co",
-                    "jometer.com", "recruitics.com", "equest.com")
+SHORT_LINK_HOSTS = (
+    "grnh.se",
+    "lnkd.in",
+    "click.appcast.io",
+    "prng.co",
+    "jometer.com",
+    "recruitics.com",
+    "equest.com",
+)
 
 
 def is_short_link(url) -> bool:
@@ -482,6 +541,7 @@ async def resolve_short_links(urls, concurrency: int = 5) -> dict:
     resolve, and every other link, is left out. Called before a source's insert loop, so no
     request waits while its session holds uncommitted rows."""
     import asyncio
+
     short = list(dict.fromkeys(u for u in urls if u and is_short_link(u)))
     if not short:
         return {}
@@ -503,6 +563,7 @@ async def resolve_short_link(url: str) -> str:
     if not is_short_link(url):
         return url
     from backend.scraper._shared.url_safety import safe_get
+
     try:
         resp = await safe_get(url, timeout=10)
         final = str(resp.url)

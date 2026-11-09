@@ -1,4 +1,5 @@
 """trulyremotework.com source — roster/detail parsing (no network)."""
+
 import pytest
 
 from backend.scraper.sources import trulyremote
@@ -34,7 +35,9 @@ def test_parse_roster_maps_every_field():
     assert [j["title"] for j in jobs] == ["Senior Backend Engineer", "Other Role"]
     first = jobs[0]
     assert first["company"] == "Acme"
-    assert first["url"] == "https://trulyremotework.com/jobs/senior-backend-engineer-acme"
+    assert (
+        first["url"] == "https://trulyremotework.com/jobs/senior-backend-engineer-acme"
+    )
     assert first["employment_type"] == "Full-time"
     assert first["location"] == "Worldwide (no restrictions)"
     assert first["posted"] == "2026-10-01"
@@ -55,29 +58,35 @@ def test_parse_roster_splits_on_the_last_at():
     assert jobs[0]["company"] == "Acme"
 
 
-@pytest.mark.parametrize("text,expected", [
-    ("$152k - $205k", (152000, 205000)),
-    ("$123,840—$209,520", (123840, 209520)),
-    ("€100K - €125K", (100000, 125000)),
-    ("$178.5K", (178500, None)),
-    ("Competitive", (None, None)),
-    ("", (None, None)),
-])
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("$152k - $205k", (152000, 205000)),
+        ("$123,840—$209,520", (123840, 209520)),
+        ("€100K - €125K", (100000, 125000)),
+        ("$178.5K", (178500, None)),
+        ("Competitive", (None, None)),
+        ("", (None, None)),
+    ],
+)
 def test_parse_salary(text, expected):
     assert trulyremote._parse_salary(text) == expected
 
 
-@pytest.mark.parametrize("text,usd_annual", [
-    ("$152k - $205k", True),          # bare "$" is USD on this board
-    ("$60,326 - $77,688/yr", True),
-    ("$178.5K", True),
-    ("€65K - €105K", False),          # another currency
-    ("£90,000 - £110,000", False),
-    ("$37.42 /hour", False),          # not annual
-    ("$8,000 / month", False),
-    ("Competitive", False),
-    ("", False),
-])
+@pytest.mark.parametrize(
+    "text,usd_annual",
+    [
+        ("$152k - $205k", True),  # bare "$" is USD on this board
+        ("$60,326 - $77,688/yr", True),
+        ("$178.5K", True),
+        ("€65K - €105K", False),  # another currency
+        ("£90,000 - £110,000", False),
+        ("$37.42 /hour", False),  # not annual
+        ("$8,000 / month", False),
+        ("Competitive", False),
+        ("", False),
+    ],
+)
 def test_salary_fields_gate_what_the_run_stores(text, usd_annual):
     fields = trulyremote._salary_fields(text)
     assert fields["salary_usd_annual"] is usd_annual
@@ -86,11 +95,17 @@ def test_salary_fields_gate_what_the_run_stores(text, usd_annual):
 
 
 def test_get_url_appends_the_md_twin():
-    assert trulyremote._get_url("https://trulyremotework.com/jobs/x") == "https://trulyremotework.com/jobs/x.md"
+    assert (
+        trulyremote._get_url("https://trulyremotework.com/jobs/x")
+        == "https://trulyremotework.com/jobs/x.md"
+    )
 
 
 def test_md_text_strips_links_and_emphasis():
-    assert trulyremote._md_text("[Growe](https://trulyremotework.com/companies/growe)") == "Growe"
+    assert (
+        trulyremote._md_text("[Growe](https://trulyremotework.com/companies/growe)")
+        == "Growe"
+    )
     assert trulyremote._md_text("**Full-time**") == "Full-time"
 
 
@@ -115,12 +130,17 @@ The full description body.
 
 
 def test_parse_detail_prefers_the_md_twin():
-    out = trulyremote._parse_detail(_DETAIL, {"title": "stale", "company": "", "url": "u"})
+    out = trulyremote._parse_detail(
+        _DETAIL, {"title": "stale", "company": "", "url": "u"}
+    )
     assert out["title"] == "Affiliate Manager"
     assert out["company"] == "Growe"
     assert out["location"] == "Worldwide (Fully Remote)"
-    assert out["posted"] == "2026-10-01"   # the page's date, as ISO (R13)
-    assert out["apply_url"] == "https://job-boards.eu.greenhouse.io/growetalents/jobs/4965477101"
+    assert out["posted"] == "2026-10-01"  # the page's date, as ISO (R13)
+    assert (
+        out["apply_url"]
+        == "https://job-boards.eu.greenhouse.io/growetalents/jobs/4965477101"
+    )
     assert out["description"] == "The full description body."
 
 
@@ -150,6 +170,7 @@ def test_retry_after_parses_and_caps():
 async def test_get_backs_off_on_429_then_returns(monkeypatch):
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(trulyremote.asyncio, "sleep", _no_sleep)
 
     client = _FakeClient([429, 200])

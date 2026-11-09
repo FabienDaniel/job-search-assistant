@@ -1,4 +1,5 @@
 """Persona endpoints — one record per account (backend.accounts.owned.get_persona)."""
+
 import copy
 import logging
 import re
@@ -8,9 +9,10 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from backend.accounts.owned import get_owned_or_404, get_persona as _account_persona
-from backend.models.db import get_db, Persona, Resume, utcnow
+from backend.accounts.owned import get_owned_or_404
+from backend.accounts.owned import get_persona as _account_persona
 from backend.api._input import str_field
+from backend.models.db import Persona, Resume, get_db, utcnow
 
 logger = logging.getLogger("jobnavigator.persona")
 
@@ -54,7 +56,9 @@ def update_persona(updates: dict, db: Session = Depends(get_db)):
     """Replace one or more node values atomically; callers must send the complete intended value of each node they update. Unknown top-level keys → 400."""
     unknown = set(updates.keys()) - _NODES
     if unknown:
-        raise HTTPException(status_code=400, detail=f"Unknown persona node(s): {sorted(unknown)}")
+        raise HTTPException(
+            status_code=400, detail=f"Unknown persona node(s): {sorted(unknown)}"
+        )
 
     p = _account_persona(db)
 
@@ -98,6 +102,7 @@ def _split_location(text: str) -> dict:
         out["state"], out["country"] = parts[1], parts[2]
     elif len(parts) == 2:
         from backend.autofill_schema import _DIAL_CODES
+
         second = parts[1]
         out["country" if second.lower() in _DIAL_CODES else "state"] = second
     return out
@@ -154,16 +159,22 @@ def _contact_from_header(header: dict) -> dict:
 # The résumé sections the Persona editor renders (ResumeSections.jsx SECTION_ORDER minus
 # Header, which lives in `contact`); defaults keep the node's shape stable for the editor.
 _CONTENT_DEFAULTS = (
-    ("summary", ""), ("experience", []), ("skills", {}),
-    ("education", []), ("projects", []), ("publications", []),
+    ("summary", ""),
+    ("experience", []),
+    ("skills", {}),
+    ("education", []),
+    ("projects", []),
+    ("publications", []),
 )
 
 
 def _resume_content_from(json_data: dict) -> dict:
     """The résumé's own sections, copied verbatim — exactly what the Persona editor edits via ResumeSections."""
     src = json_data or {}
-    return {k: copy.deepcopy(src[k]) if src.get(k) else copy.deepcopy(default)
-            for k, default in _CONTENT_DEFAULTS}
+    return {
+        k: copy.deepcopy(src[k]) if src.get(k) else copy.deepcopy(default)
+        for k, default in _CONTENT_DEFAULTS
+    }
 
 
 # ── current employer ─────────────────────────────────────────────────────────
@@ -172,8 +183,26 @@ def _resume_content_from(json_data: dict) -> dict:
 # every dated one; ties keep the résumé's own order, which lists newest first.
 _PRESENT_WORDS = ("present", "current", "now", "ongoing", "to date")
 _YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
-_MONTHS = {m: i for i, m in enumerate(
-    ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), start=1)}
+_MONTHS = {
+    m: i
+    for i, m in enumerate(
+        (
+            "jan",
+            "feb",
+            "mar",
+            "apr",
+            "may",
+            "jun",
+            "jul",
+            "aug",
+            "sep",
+            "oct",
+            "nov",
+            "dec",
+        ),
+        start=1,
+    )
+}
 # en dash, em dash, minus, hyphen or the word "to" — the separators résumé date ranges use
 _RANGE_SPLIT_RE = re.compile(r"\s*(?:[–—−-]|\bto\b)\s*")
 
@@ -193,8 +222,11 @@ def _role_end(entry: dict):
 
 def _current_company_from(content: dict) -> str:
     """The employer of the most recent role in `resume_content`, for contact.current_company; empty when no role names a company."""
-    rows = [e for e in (content or {}).get("experience") or []
-            if isinstance(e, dict) and str(e.get("company") or "").strip()]
+    rows = [
+        e
+        for e in (content or {}).get("experience") or []
+        if isinstance(e, dict) and str(e.get("company") or "").strip()
+    ]
     if not rows:
         return ""
     # -i breaks a tie toward the earlier row, i.e. the one the résumé lists first
@@ -217,12 +249,21 @@ def _import_summary(contact: dict, content: dict, source: str) -> dict:
 
 
 @router.post("/import")
-async def import_persona(request: Request, file: Optional[UploadFile] = File(None), db: Session = Depends(get_db)):
+async def import_persona(
+    request: Request,
+    file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+):
     """Populate the persona from a base résumé (`{"resume_id": ...}`) or an uploaded résumé PDF (same parser as POST /api/resumes/import-pdf, stores nothing as a Resume row), replacing `contact` and `resume_content` wholesale while leaving the other nodes untouched."""
     p = _account_persona(db)
 
     if file is not None and getattr(file, "filename", None):
-        from backend.api.routes_resumes import check_pdf_name, check_pdf_size, parse_resume_pdf
+        from backend.api.routes_resumes import (
+            check_pdf_name,
+            check_pdf_size,
+            parse_resume_pdf,
+        )
+
         filename = file.filename
         check_pdf_name(filename)
         pdf_bytes = await file.read()
@@ -234,9 +275,15 @@ async def import_persona(request: Request, file: Optional[UploadFile] = File(Non
             body = await request.json()
         except Exception:
             body = None
-        resume_id = str((body or {}).get("resume_id") or "").strip() if isinstance(body, dict) else ""
+        resume_id = (
+            str((body or {}).get("resume_id") or "").strip()
+            if isinstance(body, dict)
+            else ""
+        )
         if not resume_id:
-            raise HTTPException(status_code=400, detail="Send a resume_id, or upload a PDF file")
+            raise HTTPException(
+                status_code=400, detail="Send a resume_id, or upload a PDF file"
+            )
         r = get_owned_or_404(db, Resume, resume_id)
         if not r.is_base:
             raise HTTPException(
@@ -261,12 +308,16 @@ async def import_persona(request: Request, file: Optional[UploadFile] = File(Non
     p.updated_at = utcnow()
 
     from backend.activity import log_activity
+
     log_activity("persona", f"Persona imported from {source}", db=db)
 
     db.commit()
     db.refresh(p)
     logger.info(f"Persona imported from {source}")
-    return {"persona": _to_dict(p), "summary": _import_summary(contact, content, source)}
+    return {
+        "persona": _to_dict(p),
+        "summary": _import_summary(contact, content, source),
+    }
 
 
 @router.post("/qa-bank")

@@ -16,6 +16,7 @@ jobs in the same batch). The fix has two parts, both exercised here:
    `IntegrityError`) so one poisoned/failing row is skipped and logged
    instead of sinking the whole batch.
 """
+
 import asyncio
 
 import pytest
@@ -23,8 +24,8 @@ import sqlalchemy.orm as sa_orm
 
 from backend.models.db import Job, Search, sanitize_text
 
-
 # ── 1. sanitize_text() the raw helper ───────────────────────────────────────
+
 
 def test_sanitize_text_strips_nul_and_control_chars():
     assert sanitize_text("Senior\x00Engineer") == "SeniorEngineer"
@@ -43,6 +44,7 @@ def test_sanitize_text_passthrough_for_non_strings_and_empty():
 
 
 # ── 2. Model-level round trip: a job dict with NUL bytes survives insert ───
+
 
 def test_job_with_nul_in_title_and_description_round_trips_clean(test_db):
     job = Job(
@@ -74,7 +76,9 @@ def test_job_with_nul_in_title_and_description_round_trips_clean(test_db):
 def test_job_field_assignment_after_construction_is_also_sanitised(test_db):
     """The listener fires on attribute `set`, not just constructor kwargs —
     scrapers set salary_source / description etc. after building the Job()."""
-    job = Job(external_id="ext-nul-2", content_hash="hash-nul-2", title="OK", company="Co")
+    job = Job(
+        external_id="ext-nul-2", content_hash="hash-nul-2", title="OK", company="Co"
+    )
     job.description = "desc with \x00 nul"
     job.location = "Remote\x00"
     assert job.description == "desc with  nul"
@@ -82,6 +86,7 @@ def test_job_field_assignment_after_construction_is_also_sanitised(test_db):
 
 
 # ── 3. Batch isolation: one failing job doesn't sink the others ───────────
+
 
 def test_batch_survives_one_poisoned_job(test_db, monkeypatch):
     """Reproduces the per-job savepoint pattern shared by every scraper source
@@ -102,9 +107,27 @@ def test_batch_survives_one_poisoned_job(test_db, monkeypatch):
     monkeypatch.setattr(sa_orm.Session, "add", flaky_add)
 
     jobs = [
-        Job(external_id="e1", content_hash="c1", title="Good Job 1", company="A", status="new"),
-        Job(external_id="e2", content_hash="c2", title="Boom Job", company="B", status="new"),
-        Job(external_id="e3", content_hash="c3", title="Good Job 2", company="C", status="new"),
+        Job(
+            external_id="e1",
+            content_hash="c1",
+            title="Good Job 1",
+            company="A",
+            status="new",
+        ),
+        Job(
+            external_id="e2",
+            content_hash="c2",
+            title="Boom Job",
+            company="B",
+            status="new",
+        ),
+        Job(
+            external_id="e3",
+            content_hash="c3",
+            title="Good Job 2",
+            company="C",
+            status="new",
+        ),
     ]
 
     saved = 0
@@ -129,7 +152,10 @@ def test_batch_survives_one_poisoned_job(test_db, monkeypatch):
 
 # ── 4. End-to-end: the real Jobright source module survives a poisoned job ─
 
-def test_jobright_run_saves_clean_jobs_when_one_job_fails_to_insert(test_db, monkeypatch):
+
+def test_jobright_run_saves_clean_jobs_when_one_job_fails_to_insert(
+    test_db, monkeypatch
+):
     """Exercises the actual fixed code path in backend/scraper/sources/jobright.py:
     a NUL byte in one job's title/description is stripped by the model-level
     sanitiser, and a second, unrelated insert failure on a different job is
@@ -138,28 +164,44 @@ def test_jobright_run_saves_clean_jobs_when_one_job_fails_to_insert(test_db, mon
     """
     from backend.scraper.sources import jobright as jobright_mod
 
-    search = Search(name="JR test", search_mode="jobright", search_term="engineer",
-                     location="", min_fit_score=0, require_salary=False,
-                     title_include_keywords=[], title_exclude_keywords=[],
-                     company_exclude=[])
+    search = Search(
+        name="JR test",
+        search_mode="jobright",
+        search_term="engineer",
+        location="",
+        min_fit_score=0,
+        require_salary=False,
+        title_include_keywords=[],
+        title_exclude_keywords=[],
+        company_exclude=[],
+    )
     test_db.add(search)
     test_db.commit()
 
     raw_jobs = [
         {
-            "jobResult": {"jobId": "1", "jobTitle": "Nul\x00Byte Engineer",
-                          "applyLink": "https://example.com/apply/1",
-                          "jobSummary": "Great\x00 role"},
+            "jobResult": {
+                "jobId": "1",
+                "jobTitle": "Nul\x00Byte Engineer",
+                "applyLink": "https://example.com/apply/1",
+                "jobSummary": "Great\x00 role",
+            },
             "companyResult": {"companyName": "Acme"},
         },
         {
-            "jobResult": {"jobId": "2", "jobTitle": "Boom Job",
-                          "applyLink": "https://example.com/apply/2"},
+            "jobResult": {
+                "jobId": "2",
+                "jobTitle": "Boom Job",
+                "applyLink": "https://example.com/apply/2",
+            },
             "companyResult": {"companyName": "Boomcorp"},
         },
         {
-            "jobResult": {"jobId": "3", "jobTitle": "Plain Engineer",
-                          "applyLink": "https://example.com/apply/3"},
+            "jobResult": {
+                "jobId": "3",
+                "jobTitle": "Plain Engineer",
+                "applyLink": "https://example.com/apply/3",
+            },
             "companyResult": {"companyName": "Widgets Inc"},
         },
     ]
@@ -178,8 +220,13 @@ def test_jobright_run_saves_clean_jobs_when_one_job_fails_to_insert(test_db, mon
 
     monkeypatch.setattr(jobright_mod, "_ensure_session", fake_ensure_session)
     monkeypatch.setattr(jobright_mod, "_fetch_search_ssr", fake_fetch_search_ssr)
-    monkeypatch.setattr("backend.analyzer.h1b_checker.check_job_h1b", fake_check_job_h1b)
-    monkeypatch.setattr("backend.analyzer.salary_extractor.apply_salary_to_job", fake_apply_salary_to_job)
+    monkeypatch.setattr(
+        "backend.analyzer.h1b_checker.check_job_h1b", fake_check_job_h1b
+    )
+    monkeypatch.setattr(
+        "backend.analyzer.salary_extractor.apply_salary_to_job",
+        fake_apply_salary_to_job,
+    )
 
     original_add = sa_orm.Session.add
 

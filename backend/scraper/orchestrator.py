@@ -4,16 +4,17 @@ scheduler + API triggers import from; internal sources/ modules are implementati
 Accounts (MT-8): run_all() is the shared-scrape fan-out — identical targets of different
 accounts are fetched once and ingested per account (see backend/scraper/targets.py). A
 manual run of one search (_run_search_by_id) or company feeds only the caller's account."""
+
 import logging
 from datetime import datetime, timezone
 from typing import Optional
 
 from backend.models.db import (
-    SessionLocal,
-    Search,
     Company,
     Job,
     ScrapeLog,
+    Search,
+    SessionLocal,
 )
 
 logger = logging.getLogger("jobnavigator.scraper.orchestrator")
@@ -21,14 +22,19 @@ logger = logging.getLogger("jobnavigator.scraper.orchestrator")
 
 # ── Per-search dispatch ─────────────────────────────────────────────────────
 
-async def run_search(search: Search, proxy_url: Optional[str] = None, shared=None) -> dict:
+
+async def run_search(
+    search: Search, proxy_url: Optional[str] = None, shared=None
+) -> dict:
     """Dispatch one search to its source module (`search_modes.SEARCH_MODES[mode].module`);
     returns the module's result dict, or raises ValueError on an unknown mode.
 
     `shared` (MT-8 `SharedFetch`) is passed only to the shareable modes and only when set, and
     `proxy_url` only to the modes that take one, so a single search calls exactly as before."""
     import importlib
+
     from backend.scraper.search_modes import get_mode
+
     mode = get_mode(search.search_mode)
     if mode is None:
         raise ValueError(f"Unknown search_mode: {search.search_mode}")
@@ -52,16 +58,20 @@ async def run_search(search: Search, proxy_url: Optional[str] = None, shared=Non
 
 # ── Per-company dispatch ────────────────────────────────────────────────────
 
+
 async def run_company(company: Company, shared_browser=None) -> dict:
     """Scrape one company's scrape_urls. Delegates to sources.company_pages."""
     from backend.scraper.sources.company_pages import scrape_single_career_page
+
     return await scrape_single_career_page(company, shared_browser=shared_browser)
 
 
 # ── Internal helpers ────────────────────────────────────────────────────────
 
+
 def _get_setting_value(db, key: str, default: str = "") -> str:
     from backend.accounts.settings import get_setting
+
     return get_setting(db, key, default)
 
 
@@ -82,11 +92,12 @@ SOURCE_LABELS = {
 
 
 def source_label(key: str) -> str:
-    """"zip_recruiter" -> "ZipRecruiter"; unknown boards keep their raw key."""
+    """ "zip_recruiter" -> "ZipRecruiter"; unknown boards keep their raw key."""
     k = str(key or "").lower()
     if k in SOURCE_LABELS:
         return SOURCE_LABELS[k]
-    from backend.scraper.sources.apify import PRESETS   # Apify boards name themselves
+    from backend.scraper.sources.apify import PRESETS  # Apify boards name themselves
+
     return PRESETS[k].label if k in PRESETS else str(key or "")
 
 
@@ -102,7 +113,7 @@ def source_errors(breakdown) -> list:
 
 
 def describe_source_errors(breakdown) -> str:
-    """"zip_recruiter: 403 · indeed: 503" (empty when clean)."""
+    """ "zip_recruiter: 403 · indeed: 503" (empty when clean)."""
     return " · ".join(f"{key}: {err}" for key, err in source_errors(breakdown))
 
 
@@ -121,9 +132,12 @@ def empty_sources(breakdown) -> list:
     if not isinstance(breakdown, dict):
         return []
     return [
-        str(key) for key, val in breakdown.items()
-        if isinstance(val, dict) and not val.get("error")
-        and "returned" in val and not (val.get("returned") or 0)
+        str(key)
+        for key, val in breakdown.items()
+        if isinstance(val, dict)
+        and not val.get("error")
+        and "returned" in val
+        and not (val.get("returned") or 0)
     ]
 
 
@@ -151,8 +165,9 @@ def filtered_count(breakdown) -> int:
     """Postings the title filters rejected, summed across boards; JobSpy still writes them as `ignored` for dedup (so its stored rows can exceed "N seen"), Apify does not store them."""
     if not isinstance(breakdown, dict):
         return 0
-    return sum(int(v.get("filtered") or 0) for v in breakdown.values()
-               if isinstance(v, dict))
+    return sum(
+        int(v.get("filtered") or 0) for v in breakdown.values() if isinstance(v, dict)
+    )
 
 
 def summarize_search_run(label: str, result: dict) -> str:
@@ -172,7 +187,7 @@ def summarize_search_run(label: str, result: dict) -> str:
                 found = row.jobs_found or 0
                 new = row.new_jobs or 0
                 breakdown = row.source_breakdown
-        except Exception as e:          # a summary must never break the run
+        except Exception as e:  # a summary must never break the run
             logger.warning(f"Could not read back ScrapeLog {log_id}: {e}")
         finally:
             db.close()
@@ -197,6 +212,7 @@ def summarize_search_run(label: str, result: dict) -> str:
 def _source_for_search(search: Search) -> str:
     """Source string used for ScrapeLog.source."""
     from backend.scraper.search_modes import get_mode
+
     mode = get_mode(search.search_mode)
     return mode.source if mode else search.search_mode
 
@@ -205,6 +221,7 @@ def _search_mode_is_valid(search: Search) -> bool:
     """True if a search has a runnable configuration (`search_config_error` is None for a mode
     with a scraper); invalid configs are skipped, not raised."""
     from backend.scraper.search_modes import get_mode
+
     mode = get_mode(search.search_mode)
     return bool(mode and mode.runnable) and search_config_error(search) is None
 
@@ -214,12 +231,16 @@ def search_config_error(search) -> Optional[str]:
     invalid config silently; the manual trigger reads this so the run history says why instead
     of leaving it at "nothing ran"."""
     from backend.scraper.search_modes import config_error
+
     return config_error(search)
 
 
 # ── Fan-out: all active searches + companies ────────────────────────────────
 
-def _record_search_log(db, search: Search, result: dict, run_id=None, started_at=None) -> ScrapeLog:
+
+def _record_search_log(
+    db, search: Search, result: dict, run_id=None, started_at=None
+) -> ScrapeLog:
     """The ScrapeLog row of one search run, under the current account. A clean run that
     found nothing is a warning (same rule company scrapes use) so /health/entities can flag
     a search that quietly stopped returning results."""
@@ -262,14 +283,23 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
     deleted mid-run is skipped. Errors outside a source's own result (an ingest crash, a
     scoring sweep) come back in `errors` ({"account", "where", "error"}) for the summary."""
     import uuid
+
     from backend.accounts.background import account_session, acting_as
     from backend.accounts.context import current_account
     from backend.scraper.search_modes import is_extension
     from backend.scraper.targets import (
-        group_targets, is_shareable_search, load_active, reusable_key, search_due,
-        search_fetch_params, search_key, search_target_due, shared_fetch_for,
+        group_targets,
+        is_shareable_search,
+        load_active,
+        reusable_key,
+        search_due,
+        search_fetch_params,
+        search_key,
+        search_target_due,
+        shared_fetch_for,
         split_search_targets,
     )
+
     db = SessionLocal()
     errors: list = []
     skip_search_ids = set(getattr(skip, "search_ids", None) or ())
@@ -277,6 +307,7 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
     try:
         searches = load_active(db, Search, account_ids)
         from backend.models.db import Company
+
         companies = load_active(db, Company, account_ids)
         # Plain (id, name, account) per search: later commits expire the rows (T5-01).
         ident = {id(s): (s.id, s.name, s.account_id) for s in searches}
@@ -284,7 +315,9 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
         # First run, per account: an account with no ScrapeLog yet gets its existing jobs
         # marked seen afterwards, so only truly new ones trigger alerts.
         accounts = []
-        for acc in [current_account.get()] + [r.account_id for r in searches + companies]:
+        for acc in [current_account.get()] + [
+            r.account_id for r in searches + companies
+        ]:
             if acc not in accounts:
                 accounts.append(acc)
         if account_ids is not None:
@@ -309,7 +342,9 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
             if is_extension(search.search_mode):
                 continue
             if str(search.id) in skip_search_ids:
-                logger.info(f"Search '{search.name}' skipped: a manual run of it is in progress")
+                logger.info(
+                    f"Search '{search.name}' skipped: a manual run of it is in progress"
+                )
                 continue
             # Skip invalid configs — logged and skipped rather than raising.
             if not _search_mode_is_valid(search):
@@ -318,15 +353,23 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
             runnable.append(search)
 
         def _key(s):
-            return search_key(s) if is_shareable_search(s) else (s.search_mode, "own", str(s.id))
+            return (
+                search_key(s)
+                if is_shareable_search(s)
+                else (s.search_mode, "own", str(s.id))
+            )
+
         # QA F10 / R4-05: JobSpy subscribers share one fetch only when their
         # results_wanted / hours_old are close; otherwise they are separate fetches.
         targets = split_search_targets(group_targets(runnable, _key))
-        logger.info(f"Running {len(runnable)} active searches as {len(targets)} targets")
+        logger.info(
+            f"Running {len(runnable)} active searches as {len(targets)} targets"
+        )
         sweep_accounts = []
 
         now = datetime.now(timezone.utc)
         from backend.scraper.sources.company_pages import _row_still_there
+
         for target in targets:
             # T5-01: drop subscribers deleted since the load before reading their attributes.
             alive = [s for s in target.subscribers if _row_still_there(db, s)]
@@ -339,15 +382,20 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
                 if not due:
                     for search in target.subscribers:
                         _, elapsed, interval = search_due(search, now, tick)
-                        logger.info(f"Search '{search.name}' skipped — next run in {interval - elapsed:.0f}m")
+                        logger.info(
+                            f"Search '{search.name}' skipped — next run in {interval - elapsed:.0f}m"
+                        )
                     continue
 
             run_id = uuid.uuid4()
             # Every shareable target gets a SharedFetch, even with one subscriber, so a later
             # run (another account's Run all, the scheduled scrape) can reuse it; per-account
             # modes (own session, paid Apify) keep calling their source directly.
-            shared = (shared_fetch_for(target.key, search_fetch_params(target.subscribers))
-                      if reusable_key(target.key) else None)
+            shared = (
+                shared_fetch_for(target.key, search_fetch_params(target.subscribers))
+                if reusable_key(target.key)
+                else None
+            )
             for search in target.subscribers:
                 sid, sname, account = ident[id(search)]
                 # QA F10 / R1-05: each subscriber works in a fresh session of its own
@@ -358,21 +406,32 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
                         # QA F6 / T5-01: a search (or account) deleted mid-run is skipped.
                         search = sdb.query(Search).filter(Search.id == sid).first()
                         if search is None:
-                            logger.info(f"Search '{sname}' was deleted during the run, skipped")
+                            logger.info(
+                                f"Search '{sname}' was deleted during the run, skipped"
+                            )
                             continue
                         try:
                             kwargs = {"shared": shared} if shared is not None else {}
-                            result = await run_search(search, proxy_url=proxy_url, **kwargs)
+                            result = await run_search(
+                                search, proxy_url=proxy_url, **kwargs
+                            )
                         except ValueError as e:
                             # Unknown search_mode — log and skip, don't abort the whole batch
                             logger.warning(f"Search '{sname}': {e}, skipping")
                             continue
                         except Exception as e:
                             logger.exception(f"Search '{sname}' failed: {e}")
-                            result = {"jobs_found": 0, "new_jobs": 0, "error": str(e), "duration": 0}
+                            result = {
+                                "jobs_found": 0,
+                                "new_jobs": 0,
+                                "error": str(e),
+                                "duration": 0,
+                            }
 
                         auto_depth = search.auto_scoring_depth
-                        _record_search_log(sdb, search, result, run_id=run_id, started_at=now)
+                        _record_search_log(
+                            sdb, search, result, run_id=run_id, started_at=now
+                        )
                         breakdown = result.get("source_breakdown") or None
                         if source_errors(breakdown):
                             logger.warning(
@@ -382,13 +441,20 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
                         logger.info(
                             f"Search '{sname}': found={result.get('jobs_found', 0)}, "
                             f"new={result.get('new_jobs', 0)}, duration={result.get('duration', 0):.1f}s"
-                            + (f" (shared fetch, {len(target.subscribers)} subscribers)" if target.shared else "")
+                            + (
+                                f" (shared fetch, {len(target.subscribers)} subscribers)"
+                                if target.shared
+                                else ""
+                            )
                         )
 
                         # Auto CV-score: mark the account for one pool sweep after all searches
                         # (the sweep is a common pool — per-search invocations re-walked it N times).
-                        if (auto_depth in ("light", "full") and result.get("new_jobs", 0) > 0
-                                and account not in sweep_accounts):
+                        if (
+                            auto_depth in ("light", "full")
+                            and result.get("new_jobs", 0) > 0
+                            and account not in sweep_accounts
+                        ):
                             sweep_accounts.append(account)
                     except Exception as e:
                         # e.g. the ScrapeLog write failed: this subscriber only. Roll back
@@ -398,15 +464,27 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
                         except Exception:
                             pass
                         try:
-                            gone = sdb.query(Search.id).filter(Search.id == sid).first() is None
+                            gone = (
+                                sdb.query(Search.id).filter(Search.id == sid).first()
+                                is None
+                            )
                         except Exception:
                             gone = False
                         if gone:
-                            logger.info(f"Search '{sname}' was deleted during the run, skipped: {e}")
+                            logger.info(
+                                f"Search '{sname}' was deleted during the run, skipped: {e}"
+                            )
                             continue
-                        logger.exception(f"Search '{sname}' ingest failed, others continue: {e}")
-                        errors.append({"account": account, "where": f"search {sname}",
-                                       "error": f"{type(e).__name__}: {e}"})
+                        logger.exception(
+                            f"Search '{sname}' ingest failed, others continue: {e}"
+                        )
+                        errors.append(
+                            {
+                                "account": account,
+                                "where": f"search {sname}",
+                                "error": f"{type(e).__name__}: {e}",
+                            }
+                        )
             # End the batch session's read transaction and expire its rows, so the next
             # target's due/deleted checks read fresh values.
             db.commit()
@@ -417,13 +495,22 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
             with acting_as(acc):
                 try:
                     from backend.analyzer.cv_scorer import analyze_unscored_jobs
+
                     await analyze_unscored_jobs(status="new")
                 except Exception as e:
-                    logger.exception(f"Post-search scoring sweep failed (scrape continues): {e}")
-                    errors.append({"account": acc, "where": "search scoring sweep",
-                                   "error": f"{type(e).__name__}: {e}"})
+                    logger.exception(
+                        f"Post-search scoring sweep failed (scrape continues): {e}"
+                    )
+                    errors.append(
+                        {
+                            "account": acc,
+                            "where": "search scoring sweep",
+                            "error": f"{type(e).__name__}: {e}",
+                        }
+                    )
 
         from backend.scraper.sources import company_pages
+
         cp_kwargs = {"force": force}
         if account_ids is not None:
             cp_kwargs["account_ids"] = account_ids
@@ -440,12 +527,21 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
                     for j in unseen:
                         j.seen = True
                     adb.commit()
-                    logger.info(f"First run: marked {len(unseen)} existing jobs as seen")
-                except Exception as e:   # one account's bookkeeping, never the run (R4-03)
+                    logger.info(
+                        f"First run: marked {len(unseen)} existing jobs as seen"
+                    )
+                except (
+                    Exception
+                ) as e:  # one account's bookkeeping, never the run (R4-03)
                     adb.rollback()
                     logger.exception(f"First-run mark-seen failed: {e}")
-                    errors.append({"account": acc, "where": "first-run mark seen",
-                                   "error": f"{type(e).__name__}: {e}"})
+                    errors.append(
+                        {
+                            "account": acc,
+                            "where": "first-run mark seen",
+                            "error": f"{type(e).__name__}: {e}",
+                        }
+                    )
 
         # Handed to the caller so a manual run's summary can say what did not run
         # (companies with no URLs, or — scheduler only — companies not yet due), and the
@@ -456,6 +552,7 @@ async def run_all(force: bool = False, account_ids=None, skip=None):
 
 
 # ── Single-search trigger (API) ─────────────────────────────────────────────
+
 
 async def _run_search_by_id(search_id: str, auto_score: Optional[bool] = None) -> dict:
     """Fetch one search by ID and dispatch (used by the API trigger endpoint); writes a ScrapeLog row and runs analyze_unscored_jobs if scoring is enabled and new jobs were found. Returns None if the search isn't found."""
@@ -492,16 +589,20 @@ async def _run_search_by_id(search_id: str, auto_score: Optional[bool] = None) -
         # A manual run fetches for, and feeds, only this account (MT-8): no shared fetch,
         # a run_id of its own.
         import uuid
+
         log = _record_search_log(db, search, result, run_id=uuid.uuid4())
         # Hand the caller the row it should summarise, so the Run-history line
         # and the audit row are read from the same place.
         result["scrape_log_id"] = str(log.id)
 
         if failed_sources:
-            logger.warning(f"Search '{search.name}': {describe_source_errors(breakdown)}")
+            logger.warning(
+                f"Search '{search.name}': {describe_source_errors(breakdown)}"
+            )
 
         if should_score and result and result.get("new_jobs", 0) > 0:
             from backend.analyzer.cv_scorer import analyze_unscored_jobs
+
             await analyze_unscored_jobs(status="new")
 
         return result

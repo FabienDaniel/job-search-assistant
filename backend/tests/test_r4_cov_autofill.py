@@ -4,13 +4,16 @@
 the `test_db` fixture rebinds that to the in-memory DB, so these call the
 functions directly instead of paying for a TestClient.
 """
+
 import json
 
 import pytest
 from fastapi import HTTPException
 
 from backend.api.routes_autofill import (
-    _build_autofill_prompt, _extract_answer, autofill_answer_stream,
+    _build_autofill_prompt,
+    _extract_answer,
+    autofill_answer_stream,
 )
 from backend.models.db import Persona, Setting
 from backend.seed import DEFAULT_SETTINGS
@@ -24,10 +27,18 @@ def _seed(db, *, prompt=PROMPT, default_len="250", persona=True):
     if default_len is not None:
         db.add(Setting(key="autofill_default_length", value=default_len))
     if persona:
-        db.add(Persona(id=1, contact={"name": "V"}, work_auth={}, demographics={},
-                       compensation={}, preferences={"tone": "plain"},
-                       resume_content={"summary": "fintech PM"},
-                       qa_bank=[{"question": "Why fintech?", "answer": "Because payments."}]))
+        db.add(
+            Persona(
+                id=1,
+                contact={"name": "V"},
+                work_auth={},
+                demographics={},
+                compensation={},
+                preferences={"tone": "plain"},
+                resume_content={"summary": "fintech PM"},
+                qa_bank=[{"question": "Why fintech?", "answer": "Because payments."}],
+            )
+        )
     db.commit()
 
 
@@ -37,11 +48,14 @@ BODY = {"question": "Why us?", "company": "Rogo", "position": "PM"}
 # ── _extract_answer numeric coercion ────────────────────────────────────────
 
 
-@pytest.mark.parametrize("raw,expected", [
-    ('{"answer": 42}', "42"),
-    ('{"answer": 3.5}', "3.5"),
-    ('{"answer": -7}', "-7"),
-])
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ('{"answer": 42}', "42"),
+        ('{"answer": 3.5}', "3.5"),
+        ('{"answer": -7}', "-7"),
+    ],
+)
 def test_numeric_answer_is_coerced_to_a_string(raw, expected):
     """A model that answers with a bare number still yields usable text."""
     assert _extract_answer(raw) == expected
@@ -56,8 +70,10 @@ def test_boolean_answer_is_not_coerced(raw):
 # ── _build_autofill_prompt: question ────────────────────────────────────────
 
 
-@pytest.mark.parametrize("body", [{}, {"question": ""}, {"question": "   "},
-                                  {"question": None, "company": "Rogo"}])
+@pytest.mark.parametrize(
+    "body",
+    [{}, {"question": ""}, {"question": "   "}, {"question": None, "company": "Rogo"}],
+)
 def test_a_missing_or_blank_question_is_a_400(test_db, body):
     """The question is the only truly required field."""
     _seed(test_db)
@@ -104,24 +120,41 @@ def test_a_template_without_a_company_placeholder_becomes_all_suffix(test_db):
     built = _build_autofill_prompt(BODY)
     assert built["cached_prefix"] is None
     assert "{persona}" not in built["suffix"]
-    assert built["suffix"].startswith("Answer <<<APPLICATION QUESTION>>>\nWhy us?\n<<<END APPLICATION QUESTION>>> in 250 chars for ")
-    assert built["suffix"].rstrip().endswith("whatever it says.")   # the fence notice closes the suffix
-    assert "fintech PM" in built["suffix"]         # the flattened persona, not the token
+    assert built["suffix"].startswith(
+        "Answer <<<APPLICATION QUESTION>>>\nWhy us?\n<<<END APPLICATION QUESTION>>> in 250 chars for "
+    )
+    assert (
+        built["suffix"].rstrip().endswith("whatever it says.")
+    )  # the fence notice closes the suffix
+    assert "fintech PM" in built["suffix"]  # the flattened persona, not the token
 
 
 def test_every_placeholder_is_substituted_in_both_halves(test_db):
     """No placeholder survives, wherever the {company} split falls (R4-E2E-04)."""
-    _seed(test_db, prompt="{persona}|{qa_bank}|{question}|{company}|{position}|{max_chars}")
+    _seed(
+        test_db,
+        prompt="{persona}|{qa_bank}|{question}|{company}|{position}|{max_chars}",
+    )
     built = _build_autofill_prompt(BODY)
     whole = (built["cached_prefix"] or "") + built["suffix"]
-    for token in ("{persona}", "{qa_bank}", "{question}", "{company}", "{position}", "{max_chars}"):
+    for token in (
+        "{persona}",
+        "{qa_bank}",
+        "{question}",
+        "{company}",
+        "{position}",
+        "{max_chars}",
+    ):
         assert token not in whole, token
     assert "Because payments." in whole and "Rogo" in whole and "Why us?" in whole
 
 
 def test_a_question_placeholder_before_company_is_filled_too(test_db):
     """A template that asks the question before naming the company still reads."""
-    _seed(test_db, prompt="Q: {question}\nProfile: {persona}\nAt {company} for {position}.")
+    _seed(
+        test_db,
+        prompt="Q: {question}\nProfile: {persona}\nAt {company} for {position}.",
+    )
     built = _build_autofill_prompt(BODY)
     assert "{question}" not in built["cached_prefix"]
     assert "Why us?" in built["cached_prefix"]
@@ -135,7 +168,10 @@ def test_the_split_puts_persona_and_qa_bank_in_the_cacheable_prefix(test_db):
     assert "Because payments." in built["cached_prefix"]
     assert "Because payments." not in built["suffix"]
     assert built["suffix"].startswith("Rogo - PM")
-    assert "<<<APPLICATION QUESTION>>>\nWhy us?\n<<<END APPLICATION QUESTION>>>" in built["suffix"]
+    assert (
+        "<<<APPLICATION QUESTION>>>\nWhy us?\n<<<END APPLICATION QUESTION>>>"
+        in built["suffix"]
+    )
 
 
 def test_no_persona_row_renders_a_placeholder(test_db):
@@ -160,16 +196,19 @@ def test_a_non_digit_default_length_falls_back_to_120(test_db, stored):
     assert _build_autofill_prompt(BODY)["max_chars"] == 120
 
 
-@pytest.mark.parametrize("supplied,expected", [
-    ("300", 300),      # digit string from the extension
-    (300, 300),        # real int
-    ("abc", 250),      # junk → default_len
-    ("", 250),
-    (-5, 250),         # str(-5).isdigit() is False
-    (None, 250),
-    (True, 250),       # bool is an int in Python but "True".isdigit() is False
-    ([300], 250),      # not int/str at all
-])
+@pytest.mark.parametrize(
+    "supplied,expected",
+    [
+        ("300", 300),  # digit string from the extension
+        (300, 300),  # real int
+        ("abc", 250),  # junk → default_len
+        ("", 250),
+        (-5, 250),  # str(-5).isdigit() is False
+        (None, 250),
+        (True, 250),  # bool is an int in Python but "True".isdigit() is False
+        ([300], 250),  # not int/str at all
+    ],
+)
 def test_max_chars_resolution(test_db, supplied, expected):
     """max_chars is honoured only when it spells a plain non-negative integer."""
     _seed(test_db)
@@ -218,8 +257,10 @@ def test_want_provider_true_falls_back_to_the_primary(test_db):
 
 
 async def _collect(resp):
-    return [chunk.decode() if isinstance(chunk, bytes) else chunk
-            async for chunk in resp.body_iterator]
+    return [
+        chunk.decode() if isinstance(chunk, bytes) else chunk
+        async for chunk in resp.body_iterator
+    ]
 
 
 @pytest.mark.asyncio
@@ -234,8 +275,11 @@ async def test_stream_emits_deltas_then_done(test_db, monkeypatch):
         for c in ("Because ", "", "payments."):
             yield c
 
-    monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream",
-                        fake_stream, raising=True)
+    monkeypatch.setattr(
+        "backend.api.routes_autofill.call_autofill_llm_stream",
+        fake_stream,
+        raising=True,
+    )
 
     events = await _collect(await autofill_answer_stream({**BODY, "max_chars": 200}))
     assert events == [
@@ -263,34 +307,51 @@ async def test_stream_never_emits_a_json_envelope_char(test_db, monkeypatch):
         for ch in envelope:  # one character per chunk — the worst case
             yield ch
 
-    monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream",
-                        fake_stream, raising=True)
+    monkeypatch.setattr(
+        "backend.api.routes_autofill.call_autofill_llm_stream",
+        fake_stream,
+        raising=True,
+    )
 
     events = await _collect(await autofill_answer_stream(BODY))
-    deltas = [json.loads(e[len("data: "):])["delta"]
-              for e in events if e.startswith('data: {"delta"')]
+    deltas = [
+        json.loads(e[len("data: ") :])["delta"]
+        for e in events
+        if e.startswith('data: {"delta"')
+    ]
     assert "".join(deltas) == "Because payments."
     assert all("{" not in d for d in deltas)
     assert events[-1] == "data: [DONE]\n\n"
 
 
 @pytest.mark.asyncio
-async def test_stream_unwraps_a_fenced_json_envelope_split_mid_escape(test_db, monkeypatch):
+async def test_stream_unwraps_a_fenced_json_envelope_split_mid_escape(
+    test_db, monkeypatch
+):
     """A ```json fence plus an escaped quote split across two chunks (so the
     escape's backslash and its following `"` arrive in separate deltas) must
     still decode to plain text, never a partial `\\` or the envelope's tail."""
     _seed(test_db)
 
     async def fake_stream(prompt, system, max_tokens=400, cached_prefix=None):
-        for c in ('```json\n{"answer": "She said \\', '"go\\", and left.", "x": 1}\n```'):
+        for c in (
+            '```json\n{"answer": "She said \\',
+            '"go\\", and left.", "x": 1}\n```',
+        ):
             yield c
 
-    monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream",
-                        fake_stream, raising=True)
+    monkeypatch.setattr(
+        "backend.api.routes_autofill.call_autofill_llm_stream",
+        fake_stream,
+        raising=True,
+    )
 
     events = await _collect(await autofill_answer_stream(BODY))
-    deltas = [json.loads(e[len("data: "):])["delta"]
-              for e in events if e.startswith('data: {"delta"')]
+    deltas = [
+        json.loads(e[len("data: ") :])["delta"]
+        for e in events
+        if e.startswith('data: {"delta"')
+    ]
     assert "".join(deltas) == 'She said "go", and left.'
     assert all("{" not in d and "```" not in d for d in deltas)
 
@@ -306,11 +367,17 @@ async def test_stream_appends_refinements_in_order(test_db, monkeypatch):
         seen["prefix"] = cached_prefix
         yield "ok"
 
-    monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream",
-                        fake_stream, raising=True)
+    monkeypatch.setattr(
+        "backend.api.routes_autofill.call_autofill_llm_stream",
+        fake_stream,
+        raising=True,
+    )
 
-    await _collect(await autofill_answer_stream(
-        {**BODY, "refinements": ["shorter", "  ", "mention fintech work", ""]}))
+    await _collect(
+        await autofill_answer_stream(
+            {**BODY, "refinements": ["shorter", "  ", "mention fintech work", ""]}
+        )
+    )
 
     assert "Apply these changes the candidate requested, in order:" in seen["prompt"]
     assert "- shorter\n- mention fintech work" in seen["prompt"]
@@ -320,7 +387,9 @@ async def test_stream_appends_refinements_in_order(test_db, monkeypatch):
 
 @pytest.mark.parametrize("refinements", [[], ["", "   "], "not a list", None])
 @pytest.mark.asyncio
-async def test_stream_without_usable_refinements_adds_no_block(test_db, monkeypatch, refinements):
+async def test_stream_without_usable_refinements_adds_no_block(
+    test_db, monkeypatch, refinements
+):
     """Empty, blank-only, missing or non-list refinements add nothing to the prompt."""
     _seed(test_db)
     seen = {}
@@ -329,15 +398,20 @@ async def test_stream_without_usable_refinements_adds_no_block(test_db, monkeypa
         seen["prompt"] = prompt
         yield "ok"
 
-    monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream",
-                        fake_stream, raising=True)
+    monkeypatch.setattr(
+        "backend.api.routes_autofill.call_autofill_llm_stream",
+        fake_stream,
+        raising=True,
+    )
 
     await _collect(await autofill_answer_stream({**BODY, "refinements": refinements}))
     assert "Apply these changes" not in seen["prompt"]
 
 
 @pytest.mark.asyncio
-async def test_stream_reports_a_provider_failure_as_an_error_event(test_db, monkeypatch):
+async def test_stream_reports_a_provider_failure_as_an_error_event(
+    test_db, monkeypatch
+):
     """A raising provider yields one generic error event — never the exception text."""
     _seed(test_db)
 
@@ -345,12 +419,17 @@ async def test_stream_reports_a_provider_failure_as_an_error_event(test_db, monk
         yield "partial"
         raise RuntimeError("anthropic 529 overloaded: key sk-ant-secret")
 
-    monkeypatch.setattr("backend.api.routes_autofill.call_autofill_llm_stream",
-                        fake_stream, raising=True)
+    monkeypatch.setattr(
+        "backend.api.routes_autofill.call_autofill_llm_stream",
+        fake_stream,
+        raising=True,
+    )
 
     events = await _collect(await autofill_answer_stream(BODY))
     assert events[0] == 'data: {"delta": "partial"}\n\n'
-    assert json.loads(events[-1][len("data: "):]) == {"error": "autofill generation failed"}
+    assert json.loads(events[-1][len("data: ") :]) == {
+        "error": "autofill generation failed"
+    }
     assert "sk-ant-secret" not in "".join(events)
     assert "[DONE]" not in "".join(events)
 

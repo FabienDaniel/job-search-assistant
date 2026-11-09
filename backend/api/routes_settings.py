@@ -1,14 +1,17 @@
 """GET /settings and PATCH /settings endpoints, plus the MT-9 section table and policies."""
+
 import json
 import logging
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from backend.models.db import get_db, Account, SectionPolicy
-from backend.scheduler import configure_scheduler
-from backend.analyzer.cv_scorer import reset_scoring_semaphore
-from backend.scraper._shared.dedup import reload_tracking_params
+
 from backend.accounts import settings as acct_settings
+from backend.analyzer.cv_scorer import reset_scoring_semaphore
+from backend.models.db import Account, SectionPolicy, get_db
+from backend.scheduler import configure_scheduler
+from backend.scraper._shared.dedup import reload_tracking_params
 
 logger = logging.getLogger(__name__)
 
@@ -16,14 +19,26 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 _REDACT_SUFFIXES = ("_password", "_api_key", "_session_id", "_secret")
-_REDACT_KEYS = {"dashboard_api_key", "gmail_refresh_token", "claude_code_oauth_token",
-                "telegram_bot_token"}
+_REDACT_KEYS = {
+    "dashboard_api_key",
+    "gmail_refresh_token",
+    "claude_code_oauth_token",
+    "telegram_bot_token",
+}
 # Server-side only, never listed (not even redacted) and not writable (not a known key).
-_HIDDEN_KEYS = {"account_cookie_secret", "telegram_own_webhook_secret", "gmail_token_status",
-                "llm_local_seed_cleared", "llm_provider_keys_migrated", "cv_score_keys_migrated", "posting_keys_migrated",
-                "telemetry_install_id", "telemetry_last_sent_at",
-                # the per-slot API keys replaced by one key per provider (kept one release for a downgrade)
-                *acct_settings.LEGACY_LLM_KEY_SETTINGS}
+_HIDDEN_KEYS = {
+    "account_cookie_secret",
+    "telegram_own_webhook_secret",
+    "gmail_token_status",
+    "llm_local_seed_cleared",
+    "llm_provider_keys_migrated",
+    "cv_score_keys_migrated",
+    "posting_keys_migrated",
+    "telemetry_install_id",
+    "telemetry_last_sent_at",
+    # the per-slot API keys replaced by one key per provider (kept one release for a downgrade)
+    *acct_settings.LEGACY_LLM_KEY_SETTINGS,
+}
 
 
 def _is_secret(key: str) -> bool:
@@ -46,6 +61,7 @@ def mask_url_credentials(value: str) -> str:
     """`scheme://user:pass@host:port/…` → `scheme://••••@host:port/…`; a URL with no
     credentials is returned as it is."""
     from urllib.parse import urlsplit, urlunsplit
+
     v = (value or "").strip()
     if "@" not in v:
         return v
@@ -69,28 +85,44 @@ def _check_default_resume(db, value) -> None:
     if v in ("", "persona"):
         return
     from backend.models.db import Resume
+
     try:
         rid = uuid.UUID(str(v))
     except (ValueError, TypeError, AttributeError):
         rid = None
-    found = rid is not None and db.query(Resume.id).filter(
-        Resume.id == rid, Resume.is_base == True).first() is not None  # noqa: E712 (scoped)
+    found = (
+        rid is not None
+        and db.query(Resume.id).filter(Resume.id == rid, Resume.is_base == True).first()
+        is not None
+    )  # noqa: E712 (scoped)
     if not found:
-        raise HTTPException(status_code=422, detail="default_resume_id must be \"\", \"persona\" or the id of one of your base résumés")
+        raise HTTPException(
+            status_code=422,
+            detail='default_resume_id must be "", "persona" or the id of one of your base résumés',
+        )
 
 
 def _check_template_setting(key, value) -> None:
     """`cover_letter_template` is "", same_as_resume, last_selected or a folder under
     cover_letter_templates/; `resume_template` is "", last_selected or a folder under
     resume_templates/ (on this install). Anything else is a 422."""
-    from backend.api import routes_cover_letters as CL, routes_resumes as R
+    from backend.api import routes_cover_letters as CL
+    from backend.api import routes_resumes as R
+
     if key == "cover_letter_template":
-        rules, folder, what = ("", CL.SAME_AS_RESUME, R.LAST_SELECTED), CL.TEMPLATES_DIR, "same_as_resume, last_selected"
+        rules, folder, what = (
+            ("", CL.SAME_AS_RESUME, R.LAST_SELECTED),
+            CL.TEMPLATES_DIR,
+            "same_as_resume, last_selected",
+        )
     else:
         rules, folder, what = ("", R.LAST_SELECTED), R.TEMPLATES_DIR, "last_selected"
     v = value.strip() if isinstance(value, str) else value
     if v not in rules and v not in R.template_paths(folder):
-        raise HTTPException(status_code=422, detail=f"{key} must be {what} or the id of a template on this install")
+        raise HTTPException(
+            status_code=422,
+            detail=f"{key} must be {what} or the id of a template on this install",
+        )
 
 
 _CHAT_KEYS = ("telegram_chat_id", "telegram_bot_mode", "telegram_bot_token")
@@ -103,8 +135,9 @@ def _check_telegram_chat(db, updates: dict, targets: dict) -> None:
     409 `chat_in_use` (nothing written). Clearing the chat id is always allowed."""
     if not any(k in updates for k in _CHAT_KEYS):
         return
-    from backend.models.db import get_owner_id
     import backend.notifier.telegram as tg
+    from backend.models.db import get_owner_id
+
     # Every key of the notifications section has the same target: the owner's (install,
     # also for a member with the owner unlock writing install values) or the member's own.
     target = next((targets.get(k) for k in _CHAT_KEYS if k in updates), None)
@@ -127,16 +160,24 @@ def _check_telegram_chat(db, updates: dict, targets: dict) -> None:
     chat = after("telegram_chat_id")
     if not chat:
         return
-    on_own_bot = (target is not None and after("telegram_bot_mode").lower() == tg.OWN_BOT
-                  and bool(after("telegram_bot_token")))
+    on_own_bot = (
+        target is not None
+        and after("telegram_bot_mode").lower() == tg.OWN_BOT
+        and bool(after("telegram_bot_token"))
+    )
     other = tg.chat_in_use_by(db, account, chat, on_own_bot)
     if other:
         raise HTTPException(status_code=409, detail="chat_in_use")
 
 
 @router.get("")
-def get_settings(meta: bool = Query(False, description="Add `_meta` (per-key section, source, editable); always on for members"),
-                 db: Session = Depends(get_db)):
+def get_settings(
+    meta: bool = Query(
+        False,
+        description="Add `_meta` (per-key section, source, editable); always on for members",
+    ),
+    db: Session = Depends(get_db),
+):
     """Return the settings the current account sees as a key-value map. Sensitive values are redacted. For the owner these are the install values plus `_effective` {lmstudio_base_url, ollama_base_url: the address in use} (`_meta` only with `?meta=1`); a member gets inherited install values plus its own rows, and a `_meta` key with `{key: {section, source, editable}}`. A member never receives the owner's addresses, chat ids or secrets: those come back empty (secrets as "••••••") with `set_by_owner: true` in `_meta`, and `proxy_url` with its credentials masked."""
     rows = [r for r in acct_settings.effective_rows(db) if r[0] not in _HIDDEN_KEYS]
     member_caller = not acct_settings.is_owner_caller(db)
@@ -167,8 +208,11 @@ def get_settings(meta: bool = Query(False, description="Add `_meta` (per-key sec
         # which Settings › Models shows as the placeholder of an empty box. Owner only: it can
         # carry the owner's env address, which a member never receives in clear.
         from backend.analyzer.llm_client import LOCAL_LLM_URLS, local_base_url
-        result["_effective"] = {key: local_base_url(provider, db=db)
-                                for provider, (key, _env, _default) in LOCAL_LLM_URLS.items()}
+
+        result["_effective"] = {
+            key: local_base_url(provider, db=db)
+            for provider, (key, _env, _default) in LOCAL_LLM_URLS.items()
+        }
     if meta or member_caller:
         info = acct_settings.key_meta(db, [k for k, _v, _s in rows])
         for key, _value, source in rows:
@@ -203,8 +247,9 @@ def update_settings(updates: dict, db: Session = Depends(get_db)):
         )
 
     # The redacted placeholder is never a real value — it is skipped below too.
-    checkable = {k: v for k, v in updates.items()
-                 if not (isinstance(v, str) and v == "•" * 6)}
+    checkable = {
+        k: v for k, v in updates.items() if not (isinstance(v, str) and v == "•" * 6)
+    }
     problems = invalid_setting_values(checkable)
     if problems:
         raise HTTPException(
@@ -217,7 +262,8 @@ def update_settings(updates: dict, db: Session = Depends(get_db)):
     except acct_settings.SettingNotWritable as e:
         raise HTTPException(
             status_code=403,
-            detail="These settings are managed by the account owner: " + ", ".join(e.keys),
+            detail="These settings are managed by the account owner: "
+            + ", ".join(e.keys),
         )
 
     if "default_resume_id" in checkable:
@@ -233,7 +279,9 @@ def update_settings(updates: dict, db: Session = Depends(get_db)):
     for key, value in updates.items():
         if isinstance(value, str) and value == "•" * 6:
             continue
-        stored = json.dumps(value) if isinstance(value, (list, dict, bool)) else str(value)
+        stored = (
+            json.dumps(value) if isinstance(value, (list, dict, bool)) else str(value)
+        )
         target = targets.get(key)
         acct_settings.put_setting(db, key, stored, account_id=target)
         updated.append(key)
@@ -249,7 +297,9 @@ def update_settings(updates: dict, db: Session = Depends(get_db)):
     # A member writing install values through the owner unlock (MT-14): the reconfigure
     # steps below must read the install values, not that member's own.
     from contextlib import nullcontext
+
     from backend.accounts.context import unscoped
+
     member_caller = not acct_settings.is_owner_caller(db)
 
     def _reconfigure(name: str, fn) -> None:
@@ -259,15 +309,21 @@ def update_settings(updates: dict, db: Session = Depends(get_db)):
         strings and stack detail, and the response is not the place for it.
         """
         try:
-            with (unscoped() if member_caller else nullcontext()):
+            with unscoped() if member_caller else nullcontext():
                 fn()
         except Exception:
             warnings.append(f"{name} failed — see server logs")
             logger.exception("%s failed after settings update", name)
 
     timing_keys = {
-        "scrape_interval_minutes", "email_check_interval_minutes", "telemetry_level",
-        "backup_cron", "digest_cron", "h1b_cron", "cleanup_cron", "reject_cron",
+        "scrape_interval_minutes",
+        "email_check_interval_minutes",
+        "telemetry_level",
+        "backup_cron",
+        "digest_cron",
+        "h1b_cron",
+        "cleanup_cron",
+        "reject_cron",
     }
     if timing_keys & set(install_updated):
         _reconfigure("configure_scheduler", configure_scheduler)
@@ -276,15 +332,21 @@ def update_settings(updates: dict, db: Session = Depends(get_db)):
         _reconfigure("reset_scoring_semaphore", reset_scoring_semaphore)
 
     if "scrape_max_concurrent" in install_updated:
+
         def _reset_scraping():
             from backend.job_monitor import reset_limiter
+
             reset_limiter("scraping")
+
         _reconfigure("reset_scrape_gate", _reset_scraping)
 
     if "tailoring_max_concurrent" in install_updated:
+
         def _reset_tailoring():
             from backend.api.routes_resumes import reset_tailoring_semaphore
+
             reset_tailoring_semaphore()
+
         _reconfigure("reset_tailoring_semaphore", _reset_tailoring)
 
     if "dedup_tracking_params" in install_updated:
@@ -296,7 +358,9 @@ def update_settings(updates: dict, db: Session = Depends(get_db)):
 def _require_owner(db):
     # MT-14: a member whose browser holds a live owner unlock acts as the owner here too.
     if not acct_settings.acts_as_owner(db):
-        raise HTTPException(status_code=403, detail="Only the account owner can change section policies")
+        raise HTTPException(
+            status_code=403, detail="Only the account owner can change section policies"
+        )
 
 
 @router.get("/policies")
@@ -304,6 +368,7 @@ def get_policies(db: Session = Depends(get_db)):
     """Owner only: every member's effective mode per 'policy' section, `{account_id: {section: mode}}`."""
     _require_owner(db)
     from backend.accounts.context import unscoped
+
     with unscoped():
         members = db.query(Account.id).filter(Account.role != "owner").all()
     out = {}
@@ -323,11 +388,18 @@ def update_policy(body: dict, db: Session = Depends(get_db)):
     body = body or {}
     section = body.get("section")
     mode = body.get("mode")
-    sec = acct_settings.SETTING_SECTIONS.get(section) if isinstance(section, str) else None
+    sec = (
+        acct_settings.SETTING_SECTIONS.get(section)
+        if isinstance(section, str)
+        else None
+    )
     if sec is None:
         raise HTTPException(status_code=400, detail=f"Unknown section: {section!r}")
     if sec["scope"] != acct_settings.POLICY:
-        raise HTTPException(status_code=400, detail=f"Section {section!r} is {sec['scope']}; it has no policy")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Section {section!r} is {sec['scope']}; it has no policy",
+        )
     if mode not in acct_settings.POLICY_MODES:
         raise HTTPException(status_code=400, detail="mode must be 'inherit' or 'own'")
     try:
@@ -338,9 +410,15 @@ def update_policy(body: dict, db: Session = Depends(get_db)):
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
     if account.role == "owner":
-        raise HTTPException(status_code=400, detail="The owner's values are the install values; policies apply to members")
-    row = (db.query(SectionPolicy)
-           .filter(SectionPolicy.account_id == acc_id, SectionPolicy.section == section).first())
+        raise HTTPException(
+            status_code=400,
+            detail="The owner's values are the install values; policies apply to members",
+        )
+    row = (
+        db.query(SectionPolicy)
+        .filter(SectionPolicy.account_id == acc_id, SectionPolicy.section == section)
+        .first()
+    )
     if row is None:
         db.add(SectionPolicy(account_id=acc_id, section=section, mode=mode))
     else:
@@ -357,11 +435,15 @@ async def check_apify_key(db: Session = Depends(get_db)):
     answer then says only that it works (`inherited: true`), never the owner's Apify
     username, unless the caller holds a live owner unlock."""
     import httpx
+
     from backend.scraper.sources.apify import ApifyError, account_name
+
     member = acct_settings.member_account(db)
-    inherited = (member is not None
-                 and acct_settings.section_mode(db, member, "apify") == acct_settings.INHERIT
-                 and not acct_settings.acts_as_owner(db))
+    inherited = (
+        member is not None
+        and acct_settings.section_mode(db, member, "apify") == acct_settings.INHERIT
+        and not acct_settings.acts_as_owner(db)
+    )
     try:
         username = await account_name()
         if inherited:
@@ -370,11 +452,14 @@ async def check_apify_key(db: Session = Depends(get_db)):
     except ApifyError as e:
         raise HTTPException(status_code=400, detail=f"Apify: {e}") from e
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Apify is unreachable ({type(e).__name__})") from e
+        raise HTTPException(
+            status_code=502, detail=f"Apify is unreachable ({type(e).__name__})"
+        ) from e
 
 
 @router.get("/defaults")
 def get_defaults():
     """Seeded defaults, so an editor can offer "Reset to default" without hardcoding a second copy of every prompt in the frontend."""
     from backend.seed import DEFAULT_SETTINGS
+
     return {k: v[0] for k, v in DEFAULT_SETTINGS.items()}

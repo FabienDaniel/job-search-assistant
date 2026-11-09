@@ -1,9 +1,10 @@
 """Run summaries must use a real plural, not noun + "s"; _activity_summary takes an explicit plural."""
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
-pytest.importorskip("apscheduler")   # scheduler.py imports it at module level
+pytest.importorskip("apscheduler")  # scheduler.py imports it at module level
 
 from backend.models.db import ActivityLog
 
@@ -20,12 +21,14 @@ def _since():
 
 def test_singular_reply(test_db):
     from backend.scheduler import _activity_summary
+
     _rows(test_db, 1)
     assert _activity_summary(_since(), "email", "reply", "replies") == "1 reply"
 
 
 def test_plural_replies(test_db):
     from backend.scheduler import _activity_summary
+
     _rows(test_db, 3)
     assert _activity_summary(_since(), "email", "reply", "replies") == "3 replies"
 
@@ -33,12 +36,14 @@ def test_plural_replies(test_db):
 def test_zero_is_still_empty(test_db):
     """An empty string is what makes the caller's `or "No new replies"` fire."""
     from backend.scheduler import _activity_summary
+
     assert _activity_summary(_since(), "email", "reply", "replies") == ""
 
 
 def test_regular_nouns_need_no_plural_argument(test_db):
     """The digest's "alert" / "alerts" caller keeps working unchanged."""
     from backend.scheduler import _activity_summary
+
     _rows(test_db, 1, log_type="telegram")
     assert _activity_summary(_since(), "telegram", "alert") == "1 alert"
     _rows(test_db, 1, log_type="telegram")
@@ -55,10 +60,12 @@ async def test_email_check_run_summary_reads_reply(test_db, monkeypatch):
         test_db.commit()
 
     import backend.email_monitor.gmail_client as gmail
+
     monkeypatch.setattr(gmail, "check_emails", fake_check_emails)
 
     await sched.run_email_check()
 
     from backend.models.db import JobRun
+
     run = test_db.query(JobRun).filter(JobRun.job_type == "email_check").one()
     assert run.result_summary == "1 reply"

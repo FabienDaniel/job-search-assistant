@@ -1,15 +1,16 @@
 """Rippling ATS handler — GET api.rippling.com/platform/api/ats/v1/board/{slug}/jobs.
 Server-side filter params are unreliable, so filtering happens client-side; multi-location jobs repeat under the same UUID and are deduped preferring US locations."""
+
 import json
 import logging
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 
 from backend.analyzer.location import COUNTRY_NAMES, SAFE_COUNTRY_CODES, fold, parse
-from backend.scraper._shared.urls import host_matches, path_contains
-from backend.scraper._shared.filters import _validate_job
 from backend.scraper._shared.errors import raise_if_board_gone
+from backend.scraper._shared.filters import _validate_job
+from backend.scraper._shared.urls import host_matches, path_contains
 
 logger = logging.getLogger("jobnavigator.scraper.ats.rippling")
 
@@ -100,7 +101,9 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
     filter_dept = filters.get("department", "").lower()
     filter_loc = filters.get("workLocation", "").lower()
 
-    logger.info(f"Rippling API: {api_url} dept_filter='{filter_dept}' loc_filter='{filter_loc}'")
+    logger.info(
+        f"Rippling API: {api_url} dept_filter='{filter_dept}' loc_filter='{filter_loc}'"
+    )
 
     jobs = []
     rejected = []
@@ -113,7 +116,14 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
             if not debug:
                 raise_if_board_gone(resp.status_code, "Rippling", slug)
             if debug:
-                return [], [{"title": "(none)", "url": api_url, "selector": "rippling_api", "reason": f"HTTP {resp.status_code}"}]
+                return [], [
+                    {
+                        "title": "(none)",
+                        "url": api_url,
+                        "selector": "rippling_api",
+                        "reason": f"HTTP {resp.status_code}",
+                    }
+                ]
             return []
 
         postings = json.loads(resp.text)
@@ -149,15 +159,27 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
 
             if filter_dept and filter_dept != dept_label.lower():
                 if debug:
-                    rejected.append({"title": title, "url": job_url, "selector": "rippling_api",
-                                     "reason": f"Department '{dept_label}' != '{filters.get('department', '')}'"})
+                    rejected.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "selector": "rippling_api",
+                            "reason": f"Department '{dept_label}' != '{filters.get('department', '')}'",
+                        }
+                    )
                 continue
 
             if filter_loc:
                 if not any(_loc_matches(loc, filter_loc) for loc in all_locs):
                     if debug:
-                        rejected.append({"title": title, "url": job_url, "selector": "rippling_api",
-                                         "reason": f"No location matches '{filters.get('workLocation', '')}' (has: {', '.join(all_locs[:3])})"})
+                        rejected.append(
+                            {
+                                "title": title,
+                                "url": job_url,
+                                "selector": "rippling_api",
+                                "reason": f"No location matches '{filters.get('workLocation', '')}' (has: {', '.join(all_locs[:3])})",
+                            }
+                        )
                     continue
 
             reason = _validate_job(title, job_url)
@@ -169,11 +191,23 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
                 for other in all_locs:
                     if other and other not in places:
                         places.append(other)
-                jobs.append({"title": title, "url": job_url,
-                             "location": loc_label or None,
-                             "locations": places})
+                jobs.append(
+                    {
+                        "title": title,
+                        "url": job_url,
+                        "location": loc_label or None,
+                        "locations": places,
+                    }
+                )
             elif debug:
-                rejected.append({"title": title, "url": job_url, "selector": "rippling_api", "reason": reason})
+                rejected.append(
+                    {
+                        "title": title,
+                        "url": job_url,
+                        "selector": "rippling_api",
+                        "reason": reason,
+                    }
+                )
 
     logger.info(f"Rippling API: fetched {len(jobs)} jobs for {slug}")
     if debug:

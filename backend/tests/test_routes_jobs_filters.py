@@ -1,9 +1,11 @@
 """Tests for GET /api/jobs filter and sort combinations."""
+
 import pytest
 
 
 def _seed_first_run(db):
     from backend.models.db import Setting
+
     db.add(Setting(key="dashboard_api_key", value=""))
     db.commit()
 
@@ -11,27 +13,46 @@ def _seed_first_run(db):
 def _seed_jobs(db):
     """Add 3 jobs with varied attributes."""
     from backend.models.db import Job
+
     jobs = [
         Job(
-            external_id="j1", content_hash="h1",
-            company="Acme", title="Senior Product Manager",
-            url="https://x.com/1", status="saved", source="jobspy_linkedin",
-            best_cv_score=82.0, cv_scores={"Default": 82.0},
-            salary_min=150000, salary_max=200000,
+            external_id="j1",
+            content_hash="h1",
+            company="Acme",
+            title="Senior Product Manager",
+            url="https://x.com/1",
+            status="saved",
+            source="jobspy_linkedin",
+            best_cv_score=82.0,
+            cv_scores={"Default": 82.0},
+            salary_min=150000,
+            salary_max=200000,
         ),
         Job(
-            external_id="j2", content_hash="h2",
-            company="Beta Corp", title="Staff Software Engineer",
-            url="https://x.com/2", status="new", source="playwright_url",
-            best_cv_score=65.0, cv_scores={"Default": 65.0},
-            salary_min=180000, salary_max=240000,
+            external_id="j2",
+            content_hash="h2",
+            company="Beta Corp",
+            title="Staff Software Engineer",
+            url="https://x.com/2",
+            status="new",
+            source="playwright_url",
+            best_cv_score=65.0,
+            cv_scores={"Default": 65.0},
+            salary_min=180000,
+            salary_max=240000,
         ),
         Job(
-            external_id="j3", content_hash="h3",
-            company="Acme", title="Junior PM Intern",
-            url="https://x.com/3", status="skip", source="jobspy_indeed",
-            best_cv_score=40.0, cv_scores={"Default": 40.0},
-            salary_min=None, salary_max=None,
+            external_id="j3",
+            content_hash="h3",
+            company="Acme",
+            title="Junior PM Intern",
+            url="https://x.com/3",
+            status="skip",
+            source="jobspy_indeed",
+            best_cv_score=40.0,
+            cv_scores={"Default": 40.0},
+            salary_min=None,
+            salary_max=None,
         ),
     ]
     for j in jobs:

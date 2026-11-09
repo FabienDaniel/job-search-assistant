@@ -1,6 +1,8 @@
 """Test LlmCallLog model persistence."""
-import pytest
+
 import uuid
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -9,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 def test_db():
     """In-memory SQLite with only LlmCallLog table created."""
     from backend.models.db import Base, LlmCallLog
+
     engine = create_engine("sqlite:///:memory:")
     LlmCallLog.__table__.create(engine)
     Session = sessionmaker(bind=engine)
@@ -20,12 +23,14 @@ def test_db():
 def test_llm_call_log_model_exists():
     """LlmCallLog is importable from models.db."""
     from backend.models.db import LlmCallLog
+
     assert LlmCallLog.__tablename__ == "llm_call_log"
 
 
 def test_llm_call_log_can_insert(test_db):
     """A row with all expected columns can be inserted and retrieved."""
     from backend.models.db import LlmCallLog
+
     row = LlmCallLog(
         purpose="score_light",
         provider="claude_api",
@@ -53,6 +58,7 @@ def test_llm_call_log_can_insert(test_db):
 def test_llm_call_log_defaults(test_db):
     """Columns with defaults don't require explicit values."""
     from backend.models.db import LlmCallLog
+
     row = LlmCallLog(purpose="email", model="claude-haiku-4-5-20251001")
     test_db.add(row)
     test_db.commit()

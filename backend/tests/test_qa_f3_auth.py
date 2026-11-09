@@ -7,6 +7,7 @@ test_t4_auth.py / test_t4_race.py, `test_PROVE_*`) ported and inverted: each att
 now fail. The rest are unit tests of the new counters (aging, escalation, memory bound,
 global ceiling), the unlock allowlist and the removal guard.
 """
+
 import asyncio
 import threading
 import uuid
@@ -27,6 +28,7 @@ XFF = "X-Forwarded-For"
 @pytest.fixture
 def no_backup(monkeypatch):
     import backend.api.routes_accounts as ra
+
     monkeypatch.setattr(ra, "backup_before_remove", lambda acc: "pre_remove_fake.sql")
 
 
@@ -40,6 +42,7 @@ def clock(monkeypatch):
 @pytest.fixture(autouse=True)
 def _clean_monitor():
     import backend.job_monitor as jm
+
     A.revoke_all_unlocks()
     yield
     jm._removing.clear()
@@ -78,11 +81,15 @@ def _unlock_as(c, value, pin):
 
 def _owner_patch(c, owner_id, body):
     """The owner, from another device (its API token)."""
-    return c.patch(f"/api/accounts/{owner_id}", json=body,
-                   headers={"X-API-Key": API_KEY, ACT_AS: str(owner_id)})
+    return c.patch(
+        f"/api/accounts/{owner_id}",
+        json=body,
+        headers={"X-API-Key": API_KEY, ACT_AS: str(owner_id)},
+    )
 
 
 # ── R2-02: atomic attempt reservation ───────────────────────────────────────
+
 
 def _count_verifies(monkeypatch, hashes):
     seen = Counter()
@@ -93,6 +100,7 @@ def _count_verifies(monkeypatch, hashes):
         with lock:
             seen[hashes.get(stored, "other")] += 1
         return orig(pin, stored)
+
     monkeypatch.setattr(A, "verify_pin", counting)
     return seen
 
@@ -125,9 +133,13 @@ def test_40_concurrent_guesses_evaluate_at_most_5(test_db, owner, monkeypatch):
     accounts = A.load_accounts(test_db)
     target = A._find(accounts, member.id)
     owner_d = A._owner_of(accounts)
-    seen = _count_verifies(monkeypatch, {target["pin_hash"]: "member", owner_d["pin_hash"]: "owner"})
+    seen = _count_verifies(
+        monkeypatch, {target["pin_hash"]: "member", owner_d["pin_hash"]: "owner"}
+    )
     A.reset_pin_cooldowns()
-    tally = _burst(lambda: A.check_switch(accounts, target, "0000", client="10.0.0.9"), [()] * 40)
+    tally = _burst(
+        lambda: A.check_switch(accounts, target, "0000", client="10.0.0.9"), [()] * 40
+    )
     assert seen["member"] <= A.PIN_MAX_FAILURES
     assert seen["owner"] <= A.PIN_MAX_FAILURES
     assert tally["wrong_pin"] + tally["accepted"] <= A.PIN_MAX_FAILURES
@@ -137,7 +149,9 @@ def test_40_concurrent_guesses_evaluate_at_most_5(test_db, owner, monkeypatch):
     assert all(b.inflight == 0 for b in A._pin_buckets.values())
 
 
-def test_owner_guesses_do_not_multiply_across_member_targets(test_db, owner, monkeypatch):
+def test_owner_guesses_do_not_multiply_across_member_targets(
+    test_db, owner, monkeypatch
+):
     """T4 test_PROVE_R2_02_owner_guesses_multiply_across_member_targets, inverted (was 15
     owner-PIN verifications in one window from 4 members x 10)."""
     _set_pin(test_db, owner, "9999")
@@ -146,22 +160,30 @@ def test_owner_guesses_do_not_multiply_across_member_targets(test_db, owner, mon
     targets = [A._find(accounts, m.id) for m in members]
     seen = _count_verifies(monkeypatch, {A._owner_of(accounts)["pin_hash"]: "owner"})
     A.reset_pin_cooldowns()
-    _burst(lambda t: A.check_switch(accounts, t, "0000", client="10.0.0.9"),
-           [(t,) for t in targets for _ in range(10)])
+    _burst(
+        lambda t: A.check_switch(accounts, t, "0000", client="10.0.0.9"),
+        [(t,) for t in targets for _ in range(10)],
+    )
     assert seen["owner"] <= A.PIN_MAX_FAILURES
 
 
 def test_one_owner_charge_per_request(test_db, owner, clock):
     """A wrong guess at a PIN'd member costs the owner's (owner, client) counter exactly one."""
     _set_pin(test_db, owner, "9999")
-    m1, m2 = _member(test_db, name="A", pin="1111"), _member(test_db, name="B", pin="2222")
+    m1, m2 = (
+        _member(test_db, name="A", pin="1111"),
+        _member(test_db, name="B", pin="2222"),
+    )
     accounts = A.load_accounts(test_db)
     for t in (m1, m2):
         with pytest.raises(A.SwitchDenied):
             A.check_switch(accounts, A._find(accounts, t.id), "0000", client="c")
     assert A._pin_buckets[(str(owner.id), "c")].fails == 2
     # the owner PIN still covers a member and resets that client's owner counter
-    assert A.check_switch(accounts, A._find(accounts, m1.id), "9999", client="c") == "owner_pin"
+    assert (
+        A.check_switch(accounts, A._find(accounts, m1.id), "9999", client="c")
+        == "owner_pin"
+    )
     assert A._pin_buckets[(str(owner.id), "c")].fails == 0
 
 
@@ -169,12 +191,16 @@ def test_own_pin_success_does_not_charge_the_owner(test_db, owner):
     _set_pin(test_db, owner, "9999")
     m = _member(test_db, pin="4321")
     accounts = A.load_accounts(test_db)
-    assert A.check_switch(accounts, A._find(accounts, m.id), "4321", client="c") == "own_pin"
+    assert (
+        A.check_switch(accounts, A._find(accounts, m.id), "4321", client="c")
+        == "own_pin"
+    )
     b = A._pin_buckets.get((str(owner.id), "c"))
     assert b is None or (b.fails == 0 and b.inflight == 0)
 
 
 # ── R2-04: no lockout of the owner from another device ──────────────────────
+
 
 def test_member_cannot_keep_the_owner_locked_out(client, test_db, owner, clock):
     """T4 test_PROVE_R2_04_member_keeps_owner_locked_out, inverted (was 429 for the owner's
@@ -185,28 +211,46 @@ def test_member_cannot_keep_the_owner_locked_out(client, test_db, owner, clock):
     attacker = {ACT_AS: str(m.id), XFF: "192.168.1.50"}
     for _ in range(4):
         for _ in range(5):
-            client.post("/api/auth/verify-owner-pin", json={"pin": "0000"}, headers=attacker)
-        r = client.post("/api/auth/switch", json={"account_id": str(owner.id), "pin": "9999"},
-                        headers={XFF: "192.168.1.10"})
+            client.post(
+                "/api/auth/verify-owner-pin", json={"pin": "0000"}, headers=attacker
+            )
+        r = client.post(
+            "/api/auth/switch",
+            json={"account_id": str(owner.id), "pin": "9999"},
+            headers={XFF: "192.168.1.10"},
+        )
         assert r.status_code == 200, r.text
         clock[0] += 31
     # the attacker's own device is the one cooling down, and longer each time
-    r = client.post("/api/auth/verify-owner-pin", json={"pin": "0000"}, headers=attacker)
+    r = client.post(
+        "/api/auth/verify-owner-pin", json={"pin": "0000"}, headers=attacker
+    )
     assert r.status_code == 429 and int(r.headers["Retry-After"]) > 30
 
 
-def test_member_guesses_via_a_pinned_member_do_not_lock_the_owner(client, test_db, owner, clock):
+def test_member_guesses_via_a_pinned_member_do_not_lock_the_owner(
+    client, test_db, owner, clock
+):
     _set_pin(test_db, owner, "9999")
     pm = _member(test_db, name="Pinned", pin="4321")
     for _ in range(5):
-        client.post("/api/auth/verify-pin", json={"account_id": str(pm.id), "pin": "0000"},
-                    headers={XFF: "192.168.1.50"})
-    r = client.post("/api/auth/switch", json={"account_id": str(owner.id), "pin": "9999"},
-                    headers={XFF: "192.168.1.10"})
+        client.post(
+            "/api/auth/verify-pin",
+            json={"account_id": str(pm.id), "pin": "0000"},
+            headers={XFF: "192.168.1.50"},
+        )
+    r = client.post(
+        "/api/auth/switch",
+        json={"account_id": str(owner.id), "pin": "9999"},
+        headers={XFF: "192.168.1.10"},
+    )
     assert r.status_code == 200
     # from the attacker's device the owner's PIN no longer covers (owner counter full)
-    r = client.post("/api/auth/switch", json={"account_id": str(pm.id), "pin": "9999"},
-                    headers={XFF: "192.168.1.50"})
+    r = client.post(
+        "/api/auth/switch",
+        json={"account_id": str(pm.id), "pin": "9999"},
+        headers={XFF: "192.168.1.50"},
+    )
     assert r.status_code == 429
 
 
@@ -224,7 +268,7 @@ def test_one_client_can_never_reach_the_global_ceiling(test_db, owner, clock):
                 clock[0] += e.retry_after
         g = A._pin_buckets[(str(owner.id), A.GLOBAL_CLIENT)]
         assert not g.until, "one client tripped the global ceiling"
-    A.check_pin(acc, "9999", client="owner-laptop")      # never locked for another device
+    A.check_pin(acc, "9999", client="owner-laptop")  # never locked for another device
 
 
 def test_many_clients_trip_the_global_ceiling(test_db, owner, clock):
@@ -241,6 +285,7 @@ def test_many_clients_trip_the_global_ceiling(test_db, owner, clock):
 
 
 # ── R2-05: aging, escalation, memory bound ──────────────────────────────────
+
 
 def test_failures_age_out(client, test_db, owner, clock):
     """T4 test_PROVE_R2_05 part 1, inverted (was: one typo a month after 4 typos -> 429)."""
@@ -290,7 +335,7 @@ def test_success_resets_the_escalation(test_db, owner, clock):
 
 
 def test_counters_are_memory_bounded(test_db, owner, clock, monkeypatch):
-    monkeypatch.setattr(A, "PIN_GLOBAL_MAX_FAILURES", 10 ** 6)
+    monkeypatch.setattr(A, "PIN_GLOBAL_MAX_FAILURES", 10**6)
     _set_pin(test_db, owner, "9999")
     acc = A._find(A.load_accounts(test_db), owner.id)
     for i in range(A.PIN_MAX_BUCKETS + 500):
@@ -308,13 +353,22 @@ def test_owner_reset_of_a_member_pin_clears_its_cooldown(client, test_db, owner,
     """R2-14 (same code): the member can use the new PIN at once."""
     m = _member(test_db, pin="4321")
     for _ in range(5):
-        client.post("/api/auth/verify-pin", json={"account_id": str(m.id), "pin": "0000"})
-    assert client.patch(f"/api/accounts/{m.id}", json={"pin": "5555"}).status_code == 200
-    assert client.post("/api/auth/verify-pin",
-                       json={"account_id": str(m.id), "pin": "5555"}).status_code == 200
+        client.post(
+            "/api/auth/verify-pin", json={"account_id": str(m.id), "pin": "0000"}
+        )
+    assert (
+        client.patch(f"/api/accounts/{m.id}", json={"pin": "5555"}).status_code == 200
+    )
+    assert (
+        client.post(
+            "/api/auth/verify-pin", json={"account_id": str(m.id), "pin": "5555"}
+        ).status_code
+        == 200
+    )
 
 
 # ── R2-06: owner unlock is revocable ────────────────────────────────────────
+
 
 def test_unlock_dies_with_lock_owner_pin_change_and_switch(browser, test_db, owner):
     """T4 test_PROVE_R2_06_unlock_survives_lock_and_owner_pin_change, inverted (was: the
@@ -328,10 +382,19 @@ def test_unlock_dies_with_lock_owner_pin_change_and_switch(browser, test_db, own
     assert _me_as(browser, unlocked).json()["owner_unlocked_until"]
     lock = _as_cookie(browser, unlocked, "POST", "/api/auth/owner-lock")
     assert lock.json()["locked"] is True
-    assert _me_as(browser, lock.cookies.get("jn_account")).json()["owner_unlocked_until"] is None
+    assert (
+        _me_as(browser, lock.cookies.get("jn_account")).json()["owner_unlocked_until"]
+        is None
+    )
     # replay the copied value
     assert _me_as(browser, unlocked).json()["owner_unlocked_until"] is None
-    w = _as_cookie(browser, unlocked, "PATCH", "/api/settings", json={"proxy_url": "socks5://attacker:1"})
+    w = _as_cookie(
+        browser,
+        unlocked,
+        "PATCH",
+        "/api/settings",
+        json={"proxy_url": "socks5://attacker:1"},
+    )
     assert w.status_code == 403
 
     # a fresh unlock, then the owner changes their PIN from another device
@@ -340,7 +403,13 @@ def test_unlock_dies_with_lock_owner_pin_change_and_switch(browser, test_db, own
     r = _owner_patch(browser, owner.id, {"pin": "1111", "current_pin": "9999"})
     assert r.status_code == 200, r.text
     assert _me_as(browser, unlocked).json()["owner_unlocked_until"] is None
-    w = _as_cookie(browser, unlocked, "PATCH", "/api/settings", json={"proxy_url": "socks5://attacker:2"})
+    w = _as_cookie(
+        browser,
+        unlocked,
+        "PATCH",
+        "/api/settings",
+        json={"proxy_url": "socks5://attacker:2"},
+    )
     assert w.status_code == 403
 
     # switching away ends the unlock of the previous cookie
@@ -362,7 +431,12 @@ def test_owner_removing_their_pin_also_ends_unlocks(browser, test_db, owner):
     _, cookie = _switch_as(browser, "", m.id)
     unlocked = _unlock_as(browser, cookie, "9999")
     assert _me_as(browser, unlocked).json()["owner_unlocked_until"]
-    assert _owner_patch(browser, owner.id, {"pin": None, "current_pin": "9999"}).status_code == 200
+    assert (
+        _owner_patch(
+            browser, owner.id, {"pin": None, "current_pin": "9999"}
+        ).status_code
+        == 200
+    )
     assert _me_as(browser, unlocked).json()["owner_unlocked_until"] is None
 
 
@@ -371,23 +445,37 @@ def test_member_pin_change_keeps_its_own_live_unlock(browser, test_db, owner):
     m = _member(test_db, name="Member", pin="4321")
     _, cookie = _switch_as(browser, "", m.id, "4321")
     unlocked = _unlock_as(browser, cookie, "9999")
-    r = _as_cookie(browser, unlocked, "PATCH", f"/api/accounts/{m.id}",
-                   json={"pin": "2468", "current_pin": "4321"})
+    r = _as_cookie(
+        browser,
+        unlocked,
+        "PATCH",
+        f"/api/accounts/{m.id}",
+        json={"pin": "2468", "current_pin": "4321"},
+    )
     assert r.status_code == 200
     resigned = r.cookies.get("jn_account")
-    assert _me_as(browser, resigned).json()["owner_unlocked_until"]   # same unlock, new PIN
+    assert _me_as(browser, resigned).json()[
+        "owner_unlocked_until"
+    ]  # same unlock, new PIN
 
 
 def test_cookie_with_u_but_no_live_unlock_id_is_locked(browser, test_db, owner):
     m = _member(test_db, name="Member")
     acc = A._find(A.load_accounts(test_db), m.id)
     until = A._now() + 600
-    legacy = A.sign_cookie(A.cookie_secret(test_db),
-                           {"k": "cookie", "a": str(m.id), "p": "", "e": int(until), "u": int(until)})
+    legacy = A.sign_cookie(
+        A.cookie_secret(test_db),
+        {"k": "cookie", "a": str(m.id), "p": "", "e": int(until), "u": int(until)},
+    )
     me = _me_as(browser, legacy).json()
     assert me["account"]["id"] == str(m.id) and me["owner_unlocked_until"] is None
     # an unknown id is locked too; a granted one unlocks until revoked
-    assert _me_as(browser, A.make_cookie_value(test_db, acc, until, "nope")).json()["owner_unlocked_until"] is None
+    assert (
+        _me_as(browser, A.make_cookie_value(test_db, acc, until, "nope")).json()[
+            "owner_unlocked_until"
+        ]
+        is None
+    )
     uid = A.grant_unlock(until)
     value = A.make_cookie_value(test_db, acc, until, uid)
     assert _me_as(browser, value).json()["owner_unlocked_until"]
@@ -404,16 +492,23 @@ def test_unlock_allowlist_drops_expired_ids(clock):
 
 # ── R2-07: non-ASCII auth values -> 401, never 500 ──────────────────────────
 
-@pytest.mark.parametrize("hdr", [
-    {"Cookie": "jn_account=abc.\xe9\xe9".encode("latin-1")},
-    {"X-API-Key": "r4-test-k\xe9y".encode("latin-1")},
-    {"Cookie": f"jn_session={API_KEY}\xe9".encode("latin-1")},
-], ids=["jn_account", "x_api_key", "jn_session"])
+
+@pytest.mark.parametrize(
+    "hdr",
+    [
+        {"Cookie": "jn_account=abc.\xe9\xe9".encode("latin-1")},
+        {"X-API-Key": "r4-test-k\xe9y".encode("latin-1")},
+        {"Cookie": f"jn_session={API_KEY}\xe9".encode("latin-1")},
+    ],
+    ids=["jn_account", "x_api_key", "jn_session"],
+)
 def test_non_ascii_auth_values_are_401(client, test_db, owner, hdr):
     """T4 test_PROVE_R2_07_non_ascii_auth_values_500, inverted (was 500 on each)."""
     client.headers.pop(ACT_AS, None)
     if "X-API-Key" in hdr or b"jn_session" in hdr.get("Cookie", b""):
-        client.headers.pop("X-API-Key", None)    # else: the key header + the bad jn_account
+        client.headers.pop(
+            "X-API-Key", None
+        )  # else: the key header + the bad jn_account
     _member(test_db)
     r = client.get("/api/jobs", headers=hdr)
     assert r.status_code == 401
@@ -427,6 +522,7 @@ def test_non_ascii_key_in_the_body_is_401(client, path):
 
 def test_secret_eq_never_raises():
     from backend.main import _secret_eq
+
     assert _secret_eq("abc", "abc") and not _secret_eq("ab\xe9", "abc")
     assert not _secret_eq(None, "abc") and not _secret_eq(5, "abc")
     assert _secret_eq("kéy", "kéy")
@@ -434,7 +530,10 @@ def test_secret_eq_never_raises():
 
 # ── R2-03: a stale cookie never falls back to the owner ─────────────────────
 
-def test_removed_member_browser_does_not_become_owner(client, test_db, owner, no_backup):
+
+def test_removed_member_browser_does_not_become_owner(
+    client, test_db, owner, no_backup
+):
     """T4 test_PROVE_R2_03_removed_member_browser_becomes_owner, inverted (was /me role=owner,
     export owner 200, backup 202 for the removed member's browser)."""
     _set_pin(test_db, owner, "9999")
@@ -442,16 +541,26 @@ def test_removed_member_browser_does_not_become_owner(client, test_db, owner, no
     r, member_cookie = _switch_as(client, "", m.id)
     assert r.status_code == 200
     assert _me_as(client, member_cookie).json()["account"]["id"] == str(m.id)
-    d = client.request("DELETE", f"/api/accounts/{m.id}", json={"confirm_name": "Leaver"},
-                       headers={"X-API-Key": API_KEY, ACT_AS: str(owner.id)})
+    d = client.request(
+        "DELETE",
+        f"/api/accounts/{m.id}",
+        json={"confirm_name": "Leaver"},
+        headers={"X-API-Key": API_KEY, ACT_AS: str(owner.id)},
+    )
     assert d.status_code == 200, d.text
     r = _me_as(client, member_cookie)
     assert (r.status_code, r.json()) == (401, {"detail": "account_required"})
     assert r.headers.get("X-JN-Auth") == "account"
     sc = r.headers.get("set-cookie", "")
-    assert sc.startswith("jn_account=") and ("Max-Age=0" in sc or "max-age=0" in sc.lower())
-    for method, path in (("GET", f"/api/accounts/{owner.id}/export"), ("POST", "/api/db/backup"),
-                         ("GET", "/api/settings"), ("GET", "/api/jobs")):
+    assert sc.startswith("jn_account=") and (
+        "Max-Age=0" in sc or "max-age=0" in sc.lower()
+    )
+    for method, path in (
+        ("GET", f"/api/accounts/{owner.id}/export"),
+        ("POST", "/api/db/backup"),
+        ("GET", "/api/settings"),
+        ("GET", "/api/jobs"),
+    ):
         assert _as_cookie(client, member_cookie, method, path).status_code == 401, path
     # garbage also gets the picker, not the owner
     assert _me_as(client, "garbage.value").status_code == 401
@@ -477,19 +586,26 @@ def test_stale_cookie_with_pinless_owner_is_one_click(browser, test_db, owner):
     test_db.delete(m)
     test_db.commit()
     assert _me_as(browser, stale).status_code == 401
-    r, cookie = _switch_as(browser, stale, owner.id)            # no PIN: one click
+    r, cookie = _switch_as(browser, stale, owner.id)  # no PIN: one click
     assert r.status_code == 200
     assert _me_as(browser, cookie).json()["account"]["id"] == str(owner.id)
 
 
 # ── R2-08: delete busy check ────────────────────────────────────────────────
 
+
 def _fake_run(job_type, account_id=None, all_accounts=False):
     import backend.job_monitor as jm
+
     key = f"{job_type}:{uuid.uuid4()}"
-    jm._running[key] = jm.RunningJob(run_id=uuid.uuid4(), job_type=job_type, trigger="scheduler",
-                                     started_at=datetime.now(timezone.utc), account_id=account_id,
-                                     all_accounts=all_accounts)
+    jm._running[key] = jm.RunningJob(
+        run_id=uuid.uuid4(),
+        job_type=job_type,
+        trigger="scheduler",
+        started_at=datetime.now(timezone.utc),
+        account_id=account_id,
+        all_accounts=all_accounts,
+    )
     return key
 
 
@@ -497,8 +613,11 @@ def _delete(c, m):
     return c.request("DELETE", f"/api/accounts/{m.id}", json={"confirm_name": m.name})
 
 
-def test_scheduled_scrape_all_makes_every_account_busy(client, test_db, owner, no_backup):
+def test_scheduled_scrape_all_makes_every_account_busy(
+    client, test_db, owner, no_backup
+):
     import backend.job_monitor as jm
+
     m = _member(test_db, name="Busy")
     key = _fake_run("scrape_all", None, all_accounts=True)
     try:
@@ -510,8 +629,11 @@ def test_scheduled_scrape_all_makes_every_account_busy(client, test_db, owner, n
     assert _delete(client, m).status_code == 200
 
 
-def test_owner_run_that_is_not_all_accounts_does_not_block(client, test_db, owner, no_backup):
+def test_owner_run_that_is_not_all_accounts_does_not_block(
+    client, test_db, owner, no_backup
+):
     import backend.job_monitor as jm
+
     m = _member(test_db, name="Free")
     key = _fake_run("company_scrape", None)
     try:
@@ -520,8 +642,11 @@ def test_owner_run_that_is_not_all_accounts_does_not_block(client, test_db, owne
         jm._running.pop(key, None)
 
 
-def test_per_account_sweep_that_includes_the_account_is_busy(client, test_db, owner, no_backup):
+def test_per_account_sweep_that_includes_the_account_is_busy(
+    client, test_db, owner, no_backup
+):
     import backend.job_monitor as jm
+
     m = _member(test_db, name="Swept")
     with jm.fanning_out([owner.id, m.id]):
         assert _delete(client, m).json()["detail"] == "account_busy"
@@ -531,6 +656,7 @@ def test_per_account_sweep_that_includes_the_account_is_busy(client, test_db, ow
 def test_run_started_during_the_backup_is_caught(client, test_db, owner, monkeypatch):
     import backend.api.routes_accounts as ra
     import backend.job_monitor as jm
+
     m = _member(test_db, name="Late")
     keys = []
 
@@ -542,6 +668,7 @@ def test_run_started_during_the_backup_is_caught(client, test_db, owner, monkeyp
                 jm.launch_background("daily_digest", lambda: None)
         keys.append(_fake_run("email_check", m.id))
         return "pre_remove_fake.sql"
+
     monkeypatch.setattr(ra, "backup_before_remove", slow_backup)
     try:
         r = _delete(client, m)
@@ -557,11 +684,13 @@ def test_run_started_during_the_backup_is_caught(client, test_db, owner, monkeyp
 def test_removal_blocks_all_account_runs_and_skips_the_account_in_sweeps():
     import backend.job_monitor as jm
     from backend.accounts.background import for_each_account
+
     a, b = uuid.uuid4(), uuid.uuid4()
     seen = []
 
     async def body():
         from backend.accounts.context import current_account
+
         seen.append(current_account.get())
 
     async def scheduled_scrape():

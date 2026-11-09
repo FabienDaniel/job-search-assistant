@@ -1,16 +1,16 @@
 """LinkedIn session (Voyager cookie) status and refresh; the login is gated behind
 LinkedIn's email-PIN checkpoint, so a refresh parks in `awaiting_pin` until the code is posted back here."""
+
 import logging
 import os
 import time
 from datetime import datetime, timezone
-
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from backend.job_monitor import launch_background, JobAlreadyRunningError
+from backend.job_monitor import JobAlreadyRunningError, launch_background
 
 logger = logging.getLogger("jobnavigator.linkedin")
 
@@ -28,6 +28,7 @@ class PinIn(BaseModel):
 def _shared_from_owner() -> bool:
     """A member on 'inherit' LinkedIn uses the owner's session (QA F5, R5-01)."""
     from backend.accounts.credentials import linkedin_shared_from_owner
+
     return linkedin_shared_from_owner()
 
 
@@ -37,9 +38,13 @@ def _require_session_writer() -> None:
     if not _shared_from_owner():
         return
     from backend.accounts.context import is_owner_unlocked
+
     if is_owner_unlocked():
         return
-    raise HTTPException(status_code=403, detail="LinkedIn is shared from the account owner; only the owner can refresh the session")
+    raise HTTPException(
+        status_code=403,
+        detail="LinkedIn is shared from the account owner; only the owner can refresh the session",
+    )
 
 
 # which session: mock (the extension import and the lookup) or main (LinkedIn Personal)
@@ -52,7 +57,7 @@ def session_status(which: Which = "mock"):
     from backend.scraper._shared import linkedin_session as rls
 
     shared = _shared_from_owner()
-    path = rls.jar(which)   # the caller's cookie jar (MT-16; the owner's when shared)
+    path = rls.jar(which)  # the caller's cookie jar (MT-16; the owner's when shared)
     state = rls.state(which)
     exists = os.path.exists(path)
     age_days = None
@@ -68,14 +73,25 @@ def session_status(which: Which = "mock"):
         status, summary = "stale", f"Signed in {int(age_days)}d ago — likely expired."
     else:
         days = int(age_days)
-        status, summary = "ok", ("Signed in today." if days == 0 else f"Signed in {days}d ago.")
-    if exists and which == rls.MOCK and (rls.signed_in_as(which) or {}).get("account") != rls.MOCK:
+        status, summary = (
+            "ok",
+            ("Signed in today." if days == 0 else f"Signed in {days}d ago."),
+        )
+    if (
+        exists
+        and which == rls.MOCK
+        and (rls.signed_in_as(which) or {}).get("account") != rls.MOCK
+    ):
         # saved before the main/mock split (3.2): the employer-link lookup will not use it
-        status, summary = "stale", "Saved before the main/mock split — sign in again so the link lookup can use it."
+        status, summary = (
+            "stale",
+            "Saved before the main/mock split — sign in again so the link lookup can use it.",
+        )
     elif exists and which == rls.MOCK:
         # the lookup's own checks: the mock email must differ from the main one and match the sign-in
         from backend.models.db import SessionLocal
         from backend.scraper._shared.linkedin_lookup import mock_session_problem
+
         db = SessionLocal()
         try:
             problem = mock_session_problem(db)
@@ -97,7 +113,9 @@ def session_status(which: Which = "mock"):
         "shared": shared,
         "which": which,
         # the owner's address stays the owner's: a member on 'inherit' sees only that it is signed in
-        "signed_in_as": None if shared else (rls.signed_in_as(which) or {}).get("email"),
+        "signed_in_as": None
+        if shared
+        else (rls.signed_in_as(which) or {}).get("email"),
     }
 
 
@@ -111,8 +129,13 @@ async def session_refresh(which: Which = "mock"):
     if state.get("phase") in ("running", "awaiting_pin"):
         return {"run_id": None, "status": state["phase"]}
     try:
-        run_id = launch_background("linkedin_session_refresh", rls.run_refresh,
-                                   trigger="manual", scope_key=f"linkedin-{which}", func_args=(which,))
+        run_id = launch_background(
+            "linkedin_session_refresh",
+            rls.run_refresh,
+            trigger="manual",
+            scope_key=f"linkedin-{which}",
+            func_args=(which,),
+        )
     except JobAlreadyRunningError:
         return {"run_id": None, "status": "running"}
     return {"run_id": run_id, "status": "running"}
@@ -124,7 +147,7 @@ def session_pin(body: PinIn, which: Which = "mock"):
     from backend.scraper._shared import linkedin_session as rls
 
     _require_session_writer()
-    digits ="".join(c for c in (body.pin or "") if c.isdigit())
+    digits = "".join(c for c in (body.pin or "") if c.isdigit())
     if not digits:
         return {"ok": False, "detail": "Enter the digits from LinkedIn's email."}
     with open(rls.pin_file(which), "w") as f:

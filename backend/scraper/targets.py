@@ -44,6 +44,7 @@ module: it fetches for, and feeds, only the account that pressed it.
 Everything here is pure (no DB writes); loading rows across accounts is the caller's job
 (`load_active`), done inside `unscoped()`.
 """
+
 import asyncio
 import copy
 import logging
@@ -62,6 +63,7 @@ logger = logging.getLogger("jobnavigator.scraper.targets")
 
 
 # ── Shared fetch ─────────────────────────────────────────────────────────────
+
 
 class SharedFetch:
     """The one fetch of a shared target, memoised for its subscribers.
@@ -88,9 +90,11 @@ class SharedFetch:
         self.params = dict(params or {})
         self.memo: dict = {}
         self.done = False
-        self.calls = 0           # how many times the fetch really ran (0 or 1)
+        self.calls = 0  # how many times the fetch really ran (0 or 1)
         self.duration = 0.0
-        self.finished_at: Optional[float] = None   # time.monotonic() when the fetch ended
+        self.finished_at: Optional[float] = (
+            None  # time.monotonic() when the fetch ended
+        )
         self._value = None
         self._error: Optional[BaseException] = None
         # Two runs can hold the same fetch (`shared_fetch_for`), so the first caller fetches
@@ -112,7 +116,9 @@ class SharedFetch:
 
     def _lock(self) -> asyncio.Lock:
         loop = asyncio.get_running_loop()
-        if self._lock_loop is not loop:     # one loop in the app; tests use a fresh one each
+        if (
+            self._lock_loop is not loop
+        ):  # one loop in the app; tests use a fresh one each
             self._async_lock, self._lock_loop = asyncio.Lock(), loop
         return self._async_lock
 
@@ -159,8 +165,11 @@ class SharedFetch:
         empty fetch (a 429, a board that was down) is shared within its own run only."""
         if not self.done:
             return True
-        return (self._error is None and _has_postings(self._value)
-                and now - (self.finished_at or 0) <= REUSE_SECONDS)
+        return (
+            self._error is None
+            and _has_postings(self._value)
+            and now - (self.finished_at or 0) <= REUSE_SECONDS
+        )
 
 
 # Cross-run reuse. Runs go one after another (the scrape gate), so two accounts' Run alls,
@@ -203,7 +212,11 @@ def shared_fetch_for(key, params: Optional[dict] = None) -> "SharedFetch":
             _recent.pop(k, None)
         earlier = _recent.get(key)
         if earlier is not None and earlier.covers(params):
-            age = "in flight" if not earlier.done else f"{now - earlier.finished_at:.0f}s old"
+            age = (
+                "in flight"
+                if not earlier.done
+                else f"{now - earlier.finished_at:.0f}s old"
+            )
             logger.info(f"Reusing the fetch of {key[0]} target ({age})")
             if earlier.done:
                 # A board's throttle stop (`<source>_halt`) lasts one run; pages the earlier
@@ -224,6 +237,7 @@ def reset_shared_fetches() -> None:
 
 # ── Keys ─────────────────────────────────────────────────────────────────────
 
+
 def target_url(url: str) -> str:
     """A list/board URL in comparable form: trimmed, scheme and host lowercased, no
     trailing slash on the path, query params sorted. Nothing else is dropped (QA F6 /
@@ -236,13 +250,20 @@ def target_url(url: str) -> str:
     if not raw:
         return ""
     if not raw.lower().startswith(("http://", "https://")):
-        return raw   # a request spec such as "POST|https://…|{json}": compared verbatim
+        return raw  # a request spec such as "POST|https://…|{json}": compared verbatim
     try:
         parts = urlsplit(raw)
         query = sorted(parse_qsl(parts.query, keep_blank_values=True))
         path = parts.path.rstrip("/")
-        return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path,
-                           urlencode(query, doseq=True), parts.fragment))
+        return urlunsplit(
+            (
+                parts.scheme.lower(),
+                parts.netloc.lower(),
+                path,
+                urlencode(query, doseq=True),
+                parts.fragment,
+            )
+        )
     except Exception:
         return raw
 
@@ -250,13 +271,16 @@ def target_url(url: str) -> str:
 def _ats_label(url: str) -> str:
     try:
         from backend.scraper.ats.registry import scrape_type
+
         return scrape_type(url)
     except Exception:
         return "?"
 
 
 def company_key(company) -> tuple:
-    urls = sorted({target_url(u) for u in (company.scrape_urls or []) if (u or "").strip()})
+    urls = sorted(
+        {target_url(u) for u in (company.scrape_urls or []) if (u or "").strip()}
+    )
     return (
         "company",
         tuple((u, _ats_label(u)) for u in urls),
@@ -273,6 +297,7 @@ def search_key(search) -> tuple:
     mode = search.search_mode or "keyword"
     if mode == "keyword":
         from backend.countries import DEFAULT_COUNTRY
+
         return (
             "keyword",
             tuple(sorted({s for s in (search.sources or []) if s != "direct"})),
@@ -286,12 +311,18 @@ def search_key(search) -> tuple:
         return ("levels_fyi", target_url(search.direct_url), search.max_pages or 50)
     if mode == "freehire":
         from backend.scraper.sources.freehire import _base_params
+
         return ("freehire", tuple(sorted(_base_params(search).items())))
     if mode == "caribbeanjobs":
         from backend.scraper.sources.caribbeanjobs import _query_plan
+
         base, keywords = _query_plan(search)
         # Keyword order is kept: the merged listing is cut to results_wanted in query order.
-        return ("caribbeanjobs", tuple(sorted(base.items())), tuple(_norm(k) for k in keywords))
+        return (
+            "caribbeanjobs",
+            tuple(sorted(base.items())),
+            tuple(_norm(k) for k in keywords),
+        )
     if mode == "trulyremote":
         # The whole corpus, no query: every trulyremote search is the same fetch.
         return ("trulyremote",)
@@ -303,9 +334,12 @@ def search_key(search) -> tuple:
 def search_fetch_params(subscribers: list) -> dict:
     """The fetch-side values for a shared search target: the max of the trimmed fields."""
     from backend.scraper.search_modes import get_mode
+
     mode = get_mode(subscribers[0].search_mode)
-    return {field: max((getattr(s, field) or default) for s in subscribers)
-            for field, default in (mode.fetch_params if mode else ())}
+    return {
+        field: max((getattr(s, field) or default) for s in subscribers)
+        for field, default in (mode.fetch_params if mode else ())
+    }
 
 
 # QA F10 / R4-05: when JobSpy subscribers may share one fetch. A shared fetch runs at the
@@ -367,7 +401,9 @@ def split_search_targets(targets: list) -> list:
             continue
         for group in groups:
             params = search_fetch_params(group)
-            key = target.key + (("fetch", params["results_wanted"], params["hours_old"]),)
+            key = target.key + (
+                ("fetch", params["results_wanted"], params["hours_old"]),
+            )
             out.append(Target(key=key, subscribers=group))
     return out
 
@@ -375,14 +411,16 @@ def split_search_targets(targets: list) -> list:
 def is_shareable_search(search) -> bool:
     # Never "apify" (billed per account) nor the own-session modes; see search_modes.py.
     from backend.scraper.search_modes import get_mode
+
     mode = get_mode(search.search_mode)
     return bool(mode and mode.shareable)
 
 
 # ── Due-ness ─────────────────────────────────────────────────────────────────
 
+
 def _as_utc(ts):
-    if ts is not None and ts.tzinfo is None:   # SQLite / legacy rows are naive UTC
+    if ts is not None and ts.tzinfo is None:  # SQLite / legacy rows are naive UTC
         return ts.replace(tzinfo=timezone.utc)
     return ts
 
@@ -396,7 +434,9 @@ def _elapsed_due(elapsed: float, interval: int, tick: int) -> bool:
     return elapsed >= interval - max(tick or 0, 0) / 2
 
 
-def company_due(company, now: datetime, global_interval: int, tick: Optional[int] = None):
+def company_due(
+    company, now: datetime, global_interval: int, tick: Optional[int] = None
+):
     """(due, elapsed_minutes|None, interval) for one company under its own interval.
     `tick` is the scheduler period, by default the global interval (they are the same
     setting)."""
@@ -405,7 +445,11 @@ def company_due(company, now: datetime, global_interval: int, tick: Optional[int
     if not last:
         return True, None, interval
     elapsed = (now - last).total_seconds() / 60
-    return _elapsed_due(elapsed, interval, global_interval if tick is None else tick), elapsed, interval
+    return (
+        _elapsed_due(elapsed, interval, global_interval if tick is None else tick),
+        elapsed,
+        interval,
+    )
 
 
 def search_due(search, now: datetime, tick: int = 0):
@@ -422,10 +466,13 @@ def search_due(search, now: datetime, tick: int = 0):
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class Target:
     key: tuple
-    subscribers: list = field(default_factory=list)   # Search or Company rows, load order
+    subscribers: list = field(
+        default_factory=list
+    )  # Search or Company rows, load order
 
     @property
     def shared(self) -> bool:
@@ -447,7 +494,7 @@ def group_targets(rows: list, key_fn: Callable) -> list[Target]:
     for row in rows:
         try:
             key = key_fn(row)
-        except Exception as e:   # a key we cannot build is a target of its own
+        except Exception as e:  # a key we cannot build is a target of its own
             logger.warning(f"Target key failed for {getattr(row, 'name', row)!r}: {e}")
             key = ("unkeyed", str(getattr(row, "id", id(row))))
         targets.setdefault(key, Target(key=key)).subscribers.append(row)

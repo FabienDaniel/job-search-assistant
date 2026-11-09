@@ -1,35 +1,49 @@
 """Job listing and management endpoints."""
+
 import logging
 from typing import Annotated, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Request
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
+from sqlalchemy import asc, desc, func
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, asc, func
-from backend.models.db import get_db, Job, find_company_by_name
-from backend.api._input import str_field, uuid_filter
-from backend.scraper._shared.dedup import make_external_id, make_content_hash, mark_ignored
+
+from backend.analyzer.location import apply_location_to_job
 from backend.analyzer.salary_extractor import apply_salary_to_job
 from backend.analyzer.work_arrangement import apply_arrangement_to_job
-from backend.analyzer.location import apply_location_to_job
-from backend.job_monitor import launch_background, JobAlreadyRunningError
+from backend.api._input import str_field, uuid_filter
+from backend.job_monitor import JobAlreadyRunningError, launch_background
+from backend.models.db import Job, find_company_by_name, get_db
+from backend.scraper._shared.dedup import (
+    make_content_hash,
+    make_external_id,
+    mark_ignored,
+)
+
 # LinkedIn extension enrichment — see sources/linkedin_extension.py
 from backend.scraper._shared.link_kinds import job_link
 from backend.scraper.sources.linkedin_extension import (
-    enrich as _scrape_linkedin_ids,  # noqa: F401
     _linkedin_import_progress,
+)
+from backend.scraper.sources.linkedin_extension import (
+    enrich as _scrape_linkedin_ids,  # noqa: F401
 )
 
 logger = logging.getLogger("jobnavigator.jobs")
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
+
 def _score_resume_names(db, job) -> list[str]:
     """Résumé names an auto-score launch will cover; never fatal to the save itself."""
     try:
         from backend.analyzer.cv_scorer import resolve_score_resume_names
+
         return resolve_score_resume_names(db, job=job)
     except Exception as e:
-        logger.warning(f"Could not resolve resume names for job {getattr(job, 'id', '?')}: {e}")
+        logger.warning(
+            f"Could not resolve resume names for job {getattr(job, 'id', '?')}: {e}"
+        )
         return []
 
 
@@ -50,8 +64,9 @@ async def linkedin_import(request: Request, db: Session = Depends(get_db)):
     # A bare string is the dangerous shape: iterating it queues one junk id per
     # character (R4-T1-14). Anything that is not a list/tuple is a request error.
     if not isinstance(raw_ids, (list, tuple)):
-        raise HTTPException(status_code=422,
-                            detail="linkedin_ids must be a list of job ids")
+        raise HTTPException(
+            status_code=422, detail="linkedin_ids must be a list of job ids"
+        )
     linkedin_ids = [str(lid).strip() for lid in raw_ids if lid]
 
     if not linkedin_ids:
@@ -59,7 +74,8 @@ async def linkedin_import(request: Request, db: Session = Depends(get_db)):
 
     # Quick pre-check: how many are already in DB (for immediate feedback to extension)
     existing_li_ids = {
-        r[0] for r in db.query(Job.linkedin_job_id).filter(Job.linkedin_job_id != None).all()
+        r[0]
+        for r in db.query(Job.linkedin_job_id).filter(Job.linkedin_job_id != None).all()
     }
     new_count = sum(1 for lid in linkedin_ids if lid not in existing_li_ids)
 
@@ -129,7 +145,11 @@ def list_jobs(
 
     if status:
         vals = [s.strip() for s in status.split(",") if s.strip()]
-        q = q.filter(Job.status.in_(vals)) if len(vals) > 1 else q.filter(Job.status == vals[0])
+        q = (
+            q.filter(Job.status.in_(vals))
+            if len(vals) > 1
+            else q.filter(Job.status == vals[0])
+        )
     if company:
         company = _expand_company_filter(db, company)
         vals = [c.strip() for c in company.split(",") if c.strip()]
@@ -142,12 +162,20 @@ def list_jobs(
         q = q.filter(Job.search_id == search_id)
     if h1b_verdict:
         vals = [v.strip() for v in h1b_verdict.split(",") if v.strip()]
-        q = q.filter(Job.h1b_verdict.in_(vals)) if len(vals) > 1 else q.filter(Job.h1b_verdict == vals[0])
+        q = (
+            q.filter(Job.h1b_verdict.in_(vals))
+            if len(vals) > 1
+            else q.filter(Job.h1b_verdict == vals[0])
+        )
     if remote is not None:
         q = q.filter(Job.remote == remote)
     if source:
         vals = [s.strip() for s in source.split(",") if s.strip()]
-        q = q.filter(Job.source.in_(vals)) if len(vals) > 1 else q.filter(Job.source == vals[0])
+        q = (
+            q.filter(Job.source.in_(vals))
+            if len(vals) > 1
+            else q.filter(Job.source == vals[0])
+        )
     if saved is not None:
         q = q.filter(Job.saved == saved)
     if title_search:
@@ -178,24 +206,31 @@ def list_jobs(
     elif sort_by == "company":
         q = q.order_by(asc(Job.company), Job.id)
     else:  # "date" (default)
-        q = q.order_by(desc(Job.discovered_at), Job.id)   # id tiebreak: LIMIT/OFFSET over a tie-heavy sort is not stable without one
+        q = q.order_by(
+            desc(Job.discovered_at), Job.id
+        )  # id tiebreak: LIMIT/OFFSET over a tie-heavy sort is not stable without one
 
     jobs = q.offset(offset).limit(limit).all()
 
     # Batch-check which jobs have tailored resumes (most recent per job)
     from backend.models.db import Resume
+
     job_ids = [j.id for j in jobs]
     tailored_map = {}
     if job_ids:
-        rows = db.query(Resume.job_id, Resume.id).filter(
-            Resume.job_id.in_(job_ids), Resume.is_base == False
-        ).order_by(Resume.updated_at.desc()).all()
+        rows = (
+            db.query(Resume.job_id, Resume.id)
+            .filter(Resume.job_id.in_(job_ids), Resume.is_base == False)
+            .order_by(Resume.updated_at.desc())
+            .all()
+        )
         for jid, rid in rows:
             if jid not in tailored_map:
                 tailored_map[jid] = rid
 
     # Batch per-job in-flight op lookup (O(N running jobs) once, O(1) per row)
     import backend.job_monitor as _mon
+
     in_flight_map: dict[str, list[str]] = {}
     in_flight_detail_map: dict[str, list[dict]] = {}
     for r in _mon.visible_running():
@@ -204,9 +239,11 @@ def list_jobs(
         key = str(r.target_job_id)
         in_flight_map.setdefault(key, []).append(r.job_type)
         in_flight_detail_map.setdefault(key, []).append(
-            {"job_type": r.job_type, "meta": r.meta})
+            {"job_type": r.job_type, "meta": r.meta}
+        )
 
     from backend.analyzer.score_keys import resume_names
+
     names = resume_names(db)
     also_on = _also_on(db, job_ids)
     skipped = _skipped_roles(db, jobs)
@@ -245,7 +282,7 @@ def _expand_company_filter(db, company):
         co = find_company_by_name(db, v)
         if co:
             expanded.add(co.name)
-            for a in (co.aliases or []):
+            for a in co.aliases or []:
                 expanded.add(a)
         else:
             expanded.add(v)
@@ -264,9 +301,9 @@ def _location_clause(raw):
     already identifies the place, so "Vancouver, BC" still reaches the rows
     whose region the board never stated.
     """
-    from backend.analyzer.location import split_key
     from sqlalchemy import and_, or_
 
+    from backend.analyzer.location import split_key
     from backend.models.db import JobLocation
 
     clauses = []
@@ -276,8 +313,11 @@ def _location_clause(raw):
         if country:
             parts.append(JobLocation.country == country)
         if region:
-            parts.append(or_(JobLocation.region == region, JobLocation.region.is_(None))
-                         if city else JobLocation.region == region)
+            parts.append(
+                or_(JobLocation.region == region, JobLocation.region.is_(None))
+                if city
+                else JobLocation.region == region
+            )
         if city:
             parts.append(JobLocation.city == city)
         if len(parts) > 1:
@@ -287,6 +327,7 @@ def _location_clause(raw):
     # EXISTS, not a join: a posting open in twenty-two cities must answer all
     # twenty-two filters without being returned twenty-two times.
     from sqlalchemy import exists
+
     return or_(*[exists().where(clause) for clause in clauses])
 
 
@@ -303,15 +344,23 @@ def _arrangement_clause(raw):
     from sqlalchemy import and_, or_
 
     picked = [v.strip().lower() for v in (raw or "").split(",") if v.strip()]
-    columns = {"remote": Job.arr_remote, "hybrid": Job.arr_hybrid,
-               "onsite": Job.arr_onsite}
+    columns = {
+        "remote": Job.arr_remote,
+        "hybrid": Job.arr_hybrid,
+        "onsite": Job.arr_onsite,
+    }
     clauses = []
     for value in picked:
         if value in columns:
             clauses.append(columns[value].is_(True))
         elif value == "unknown":
-            clauses.append(and_(Job.arr_remote.is_(None), Job.arr_hybrid.is_(None),
-                                Job.arr_onsite.is_(None)))
+            clauses.append(
+                and_(
+                    Job.arr_remote.is_(None),
+                    Job.arr_hybrid.is_(None),
+                    Job.arr_onsite.is_(None),
+                )
+            )
     return or_(*clauses) if clauses else None
 
 
@@ -331,10 +380,24 @@ def _link_kind_clause(link_kind):
     return Job.link_kind.in_(vals) if vals else None
 
 
-def _apply_common_filters(q, status=None, company=None, source=None, h1b_verdict=None,
-                          min_score=None, saved=None, title_search=None, remote=None,
-                          min_salary=None, max_salary=None, search_id=None,
-                          location=None, arrangement=None, link_kind=None, open_state=None):
+def _apply_common_filters(
+    q,
+    status=None,
+    company=None,
+    source=None,
+    h1b_verdict=None,
+    min_score=None,
+    saved=None,
+    title_search=None,
+    remote=None,
+    min_salary=None,
+    max_salary=None,
+    search_id=None,
+    location=None,
+    arrangement=None,
+    link_kind=None,
+    open_state=None,
+):
     """Apply shared filter logic for job list and filter-list endpoints."""
     clause = _link_kind_clause(link_kind)
     if clause is not None:
@@ -344,17 +407,29 @@ def _apply_common_filters(q, status=None, company=None, source=None, h1b_verdict
         q = q.filter(clause)
     if status:
         vals = [s.strip() for s in status.split(",") if s.strip()]
-        q = q.filter(Job.status.in_(vals)) if len(vals) > 1 else q.filter(Job.status == vals[0])
+        q = (
+            q.filter(Job.status.in_(vals))
+            if len(vals) > 1
+            else q.filter(Job.status == vals[0])
+        )
     if company:
         vals = [c.strip() for c in company.split(",") if c.strip()]
         # Caller is expected to pre-expand aliases via _expand_company_filter
         q = q.filter(func.lower(Job.company).in_([v.lower() for v in vals]))
     if source:
         vals = [s.strip() for s in source.split(",") if s.strip()]
-        q = q.filter(Job.source.in_(vals)) if len(vals) > 1 else q.filter(Job.source == vals[0])
+        q = (
+            q.filter(Job.source.in_(vals))
+            if len(vals) > 1
+            else q.filter(Job.source == vals[0])
+        )
     if h1b_verdict:
         vals = [v.strip() for v in h1b_verdict.split(",") if v.strip()]
-        q = q.filter(Job.h1b_verdict.in_(vals)) if len(vals) > 1 else q.filter(Job.h1b_verdict == vals[0])
+        q = (
+            q.filter(Job.h1b_verdict.in_(vals))
+            if len(vals) > 1
+            else q.filter(Job.h1b_verdict == vals[0])
+        )
     if min_score is not None:
         q = q.filter(Job.best_cv_score >= float(min_score))
     if saved is not None:
@@ -382,6 +457,7 @@ def _unscored_filter():
     """New/saved jobs with no scores yet. ORM (not text()) so the account scoping applies
     (MT-4); cv_scorer's predicate is the old `cv_scores::text = '{}'` as a portable CAST."""
     from backend.analyzer.cv_scorer import unscored_filter
+
     return (Job.status.in_(("new", "saved")), unscored_filter())
 
 
@@ -389,17 +465,29 @@ def _unscored_filter():
 def feed_stats(db: Session = Depends(get_db)):
     """Global counts for the v2 feed header — arrived today + not-yet-scored — since the paged /jobs response only sees the current page."""
     from datetime import datetime, timezone
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    arrived_today = db.query(func.count(Job.id)).filter(Job.discovered_at >= start).scalar() or 0
+
+    start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    arrived_today = (
+        db.query(func.count(Job.id)).filter(Job.discovered_at >= start).scalar() or 0
+    )
     unscored = db.query(func.count(Job.id)).filter(*_unscored_filter()).scalar() or 0
     return {"arrived_today": int(arrived_today), "unscored": int(unscored)}
 
 
 @router.get("/unscored-ids")
-def unscored_ids(limit: Annotated[int, Query(ge=0, le=10000)] = 500, db: Session = Depends(get_db)):
+def unscored_ids(
+    limit: Annotated[int, Query(ge=0, le=10000)] = 500, db: Session = Depends(get_db)
+):
     """IDs of not-yet-scored new/saved jobs; the header's "Score N unscored" action scores exactly these, since they sort to the bottom by score and won't be on the feed page."""
-    rows = (db.query(Job.id).filter(*_unscored_filter())
-            .order_by(Job.discovered_at.desc()).limit(limit).all())
+    rows = (
+        db.query(Job.id)
+        .filter(*_unscored_filter())
+        .order_by(Job.discovered_at.desc())
+        .limit(limit)
+        .all()
+    )
     return {"ids": [str(r[0]) for r in rows]}
 
 
@@ -424,25 +512,62 @@ def list_job_companies(
 ):
     """Return distinct canonical company names from jobs matching current filters, sorted, with aliases collapsed to their parent (e.g. 'Audible' -> 'Amazon'); with ?counts=1, returns [{name, count}] sorted by open-role count."""
     from backend.models.db import build_company_lookup
+
     if counts:
         from sqlalchemy import func
-        cq = db.query(Job.company, func.count(Job.id)).filter(Job.company.isnot(None), Job.company != "")
-        cq = _apply_common_filters(cq, status=status, source=source, h1b_verdict=h1b_verdict,
-                                   min_score=min_score, saved=saved, title_search=title_search,
-                                   remote=remote, location=location, arrangement=arrangement, link_kind=link_kind, open_state=open_state, min_salary=min_salary, max_salary=max_salary,
-                                   search_id=search_id).group_by(Job.company)
+
+        cq = db.query(Job.company, func.count(Job.id)).filter(
+            Job.company.isnot(None), Job.company != ""
+        )
+        cq = _apply_common_filters(
+            cq,
+            status=status,
+            source=source,
+            h1b_verdict=h1b_verdict,
+            min_score=min_score,
+            saved=saved,
+            title_search=title_search,
+            remote=remote,
+            location=location,
+            arrangement=arrangement,
+            link_kind=link_kind,
+            open_state=open_state,
+            min_salary=min_salary,
+            max_salary=max_salary,
+            search_id=search_id,
+        ).group_by(Job.company)
         lookup = build_company_lookup(db)
         agg = {}
         for name, cnt in cq.all():
             co = lookup.get((name or "").lower())
             cname = co.name if co else name
             agg[cname] = agg.get(cname, 0) + cnt
-        return [{"name": n, "count": c} for n, c in sorted(agg.items(), key=lambda x: (-x[1], x[0].lower()))]
-    q = db.query(Job.company).distinct().filter(Job.company.isnot(None), Job.company != "")
-    q = _apply_common_filters(q, status=status, source=source, h1b_verdict=h1b_verdict,
-                              min_score=min_score, saved=saved, title_search=title_search,
-                              remote=remote, location=location, arrangement=arrangement, link_kind=link_kind, open_state=open_state, min_salary=min_salary, max_salary=max_salary,
-                              search_id=search_id)
+        return [
+            {"name": n, "count": c}
+            for n, c in sorted(agg.items(), key=lambda x: (-x[1], x[0].lower()))
+        ]
+    q = (
+        db.query(Job.company)
+        .distinct()
+        .filter(Job.company.isnot(None), Job.company != "")
+    )
+    q = _apply_common_filters(
+        q,
+        status=status,
+        source=source,
+        h1b_verdict=h1b_verdict,
+        min_score=min_score,
+        saved=saved,
+        title_search=title_search,
+        remote=remote,
+        location=location,
+        arrangement=arrangement,
+        link_kind=link_kind,
+        open_state=open_state,
+        min_salary=min_salary,
+        max_salary=max_salary,
+        search_id=search_id,
+    )
     raw_names = [r[0] for r in q.all()]
     lookup = build_company_lookup(db)
     canonical = set()
@@ -474,13 +599,33 @@ def list_job_sources(
     """Return distinct source values from jobs matching current filters, sorted."""
     company = _expand_company_filter(db, company)
     # ?counts=1 returns [{name, count}] so the dropdown can show how many jobs each value has
-    q = (db.query(Job.source, func.count(Job.id)) if counts else db.query(Job.source).distinct()).filter(Job.source.isnot(None), Job.source != "")
-    q = _apply_common_filters(q, status=status, company=company, h1b_verdict=h1b_verdict,
-                              min_score=min_score, saved=saved, title_search=title_search,
-                              remote=remote, location=location, arrangement=arrangement, link_kind=link_kind, open_state=open_state, min_salary=min_salary, max_salary=max_salary,
-                              search_id=search_id)
+    q = (
+        db.query(Job.source, func.count(Job.id))
+        if counts
+        else db.query(Job.source).distinct()
+    ).filter(Job.source.isnot(None), Job.source != "")
+    q = _apply_common_filters(
+        q,
+        status=status,
+        company=company,
+        h1b_verdict=h1b_verdict,
+        min_score=min_score,
+        saved=saved,
+        title_search=title_search,
+        remote=remote,
+        location=location,
+        arrangement=arrangement,
+        link_kind=link_kind,
+        open_state=open_state,
+        min_salary=min_salary,
+        max_salary=max_salary,
+        search_id=search_id,
+    )
     if counts:
-        return [{"name": r[0], "count": r[1]} for r in q.group_by(Job.source).order_by(Job.source).all()]
+        return [
+            {"name": r[0], "count": r[1]}
+            for r in q.group_by(Job.source).order_by(Job.source).all()
+        ]
     rows = q.order_by(Job.source).all()
     return [r[0] for r in rows]
 
@@ -507,13 +652,33 @@ def list_job_verdicts(
     """Return distinct h1b_verdict values from jobs matching current filters."""
     company = _expand_company_filter(db, company)
     # ?counts=1 returns [{name, count}] so the dropdown can show how many jobs each value has
-    q = (db.query(Job.h1b_verdict, func.count(Job.id)) if counts else db.query(Job.h1b_verdict).distinct()).filter(Job.h1b_verdict.isnot(None), Job.h1b_verdict != "")
-    q = _apply_common_filters(q, status=status, company=company, source=source,
-                              min_score=min_score, saved=saved, title_search=title_search,
-                              remote=remote, location=location, arrangement=arrangement, link_kind=link_kind, open_state=open_state, min_salary=min_salary, max_salary=max_salary,
-                              search_id=search_id)
+    q = (
+        db.query(Job.h1b_verdict, func.count(Job.id))
+        if counts
+        else db.query(Job.h1b_verdict).distinct()
+    ).filter(Job.h1b_verdict.isnot(None), Job.h1b_verdict != "")
+    q = _apply_common_filters(
+        q,
+        status=status,
+        company=company,
+        source=source,
+        min_score=min_score,
+        saved=saved,
+        title_search=title_search,
+        remote=remote,
+        location=location,
+        arrangement=arrangement,
+        link_kind=link_kind,
+        open_state=open_state,
+        min_salary=min_salary,
+        max_salary=max_salary,
+        search_id=search_id,
+    )
     if counts:
-        return [{"name": r[0], "count": r[1]} for r in q.group_by(Job.h1b_verdict).order_by(Job.h1b_verdict).all()]
+        return [
+            {"name": r[0], "count": r[1]}
+            for r in q.group_by(Job.h1b_verdict).order_by(Job.h1b_verdict).all()
+        ]
     rows = q.order_by(Job.h1b_verdict).all()
     return [r[0] for r in rows]
 
@@ -565,9 +730,23 @@ def job_facets(
     under it.
     """
     expanded = _expand_company_filter(db, company)
-    base = dict(status=status, company=expanded, source=source, h1b_verdict=h1b_verdict,
-                min_score=min_score, saved=saved, title_search=title_search, remote=remote, location=location, arrangement=arrangement, link_kind=link_kind, open_state=open_state,
-                min_salary=min_salary, max_salary=max_salary, search_id=search_id)
+    base = dict(
+        status=status,
+        company=expanded,
+        source=source,
+        h1b_verdict=h1b_verdict,
+        min_score=min_score,
+        saved=saved,
+        title_search=title_search,
+        remote=remote,
+        location=location,
+        arrangement=arrangement,
+        link_kind=link_kind,
+        open_state=open_state,
+        min_salary=min_salary,
+        max_salary=max_salary,
+        search_id=search_id,
+    )
 
     def _counts(col, drop):
         """(value, count) rows for one column with that column's own filter lifted."""
@@ -582,8 +761,13 @@ def job_facets(
         kw["open_state"] = None
         q = _apply_common_filters(db.query(func.count(Job.id)), **kw)
         closed = int(q.filter(Job.open_state == "closed").scalar() or 0)
-        total = int(_apply_common_filters(db.query(func.count(Job.id)), **kw).scalar() or 0)
-        return [{"name": "open", "count": total - closed}, {"name": "closed", "count": closed}]
+        total = int(
+            _apply_common_filters(db.query(func.count(Job.id)), **kw).scalar() or 0
+        )
+        return [
+            {"name": "open", "count": total - closed},
+            {"name": "closed", "count": closed},
+        ]
 
     def _pad(rows, selected):
         """Keep a selected-but-now-empty value in the menu, at 0."""
@@ -595,6 +779,7 @@ def job_facets(
 
     # companies — aliases collapse onto their parent, as in /jobs/companies/list
     from backend.models.db import build_company_lookup
+
     lookup = build_company_lookup(db)
     agg: dict[str, int] = {}
     for name, cnt in _counts(Job.company, "company"):
@@ -607,33 +792,55 @@ def job_facets(
         co = lookup.get(picked.lower())
         cname = co.name if co else picked
         agg.setdefault(cname, 0)
-    companies = [{"name": n, "count": c}
-                 for n, c in sorted(agg.items(), key=lambda x: (-x[1], x[0].lower()))]
+    companies = [
+        {"name": n, "count": c}
+        for n, c in sorted(agg.items(), key=lambda x: (-x[1], x[0].lower()))
+    ]
 
-    sources = [{"name": n, "count": c}
-               for n, c in sorted(_pad(_counts(Job.source, "source"), _picked(source)),
-                                  key=lambda x: x[0])]
-    verdicts = [{"name": n, "count": c}
-                for n, c in sorted(_pad(_counts(Job.h1b_verdict, "h1b_verdict"), _picked(h1b_verdict)),
-                                   key=lambda x: (_VERDICT_ORDER.get(x[0], 99), x[0]))]
-    statuses = [{"name": n, "count": c}
-                for n, c in sorted(_pad(_counts(Job.status, "status"), _picked(status)),
-                                   key=lambda x: x[0])]
+    sources = [
+        {"name": n, "count": c}
+        for n, c in sorted(
+            _pad(_counts(Job.source, "source"), _picked(source)), key=lambda x: x[0]
+        )
+    ]
+    verdicts = [
+        {"name": n, "count": c}
+        for n, c in sorted(
+            _pad(_counts(Job.h1b_verdict, "h1b_verdict"), _picked(h1b_verdict)),
+            key=lambda x: (_VERDICT_ORDER.get(x[0], 99), x[0]),
+        )
+    ]
+    statuses = [
+        {"name": n, "count": c}
+        for n, c in sorted(
+            _pad(_counts(Job.status, "status"), _picked(status)), key=lambda x: x[0]
+        )
+    ]
 
     # locations — one row per resolved place, rolled up so a country carries the
     # sum of its regions and cities. The list is ordered coarse to fine, which is
     # how the menu indents it.
-    from backend.analyzer.location import label_for, key_for
+    from backend.analyzer.location import key_for, label_for
+
     loc_kw = dict(base)
     loc_kw["location"] = None
     from backend.models.db import JobLocation
-    loc_rows = _apply_common_filters(
-        db.query(JobLocation.country, JobLocation.region, JobLocation.city,
-                 func.count(func.distinct(Job.id))),
-        **loc_kw
-    ).join(JobLocation, JobLocation.job_id == Job.id).filter(
-        JobLocation.country.isnot(None)).group_by(
-        JobLocation.country, JobLocation.region, JobLocation.city).all()
+
+    loc_rows = (
+        _apply_common_filters(
+            db.query(
+                JobLocation.country,
+                JobLocation.region,
+                JobLocation.city,
+                func.count(func.distinct(Job.id)),
+            ),
+            **loc_kw,
+        )
+        .join(JobLocation, JobLocation.job_id == Job.id)
+        .filter(JobLocation.country.isnot(None))
+        .group_by(JobLocation.country, JobLocation.region, JobLocation.city)
+        .all()
+    )
 
     from backend.analyzer.location import split_key
 
@@ -652,8 +859,11 @@ def job_facets(
     # jobs. The region-bearing key already reaches the region-less rows, so the
     # bare one is dropped.
     with_region = {(c, city) for c, r, city in candidates if r and city}
-    candidates = {(c, r, city) for c, r, city in candidates
-                  if r or not city or (c, city) not in with_region}
+    candidates = {
+        (c, r, city)
+        for c, r, city in candidates
+        if r or not city or (c, city) not in with_region
+    }
     candidates.update(split_key(k) for k in _picked(location))
 
     def _covers(key, row):
@@ -667,9 +877,14 @@ def job_facets(
             return False
         return True
 
-    roll = {key: sum(cnt for country, region, city, cnt in loc_rows
-                     if _covers(key, (country, region, city)))
-            for key in candidates}
+    roll = {
+        key: sum(
+            cnt
+            for country, region, city, cnt in loc_rows
+            if _covers(key, (country, region, city))
+        )
+        for key in candidates
+    }
 
     def _depth(entry):
         country, region, city = entry
@@ -682,8 +897,13 @@ def job_facets(
     # it counts the same jobs.
     def _same_place(entry):
         country, region, city = entry
-        return bool(region and city and region.strip().lower() == city.strip().lower()
-                    and roll.get((country, region, None)) == roll.get(entry))
+        return bool(
+            region
+            and city
+            and region.strip().lower() == city.strip().lower()
+            and roll.get((country, region, None)) == roll.get(entry)
+        )
+
     roll = {k: v for k, v in roll.items() if not _same_place(k)}
 
     # Busiest first at every level, tree order kept: a country row, then its
@@ -700,8 +920,12 @@ def job_facets(
         return (-cc, country or "", 1, -rc, region or "", 1, -count, city or "")
 
     locations = [
-        {"key": key_for(*entry), "name": label_for(*entry),
-         "count": count, "level": _depth(entry)}
+        {
+            "key": key_for(*entry),
+            "name": label_for(*entry),
+            "count": count,
+            "level": _depth(entry),
+        }
         for entry, count in sorted(roll.items(), key=_order)
     ]
 
@@ -713,8 +937,9 @@ def job_facets(
     for value in ARRANGEMENTS:
         clause = _arrangement_clause(value)
         q = _apply_common_filters(db.query(func.count(func.distinct(Job.id))), **arr_kw)
-        arrangements.append({"name": value,
-                             "count": int(q.filter(clause).scalar() or 0)})
+        arrangements.append(
+            {"name": value, "count": int(q.filter(clause).scalar() or 0)}
+        )
 
     # score bands: the score filter is the one lifted, so each preset says how many
     # jobs it would leave from where the other filters already stand
@@ -723,8 +948,12 @@ def job_facets(
     score_bands = []
     for n in _SCORE_BANDS:
         q = _apply_common_filters(db.query(func.count(Job.id)), **score_kw)
-        score_bands.append({"name": str(n),
-                            "count": int(q.filter(Job.best_cv_score >= float(n)).scalar() or 0)})
+        score_bands.append(
+            {
+                "name": str(n),
+                "count": int(q.filter(Job.best_cv_score >= float(n)).scalar() or 0),
+            }
+        )
 
     return {
         "companies": companies,
@@ -735,8 +964,10 @@ def job_facets(
         "arrangements": arrangements,
         "score_bands": score_bands,
         "open_states": _open_state_counts(),
-        "link_kinds": [{"name": n, "count": c}
-                       for n, c in _pad(_counts(Job.link_kind, "link_kind"), _picked(link_kind))],
+        "link_kinds": [
+            {"name": n, "count": c}
+            for n, c in _pad(_counts(Job.link_kind, "link_kind"), _picked(link_kind))
+        ],
     }
 
 
@@ -751,15 +982,24 @@ def _known_posting(db, external_id: str, content_hash: str, url: str | None = No
     role from another site. New ignored rows carry no content_hash (`mark_ignored`); the
     status test covers the ones stored with a hash before that."""
     from backend.scraper._shared.postings import posting_key
+
     not_ignored = (Job.status.is_(None)) | (Job.status != "ignored")
-    row = db.query(Job).filter(
-        (Job.external_id == external_id)
-        | ((Job.content_hash == content_hash) & not_ignored)
-    ).first()
+    row = (
+        db.query(Job)
+        .filter(
+            (Job.external_id == external_id)
+            | ((Job.content_hash == content_hash) & not_ignored)
+        )
+        .first()
+    )
     key = posting_key(url) if url else None
     if row is None and key:
-        row = (db.query(Job).filter(Job.posting_key == key, not_ignored)
-               .order_by(Job.discovered_at.asc()).first())
+        row = (
+            db.query(Job)
+            .filter(Job.posting_key == key, not_ignored)
+            .order_by(Job.discovered_at.asc())
+            .first()
+        )
     if row is not None and row.duplicate_of:
         row = db.query(Job).filter(Job.id == row.duplicate_of).first() or row
     return row
@@ -768,9 +1008,10 @@ def _known_posting(db, external_id: str, content_hash: str, url: str | None = No
 @router.post("/save-from-extension")
 async def save_from_extension(body: dict, db: Session = Depends(get_db)):
     """Save a job from the Chrome Extension to the Job Feed (no application created), running the same enrichment as LinkedIn passive capture: Extension search title/company filters, salary extraction, H-1B/body-exclusion scan, and auto-score when configured."""
+    import uuid as _uuid
+
     from backend.analyzer.h1b_checker import check_job_h1b
     from backend.models.db import Search
-    import uuid as _uuid
 
     # str_field answers 400 for a wrongly typed value the same way the blank
     # checks below answer 400 for an empty one (R4-T1-20).
@@ -779,7 +1020,9 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
     url = str_field(body, "url")
     description = str_field(body, "description") or None
     if not title or not company or not url:
-        raise HTTPException(status_code=400, detail="title, company, and url are required")
+        raise HTTPException(
+            status_code=400, detail="title, company, and url are required"
+        )
 
     # Pull the per-company H-1B median (used by salary fallback) if we know the company.
     comp_obj = find_company_by_name(db, company)
@@ -797,17 +1040,28 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
         if description and not existing.description:
             existing.description = description
             from backend.analyzer.h1b_checker import resolve_company_h1b
-            _hd = await resolve_company_h1b(db, existing.company or "", allow_live=False)
+
+            _hd = await resolve_company_h1b(
+                db, existing.company or "", allow_live=False
+            )
             apply_salary_to_job(existing, (_hd or {}).get("median_salary"))
             apply_arrangement_to_job(existing)
             apply_location_to_job(existing)
         db.commit()
         # `saved` is the field the extension reads — a row sitting at `ignored` never
         # reaches the feed, and re-saving it will not change that.
-        out = {"id": str(existing.id), "company": existing.company, "title": existing.title,
-               "new": False, "saved": existing.status != "ignored", "status": existing.status}
+        out = {
+            "id": str(existing.id),
+            "company": existing.company,
+            "title": existing.title,
+            "new": False,
+            "saved": existing.status != "ignored",
+            "status": existing.status,
+        }
         if existing.status == "ignored":
-            out["reason"] = "already saved earlier and filtered out then — it stays out of the feed"
+            out["reason"] = (
+                "already saved earlier and filtered out then — it stays out of the feed"
+            )
         return out
 
     # Link to the hardcoded "Extension" search (manual Save-to-Job-Feed flow); "Extension LI"
@@ -819,25 +1073,36 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
     filter_reject_reason = None
     reject_message = None
     if ext_search is not None:
-        from backend.scraper._shared.filters import (global_company_exclude_set, search_title_filters,
-                                                     title_filter_hit)
+        from backend.scraper._shared.filters import (
+            global_company_exclude_set,
+            search_title_filters,
+            title_filter_hit,
+        )
+
         include_kw, exclude_kw = search_title_filters(ext_search, db)
         rule, keywords = title_filter_hit(title, include_kw, exclude_kw)
         if rule == "include":
             filter_reject_reason = f"title-include miss: needed any of {include_kw}"
-            reject_message = ("title matches none of the required keywords ("
-                              + ", ".join(include_kw) + ")")
+            reject_message = (
+                "title matches none of the required keywords ("
+                + ", ".join(include_kw)
+                + ")"
+            )
         elif rule == "exclude":
             filter_reject_reason = f"title-exclude hit: {', '.join(keywords)}"
-            reject_message = "title excluded by " + ", ".join(f"'{kw}'" for kw in keywords)
+            reject_message = "title excluded by " + ", ".join(
+                f"'{kw}'" for kw in keywords
+            )
         else:
             company_lower = company.lower()
-            for excl in (ext_search.company_exclude or []):
+            for excl in ext_search.company_exclude or []:
                 if excl and excl.lower() == company_lower:
                     filter_reject_reason = f"company-exclude: {excl}"
                     reject_message = f"company excluded by '{excl}'"
                     break
-            if not filter_reject_reason and company_lower in global_company_exclude_set(db):
+            if not filter_reject_reason and company_lower in global_company_exclude_set(
+                db
+            ):
                 filter_reject_reason = f"company-exclude (global): {company}"
                 reject_message = "company is on your global Company exclude list"
 
@@ -858,7 +1123,9 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
     try:
         await check_job_h1b(job, db)
     except Exception as e:
-        logger.warning(f"save-from-extension: analysis failed for '{title}' @ '{company}': {e}")
+        logger.warning(
+            f"save-from-extension: analysis failed for '{title}' @ '{company}': {e}"
+        )
 
     if description:
         apply_salary_to_job(job, getattr(job, "_h1b_median", None))
@@ -867,11 +1134,15 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
 
     # Skip flagged jobs OR jobs that hit the search-filter set.
     if filter_reject_reason:
-        logger.info(f"save-from-extension: filtered — '{title}' @ '{company}' — {filter_reject_reason}")
+        logger.info(
+            f"save-from-extension: filtered — '{title}' @ '{company}' — {filter_reject_reason}"
+        )
         mark_ignored(job)
     elif job.h1b_jd_flag:
         _phrase = getattr(job, "_h1b_matched_phrase", None) or "?"
-        logger.info(f"save-from-extension: skipping (body exclusion) — '{title}' @ '{company}' — phrase: {_phrase!r}")
+        logger.info(
+            f"save-from-extension: skipping (body exclusion) — '{title}' @ '{company}' — phrase: {_phrase!r}"
+        )
         mark_ignored(job)
         reject_message = f"description matched the excluded phrase '{_phrase}'"
 
@@ -888,6 +1159,7 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
     ):
         try:
             from backend.analyzer.cv_scorer import score_single_job
+
             launch_background(
                 "analyze_job",
                 score_single_job,
@@ -898,12 +1170,17 @@ async def save_from_extension(body: dict, db: Session = Depends(get_db)):
                     "resume_names": _score_resume_names(db, job),
                     "depth": ext_search.auto_scoring_depth,
                 },
-                func_kwargs={"job_id": str(job.id), "depth": ext_search.auto_scoring_depth},
+                func_kwargs={
+                    "job_id": str(job.id),
+                    "depth": ext_search.auto_scoring_depth,
+                },
             )
         except JobAlreadyRunningError:
             pass
         except Exception as e:
-            logger.warning(f"save-from-extension: auto-score launch failed for {job.id}: {e}")
+            logger.warning(
+                f"save-from-extension: auto-score launch failed for {job.id}: {e}"
+            )
 
     out = {
         "id": str(job.id),
@@ -927,17 +1204,23 @@ MANUAL_JOB_STATUSES = {"new", "saved"}
 
 
 @router.post("/manual")
-def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def create_manual_job(
+    body: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+):
     """Add one job to the feed by hand (Log-application modal, statuses new/saved), with no application attached; an already-known posting keeps the status it has and is returned with created=false."""
     title = str_field(body, "title")
     company = str_field(body, "company")
     url = str_field(body, "url")
     status = str_field(body, "status") or "new"
     if not title or not company or not url:
-        raise HTTPException(status_code=400, detail="title, company, and url are required")
+        raise HTTPException(
+            status_code=400, detail="title, company, and url are required"
+        )
     if status not in MANUAL_JOB_STATUSES:
-        raise HTTPException(status_code=400,
-                            detail=f"status must be one of {sorted(MANUAL_JOB_STATUSES)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"status must be one of {sorted(MANUAL_JOB_STATUSES)}",
+        )
 
     # Same two-layer dedup as save-from-extension: external_id (URL), then
     # content_hash (company+title) for the same posting reached by another URL.
@@ -955,12 +1238,12 @@ def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session
         company=company,
         title=title,
         url=url,
-        source="manual",   # same marker the hand-logged application path uses
+        source="manual",  # same marker the hand-logged application path uses
         status=status,
         location=str_field(body, "location") or None,
         # `saved` and status='saved' move together everywhere else in the feed.
         saved=(status == "saved"),
-        seen=True,         # the user typed this row in; it is not an unseen find
+        seen=True,  # the user typed this row in; it is not an unseen find
     )
     # A hand-added job has to answer the feed's Location and Work filters like any
     # other. There is no description yet, so only the title and a typed-in
@@ -975,6 +1258,7 @@ def create_manual_job(body: dict, background_tasks: BackgroundTasks, db: Session
     # score, tailor or cover letter pays for the fetch.
     from backend.api.routes_applications import _fetch_and_store_description
     from backend.scraper._shared.page_cache import _cache_job_page
+
     background_tasks.add_task(_cache_job_page, str(job.id), url)
     background_tasks.add_task(_fetch_and_store_description, str(job.id), url)
 
@@ -998,17 +1282,18 @@ def _validate_job_updates(updates: dict, allowed: set) -> None:
             continue
         if expected is bool:
             if not isinstance(value, bool):
-                raise HTTPException(status_code=400,
-                                    detail=f"{key} must be true or false")
+                raise HTTPException(
+                    status_code=400, detail=f"{key} must be true or false"
+                )
         elif not isinstance(value, expected):
-            raise HTTPException(status_code=400,
-                                detail=f"{key} must be a string")
+            raise HTTPException(status_code=400, detail=f"{key} must be a string")
 
 
 @router.post("/bulk-update")
 def bulk_update_jobs(body: dict, db: Session = Depends(get_db)):
     """Bulk update multiple jobs at once (status, seen, saved); returns {"updated": count, "not_found": [<ids>]} so the frontend can reconcile stale client-side selections."""
     import uuid as _uuid
+
     job_ids = body.get("job_ids") or []
     updates = body.get("updates") or {}
     if not isinstance(job_ids, (list, tuple)):
@@ -1043,13 +1328,18 @@ def bulk_update_jobs(body: dict, db: Session = Depends(get_db)):
 @router.get("/{job_id}")
 def get_job(job_id: str, db: Session = Depends(get_db)):
     from backend.models.db import Resume
+
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    tailored = db.query(Resume.id).filter(
-        Resume.job_id == job.id, Resume.is_base == False
-    ).order_by(Resume.updated_at.desc()).first()
+    tailored = (
+        db.query(Resume.id)
+        .filter(Resume.job_id == job.id, Resume.is_base == False)
+        .order_by(Resume.updated_at.desc())
+        .first()
+    )
     import backend.job_monitor as _mon
+
     running = [r for r in _mon.visible_running() if r.target_job_id == job.id]
     return _job_to_dict(
         job,
@@ -1063,7 +1353,12 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/{job_id}")
-async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def update_job(
+    job_id: str,
+    updates: dict,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     # Must be async — launch_background() uses asyncio.create_task(), which needs a running
     # event loop; a sync endpoint's threadpool has none, so the task would silently never start.
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -1081,17 +1376,22 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
     # op so it shows in /monitor/in-flight + /monitor/finished, driving the dashboard's scoring toasts.
     if updates.get("saved") is True and not job.cv_scores:
         from backend.accounts.settings import get_setting
+
         on_save = get_setting(db, "on_save_action") or "off"
         if on_save != "off":
             try:
                 from backend.analyzer.cv_scorer import score_single_job
+
                 launch_background(
                     "analyze_job",
                     score_single_job,
                     trigger="manual",
                     scope_key=f"{job.id}:on-save",
                     target_job_id=job.id,
-                    meta={"resume_names": _score_resume_names(db, job), "depth": on_save},
+                    meta={
+                        "resume_names": _score_resume_names(db, job),
+                        "depth": on_save,
+                    },
                     func_kwargs={"job_id": str(job.id), "depth": on_save},
                 )
             except JobAlreadyRunningError:
@@ -1107,32 +1407,51 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
     if updates.get("status") == "applied":
         if job_link(job) and not job.has_cached_page:
             from backend.scraper._shared.page_cache import _cache_job_page
+
             background_tasks.add_task(_cache_job_page, str(job.id), job_link(job))
 
-        from backend.models.db import Application
         from datetime import datetime, timezone
-        existing_app = db.query(Application).filter(Application.job_id == job.id).first()
+
+        from backend.models.db import Application
+
+        existing_app = (
+            db.query(Application).filter(Application.job_id == job.id).first()
+        )
         if not existing_app:
-            app = Application(job_id=job.id, status="applied",
-                              status_transitions=[{"from": None, "to": "applied", "at": datetime.now(timezone.utc).isoformat(), "source": "ui"}])
+            app = Application(
+                job_id=job.id,
+                status="applied",
+                status_transitions=[
+                    {
+                        "from": None,
+                        "to": "applied",
+                        "at": datetime.now(timezone.utc).isoformat(),
+                        "source": "ui",
+                    }
+                ],
+            )
             db.add(app)
             db.commit()
             created_application_id = str(app.id)
 
         if job.company and job.company.strip():
-            from backend.models.db import Company
             from backend.accounts.settings import default_resume_ids
-            from backend.models.db import find_company_by_name
+            from backend.models.db import Company, find_company_by_name
+
             existing_co = find_company_by_name(db, job.company.strip())
             if not existing_co:
                 new_co = Company(
-                    name=job.company.strip(), tier=None, active=False, playwright_enabled=False,
+                    name=job.company.strip(),
+                    tier=None,
+                    active=False,
+                    playwright_enabled=False,
                     selected_resume_ids=default_resume_ids(db),
                 )
                 db.add(new_co)
                 db.commit()
                 created_company_id = str(new_co.id)
                 from backend.analyzer.h1b_checker import fetch_h1b_for_company_id
+
                 background_tasks.add_task(fetch_h1b_for_company_id, str(new_co.id))
 
     result = _job_to_dict(job)
@@ -1142,16 +1461,23 @@ async def update_job(job_id: str, updates: dict, background_tasks: BackgroundTas
 
 
 @router.post("/cache-applied")
-def cache_applied_jobs(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def cache_applied_jobs(
+    background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+):
     """Cache pages for all applied jobs that don't have a cached page yet."""
-    jobs = db.query(Job).filter(
-        Job.status == "applied",
-        Job.url.isnot(None),
-        Job.cached_page_html.is_(None),
-    ).all()
+    jobs = (
+        db.query(Job)
+        .filter(
+            Job.status == "applied",
+            Job.url.isnot(None),
+            Job.cached_page_html.is_(None),
+        )
+        .all()
+    )
 
     for job in jobs:
         from backend.scraper._shared.page_cache import _cache_job_page
+
         background_tasks.add_task(_cache_job_page, str(job.id), job_link(job))
 
     return {"queued": len(jobs)}
@@ -1186,7 +1512,9 @@ def _reader_html(body_html: str, meta: str) -> str:
 </body></html>"""
 
 
-_READER_CSP = {"Content-Security-Policy": "sandbox; default-src 'unsafe-inline'; style-src 'unsafe-inline'"}
+_READER_CSP = {
+    "Content-Security-Policy": "sandbox; default-src 'unsafe-inline'; style-src 'unsafe-inline'"
+}
 
 
 @router.get("/{job_id}/cached-page")
@@ -1197,8 +1525,13 @@ def get_cached_page(job_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Job not found")
     if not job.cached_page_html:
         raise HTTPException(status_code=404, detail="No cached page available")
-    cached_at = job.page_cached_at.strftime("%b %d, %Y") if job.page_cached_at else "Unknown"
-    return HTMLResponse(content=_reader_html(job.cached_page_html, f"Cached on {cached_at}"), headers=_READER_CSP)
+    cached_at = (
+        job.page_cached_at.strftime("%b %d, %Y") if job.page_cached_at else "Unknown"
+    )
+    return HTMLResponse(
+        content=_reader_html(job.cached_page_html, f"Cached on {cached_at}"),
+        headers=_READER_CSP,
+    )
 
 
 @router.post("/{job_id}/open-check")
@@ -1206,6 +1539,7 @@ async def open_check(job_id: str, force: bool = False, db: Session = Depends(get
     """Is the posting still open (scraper/_shared/still_open.py)? Answered from the last check
     when it is under a day old, unless `force`. Never changes the job or an application."""
     from backend.scraper._shared.still_open import ensure_checked
+
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -1220,11 +1554,16 @@ async def frame_check(job_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Job not found")
     if not job_link(job):
         return {"embeddable": False}
-    from backend.scraper._shared.url_safety import safe_get, UnsafeURLError
+    from backend.scraper._shared.url_safety import UnsafeURLError, safe_get
+
     try:
-        resp = await safe_get(job_link(job), timeout=12, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        })
+        resp = await safe_get(
+            job_link(job),
+            timeout=12,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            },
+        )
         xfo = (resp.headers.get("x-frame-options") or "").strip()
         csp = (resp.headers.get("content-security-policy") or "").lower()
         blocked = bool(xfo) or ("frame-ancestors" in csp)
@@ -1232,20 +1571,24 @@ async def frame_check(job_id: str, db: Session = Depends(get_db)):
     except UnsafeURLError:
         return {"embeddable": False}
     except Exception:
-        return {"embeddable": True}   # unknown — let the browser try the live frame
+        return {"embeddable": True}  # unknown — let the browser try the live frame
 
 
 def _inject_base(raw_html: str, url: str) -> str:
     """Return the page's own HTML with a <base href> so its relative CSS/images/links resolve against the source, with its embedded CSP <meta> stripped (would otherwise block the render); scripts are neutered by the iframe sandbox, not here."""
-    import re
     import html as _html
+    import re
+
     raw_html = re.sub(
         r'<meta[^>]+http-equiv=["\']?content-security-policy["\']?[^>]*>',
-        '', raw_html, flags=re.IGNORECASE)
+        "",
+        raw_html,
+        flags=re.IGNORECASE,
+    )
     base_tag = f'<base href="{_html.escape(url, quote=True)}">'
-    m = re.search(r'<head[^>]*>', raw_html, flags=re.IGNORECASE)
+    m = re.search(r"<head[^>]*>", raw_html, flags=re.IGNORECASE)
     if m:
-        return raw_html[:m.end()] + base_tag + raw_html[m.end():]
+        return raw_html[: m.end()] + base_tag + raw_html[m.end() :]
     return base_tag + raw_html
 
 
@@ -1256,15 +1599,22 @@ async def get_live_page(job_id: str, db: Session = Depends(get_db)):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if not job_link(job):
-        raise HTTPException(status_code=404, detail="No posting URL captured for this job")
+        raise HTTPException(
+            status_code=404, detail="No posting URL captured for this job"
+        )
 
-    from backend.scraper._shared.url_safety import safe_get, UnsafeURLError
     from backend.scraper._shared.page_cache import _extract_clean_content
+    from backend.scraper._shared.url_safety import UnsafeURLError, safe_get
+
     try:
-        resp = await safe_get(job_link(job), timeout=20, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        })
+        resp = await safe_get(
+            job_link(job),
+            timeout=20,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+        )
         resp.raise_for_status()
         raw = resp.text[:2_000_000]
     except UnsafeURLError:
@@ -1279,7 +1629,10 @@ async def get_live_page(job_id: str, db: Session = Depends(get_db)):
     # postings come back near-empty (just a spinner without scripts) — treat that as a failure.
     clean_html, text = _extract_clean_content(raw)
     if len((text or "").strip()) < 200:
-        raise HTTPException(status_code=502, detail="Posting is rendered client-side — needs the extension")
+        raise HTTPException(
+            status_code=502,
+            detail="Posting is rendered client-side — needs the extension",
+        )
     # warm the cache with cleaned text for scoring; never overwrite an existing snapshot
     if not job.cached_page_html and clean_html:
         try:
@@ -1311,9 +1664,12 @@ def _also_on(db, job_ids) -> dict:
     duplicates, scraper/_shared/posting_links.py), one entry per source and link, oldest first."""
     if not job_ids:
         return {}
-    rows = (db.query(Job.duplicate_of, Job.source, Job.url, Job.location)
-            .filter(Job.duplicate_of.in_(job_ids))
-            .order_by(Job.discovered_at.asc()).all())
+    rows = (
+        db.query(Job.duplicate_of, Job.source, Job.url, Job.location)
+        .filter(Job.duplicate_of.in_(job_ids))
+        .order_by(Job.discovered_at.asc())
+        .all()
+    )
     out: dict = {}
     for original, source, url, location in rows:
         entry = {"source": source, "url": url, "location": location}
@@ -1327,10 +1683,21 @@ def _copy_origins(db, jobs) -> dict:
     want = {j.duplicate_of for j in jobs if getattr(j, "duplicate_of", None)}
     if not want:
         return {}
-    found = {i: (loc, src) for i, loc, src in
-             db.query(Job.id, Job.location, Job.source).filter(Job.id.in_(list(want))).all()}
-    return {j.id: {"id": str(j.duplicate_of), "location": found[j.duplicate_of][0], "source": found[j.duplicate_of][1]}
-            for j in jobs if getattr(j, "duplicate_of", None) in found}
+    found = {
+        i: (loc, src)
+        for i, loc, src in db.query(Job.id, Job.location, Job.source)
+        .filter(Job.id.in_(list(want)))
+        .all()
+    }
+    return {
+        j.id: {
+            "id": str(j.duplicate_of),
+            "location": found[j.duplicate_of][0],
+            "source": found[j.duplicate_of][1],
+        }
+        for j in jobs
+        if getattr(j, "duplicate_of", None) in found
+    }
 
 
 def _skipped_roles(db, jobs) -> dict:
@@ -1339,25 +1706,42 @@ def _skipped_roles(db, jobs) -> dict:
     want = {j.same_role_as for j in jobs if getattr(j, "same_role_as", None)}
     if not want:
         return {}
-    found = {i: loc for i, loc in db.query(Job.id, Job.location).filter(Job.id.in_(list(want))).all()}
-    return {j.id: {"id": str(j.same_role_as), "location": found[j.same_role_as]}
-            for j in jobs if getattr(j, "same_role_as", None) in found}
+    found = {
+        i: loc
+        for i, loc in db.query(Job.id, Job.location)
+        .filter(Job.id.in_(list(want)))
+        .all()
+    }
+    return {
+        j.id: {"id": str(j.same_role_as), "location": found[j.same_role_as]}
+        for j in jobs
+        if getattr(j, "same_role_as", None) in found
+    }
 
 
-def _job_to_dict(j: Job, tailored_resume_id=None, in_flight: list[str] | None = None,
-                 in_flight_detail: list[dict] | None = None, names: dict | None = None,
-                 also_on: list | None = None, same_role_skipped: dict | None = None,
-                 copy_of: dict | None = None) -> dict:
+def _job_to_dict(
+    j: Job,
+    tailored_resume_id=None,
+    in_flight: list[str] | None = None,
+    in_flight_detail: list[dict] | None = None,
+    names: dict | None = None,
+    also_on: list | None = None,
+    same_role_skipped: dict | None = None,
+    copy_of: dict | None = None,
+) -> dict:
     """`names` is {résumé id: name} for the account (score_keys.resume_names), loaded once by a
     list caller; a single job loads it itself."""
     from backend.analyzer.score_keys import display, resume_names
+
     if names is None:
         from sqlalchemy.orm import object_session
+
         sess = object_session(j)
         names = resume_names(sess) if sess is not None else {}
     # Stored by résumé id, served by the résumé's current name (score_keys.py).
-    scores, report, best_cv = display(j.cv_scores or {}, j.scoring_report, j.best_cv,
-                                      j.cv_score_names, names)
+    scores, report, best_cv = display(
+        j.cv_scores or {}, j.scoring_report, j.best_cv, j.cv_score_names, names
+    )
     numeric_scores = [v for v in scores.values() if isinstance(v, (int, float))]
     best_score = max(numeric_scores) if numeric_scores else 0
     return {
@@ -1376,7 +1760,7 @@ def _job_to_dict(j: Job, tailored_resume_id=None, in_flight: list[str] | None = 
         "open_state": j.open_state,
         "open_reason": j.open_reason,
         "open_checked_at": j.open_checked_at.isoformat() if j.open_checked_at else None,
-        "link": job_link(j),   # the employer's link when there is one: what Open opens
+        "link": job_link(j),  # the employer's link when there is one: what Open opens
         "same_role_skipped": same_role_skipped,
         "copy_kind": j.copy_kind,
         "copy_of": copy_of,

@@ -4,6 +4,7 @@ A is the owner (its values are the install values), B a member. Until MT-10 a me
 cannot be reached over HTTP, so member cases call the route functions inside
 `use_account(B)`, exactly what the MT-10 middleware will set.
 """
+
 import json
 
 import pytest
@@ -37,8 +38,10 @@ def _policy(db, account_id, section, mode):
 
 # ── the section table ────────────────────────────────────────────────────────
 
+
 def test_every_known_key_has_exactly_one_section():
     from backend.seed import DEFAULT_SETTINGS, RUNTIME_SETTING_KEYS
+
     all_keys = [k for sec in S.SETTING_SECTIONS.values() for k in sec["keys"]]
     assert len(all_keys) == len(set(all_keys))
     missing = (set(DEFAULT_SETTINGS) | RUNTIME_SETTING_KEYS) - set(all_keys)
@@ -48,18 +51,43 @@ def test_every_known_key_has_exactly_one_section():
 # The Settings screen's section ids (frontend/src/screens/Settings.jsx), minus 'appearance'
 # (Display: per-browser rows plus the feed section's one setting). The backend container does
 # not mount the frontend, so the list is kept here and re-read from the source when it is available.
-SCREEN_SECTIONS = {"models", "scoring", "tailoring", "letters", "autofill", "prep",
-                   "emailclass", "scheduler", "exclude", "dedup", "copies", "notifications", "tracer",
-                   "apify", "jobright", "linkedin", "advanced", "telemetry"}
+SCREEN_SECTIONS = {
+    "models",
+    "scoring",
+    "tailoring",
+    "letters",
+    "autofill",
+    "prep",
+    "emailclass",
+    "scheduler",
+    "exclude",
+    "dedup",
+    "copies",
+    "notifications",
+    "tracer",
+    "apify",
+    "jobright",
+    "linkedin",
+    "advanced",
+    "telemetry",
+}
 
 
 def test_ui_sections_match_the_settings_screen():
     import pathlib
     import re
+
     screen = SCREEN_SECTIONS
-    src = (pathlib.Path(__file__).resolve().parents[2] / "frontend/src/screens/Settings.jsx")
+    src = (
+        pathlib.Path(__file__).resolve().parents[2]
+        / "frontend/src/screens/Settings.jsx"
+    )
     if src.exists():
-        screen = set(re.findall(r"^\s{6}\['([a-z]+)', (?:'|t`)", src.read_text(encoding="utf-8"), re.M))
+        screen = set(
+            re.findall(
+                r"^\s{6}\['([a-z]+)', (?:'|t`)", src.read_text(encoding="utf-8"), re.M
+            )
+        )
         screen.discard("appearance")
         assert screen == SCREEN_SECTIONS
     ui = {u for sec in S.SETTING_SECTIONS.values() for u in sec["ui"]}
@@ -95,6 +123,7 @@ def test_sections_endpoint(client):
 
 # ── reads ────────────────────────────────────────────────────────────────────
 
+
 def test_owner_reads_install_values_and_ignores_member_rows(test_db, accounts):
     a, b = accounts
     set_setting(test_db, "title_exclude_global", '["intern"]')
@@ -109,7 +138,9 @@ def test_owner_reads_install_values_and_ignores_member_rows(test_db, accounts):
 def test_inherit_reads_install_even_with_an_own_row(test_db, accounts):
     a, b = accounts
     set_setting(test_db, "scoring_rubric", "owner rubric")
-    _own(test_db, b, "scoring_rubric", "member rubric")      # left over from an earlier 'own'
+    _own(
+        test_db, b, "scoring_rubric", "member rubric"
+    )  # left over from an earlier 'own'
     with use_account(b):
         assert S.get_setting(test_db, "scoring_rubric") == "owner rubric"
         assert S.resolve_setting(test_db, "scoring_rubric")[1] == "install"
@@ -123,7 +154,10 @@ def test_own_reads_the_member_row_else_the_seeded_default(test_db, accounts):
     _own(test_db, b, "title_exclude_global", '["senior"]')
     with use_account(b):
         assert S.get_setting(test_db, "title_exclude_global") == '["senior"]'
-        assert S.resolve_setting(test_db, "company_exclude_global") == ("[]", "default")   # no own row yet
+        assert S.resolve_setting(test_db, "company_exclude_global") == (
+            "[]",
+            "default",
+        )  # no own row yet
 
 
 def test_policy_flip_switches_the_source(test_db, accounts):
@@ -133,7 +167,9 @@ def test_policy_flip_switches_the_source(test_db, accounts):
     _policy(test_db, b, "scoring", "own")
     with use_account(b):
         assert S.get_setting(test_db, "scoring_rubric") == "member rubric"
-    _policy_row = test_db.query(SectionPolicy).filter_by(account_id=b, section="scoring").one()
+    _policy_row = (
+        test_db.query(SectionPolicy).filter_by(account_id=b, section="scoring").one()
+    )
     _policy_row.mode = "inherit"
     test_db.commit()
     with use_account(b):
@@ -144,7 +180,9 @@ def test_own_always_never_falls_back_to_the_owner(test_db, accounts):
     a, b = accounts
     set_setting(test_db, "telegram_chat_id", "owner-chat")
     with use_account(b):
-        assert S.get_setting(test_db, "telegram_chat_id") == ""        # seeded default, not the owner's
+        assert (
+            S.get_setting(test_db, "telegram_chat_id") == ""
+        )  # seeded default, not the owner's
         assert S.resolve_setting(test_db, "telegram_chat_id")[1] == "default"
     _own(test_db, b, "telegram_chat_id", "member-chat")
     with use_account(b):
@@ -156,12 +194,15 @@ def test_own_always_never_falls_back_to_the_owner(test_db, accounts):
 def test_owner_only_ignores_member_rows(test_db, accounts):
     a, b = accounts
     set_setting(test_db, "proxy_url", "socks5://owner")
-    _own(test_db, b, "proxy_url", "socks5://member")     # cannot be written via the API; ignored anyway
+    _own(
+        test_db, b, "proxy_url", "socks5://member"
+    )  # cannot be written via the API; ignored anyway
     with use_account(b):
         assert S.get_setting(test_db, "proxy_url") == "socks5://owner"
 
 
 # ── writes ───────────────────────────────────────────────────────────────────
+
 
 def test_owner_patch_writes_install_values(test_db, accounts):
     a, b = accounts
@@ -176,23 +217,31 @@ def test_member_patch_writes_an_own_row(test_db, accounts):
     a, b = accounts
     set_setting(test_db, "title_exclude_global", '["intern"]')
     with use_account(b):
-        out = R.update_settings({"title_exclude_global": ["senior"], "telegram_chat_id": "42"}, db=test_db)
+        out = R.update_settings(
+            {"title_exclude_global": ["senior"], "telegram_chat_id": "42"}, db=test_db
+        )
         assert sorted(out["updated"]) == ["telegram_chat_id", "title_exclude_global"]
         assert S.get_setting(test_db, "title_exclude_global") == '["senior"]'
         # a second write updates the same row
         R.update_settings({"title_exclude_global": ["lead"]}, db=test_db)
     own = test_db.query(Setting).filter(Setting.account_id == b).all()
-    assert {r.key: r.value for r in own} == {"title_exclude_global": '["lead"]', "telegram_chat_id": "42"}
+    assert {r.key: r.value for r in own} == {
+        "title_exclude_global": '["lead"]',
+        "telegram_chat_id": "42",
+    }
     with use_account(a):
         assert S.get_setting(test_db, "title_exclude_global") == '["intern"]'
 
 
-@pytest.mark.parametrize("key,value", [
-    ("scoring_rubric", "mine"),           # policy, default inherit
-    ("proxy_url", "socks5://x"),          # owner only
-    ("dashboard_api_key", "k"),           # owner only (secret)
-    ("tracer_links_base_url", "https://x"),
-])
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("scoring_rubric", "mine"),  # policy, default inherit
+        ("proxy_url", "socks5://x"),  # owner only
+        ("dashboard_api_key", "k"),  # owner only (secret)
+        ("tracer_links_base_url", "https://x"),
+    ],
+)
 def test_member_patch_denied_outside_own_sections(test_db, accounts, key, value):
     a, b = accounts
     with use_account(b):
@@ -207,7 +256,9 @@ def test_member_patch_denied_outside_own_sections(test_db, accounts, key, value)
 def test_member_patch_allowed_after_owner_flips_policy(test_db, accounts):
     a, b = accounts
     with use_account(a):
-        R.update_policy({"account_id": str(b), "section": "scoring", "mode": "own"}, db=test_db)
+        R.update_policy(
+            {"account_id": str(b), "section": "scoring", "mode": "own"}, db=test_db
+        )
     with use_account(b):
         R.update_settings({"scoring_rubric": "mine"}, db=test_db)
         assert S.get_setting(test_db, "scoring_rubric") == "mine"
@@ -223,25 +274,33 @@ def test_member_patch_still_validates_values(test_db, accounts):
 
 # ── policies ─────────────────────────────────────────────────────────────────
 
+
 def test_owner_sets_and_lists_policies(test_db, accounts):
     a, b = accounts
     with use_account(a):
-        out = R.update_policy({"account_id": str(b), "section": "models", "mode": "own"}, db=test_db)
+        out = R.update_policy(
+            {"account_id": str(b), "section": "models", "mode": "own"}, db=test_db
+        )
         assert out == {"account_id": str(b), "section": "models", "mode": "own"}
-        R.update_policy({"account_id": str(b), "section": "models", "mode": "inherit"}, db=test_db)
+        R.update_policy(
+            {"account_id": str(b), "section": "models", "mode": "inherit"}, db=test_db
+        )
         listing = R.get_policies(db=test_db)
     assert listing[str(b)]["models"] == "inherit"
-    assert listing[str(b)]["exclude"] == "own"            # default
-    assert "dedup" not in listing[str(b)]                  # owner only: no policy
+    assert listing[str(b)]["exclude"] == "own"  # default
+    assert "dedup" not in listing[str(b)]  # owner only: no policy
     assert test_db.query(SectionPolicy).count() == 1
 
 
-@pytest.mark.parametrize("body,code", [
-    ({"section": "dedup", "mode": "own"}, 400),            # owner-only section
-    ({"section": "notifications", "mode": "inherit"}, 400),  # own_always
-    ({"section": "nope", "mode": "own"}, 400),
-    ({"section": "models", "mode": "sometimes"}, 400),
-])
+@pytest.mark.parametrize(
+    "body,code",
+    [
+        ({"section": "dedup", "mode": "own"}, 400),  # owner-only section
+        ({"section": "notifications", "mode": "inherit"}, 400),  # own_always
+        ({"section": "nope", "mode": "own"}, 400),
+        ({"section": "models", "mode": "sometimes"}, 400),
+    ],
+)
 def test_policy_patch_rejects_bad_input(test_db, accounts, body, code):
     a, b = accounts
     with use_account(a):
@@ -252,13 +311,19 @@ def test_policy_patch_rejects_bad_input(test_db, accounts, body, code):
 
 def test_policy_patch_rejects_the_owner_and_unknown_accounts(test_db, accounts):
     import uuid
+
     a, b = accounts
     with use_account(a):
         with pytest.raises(HTTPException) as e:
-            R.update_policy({"account_id": str(a), "section": "models", "mode": "own"}, db=test_db)
+            R.update_policy(
+                {"account_id": str(a), "section": "models", "mode": "own"}, db=test_db
+            )
         assert e.value.status_code == 400
         with pytest.raises(HTTPException) as e:
-            R.update_policy({"account_id": str(uuid.uuid4()), "section": "models", "mode": "own"}, db=test_db)
+            R.update_policy(
+                {"account_id": str(uuid.uuid4()), "section": "models", "mode": "own"},
+                db=test_db,
+            )
         assert e.value.status_code == 404
 
 
@@ -266,7 +331,9 @@ def test_members_cannot_change_or_list_policies(test_db, accounts):
     a, b = accounts
     with use_account(b):
         with pytest.raises(HTTPException) as e:
-            R.update_policy({"account_id": str(b), "section": "models", "mode": "own"}, db=test_db)
+            R.update_policy(
+                {"account_id": str(b), "section": "models", "mode": "own"}, db=test_db
+            )
         assert e.value.status_code == 403
         with pytest.raises(HTTPException) as e:
             R.get_policies(db=test_db)
@@ -275,12 +342,16 @@ def test_members_cannot_change_or_list_policies(test_db, accounts):
 
 def test_policy_endpoint_over_http_as_owner(client, test_db, accounts):
     a, b = accounts
-    r = client.patch("/api/settings/policies", json={"account_id": str(b), "section": "letters", "mode": "own"})
+    r = client.patch(
+        "/api/settings/policies",
+        json={"account_id": str(b), "section": "letters", "mode": "own"},
+    )
     assert r.status_code == 200, r.text
     assert client.get("/api/settings/policies").json()[str(b)]["letters"] == "own"
 
 
 # ── GET /api/settings ────────────────────────────────────────────────────────
+
 
 def test_owner_get_is_unchanged_and_never_shows_member_rows(client, test_db, accounts):
     a, b = accounts
@@ -292,7 +363,11 @@ def test_owner_get_is_unchanged_and_never_shows_member_rows(client, test_db, acc
     assert body["title_exclude_global"] == ["intern"]
     assert body["anthropic_api_key"] == "•" * 6
     meta = client.get("/api/settings?meta=1").json()["_meta"]
-    assert meta["title_exclude_global"] == {"section": "exclude", "editable": True, "source": "install"}
+    assert meta["title_exclude_global"] == {
+        "section": "exclude",
+        "editable": True,
+        "source": "install",
+    }
 
 
 def test_member_get_returns_effective_values_redacted_with_meta(test_db, accounts):
@@ -308,26 +383,45 @@ def test_member_get_returns_effective_values_redacted_with_meta(test_db, account
         body = R.get_settings(meta=False, db=test_db)
     meta = body.pop("_meta")
     assert body["title_exclude_global"] == ["senior"]
-    assert body["telegram_chat_id"] == ""                       # own_always: not the owner's chat
-    assert body["anthropic_api_key"] == "•" * 6                  # inherited, still redacted
-    assert body["linkedin_password"] == "•" * 6            # own secret, redacted
-    assert meta["title_exclude_global"] == {"section": "exclude", "editable": True, "source": "account"}
-    assert meta["anthropic_api_key"] == {"section": "models", "editable": False, "source": "install",
-                                   "set_by_owner": True}
-    assert meta["telegram_chat_id"]["source"] == "default" and meta["telegram_chat_id"]["editable"]
-    assert meta["proxy_url"] == {"section": "advanced", "editable": False, "source": "install"}
+    assert body["telegram_chat_id"] == ""  # own_always: not the owner's chat
+    assert body["anthropic_api_key"] == "•" * 6  # inherited, still redacted
+    assert body["linkedin_password"] == "•" * 6  # own secret, redacted
+    assert meta["title_exclude_global"] == {
+        "section": "exclude",
+        "editable": True,
+        "source": "account",
+    }
+    assert meta["anthropic_api_key"] == {
+        "section": "models",
+        "editable": False,
+        "source": "install",
+        "set_by_owner": True,
+    }
+    assert (
+        meta["telegram_chat_id"]["source"] == "default"
+        and meta["telegram_chat_id"]["editable"]
+    )
+    assert meta["proxy_url"] == {
+        "section": "advanced",
+        "editable": False,
+        "source": "install",
+    }
 
 
 # ── consumers ────────────────────────────────────────────────────────────────
 
+
 def test_resolve_llm_config_honours_a_member_own_model(test_db, accounts):
     from backend.analyzer.llm_client import resolve_llm_config
+
     a, b = accounts
     set_setting(test_db, "llm_provider", "claude_api")
     set_setting(test_db, "llm_model", "owner-model")
     _own(test_db, b, "llm_model", "member-model")
     with use_account(b):
-        assert resolve_llm_config("", db=test_db)["model"] == "owner-model"   # models inherit by default
+        assert (
+            resolve_llm_config("", db=test_db)["model"] == "owner-model"
+        )  # models inherit by default
     _policy(test_db, b, "models", "own")
     with use_account(b):
         assert resolve_llm_config("", db=test_db)["model"] == "member-model"
@@ -338,6 +432,7 @@ def test_resolve_llm_config_honours_a_member_own_model(test_db, accounts):
 
 def test_title_exclude_filter_uses_the_member_list(test_db, accounts):
     from backend.models.db import get_global_title_exclude
+
     a, b = accounts
     set_setting(test_db, "title_exclude_global", '["intern"]')
     _own(test_db, b, "title_exclude_global", '["senior"]')
@@ -351,6 +446,7 @@ def test_runtime_writer_goes_to_the_member_row(test_db, accounts):
     """jobright's session cookie: section 'jobright' is own by default, so a member's
     scrape stores its own session and leaves the owner's alone."""
     from backend.scraper.sources import jobright
+
     a, b = accounts
     set_setting(test_db, "jobright_session_id", "owner-session")
     with use_account(b):
@@ -362,6 +458,7 @@ def test_runtime_writer_goes_to_the_member_row(test_db, accounts):
 
 def test_webhook_secret_rotation_stays_install(test_db, accounts, monkeypatch):
     from backend.notifier import telegram
+
     a, b = accounts
     set_setting(test_db, "telegram_webhook_secret", "old")
     with use_account(b):
@@ -372,6 +469,7 @@ def test_webhook_secret_rotation_stays_install(test_db, accounts, monkeypatch):
 
 
 # ── default résumé (MT-4 leftover) ───────────────────────────────────────────
+
 
 def test_default_resume_never_hands_another_accounts_resume(test_db, accounts):
     a, b = accounts
@@ -384,7 +482,9 @@ def test_default_resume_never_hands_another_accounts_resume(test_db, accounts):
     with use_account(a):
         assert S.default_resume_ids(test_db) == [rid]
     with use_account(b):
-        assert S.get_setting(test_db, "default_resume_id") == ""   # own_always, seeded default
+        assert (
+            S.get_setting(test_db, "default_resume_id") == ""
+        )  # own_always, seeded default
         assert S.default_resume_ids(test_db) == []
         # even a member row pointing at the owner's résumé is dropped
         _own(test_db, b, "default_resume_id", rid)
@@ -392,7 +492,9 @@ def test_default_resume_never_hands_another_accounts_resume(test_db, accounts):
         mine = Resume(name="Member base", is_base=True, json_data={})
         test_db.add(mine)
         test_db.commit()
-        test_db.query(Setting).filter(Setting.account_id == b).one().value = str(mine.id)
+        test_db.query(Setting).filter(Setting.account_id == b).one().value = str(
+            mine.id
+        )
         test_db.commit()
         assert S.default_resume_ids(test_db) == [str(mine.id)]
 
@@ -401,9 +503,11 @@ def test_auto_created_company_never_gets_the_owners_resume(test_db, accounts):
     """POST /companies/auto-create-from-jobs as a member: the new company's résumé list
     comes from the member's own default, not the owner's install value."""
     from unittest.mock import MagicMock
+
     from backend.api.routes_companies import auto_create_from_jobs
     from backend.models.db import Company
     from backend.tests.r4_support import make_job
+
     a, b = accounts
     with use_account(a):
         r = Resume(name="Owner base", is_base=True, json_data={})
@@ -425,8 +529,10 @@ def test_auto_created_company_never_gets_the_owners_resume(test_db, accounts):
 
 # ── schema ───────────────────────────────────────────────────────────────────
 
+
 def test_one_install_row_and_one_row_per_account_per_key(test_db, accounts):
     from sqlalchemy.exc import IntegrityError
+
     a, b = accounts
     set_setting(test_db, "proxy_url", "x")
     _own(test_db, b, "proxy_url", "y")
@@ -443,10 +549,13 @@ def test_one_install_row_and_one_row_per_account_per_key(test_db, accounts):
 def test_member_rows_cascade_with_the_account():
     fk = list(Setting.__table__.c.account_id.foreign_keys)[0]
     assert fk.ondelete == "CASCADE"
-    assert list(SectionPolicy.__table__.c.account_id.foreign_keys)[0].ondelete == "CASCADE"
+    assert (
+        list(SectionPolicy.__table__.c.account_id.foreign_keys)[0].ondelete == "CASCADE"
+    )
 
 
 def test_migration_statements_are_postgres_only(test_db):
     from backend.seed import SETTINGS_SCOPING_STATEMENTS, _migrate_settings_scoping
+
     assert any("uq_settings_install_key" in s for s in SETTINGS_SCOPING_STATEMENTS)
-    _migrate_settings_scoping(test_db)   # SQLite: no-op, no warnings
+    _migrate_settings_scoping(test_db)  # SQLite: no-op, no warnings

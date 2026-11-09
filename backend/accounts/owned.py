@@ -9,6 +9,7 @@ a new or updated row at someone else's job, résumé, letter or application.
 `get_persona` replaces the old "Persona id 1" singleton: one Persona per account, created
 on first access.
 """
+
 import uuid
 from typing import Optional
 
@@ -49,7 +50,10 @@ def get_owned_or_404(db, model, row_id, detail: Optional[str] = None):
     """`get_owned`, or HTTP 404."""
     row = get_owned(db, model, row_id)
     if row is None:
-        raise HTTPException(status_code=404, detail=detail or _NOT_FOUND.get(model.__name__, "Not found"))
+        raise HTTPException(
+            status_code=404,
+            detail=detail or _NOT_FOUND.get(model.__name__, "Not found"),
+        )
     return row
 
 
@@ -63,9 +67,17 @@ def owned_id_or_404(db, model, row_id, detail: Optional[str] = None):
 
 # ── Persona: one per account ─────────────────────────────────────────────────
 
+
 def _empty_persona_fields() -> dict:
-    return dict(contact={}, work_auth={}, demographics={}, compensation={},
-                preferences={}, resume_content={}, qa_bank=[])
+    return dict(
+        contact={},
+        work_auth={},
+        demographics={},
+        compensation={},
+        preferences={},
+        resume_content={},
+        qa_bank=[],
+    )
 
 
 def get_persona(db, create: bool = True):
@@ -73,6 +85,7 @@ def get_persona(db, create: bool = True):
     on first access, as seed_persona used to do for id 1. Two first accesses racing hit
     UNIQUE(account_id): the loser re-reads the winner's row."""
     from sqlalchemy.exc import IntegrityError
+
     from backend.models.db import Persona
 
     p = db.query(Persona).order_by(Persona.id).first()

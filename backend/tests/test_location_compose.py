@@ -10,6 +10,7 @@ sends it to every board. These tests pin the composition, pin that both call
 sites build the same string, and pin the migration that removes the country from
 the stored location text.
 """
+
 import logging
 
 import pytest
@@ -25,8 +26,7 @@ def _search(db, **kw):
     kw.setdefault("company_exclude", [])
     kw.setdefault("country", "usa")
     kw.setdefault("search_mode", "keyword")
-    s = Search(name="Location probe", active=True,
-               search_term="program manager", **kw)
+    s = Search(name="Location probe", active=True, search_term="program manager", **kw)
     db.add(s)
     db.commit()
     return s
@@ -47,77 +47,91 @@ def _record_kwargs(monkeypatch, calls):
 def _first_run_auth(db):
     """Empty dashboard_api_key triggers the middleware's first-run bypass."""
     from backend.models.db import Setting
+
     db.add(Setting(key="dashboard_api_key", value=""))
     db.commit()
 
 
 # ── the composition ──────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("location,country,expected", [
-    # A plain city gets the country spelled out. This is the case LinkedIn got
-    # wrong: "Austin" alone resolved to Austin, Colorado.
-    ("Austin", "usa", "Austin, United States"),
-    ("Toronto", "canada", "Toronto, Canada"),
-    # A city that already carries its country does not carry it twice.
-    ("Toronto, Canada", "canada", "Toronto, Canada"),
-    ("Cambridge, United Kingdom", "uk", "Cambridge, United Kingdom"),
-    # `country` wins over the text, because the user picked that field.
-    ("Toronto, Canada", "usa", "Toronto, United States"),
-    # A region is not a country, so it survives. "ON" matches no jobspy alias.
-    ("Toronto, ON", "canada", "Toronto, ON, Canada"),
-    # An empty place gives the label alone: "Canada" is a valid query and
-    # ", Canada" is not.
-    ("", "canada", "Canada"),
-    (None, "usa", "United States"),
-    ("   ", "poland", "Poland"),
-    # A location that is only a country name carries no place, so the text goes
-    # and the country field decides. "United States" is the column default.
-    ("United States", "usa", "United States"),
-    ("US", "usa", "United States"),
-    # A location that names ANOTHER country is refused by the write path, so
-    # only a row stored before this change reaches the composition. See
-    # `test_create_rejects_a_location_that_names_another_country`.
-    ("Canada", "usa", "United States"),
-    # Text that names no place still receives the country. Measured with "usa":
-    # Indeed answers both spellings with the same 20 "Remote, US" rows, so the
-    # country costs it nothing, while LinkedIn answers a bare "Remote" with jobs
-    # in Taiwan, Japan and India. The forms point at the `is_remote` field.
-    ("Remote", "usa", "Remote, United States"),
-    ("Bay Area", "usa", "Bay Area, United States"),
-    # An unknown or missing country falls back the way `country_indeed` does.
-    ("Austin", None, "Austin, United States"),
-    ("Austin", "Atlantis", "Austin, United States"),
-])
+
+@pytest.mark.parametrize(
+    "location,country,expected",
+    [
+        # A plain city gets the country spelled out. This is the case LinkedIn got
+        # wrong: "Austin" alone resolved to Austin, Colorado.
+        ("Austin", "usa", "Austin, United States"),
+        ("Toronto", "canada", "Toronto, Canada"),
+        # A city that already carries its country does not carry it twice.
+        ("Toronto, Canada", "canada", "Toronto, Canada"),
+        ("Cambridge, United Kingdom", "uk", "Cambridge, United Kingdom"),
+        # `country` wins over the text, because the user picked that field.
+        ("Toronto, Canada", "usa", "Toronto, United States"),
+        # A region is not a country, so it survives. "ON" matches no jobspy alias.
+        ("Toronto, ON", "canada", "Toronto, ON, Canada"),
+        # An empty place gives the label alone: "Canada" is a valid query and
+        # ", Canada" is not.
+        ("", "canada", "Canada"),
+        (None, "usa", "United States"),
+        ("   ", "poland", "Poland"),
+        # A location that is only a country name carries no place, so the text goes
+        # and the country field decides. "United States" is the column default.
+        ("United States", "usa", "United States"),
+        ("US", "usa", "United States"),
+        # A location that names ANOTHER country is refused by the write path, so
+        # only a row stored before this change reaches the composition. See
+        # `test_create_rejects_a_location_that_names_another_country`.
+        ("Canada", "usa", "United States"),
+        # Text that names no place still receives the country. Measured with "usa":
+        # Indeed answers both spellings with the same 20 "Remote, US" rows, so the
+        # country costs it nothing, while LinkedIn answers a bare "Remote" with jobs
+        # in Taiwan, Japan and India. The forms point at the `is_remote` field.
+        ("Remote", "usa", "Remote, United States"),
+        ("Bay Area", "usa", "Bay Area, United States"),
+        # An unknown or missing country falls back the way `country_indeed` does.
+        ("Austin", None, "Austin, United States"),
+        ("Austin", "Atlantis", "Austin, United States"),
+    ],
+)
 def test_compose_location(location, country, expected):
     from backend.countries import compose_location
+
     assert compose_location(location, country) == expected
 
 
-@pytest.mark.parametrize("location,expected", [
-    ("Toronto, Canada", ("Toronto", "canada")),
-    ("Toronto, ON", ("Toronto, ON", None)),
-    ("Toronto, ON, Canada", ("Toronto, ON", "canada")),
-    ("Canada", ("", "canada")),
-    ("  Warsaw ,  Poland  ", ("Warsaw", "poland")),
-    ("Remote", ("Remote", None)),
-    ("", ("", None)),
-    (None, ("", None)),
-])
+@pytest.mark.parametrize(
+    "location,expected",
+    [
+        ("Toronto, Canada", ("Toronto", "canada")),
+        ("Toronto, ON", ("Toronto, ON", None)),
+        ("Toronto, ON, Canada", ("Toronto, ON", "canada")),
+        ("Canada", ("", "canada")),
+        ("  Warsaw ,  Poland  ", ("Warsaw", "poland")),
+        ("Remote", ("Remote", None)),
+        ("", ("", None)),
+        (None, ("", None)),
+    ],
+)
 def test_split_country_suffix(location, expected):
     from backend.countries import split_country_suffix
+
     assert split_country_suffix(location) == expected
 
 
 # ── both call sites compose the same string ──────────────────────────────────
 
-@pytest.mark.parametrize("location,country", [
-    ("Austin", "usa"),
-    ("Toronto", "canada"),
-    ("Toronto, Canada", "usa"),
-    ("Toronto, ON", "canada"),
-    ("", "canada"),
-    ("Remote", "uk"),
-])
+
+@pytest.mark.parametrize(
+    "location,country",
+    [
+        ("Austin", "usa"),
+        ("Toronto", "canada"),
+        ("Toronto, Canada", "usa"),
+        ("Toronto, ON", "canada"),
+        ("", "canada"),
+        ("Remote", "uk"),
+    ],
+)
 def test_the_scraper_and_the_test_preview_send_the_same_location(
     api_client, test_db, monkeypatch, location, country
 ):
@@ -136,28 +150,38 @@ def test_the_scraper_and_the_test_preview_send_the_same_location(
 
     assert len(calls) == 2, f"expected one call per site, got {len(calls)}"
     scraper_loc, preview_loc = calls[0]["location"], calls[1]["location"]
-    assert scraper_loc == preview_loc, \
+    assert scraper_loc == preview_loc, (
         f"the two call sites drifted: {scraper_loc!r} vs {preview_loc!r}"
+    )
 
     from backend.countries import compose_location
+
     assert scraper_loc == compose_location(location, country)
 
 
-def test_the_scraper_sends_the_country_to_indeed_and_to_the_location(test_db, monkeypatch):
+def test_the_scraper_sends_the_country_to_indeed_and_to_the_location(
+    test_db, monkeypatch
+):
     """`country_indeed` still reaches Indeed, and the composed string reaches the rest."""
     from backend.scraper.sources.jobspy import _run_sync
 
     calls = []
     _record_kwargs(monkeypatch, calls)
-    _run_sync(_search(test_db, location="Austin", country="usa",
-                      sources=["indeed", "linkedin", "zip_recruiter", "google"]))
+    _run_sync(
+        _search(
+            test_db,
+            location="Austin",
+            country="usa",
+            sources=["indeed", "linkedin", "zip_recruiter", "google"],
+        )
+    )
 
     assert calls[0]["country_indeed"] == "usa"
     assert calls[0]["location"] == "Austin, United States"
 
 
 def test_an_empty_location_does_not_send_a_leading_comma(test_db, monkeypatch):
-    """", Canada" is not a query. "Canada" is, and it returns rows."""
+    """ ", Canada" is not a query. "Canada" is, and it returns rows."""
     from backend.scraper.sources.jobspy import _run_sync
 
     calls = []
@@ -168,6 +192,7 @@ def test_an_empty_location_does_not_send_a_leading_comma(test_db, monkeypatch):
 
 
 # ── the migration that removes the country from the stored text ──────────────
+
 
 def test_the_migration_removes_only_a_country_segment(test_db):
     from backend.seed import _strip_country_from_search_location
@@ -202,8 +227,9 @@ def test_the_migration_keeps_the_country_field_when_the_text_disagrees(test_db, 
     test_db.refresh(search)
     assert search.country == "usa", "the explicitly chosen field must survive"
     assert search.location == "Toronto"
-    assert any("keeping country" in r.getMessage() for r in caplog.records), \
+    assert any("keeping country" in r.getMessage() for r in caplog.records), (
         "a contradicting row must be logged"
+    )
 
     # Known residual, pinned on purpose: the first pass removed the only
     # evidence. From the second startup on, the row reads as a deliberate
@@ -215,8 +241,9 @@ def test_the_migration_keeps_the_country_field_when_the_text_disagrees(test_db, 
 
     test_db.refresh(search)
     assert search.location == "Toronto"
-    assert not [r for r in caplog.records if "keeping country" in r.getMessage()], \
+    assert not [r for r in caplog.records if "keeping country" in r.getMessage()], (
         "the contradiction is silent after the first startup"
+    )
 
 
 def test_the_migration_logs_a_country_only_location_that_disagrees(test_db, caplog):
@@ -261,8 +288,9 @@ def test_the_migration_is_idempotent(test_db):
         _strip_country_from_search_location(test_db)
         for row in rows:
             test_db.refresh(row)
-        assert [r.location for r in rows] == after_first, \
+        assert [r.location for r in rows] == after_first, (
             "a later run must change nothing"
+        )
 
 
 def test_the_migration_keeps_the_last_segment(test_db):
@@ -297,8 +325,9 @@ def test_the_migration_leaves_other_search_modes_alone(test_db):
     """
     from backend.seed import _strip_country_from_search_location
 
-    jobright = _search(test_db, location="Vancouver, Canada", country="usa",
-                       search_mode="jobright")
+    jobright = _search(
+        test_db, location="Vancouver, Canada", country="usa", search_mode="jobright"
+    )
     keyword = _search(test_db, location="Vancouver, Canada", country="canada")
 
     _strip_country_from_search_location(test_db)
@@ -314,8 +343,9 @@ def test_run_migrations_calls_the_location_strip(test_db, monkeypatch):
     import backend.seed as seed
 
     called = []
-    monkeypatch.setattr(seed, "_strip_country_from_search_location",
-                        lambda db: called.append(db))
+    monkeypatch.setattr(
+        seed, "_strip_country_from_search_location", lambda db: called.append(db)
+    )
     # SQLite rejects `ADD COLUMN IF NOT EXISTS`, so the guard would skip the data
     # migrations for a reason this test is not about. Report a clean list.
     monkeypatch.setattr(seed, "run_migration_statements", lambda db, statements: [])
@@ -330,10 +360,12 @@ def test_the_strip_runs_after_the_country_backfill(test_db, monkeypatch):
     import backend.seed as seed
 
     order = []
-    monkeypatch.setattr(seed, "_backfill_search_country",
-                        lambda db: order.append("backfill"))
-    monkeypatch.setattr(seed, "_strip_country_from_search_location",
-                        lambda db: order.append("strip"))
+    monkeypatch.setattr(
+        seed, "_backfill_search_country", lambda db: order.append("backfill")
+    )
+    monkeypatch.setattr(
+        seed, "_strip_country_from_search_location", lambda db: order.append("strip")
+    )
     monkeypatch.setattr(seed, "run_migration_statements", lambda db, statements: [])
 
     seed.run_migrations(test_db)
@@ -341,15 +373,21 @@ def test_the_strip_runs_after_the_country_backfill(test_db, monkeypatch):
     assert order == ["backfill", "strip"]
 
 
-def test_the_strip_is_skipped_when_the_country_column_was_not_added(test_db, monkeypatch):
+def test_the_strip_is_skipped_when_the_country_column_was_not_added(
+    test_db, monkeypatch
+):
     """It reads searches.country. Without the column it raises out of the lifespan."""
     import backend.seed as seed
 
     called = []
-    monkeypatch.setattr(seed, "_strip_country_from_search_location",
-                        lambda db: called.append(db))
-    monkeypatch.setattr(seed, "run_migration_statements",
-                        lambda db, statements: [seed._ADD_COUNTRY_COLUMN])
+    monkeypatch.setattr(
+        seed, "_strip_country_from_search_location", lambda db: called.append(db)
+    )
+    monkeypatch.setattr(
+        seed,
+        "run_migration_statements",
+        lambda db, statements: [seed._ADD_COUNTRY_COLUMN],
+    )
 
     seed.run_migrations(test_db)
 
@@ -366,10 +404,11 @@ def test_a_raising_strip_does_not_abort_the_migration(test_db, monkeypatch):
     monkeypatch.setattr(seed, "_strip_country_from_search_location", boom)
     monkeypatch.setattr(seed, "run_migration_statements", lambda db, statements: [])
 
-    seed.run_migrations(test_db)      # raises if the guard is missing
+    seed.run_migrations(test_db)  # raises if the guard is missing
 
 
 # ── the write path refuses a pair that disagrees ─────────────────────────────
+
 
 def _payload(**kw):
     body = {"name": "New search", "search_mode": "keyword", "search_term": "pm"}
@@ -382,8 +421,9 @@ def test_create_rejects_a_location_that_names_another_country(api_client, test_d
     check raised a warning. Composed, it becomes a silent wrong-country scrape,
     so the API refuses it instead of choosing a side for the user."""
     _first_run_auth(test_db)
-    resp = api_client.post("/api/searches",
-                           json=_payload(location="Toronto, Canada", country="usa"))
+    resp = api_client.post(
+        "/api/searches", json=_payload(location="Toronto, Canada", country="usa")
+    )
 
     assert resp.status_code == 400, f"Unexpected {resp.status_code}: {resp.text}"
     assert "canada" in resp.json()["detail"].lower()
@@ -393,39 +433,50 @@ def test_create_rejects_a_location_that_names_another_country(api_client, test_d
 def test_create_rejects_a_location_that_is_another_country(api_client, test_db):
     """The case the composition would otherwise swallow whole: the text vanishes."""
     _first_run_auth(test_db)
-    resp = api_client.post("/api/searches",
-                           json=_payload(location="Canada", country="usa"))
+    resp = api_client.post(
+        "/api/searches", json=_payload(location="Canada", country="usa")
+    )
     assert resp.status_code == 400, f"Unexpected {resp.status_code}: {resp.text}"
 
 
-@pytest.mark.parametrize("location,country", [
-    ("Toronto, Canada", "canada"),   # the text agrees with the field
-    ("Toronto, ON", "canada"),       # a region is not a country
-    ("Toronto", "canada"),
-    ("Remote", "usa"),
-    ("", "canada"),
-])
-def test_create_accepts_a_location_that_does_not_disagree(api_client, test_db,
-                                                          location, country):
+@pytest.mark.parametrize(
+    "location,country",
+    [
+        ("Toronto, Canada", "canada"),  # the text agrees with the field
+        ("Toronto, ON", "canada"),  # a region is not a country
+        ("Toronto", "canada"),
+        ("Remote", "usa"),
+        ("", "canada"),
+    ],
+)
+def test_create_accepts_a_location_that_does_not_disagree(
+    api_client, test_db, location, country
+):
     _first_run_auth(test_db)
-    resp = api_client.post("/api/searches",
-                           json=_payload(location=location, country=country))
+    resp = api_client.post(
+        "/api/searches", json=_payload(location=location, country=country)
+    )
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
 
 
-def test_patch_rejects_a_location_that_contradicts_the_stored_country(api_client, test_db):
+def test_patch_rejects_a_location_that_contradicts_the_stored_country(
+    api_client, test_db
+):
     _first_run_auth(test_db)
     search = _search(test_db, location="Austin", country="usa")
 
-    resp = api_client.patch(f"/api/searches/{search.id}",
-                            json={"location": "Toronto, Canada"})
+    resp = api_client.patch(
+        f"/api/searches/{search.id}", json={"location": "Toronto, Canada"}
+    )
 
     assert resp.status_code == 400, f"Unexpected {resp.status_code}: {resp.text}"
     test_db.refresh(search)
     assert search.location == "Austin", "a rejected write must leave the row alone"
 
 
-def test_patch_rejects_a_country_that_contradicts_the_stored_location(api_client, test_db):
+def test_patch_rejects_a_country_that_contradicts_the_stored_location(
+    api_client, test_db
+):
     """The same pair, reached from the other field."""
     _first_run_auth(test_db)
     search = _search(test_db, location="Toronto, Canada", country="canada")
@@ -442,8 +493,9 @@ def test_patch_accepts_the_pair_when_both_fields_move_together(api_client, test_
     _first_run_auth(test_db)
     search = _search(test_db, location="Toronto, Canada", country="canada")
 
-    resp = api_client.patch(f"/api/searches/{search.id}",
-                            json={"location": "Austin", "country": "usa"})
+    resp = api_client.patch(
+        f"/api/searches/{search.id}", json={"location": "Austin", "country": "usa"}
+    )
 
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
     test_db.refresh(search)
@@ -462,6 +514,7 @@ def test_patch_leaves_the_pair_alone_when_neither_field_moves(api_client, test_d
 
 # ── the backfill says which rows it guessed ──────────────────────────────────
 
+
 def test_the_backfill_logs_a_location_that_names_no_country(test_db, caplog):
     """A region code reads as no country, so the backfill guesses usa and the
     scraper then sends "Toronto, ON, United States". An operator must see it."""
@@ -476,8 +529,9 @@ def test_the_backfill_logs_a_location_that_names_no_country(test_db, caplog):
 
     test_db.refresh(search)
     assert search.country == "usa"
-    assert any("guessed" in r.getMessage() for r in caplog.records), \
+    assert any("guessed" in r.getMessage() for r in caplog.records), (
         "a guessed country must be logged"
+    )
 
 
 def test_the_backfill_stays_quiet_when_it_reads_a_country(test_db, caplog):
@@ -496,9 +550,12 @@ def test_the_backfill_stays_quiet_when_it_reads_a_country(test_db, caplog):
 
 # ── jobright reads the location raw ───────────────────────────────────────────
 
+
 class _FakeResponse:
-    text = '<script id="__NEXT_DATA__" type="application/json">' \
-           '{"props": {"pageProps": {"jobList": [], "totalJobs": 0}}}</script>'
+    text = (
+        '<script id="__NEXT_DATA__" type="application/json">'
+        '{"props": {"pageProps": {"jobList": [], "totalJobs": 0}}}</script>'
+    )
 
     def raise_for_status(self):
         return None
@@ -536,12 +593,18 @@ def test_a_new_jobright_search_sends_no_location(api_client, test_db, monkeypatc
     column default or the SearchCreate default returns to a country name.
     """
     import asyncio
+
     from backend.scraper.sources import jobright
 
     _first_run_auth(test_db)
-    resp = api_client.post("/api/searches", json={
-        "name": "New jobright", "search_mode": "jobright", "search_term": "program manager",
-    })
+    resp = api_client.post(
+        "/api/searches",
+        json={
+            "name": "New jobright",
+            "search_mode": "jobright",
+            "search_term": "program manager",
+        },
+    )
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
     search = test_db.query(Search).filter(Search.name == "New jobright").one()
     assert search.location == ""
@@ -561,6 +624,7 @@ def test_an_old_jobright_search_still_sends_its_stored_location(test_db, monkeyp
     it. Measured, jobright answers it the same way as no location.
     """
     import asyncio
+
     from backend.scraper.sources import jobright
 
     search = _search(test_db, search_mode="jobright", location="United States")

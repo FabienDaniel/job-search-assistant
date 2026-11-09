@@ -1,4 +1,5 @@
 """POST /jobs/save-from-extension must say why a job never reached the feed; save_from_extension is a plain async route function taking its Session as a parameter, so tests call it directly (no backend.main, no TestClient)."""
+
 import pytest
 
 from backend.models.db import Job, Search, Setting
@@ -16,22 +17,35 @@ def _no_h1b(monkeypatch):
 
 
 def _ext_search(db, exclude=None, include=None, company_exclude=None):
-    s = Search(name="Extension", search_mode="extension", active=True,
-               title_include_keywords=include or [],
-               title_exclude_keywords=exclude or [],
-               company_filter=[], company_exclude=company_exclude or [],
-               auto_scoring_depth="off")
+    s = Search(
+        name="Extension",
+        search_mode="extension",
+        active=True,
+        title_include_keywords=include or [],
+        title_exclude_keywords=exclude or [],
+        company_filter=[],
+        company_exclude=company_exclude or [],
+        auto_scoring_depth="off",
+    )
     db.add(s)
     db.commit()
     return s
 
 
-async def _save(db, title="Product Manager", company="Acme",
-                url="https://acme.test/jobs/1"):
+async def _save(
+    db, title="Product Manager", company="Acme", url="https://acme.test/jobs/1"
+):
     from backend.api.routes_jobs import save_from_extension
+
     return await save_from_extension(
-        {"title": title, "company": company, "url": url,
-         "description": "An ordinary description."}, db=db)
+        {
+            "title": title,
+            "company": company,
+            "url": url,
+            "description": "An ordinary description.",
+        },
+        db=db,
+    )
 
 
 @pytest.mark.asyncio
@@ -52,14 +66,20 @@ async def test_per_search_title_exclude_names_the_keyword(test_db, _no_h1b):
     assert out["status"] == "ignored"
     assert out["reason"] == "title excluded by 'intern'"
     # the row is still written — that is what makes the dedup key stick
-    assert test_db.query(Job).filter(Job.title == "Product Intern").one().status == "ignored"
+    assert (
+        test_db.query(Job).filter(Job.title == "Product Intern").one().status
+        == "ignored"
+    )
 
 
 @pytest.mark.asyncio
 async def test_global_title_exclude_names_the_keyword(test_db, _no_h1b):
     """`title_exclude_global` applies silently, with the search's own list empty."""
     import json
-    test_db.add(Setting(key="title_exclude_global", value=json.dumps(["intern", "contract"])))
+
+    test_db.add(
+        Setting(key="title_exclude_global", value=json.dumps(["intern", "contract"]))
+    )
     test_db.commit()
     _ext_search(test_db)
 
@@ -74,7 +94,10 @@ async def test_title_include_miss_is_explained(test_db, _no_h1b):
     out = await _save(test_db, title="Software Engineer")
 
     assert out["saved"] is False
-    assert out["reason"] == "title matches none of the required keywords (manager, director)"
+    assert (
+        out["reason"]
+        == "title matches none of the required keywords (manager, director)"
+    )
 
 
 @pytest.mark.asyncio
@@ -90,6 +113,7 @@ async def test_company_exclude_is_explained(test_db, _no_h1b):
 async def test_global_company_exclude_is_explained(test_db, _no_h1b):
     """The account-wide Company exclude list in Settings drops a saved job, as it does for every scraper."""
     import json
+
     test_db.add(Setting(key="company_exclude_global", value=json.dumps(["Acme"])))
     test_db.commit()
     _ext_search(test_db)
@@ -103,9 +127,12 @@ async def test_global_company_exclude_is_explained(test_db, _no_h1b):
 async def test_manual_save_keeps_active_companies(test_db, _no_h1b):
     """A click on Save is a choice made for that one job, so "Skip my active companies" does not apply."""
     from backend.models.db import Company
+
     s = _ext_search(test_db)
     s.exclude_active_companies = True
-    test_db.add(Company(name="Acme", active=True, scrape_urls=["https://acme.example/jobs"]))
+    test_db.add(
+        Company(name="Acme", active=True, scrape_urls=["https://acme.example/jobs"])
+    )
     test_db.commit()
     out = await _save(test_db, company="Acme")
 
@@ -125,7 +152,9 @@ async def test_body_exclusion_is_explained(test_db, monkeypatch):
 
     out = await _save(test_db)
     assert out["saved"] is False
-    assert out["reason"] == "description matched the excluded phrase 'no visa sponsorship'"
+    assert (
+        out["reason"] == "description matched the excluded phrase 'no visa sponsorship'"
+    )
 
 
 @pytest.mark.asyncio

@@ -4,6 +4,7 @@
 driver module path, the failed statement and its bound parameters, and
 `/api/monitor/history` returned all three to the browser.
 """
+
 from sqlalchemy.orm import sessionmaker
 
 from backend.job_monitor import MAX_RUN_ERROR_CHARS, sanitize_run_error
@@ -49,8 +50,8 @@ def test_finishing_a_run_stores_the_sanitised_text(test_db, monkeypatch):
     """The single writer of JobRun.error sanitises, so no raw string is stored."""
     import uuid
 
-    from backend.models.db import JobRun
     import backend.job_monitor as jm
+    from backend.models.db import JobRun
 
     TestSession = sessionmaker(bind=test_db.get_bind())
     monkeypatch.setattr(jm, "SessionLocal", TestSession)
@@ -76,7 +77,8 @@ def test_the_history_endpoint_never_returns_a_stored_driver_error(api_client, te
     # Write past the sanitising writer: this is what the column already holds
     # for the 11 scrape_all runs the json/jsonb bug poisoned.
     test_db.query(JobRun).filter_by(job_type="scrape_all").update(
-        {"error": RAW_DB_ERROR}, synchronize_session=False)
+        {"error": RAW_DB_ERROR}, synchronize_session=False
+    )
     test_db.commit()
 
     body = api_client.get("/api/monitor/history").text

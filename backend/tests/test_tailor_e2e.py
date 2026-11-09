@@ -1,22 +1,38 @@
 """End-to-end: tailor endpoint → in-flight map → completion."""
+
 import asyncio
 import uuid
+
 import pytest
 
-from backend.models.db import Setting, Resume, Job
+from backend.models.db import Job, Resume, Setting
 
 
 @pytest.mark.asyncio
 async def test_tailor_end_to_end(api_client, test_db, monkeypatch):
     test_db.add(Setting(key="dashboard_api_key", value=""))
-    test_db.add(Setting(key="cv_tailor_prompt", value="p {resume_json} {job_description}"))
-    test_db.add(Setting(key="tailor_auto_quick_score", value="false"))  # keep test simple
+    test_db.add(
+        Setting(key="cv_tailor_prompt", value="p {resume_json} {job_description}")
+    )
+    test_db.add(
+        Setting(key="tailor_auto_quick_score", value="false")
+    )  # keep test simple
 
-    job = Job(external_id="e2e1", content_hash="e2e1c", company="Acme", title="PM", description="jd")
+    job = Job(
+        external_id="e2e1",
+        content_hash="e2e1c",
+        company="Acme",
+        title="PM",
+        description="jd",
+    )
     test_db.add(job)
     test_db.flush()
-    base = Resume(name="Base", is_base=True, template="inter",
-                  json_data={"summary": "s", "experience": [], "skills": {}})
+    base = Resume(
+        name="Base",
+        is_base=True,
+        template="inter",
+        json_data={"summary": "s", "experience": [], "skills": {}},
+    )
     test_db.add(base)
     test_db.commit()
 
@@ -28,11 +44,14 @@ async def test_tailor_end_to_end(api_client, test_db, monkeypatch):
         call_started.set()
         await call_finish.wait()
         return {"text": '{"summary":"tailored"}', "usage": {}}
+
     monkeypatch.setattr("backend.analyzer.llm_client.call_cv_tailor_llm", fake_call)
 
     import backend.job_monitor as mon
+
     monkeypatch.setattr(mon, "_running", {})
     import backend.api.routes_resumes as rr
+
     monkeypatch.setattr(rr, "_tailoring_semaphore", None, raising=False)
 
     resp = api_client.post(

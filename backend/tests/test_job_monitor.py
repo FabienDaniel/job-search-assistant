@@ -1,7 +1,9 @@
 """Tests for job_monitor — tracked_run + launch_background + cleanup_stale_runs. SQLite strips tz from DateTime(timezone=True) columns (a 'load' listener re-applies UTC) and maps JobRun.id to CHAR(32) (so tests look up rows by job_type, not id)."""
+
 import asyncio
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 from sqlalchemy import event
 from sqlalchemy.orm import sessionmaker
 
@@ -26,6 +28,7 @@ def _utc_tz_on_jobrun_load():
 def _clear_running_state():
     """Ensure the in-memory _running dict is empty between tests."""
     import backend.job_monitor as jm
+
     jm._running.clear()
     yield
     jm._running.clear()
@@ -34,8 +37,8 @@ def _clear_running_state():
 @pytest.mark.asyncio
 async def test_tracked_run_writes_running_then_completed(test_db, monkeypatch):
     """tracked_run writes a JobRun row: status starts 'running', ends 'completed' on clean exit."""
-    from backend.models.db import JobRun
     import backend.job_monitor as jm
+    from backend.models.db import JobRun
 
     TestSession = sessionmaker(bind=test_db.get_bind())
     monkeypatch.setattr(jm, "SessionLocal", TestSession)
@@ -58,8 +61,8 @@ async def test_tracked_run_writes_running_then_completed(test_db, monkeypatch):
 @pytest.mark.asyncio
 async def test_tracked_run_marks_failed_on_exception(test_db, monkeypatch):
     """Exception inside the with-block marks the JobRun as 'failed' with the error message."""
-    from backend.models.db import JobRun
     import backend.job_monitor as jm
+    from backend.models.db import JobRun
 
     TestSession = sessionmaker(bind=test_db.get_bind())
     monkeypatch.setattr(jm, "SessionLocal", TestSession)
@@ -115,33 +118,39 @@ async def test_tracked_run_raises_already_running(test_db, monkeypatch):
 
 def test_cleanup_stale_runs_marks_orphans_failed(test_db, monkeypatch):
     """Startup cleanup: 'running' rows from a previous process → 'failed' with restart note."""
-    from backend.models.db import JobRun
     import backend.job_monitor as jm
+    from backend.models.db import JobRun
 
     TestSession = sessionmaker(bind=test_db.get_bind())
     monkeypatch.setattr(jm, "SessionLocal", TestSession)
 
     # Seed 2 orphan running rows + 1 already-completed row (should not be touched).
     s = TestSession()
-    s.add(JobRun(
-        job_type="orphan_job_1",
-        trigger="scheduler",
-        status="running",
-        started_at=datetime.now(timezone.utc),
-    ))
-    s.add(JobRun(
-        job_type="orphan_job_2",
-        trigger="manual",
-        status="running",
-        started_at=datetime.now(timezone.utc),
-    ))
-    s.add(JobRun(
-        job_type="done_job",
-        trigger="scheduler",
-        status="completed",
-        started_at=datetime.now(timezone.utc),
-        finished_at=datetime.now(timezone.utc),
-    ))
+    s.add(
+        JobRun(
+            job_type="orphan_job_1",
+            trigger="scheduler",
+            status="running",
+            started_at=datetime.now(timezone.utc),
+        )
+    )
+    s.add(
+        JobRun(
+            job_type="orphan_job_2",
+            trigger="manual",
+            status="running",
+            started_at=datetime.now(timezone.utc),
+        )
+    )
+    s.add(
+        JobRun(
+            job_type="done_job",
+            trigger="scheduler",
+            status="completed",
+            started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc),
+        )
+    )
     s.commit()
     s.close()
 
@@ -169,8 +178,8 @@ def test_cleanup_stale_runs_marks_orphans_failed(test_db, monkeypatch):
 @pytest.mark.asyncio
 async def test_launch_background_returns_run_id_and_executes(test_db, monkeypatch):
     """launch_background returns a run_id string AND actually runs the coroutine factory."""
-    from backend.models.db import JobRun
     import backend.job_monitor as jm
+    from backend.models.db import JobRun
 
     TestSession = sessionmaker(bind=test_db.get_bind())
     monkeypatch.setattr(jm, "SessionLocal", TestSession)

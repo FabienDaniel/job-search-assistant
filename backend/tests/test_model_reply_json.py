@@ -1,18 +1,22 @@
 """The shared model-reply reader: one tolerant parser behind every JSON-answer site, and a sentence instead of a decoder offset when a reply carries no JSON."""
+
 import json as _json
 
 import pytest
 
 from backend.analyzer.model_json import (
-    UNPARSEABLE_MESSAGE, ModelReplyError, first_json_object, parse_model_json,
+    UNPARSEABLE_MESSAGE,
+    ModelReplyError,
+    first_json_object,
+    parse_model_json,
     require_model_json,
 )
-
 
 GOOD = {"summary": "s", "experience": [], "skills": {}}
 
 
 # ── the reader ───────────────────────────────────────────────────────────────
+
 
 def test_bare_object():
     assert parse_model_json(_json.dumps(GOOD)) == GOOD
@@ -50,6 +54,7 @@ def test_unusable_reply_raises_decode_error(raw):
 
 # ── the worded failure ───────────────────────────────────────────────────────
 
+
 def test_require_model_json_passes_a_good_reply_through():
     assert require_model_json(_json.dumps(GOOD)) == GOOD
 
@@ -63,11 +68,14 @@ def test_require_model_json_words_the_failure():
 
 # ── the old homes still answer ───────────────────────────────────────────────
 
+
 def test_routes_resumes_reexports_the_parser():
     from backend.api.routes_resumes import _parse_model_json
+
     assert _parse_model_json is parse_model_json
 
 
 def test_routes_autofill_reexports_the_scanner():
     from backend.api.routes_autofill import _first_json_object
+
     assert _first_json_object is first_json_object

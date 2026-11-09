@@ -1,16 +1,23 @@
 """Search config CRUD endpoints."""
+
 import asyncio
 import logging
 import uuid
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from backend.countries import (DEFAULT_COUNTRY, normalize_country,
-                               split_country_suffix, supported_countries)
-from backend.models.db import get_db, Search, ScrapeLog, Job, is_acknowledged
+from sqlalchemy.orm import Session
+
+from backend.countries import (
+    DEFAULT_COUNTRY,
+    normalize_country,
+    split_country_suffix,
+    supported_countries,
+)
+from backend.models.db import Job, ScrapeLog, Search, get_db, is_acknowledged
 from backend.scraper import search_modes as _modes
 
 logger = logging.getLogger("jobnavigator.routes_searches")
@@ -37,11 +44,13 @@ _tests_in_flight: dict[str, str] = {}
 
 def _test_flight_key(search_id) -> str:
     from backend.job_monitor import _make_key, _run_account
+
     return _make_key("search_test", str(search_id), _run_account("search_test"))
 
 
 def _account_key() -> Optional[str]:
     from backend.accounts.context import current_account
+
     acc = current_account.get()
     return str(acc) if acc is not None else None
 
@@ -79,18 +88,27 @@ def list_searches(db: Session = Depends(get_db)):
     searches = db.query(Search).order_by(Search.created_at).all()
     # Latest ScrapeLog per search → surface the most recent run's outcome so the
     # UI can show a live summary/health line (mirrors what /companies does).
-    from sqlalchemy import func, and_
+    from sqlalchemy import and_, func
+
     from backend.models.db import ScrapeLog
+
     latest_sub = (
         db.query(ScrapeLog.search_id, func.max(ScrapeLog.ran_at).label("mx"))
         .filter(ScrapeLog.search_id.isnot(None))
-        .group_by(ScrapeLog.search_id).subquery()
+        .group_by(ScrapeLog.search_id)
+        .subquery()
     )
     last_log = {
         str(l.search_id): l
-        for l in db.query(ScrapeLog).join(
-            latest_sub, and_(ScrapeLog.search_id == latest_sub.c.search_id,
-                             ScrapeLog.ran_at == latest_sub.c.mx)).all()
+        for l in db.query(ScrapeLog)
+        .join(
+            latest_sub,
+            and_(
+                ScrapeLog.search_id == latest_sub.c.search_id,
+                ScrapeLog.ran_at == latest_sub.c.mx,
+            ),
+        )
+        .all()
     }
     rates = _direct_rates(db)
     out = []
@@ -105,14 +123,31 @@ def _direct_rates(db) -> dict:
     """{search id: {"direct": n, "total": n}}: how many of each search's jobs of the last 90 days
     (filtered ones left out) can be applied to directly: the employer's link, or Easy Apply."""
     from datetime import datetime, timedelta, timezone
+
     from sqlalchemy import case, func
+
     from backend.models.db import Job
+
     since = datetime.now(timezone.utc) - timedelta(days=90)
-    rows = (db.query(Job.search_id, func.count(Job.id),
-                     func.sum(case((Job.link_kind.in_(("direct", "easy_apply")), 1), else_=0)))
-            .filter(Job.search_id.isnot(None), Job.status != "ignored", Job.discovered_at >= since)
-            .group_by(Job.search_id).all())
-    return {sid: {"direct": int(direct or 0), "total": int(total)} for sid, total, direct in rows if total}
+    rows = (
+        db.query(
+            Job.search_id,
+            func.count(Job.id),
+            func.sum(case((Job.link_kind.in_(("direct", "easy_apply")), 1), else_=0)),
+        )
+        .filter(
+            Job.search_id.isnot(None),
+            Job.status != "ignored",
+            Job.discovered_at >= since,
+        )
+        .group_by(Job.search_id)
+        .all()
+    )
+    return {
+        sid: {"direct": int(direct or 0), "total": int(total)}
+        for sid, total, direct in rows
+        if total
+    }
 
 
 @router.get("/countries")
@@ -127,11 +162,26 @@ def list_apify_boards():
     `price_per_1k` (USD, Free plan) and `test_max_usd` (the spend cap a Test run of that board is
     started with) let the Test button name the cost before a paid preview; `max_results` is the
     per-board cap on Results wanted."""
-    from backend.scraper.sources.apify import MAX_RESULTS, PREVIEW_LIMIT, PRESETS, charge_cap_usd
-    return [{"value": key, "label": p.label, "hint": p.hint, "actor": p.actor,
-             "price_per_1k": p.price_per_1k, "test_max_usd": charge_cap_usd(p, PREVIEW_LIMIT),
-             "preview_limit": PREVIEW_LIMIT, "max_results": MAX_RESULTS}
-            for key, p in PRESETS.items()]
+    from backend.scraper.sources.apify import (
+        MAX_RESULTS,
+        PRESETS,
+        PREVIEW_LIMIT,
+        charge_cap_usd,
+    )
+
+    return [
+        {
+            "value": key,
+            "label": p.label,
+            "hint": p.hint,
+            "actor": p.actor,
+            "price_per_1k": p.price_per_1k,
+            "test_max_usd": charge_cap_usd(p, PREVIEW_LIMIT),
+            "preview_limit": PREVIEW_LIMIT,
+            "max_results": MAX_RESULTS,
+        }
+        for key, p in PRESETS.items()
+    ]
 
 
 def _writable_mode(key) -> "_modes.SearchMode":
@@ -140,10 +190,14 @@ def _writable_mode(key) -> "_modes.SearchMode":
     mode = _modes.get_mode(key)
     if mode is None:
         known = ", ".join(k for k, m in _modes.SEARCH_MODES.items() if not m.extension)
-        raise HTTPException(status_code=400, detail=f"Unknown search mode {key!r}; one of: {known}")
+        raise HTTPException(
+            status_code=400, detail=f"Unknown search mode {key!r}; one of: {known}"
+        )
     if mode.extension:
-        raise HTTPException(status_code=400,
-                            detail=f"{mode.label} searches are built in; they cannot be created or switched to")
+        raise HTTPException(
+            status_code=400,
+            detail=f"{mode.label} searches are built in; they cannot be created or switched to",
+        )
     return mode
 
 
@@ -170,13 +224,16 @@ def _apify_sources(sources) -> list:
     The JobSpy default list (SearchCreate.sources) or a keyword search patched to
     `apify` would otherwise reach the paid source with boards nobody picked."""
     from backend.scraper.sources.apify import PRESETS
+
     sources = sources if isinstance(sources, list) else []
     unknown = [s for s in sources if s not in PRESETS]
     if not sources or unknown:
         raise HTTPException(
             status_code=400,
             detail="An Apify search needs at least one Apify board from GET /api/searches/apify-boards"
-                   + (f"; not Apify boards: {', '.join(map(str, unknown))}" if unknown else ""),
+            + (
+                f"; not Apify boards: {', '.join(map(str, unknown))}" if unknown else ""
+            ),
         )
     return sources
 
@@ -207,7 +264,7 @@ def _validated_location(location, country) -> str:
         raise HTTPException(
             status_code=400,
             detail=f"Location '{location}' names {named}, but Country is {country} "
-                   f"— leave the country out of Location, or change Country",
+            f"— leave the country out of Location, or change Country",
         )
     return location
 
@@ -221,10 +278,13 @@ def create_search(data: SearchCreate, db: Session = Depends(get_db)):
     # Only the modes that send location with country to the board (JobSpy, Apify) check the
     # pair; for the URL-driven modes country means nothing and must not reject a row.
     if mode.uses_country:
-        payload["location"] = _validated_location(payload["location"], payload["country"])
+        payload["location"] = _validated_location(
+            payload["location"], payload["country"]
+        )
     payload["sources"] = _sources_for(mode.key, payload.get("sources"))
     if mode.boards == "apify":
         from backend.scraper.sources.apify import clamp_results
+
         payload["sources"] = _apify_sources(payload.get("sources"))
         if payload.get("results_wanted") is not None:
             payload["results_wanted"] = clamp_results(payload["results_wanted"])
@@ -242,6 +302,7 @@ def create_search(data: SearchCreate, db: Session = Depends(get_db)):
 def search_clone_sources(db: Session = Depends(get_db)):
     """Other accounts' searches for the "Copy from…" picker: `{accounts: [{id, name, color, role, items: [{id, name, search_mode, search_term, direct_url, location, country, active}]}]}`. Empty `accounts` with a single account; never the caller's own rows; built-in extension searches left out."""
     from backend.accounts import admin
+
     return admin.search_clone_sources(db)
 
 
@@ -249,10 +310,13 @@ def search_clone_sources(db: Session = Depends(get_db)):
 def clone_search(body: dict, db: Session = Depends(get_db)):
     """Copy one search of another account (`{source_id}`) into this account, due at once. A name clash becomes "<name> (copy)" / "(copy 2)". 409 `needs_two_accounts` / `builtin_search`, 404 `source_not_found` for an own or unknown id."""
     from backend.accounts import admin
+
     try:
         new_id = admin.clone_search(db, (body or {}).get("source_id"))
     except admin.CloneError as e:
-        return JSONResponse(status_code=e.status, content={"detail": e.code, "message": e.message})
+        return JSONResponse(
+            status_code=e.status, content={"detail": e.code, "message": e.message}
+        )
     search = db.query(Search).filter(Search.id == new_id).first()
     return _search_to_dict(search)
 
@@ -264,11 +328,28 @@ def update_search(search_id: str, updates: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Search not found")
 
     allowed = {
-        "name", "active", "sources", "search_mode", "search_term", "direct_url",
-        "location", "country", "is_remote", "job_type", "hours_old", "results_wanted",
-        "title_include_keywords", "title_exclude_keywords", "company_filter",
-        "company_exclude", "exclude_active_companies", "max_pages", "min_fit_score",
-        "require_salary", "auto_scoring_depth", "run_interval_minutes",
+        "name",
+        "active",
+        "sources",
+        "search_mode",
+        "search_term",
+        "direct_url",
+        "location",
+        "country",
+        "is_remote",
+        "job_type",
+        "hours_old",
+        "results_wanted",
+        "title_include_keywords",
+        "title_exclude_keywords",
+        "company_filter",
+        "company_exclude",
+        "exclude_active_companies",
+        "max_pages",
+        "min_fit_score",
+        "require_salary",
+        "auto_scoring_depth",
+        "run_interval_minutes",
     }
     if "country" in updates:
         updates["country"] = _validated_country(updates["country"])
@@ -276,26 +357,38 @@ def update_search(search_id: str, updates: dict, db: Session = Depends(get_db)):
     if "search_mode" in updates:
         wanted = updates["search_mode"] or "keyword"
         if current is not None and current.extension and wanted != search.search_mode:
-            raise HTTPException(status_code=400,
-                                detail="A built-in extension search keeps its mode")
+            raise HTTPException(
+                status_code=400, detail="A built-in extension search keeps its mode"
+            )
         if wanted != search.search_mode:
             updates["search_mode"] = _writable_mode(wanted).key
     mode = _modes.get_mode(updates.get("search_mode", search.search_mode)) or current
-    switching_mode = updates.get("search_mode", search.search_mode) != search.search_mode
+    switching_mode = (
+        updates.get("search_mode", search.search_mode) != search.search_mode
+    )
     # A mode switch resets `sources` to the new mode's default unless the patch sets them:
     # Apify boards must not reach JobSpy, nor JobSpy's boards a mode that takes none (R30 I-03).
-    if mode is not None and mode.boards != "apify" and ("sources" in updates or switching_mode):
+    if (
+        mode is not None
+        and mode.boards != "apify"
+        and ("sources" in updates or switching_mode)
+    ):
         updates["sources"] = _sources_for(mode.key, updates.get("sources"))
     # The pair is validated, not one field: a patch may carry either one, and the
     # other keeps its stored value. This runs before the writes, so a rejected
     # patch leaves the row alone.
-    if mode is not None and mode.uses_country and ("location" in updates or "country" in updates):
+    if (
+        mode is not None
+        and mode.uses_country
+        and ("location" in updates or "country" in updates)
+    ):
         _validated_location(
             updates.get("location", search.location),
             updates.get("country", search.country) or DEFAULT_COUNTRY,
         )
     if mode is not None and mode.boards == "apify":
         from backend.scraper.sources.apify import clamp_results
+
         switching = search.search_mode != mode.key
         if switching or "sources" in updates:
             updates["sources"] = _apify_sources(updates.get("sources", search.sources))
@@ -324,13 +417,17 @@ def acknowledge_search_warning(search_id: str, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=409,
             detail="Extension searches have no scrape health to acknowledge — "
-                   "jobs arrive from the browser extension",
+            "jobs arrive from the browser extension",
         )
     from datetime import datetime, timezone
+
     search.warning_acknowledged_at = datetime.now(timezone.utc)
     db.commit()
-    return {"id": str(search.id), "name": search.name,
-            "warning_acknowledged_at": search.warning_acknowledged_at.isoformat()}
+    return {
+        "id": str(search.id),
+        "name": search.name,
+        "warning_acknowledged_at": search.warning_acknowledged_at.isoformat(),
+    }
 
 
 @router.delete("/{search_id}")
@@ -342,14 +439,16 @@ def delete_search(search_id: str, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=409,
             detail="Built-in extension searches cannot be deleted — "
-                   "pause it instead to stop importing captured jobs",
+            "pause it instead to stop importing captured jobs",
         )
     # ScrapeLog.search_id and Job.search_id are plain FKs with no ON DELETE in the
     # live schema, so orphan both instead of deleting them — jobs keep their own company/title, and run history stays readable.
     db.query(ScrapeLog).filter(ScrapeLog.search_id == search.id).update(
-        {"search_id": None}, synchronize_session=False)
+        {"search_id": None}, synchronize_session=False
+    )
     db.query(Job).filter(Job.search_id == search.id).update(
-        {"search_id": None}, synchronize_session=False)
+        {"search_id": None}, synchronize_session=False
+    )
     db.delete(search)
     try:
         db.commit()
@@ -364,7 +463,9 @@ def delete_search(search_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{search_id}/run", status_code=202)
-async def trigger_search(search_id: str, auto_score: bool = None, db: Session = Depends(get_db)):
+async def trigger_search(
+    search_id: str, auto_score: bool = None, db: Session = Depends(get_db)
+):
     """Trigger a single search in the background; returns immediately with a run_id pollable via /api/monitor/active (scope_key = search id); auto_score overrides the search's auto_scoring_depth when set."""
     search = db.query(Search).filter(Search.id == search_id).first()
     if not search:
@@ -373,41 +474,67 @@ async def trigger_search(search_id: str, auto_score: bool = None, db: Session = 
         raise HTTPException(
             status_code=409,
             detail="Extension searches have no scraper to run — "
-                   "jobs arrive from the browser extension",
+            "jobs arrive from the browser extension",
         )
     # A keyword source with no term or URL would run, find nothing, and leave the run history
     # at "nothing ran"; say why up front instead.
     from backend.scraper.orchestrator import search_config_error
+
     config_error = search_config_error(search)
     if config_error:
         raise HTTPException(status_code=409, detail=config_error)
-    if getattr(_modes.get_mode(search.search_mode), "paid", False) and _tests_in_flight.get(_test_flight_key(search.id)):
+    if getattr(
+        _modes.get_mode(search.search_mode), "paid", False
+    ) and _tests_in_flight.get(_test_flight_key(search.id)):
         # A paid Test of this search is still running; a run now would buy the same
         # results a second time (R30 S-07).
-        return JSONResponse(status_code=409, content={
-            "detail": "test_running",
-            "message": f"A Test of “{search.name}” is still running; run it when the Test finishes"})
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": "test_running",
+                "message": f"A Test of “{search.name}” is still running; run it when the Test finishes",
+            },
+        )
     search_name = search.name
 
     async def _do():
         from backend.scraper.orchestrator import _run_search_by_id as run_single_search
+
         result = await run_single_search(search_id, auto_score=auto_score)
         # Never forward scraper exception strings to the client (py/stack-trace-exposure);
         # the real text is already persisted on the ScrapeLog row and logged here.
         if isinstance(result, dict) and result.get("error"):
-            logger.warning("Search %s finished with scrape error: %s", search_id, result.get("error"))
+            logger.warning(
+                "Search %s finished with scrape error: %s",
+                search_id,
+                result.get("error"),
+            )
         # Returned string becomes JobRun.result_summary (Stats -> Run history), built
         # from the ScrapeLog row the run just wrote so the line and audit row always agree.
         from backend.scraper.orchestrator import summarize_search_run
+
         return summarize_search_run(search_name, result)
 
     from backend.job_monitor import (
-        launch_background, JobAlreadyRunningError, scheduled_scrape_conflict_response,
+        JobAlreadyRunningError,
+        launch_background,
+        scheduled_scrape_conflict_response,
     )
+
     try:
-        run_id = launch_background("search_run", _do, trigger="manual",
-                                   scope_key=search_id, meta={"search": search_name})
-        return {"run_id": run_id, "status": "running", "search_id": search_id, "search": search_name}
+        run_id = launch_background(
+            "search_run",
+            _do,
+            trigger="manual",
+            scope_key=search_id,
+            meta={"search": search_name},
+        )
+        return {
+            "run_id": run_id,
+            "status": "running",
+            "search_id": search_id,
+            "search": search_name,
+        }
     except JobAlreadyRunningError as e:
         logger.info("Search run rejected for %s: %s", search_id, e)
         # QA F6 / R4-01: `scheduled_scrape_running` while the scheduled scrape is live.
@@ -428,34 +555,57 @@ async def test_search(search_id: str, db: Session = Depends(get_db)):
         if in_flight:
             # The same search's Test is still running: hand back its run_id to poll instead
             # of starting another (for Apify, another paid run).
-            return JSONResponse(status_code=409, content={
-                "detail": "test_running", "run_id": in_flight,
-                "message": f"A Test of “{search.name}” is already running"})
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "detail": "test_running",
+                    "run_id": in_flight,
+                    "message": f"A Test of “{search.name}” is already running",
+                },
+            )
         if mode.paid:
             from backend.job_monitor import is_running
-            if is_running("search_run", search_id) or is_running("search_run", str(search.id)):
-                return JSONResponse(status_code=409, content={
-                    "detail": "search_running",
-                    "message": f"“{search.name}” is running now; test it when the run finishes"})
+
+            if is_running("search_run", search_id) or is_running(
+                "search_run", str(search.id)
+            ):
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "detail": "search_running",
+                        "message": f"“{search.name}” is running now; test it when the run finishes",
+                    },
+                )
         run_id = str(uuid.uuid4())[:8]
         account = _account_key()
 
         def _store(status, result):
-            _test_results[run_id] = {"status": status, "result": result, "account": account}
+            _test_results[run_id] = {
+                "status": status,
+                "result": result,
+                "account": account,
+            }
+
         _store("running", None)
         _tests_in_flight[flight_key] = run_id
 
         # Snapshot search fields needed by the test functions (DB session won't survive across await)
         from backend.models.db import SessionLocal
+
         async def _run_test():
             test_db = SessionLocal()
             try:
-                test_search_obj = test_db.query(Search).filter(Search.id == search_id).first()
+                test_search_obj = (
+                    test_db.query(Search).filter(Search.id == search_id).first()
+                )
                 if not test_search_obj:
                     _store("done", {"error": "Search not found"})
                     return
                 import importlib
-                source = importlib.import_module(f"backend.scraper.sources.{mode.module}")
+
+                source = importlib.import_module(
+                    f"backend.scraper.sources.{mode.module}"
+                )
                 result = await source.preview(test_search_obj, test_db)
                 _store("done", result)
             except Exception as e:
@@ -472,14 +622,25 @@ async def test_search(search_id: str, db: Session = Depends(get_db)):
         async def _run_test_locked():
             with owner_unlocked(False):
                 await _run_test()
+
         asyncio.create_task(_run_test_locked())
-        return JSONResponse(status_code=202, content={"run_id": run_id, "status": "running"})
+        return JSONResponse(
+            status_code=202, content={"run_id": run_id, "status": "running"}
+        )
 
     if mode is None or mode.key != "keyword":
-        raise HTTPException(status_code=400, detail="Test is not available for "
-                            + (f"{mode.label} searches" if mode else f"search mode {search.search_mode!r}"))
+        raise HTTPException(
+            status_code=400,
+            detail="Test is not available for "
+            + (
+                f"{mode.label} searches"
+                if mode
+                else f"search mode {search.search_mode!r}"
+            ),
+        )
 
     from backend.scraper.sources import jobspy
+
     try:
         return await jobspy.preview(search, db)
     except ValueError as e:
@@ -494,19 +655,23 @@ async def get_test_result(run_id: str):
     if not entry or entry.get("account") != _account_key():
         raise HTTPException(status_code=404, detail="Test run not found")
     if entry["status"] == "running":
-        return JSONResponse(status_code=202, content={"run_id": run_id, "status": "running"})
+        return JSONResponse(
+            status_code=202, content={"run_id": run_id, "status": "running"}
+        )
     result = entry["result"]
     if len(_test_results) > 20:
-        oldest = list(_test_results.keys())[:len(_test_results) - 20]
+        oldest = list(_test_results.keys())[: len(_test_results) - 20]
         for k in oldest:
             _test_results.pop(k, None)
     return result
+
 
 def _last_source_errors(last_log) -> list:
     """Per-board failures from a search's most recent ScrapeLog row."""
     if last_log is None:
         return []
     from backend.scraper.orchestrator import source_errors, source_label
+
     return [
         {"source": key, "label": source_label(key), "error": err}
         for key, err in source_errors(getattr(last_log, "source_breakdown", None))
@@ -539,11 +704,14 @@ def _search_to_dict(s: Search, last_log=None) -> dict:
         "auto_scoring_depth": s.auto_scoring_depth,
         "run_interval_minutes": s.run_interval_minutes,
         "last_run_at": s.last_run_at.isoformat() if s.last_run_at else None,
-        "warning_acknowledged_at": s.warning_acknowledged_at.isoformat() if s.warning_acknowledged_at else None,
+        "warning_acknowledged_at": s.warning_acknowledged_at.isoformat()
+        if s.warning_acknowledged_at
+        else None,
         # True while the acknowledgement still covers the newest run — the UI
         # mutes the warning instead of hiding it, so the history stays readable.
         "warning_acknowledged": is_acknowledged(
-            getattr(last_log, "ran_at", None), s.warning_acknowledged_at),
+            getattr(last_log, "ran_at", None), s.warning_acknowledged_at
+        ),
         "created_at": s.created_at.isoformat() if s.created_at else None,
         # most recent ScrapeLog for this search (None until it has run once)
         "last_error": (last_log.error if last_log else None),

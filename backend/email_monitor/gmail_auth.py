@@ -19,6 +19,7 @@ the install's `account_cookie_secret` (purpose-bound, so a state can never pass 
 jn_account cookie); the nonce is single use and lives in memory (a backend restart during
 consent → "state_unknown", the user clicks Connect again).
 """
+
 import hashlib
 import hmac
 import json
@@ -49,9 +50,13 @@ def _now() -> float:
 
 # ── Install secrets (read from gmail_client so the existing test patches still apply) ──
 
+
 def client_config() -> tuple[str, str]:
     from backend.email_monitor import gmail_client
-    return (gmail_client.GMAIL_CLIENT_ID or "").strip(), (gmail_client.GMAIL_CLIENT_SECRET or "").strip()
+
+    return (gmail_client.GMAIL_CLIENT_ID or "").strip(), (
+        gmail_client.GMAIL_CLIENT_SECRET or ""
+    ).strip()
 
 
 def is_configured() -> bool:
@@ -61,10 +66,12 @@ def is_configured() -> bool:
 
 def _env_token() -> str:
     from backend.email_monitor import gmail_client
+
     return (gmail_client.GMAIL_REFRESH_TOKEN or "").strip()
 
 
 # ── Token and status per account ─────────────────────────────────────────────
+
 
 def resolve_token(db) -> tuple[str, Optional[str]]:
     """(refresh token, source) for the current account: source 'account' (stored, in-app
@@ -93,15 +100,25 @@ def is_expired(db, token: str) -> bool:
 
 
 def mark_expired(db, token: str) -> None:
-    put_setting(db, STATUS_KEY, f"expired:{fingerprint(token)}", account_id=_target(db),
-                description="Gmail token state (auto-managed)")
+    put_setting(
+        db,
+        STATUS_KEY,
+        f"expired:{fingerprint(token)}",
+        account_id=_target(db),
+        description="Gmail token state (auto-managed)",
+    )
     db.commit()
 
 
 def clear_status(db, account_id=None, commit: bool = True) -> None:
     """Drop the expired marker (writes only when one is set)."""
     from backend.accounts.settings import _account_row, install_row
-    row = install_row(db, STATUS_KEY) if account_id is None else _account_row(db, account_id, STATUS_KEY)
+
+    row = (
+        install_row(db, STATUS_KEY)
+        if account_id is None
+        else _account_row(db, account_id, STATUS_KEY)
+    )
     if row is not None and row.value:
         row.value = ""
         if commit:
@@ -122,8 +139,13 @@ def status(db) -> dict:
 
 def store_token(db, account_id: Optional[uuid.UUID], token: str) -> None:
     """Save a connected account's refresh token (None = the owner's install row)."""
-    put_setting(db, TOKEN_KEY, token, account_id=account_id,
-                description="Gmail OAuth refresh token (connected in Settings)")
+    put_setting(
+        db,
+        TOKEN_KEY,
+        token,
+        account_id=account_id,
+        description="Gmail OAuth refresh token (connected in Settings)",
+    )
     clear_status(db, account_id, commit=False)
     db.commit()
 
@@ -132,17 +154,27 @@ def connected_member_ids(db) -> set:
     """Members with a stored token that is not marked expired (system read)."""
     from backend.accounts.context import unscoped
     from backend.models.db import Setting
+
     with unscoped():
-        rows = db.query(Setting.account_id, Setting.key, Setting.value).filter(
-            Setting.account_id.isnot(None), Setting.key.in_([TOKEN_KEY, STATUS_KEY])).all()
+        rows = (
+            db.query(Setting.account_id, Setting.key, Setting.value)
+            .filter(
+                Setting.account_id.isnot(None), Setting.key.in_([TOKEN_KEY, STATUS_KEY])
+            )
+            .all()
+        )
     tokens, marks = {}, {}
     for acc, key, value in rows:
         (tokens if key == TOKEN_KEY else marks)[acc] = (value or "").strip()
-    return {acc for acc, tok in tokens.items()
-            if tok and marks.get(acc, "") != f"expired:{fingerprint(tok)}"}
+    return {
+        acc
+        for acc, tok in tokens.items()
+        if tok and marks.get(acc, "") != f"expired:{fingerprint(tok)}"
+    }
 
 
 # ── Connect state ────────────────────────────────────────────────────────────
+
 
 class StateError(Exception):
     def __init__(self, reason: str):
@@ -152,13 +184,17 @@ class StateError(Exception):
 
 def _state_key(db) -> bytes:
     from backend.accounts.auth import cookie_secret
-    return hmac.new(cookie_secret(db), b"jobnavigator gmail oauth state", hashlib.sha256).digest()
+
+    return hmac.new(
+        cookie_secret(db), b"jobnavigator gmail oauth state", hashlib.sha256
+    ).digest()
 
 
 def new_state(db, account_id, redirect_uri: str) -> tuple:
     """(signed state, its nonce). /connect puts the nonce into the BROWSER_COOKIE of the
     browser that asked, and the callback requires it there (QA F8 / R5-06)."""
     from backend.accounts.auth import sign_cookie
+
     now = _now()
     for n, exp in list(_pending_nonces.items()):
         if exp < now:
@@ -166,8 +202,10 @@ def new_state(db, account_id, redirect_uri: str) -> tuple:
     nonce = secrets.token_urlsafe(16)
     exp = int(now + STATE_TTL)
     _pending_nonces[nonce] = exp
-    state = sign_cookie(_state_key(db), {"k": "gmail", "a": str(account_id), "n": nonce,
-                                         "e": exp, "r": redirect_uri})
+    state = sign_cookie(
+        _state_key(db),
+        {"k": "gmail", "a": str(account_id), "n": nonce, "e": exp, "r": redirect_uri},
+    )
     return state, nonce
 
 
@@ -189,26 +227,46 @@ BROWSER_COOKIE = "jn_gmail_state"
 
 
 def set_browser_cookie(response, nonce: str, secure: bool = False) -> None:
-    response.set_cookie(key=BROWSER_COOKIE, value=nonce, max_age=STATE_TTL, path=CALLBACK_PATH,
-                        httponly=True, samesite="lax", secure=secure)
+    response.set_cookie(
+        key=BROWSER_COOKIE,
+        value=nonce,
+        max_age=STATE_TTL,
+        path=CALLBACK_PATH,
+        httponly=True,
+        samesite="lax",
+        secure=secure,
+    )
 
 
 def clear_browser_cookie(response) -> None:
-    response.delete_cookie(key=BROWSER_COOKIE, path=CALLBACK_PATH, httponly=True, samesite="lax")
+    response.delete_cookie(
+        key=BROWSER_COOKIE, path=CALLBACK_PATH, httponly=True, samesite="lax"
+    )
 
 
-def check_browser(db, payload: dict, browser_nonce: Optional[str], account_cookie: Optional[str]) -> None:
+def check_browser(
+    db, payload: dict, browser_nonce: Optional[str], account_cookie: Optional[str]
+) -> None:
     """StateError('browser_mismatch') unless this browser started the flow (it holds the
     state's nonce); StateError('account_mismatch') when its jn_account cookie is present
     and does not resolve to the state's account."""
     expected = str(payload.get("n") or "")
     given = browser_nonce if isinstance(browser_nonce, str) else ""
-    if not expected or not given or not hmac.compare_digest(
-            given.encode("utf-8", "surrogatepass"), expected.encode("utf-8", "surrogatepass")):
+    if (
+        not expected
+        or not given
+        or not hmac.compare_digest(
+            given.encode("utf-8", "surrogatepass"),
+            expected.encode("utf-8", "surrogatepass"),
+        )
+    ):
         raise StateError("browser_mismatch")
     if account_cookie:
         from backend.accounts import auth as acct_auth
-        acc, _payload = acct_auth.account_from_cookie(db, acct_auth.load_accounts(db), account_cookie)
+
+        acc, _payload = acct_auth.account_from_cookie(
+            db, acct_auth.load_accounts(db), account_cookie
+        )
         if acc is None or str(acc["id"]) != str(payload.get("a")):
             raise StateError("account_mismatch")
 
@@ -217,6 +275,7 @@ def read_state(db, state: Optional[str]) -> dict:
     """The payload of a valid, unexpired, unused state (the nonce is consumed); else
     StateError('invalid_state' | 'state_expired' | 'state_unknown')."""
     from backend.accounts.auth import _b64, _unb64
+
     if not state or not isinstance(state, str) or state.count(".") != 1:
         raise StateError("invalid_state")
     body, sig = state.split(".")
@@ -227,9 +286,14 @@ def read_state(db, state: Optional[str]) -> dict:
         payload = json.loads(_unb64(body))
     except Exception:
         raise StateError("invalid_state")
-    if (not isinstance(payload, dict) or payload.get("k") != "gmail"
-            or not isinstance(payload.get("e"), (int, float)) or not payload.get("a")
-            or not payload.get("n") or not payload.get("r")):
+    if (
+        not isinstance(payload, dict)
+        or payload.get("k") != "gmail"
+        or not isinstance(payload.get("e"), (int, float))
+        or not payload.get("a")
+        or not payload.get("n")
+        or not payload.get("r")
+    ):
         raise StateError("invalid_state")
     if payload["e"] < _now():
         _pending_nonces.pop(payload["n"], None)
@@ -240,24 +304,35 @@ def read_state(db, state: Optional[str]) -> dict:
 
 
 def consent_url(client_id: str, redirect_uri: str, state: str) -> str:
-    return AUTH_URL + "?" + urllib.parse.urlencode({
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": SCOPE,
-        "access_type": "offline",
-        "prompt": "consent",
-        "include_granted_scopes": "true",
-        "state": state,
-    })
+    return (
+        AUTH_URL
+        + "?"
+        + urllib.parse.urlencode(
+            {
+                "client_id": client_id,
+                "redirect_uri": redirect_uri,
+                "response_type": "code",
+                "scope": SCOPE,
+                "access_type": "offline",
+                "prompt": "consent",
+                "include_granted_scopes": "true",
+                "state": state,
+            }
+        )
+    )
 
 
 def base_url(request) -> str:
     """The browser-facing origin: forwarded proto/host when a proxy sets them, else the
     request's own (Caddy passes the original Host, so localhost works as is)."""
-    proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip() or request.url.scheme
-    host = ((request.headers.get("x-forwarded-host") or "").split(",")[0].strip()
-            or request.headers.get("host") or request.url.netloc)
+    proto = (request.headers.get("x-forwarded-proto") or "").split(",")[
+        0
+    ].strip() or request.url.scheme
+    host = (
+        (request.headers.get("x-forwarded-host") or "").split(",")[0].strip()
+        or request.headers.get("host")
+        or request.url.netloc
+    )
     return f"{proto}://{host}"
 
 

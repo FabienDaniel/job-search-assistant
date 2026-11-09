@@ -1,5 +1,6 @@
 """The scrape gate (`scrape_max_concurrent`): scrapes run one after another, a run that
 waits for its turn says so in /monitor/active, and its clock starts when it gets the slot."""
+
 import asyncio
 from datetime import timezone
 
@@ -43,11 +44,18 @@ def test_every_scrape_job_type_takes_the_scraping_gate(_monitor):
         assert jm.limiter_for_job_type(job_type) is jm.get_limiter("scraping")
 
 
-def test_scraping_limit_defaults_to_one_and_is_capped_at_two(_monitor, test_db, monkeypatch):
+def test_scraping_limit_defaults_to_one_and_is_capped_at_two(
+    _monitor, test_db, monkeypatch
+):
     jm = _monitor
     assert jm.get_limiter("scraping").value == 1
     import backend.job_monitor as mod
-    monkeypatch.setattr(mod, "get_setting", lambda db, key, *a: "7" if key == "scrape_max_concurrent" else None)
+
+    monkeypatch.setattr(
+        mod,
+        "get_setting",
+        lambda db, key, *a: "7" if key == "scrape_max_concurrent" else None,
+    )
     jm.reset_limiter("scraping")
     assert jm.get_limiter("scraping").value == 2
 
@@ -68,7 +76,7 @@ async def test_two_manual_scrapes_run_one_after_the_other(_monitor):
     jm.launch_background("company_scrape", first, scope_key="c1")
     jm.launch_background("search_run", second, scope_key="s1")
     await asyncio.sleep(0.05)
-    assert order == ["first start"]                     # the second waits, it does not fail
+    assert order == ["first start"]  # the second waits, it does not fail
     active = {r["job_type"]: r for r in jm.get_all_running()}
     assert active["company_scrape"]["waiting"] is False
     assert active["search_run"]["waiting"] is True
@@ -81,6 +89,7 @@ async def test_two_manual_scrapes_run_one_after_the_other(_monitor):
 async def test_a_waiting_run_starts_its_clock_when_it_gets_the_slot(_monitor, test_db):
     jm = _monitor
     from backend.models.db import JobRun
+
     release = asyncio.Event()
 
     async def first():
@@ -97,9 +106,12 @@ async def test_a_waiting_run_starts_its_clock_when_it_gets_the_slot(_monitor, te
     release.set()
     await _drain(jm, ["company_scrape:c1", "company_scrape:c2"])
     s = sessionmaker(bind=test_db.get_bind())()
-    rows = {r.result_summary: r for r in s.query(JobRun).filter_by(job_type="company_scrape").all()}
+    rows = {
+        r.result_summary: r
+        for r in s.query(JobRun).filter_by(job_type="company_scrape").all()
+    }
     s.close()
-    assert rows["done"].started_at > queued_at          # the queue time is not run time
+    assert rows["done"].started_at > queued_at  # the queue time is not run time
     assert rows["done"].duration_seconds < 0.25
 
 
@@ -114,7 +126,9 @@ async def test_scheduled_scrape_waits_for_a_manual_one(_monitor):
         order.append("manual end")
 
     async def scheduled():
-        async with jm.tracked_run("scrape_all", "scheduler", scope_key=jm.SCHEDULED_SCRAPE_SCOPE):
+        async with jm.tracked_run(
+            "scrape_all", "scheduler", scope_key=jm.SCHEDULED_SCRAPE_SCOPE
+        ):
             order.append("scheduled start")
 
     jm.launch_background("scrape_all", manual)

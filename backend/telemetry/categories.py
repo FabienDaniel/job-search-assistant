@@ -1,25 +1,44 @@
 """Error texts reduced to a category: the text itself (names, URLs, ids) is never sent."""
+
 import re
 
 _SCRAPE = (
     ("board_not_found", r"BoardNotFound|board .* not found|no such board"),
-    ("bot_wall", r"captcha|cloudflare|bot check|access denied|are you a robot|verify you are human"),
+    (
+        "bot_wall",
+        r"captcha|cloudflare|bot check|access denied|are you a robot|verify you are human",
+    ),
     ("http_429", r"\b429\b|too many requests|rate.?limit"),
     ("http_403", r"\b403\b|forbidden"),
     ("http_404", r"\b404\b|\b410\b|not found"),
     ("http_5xx", r"\b5\d\d\b|server disconnected|bad gateway|service unavailable"),
     ("timeout", r"timeout|timed out|TimeoutError|ReadTimeout|ConnectTimeout"),
-    ("parse", r"JSONDecode|json decode|KeyError|TypeError|IndexError|AttributeError|parse|NUL \(0x00\)"),
+    (
+        "parse",
+        r"JSONDecode|json decode|KeyError|TypeError|IndexError|AttributeError|parse|NUL \(0x00\)",
+    ),
 )
 
 _LLM = (
-    ("unknown_model", r"unrecognized_model|model[_ ]not[_ ]found|unknown model|does not exist"),
-    ("cli_missing", r"rc=127|command not found|No such file or directory|not installed|ENOENT"),
-    ("auth", r"\b401\b|invalid.{0,10}api.?key|authentication|unauthori[sz]ed|not logged in|oauth"),
+    (
+        "unknown_model",
+        r"unrecognized_model|model[_ ]not[_ ]found|unknown model|does not exist",
+    ),
+    (
+        "cli_missing",
+        r"rc=127|command not found|No such file or directory|not installed|ENOENT",
+    ),
+    (
+        "auth",
+        r"\b401\b|invalid.{0,10}api.?key|authentication|unauthori[sz]ed|not logged in|oauth",
+    ),
     ("quota", r"quota|credit|billing|insufficient|\b402\b"),
     ("rate_limit", r"\b429\b|rate.?limit|overloaded|\b529\b"),
     ("timeout", r"timeout|timed out|deadline"),
-    ("bad_response", r"JSON decode|not valid JSON|Expecting value|Expecting ',' delimiter|malformed|empty response"),
+    (
+        "bad_response",
+        r"JSON decode|not valid JSON|Expecting value|Expecting ',' delimiter|malformed|empty response",
+    ),
     # a CLI provider (Claude Code, Codex, Antigravity) that exited with an error and said nothing more
     ("cli_error", r"subprocess failed|exited with|\brc=\d+"),
     ("cancelled", r"^cancelled$"),
@@ -50,4 +69,6 @@ def tally(categories) -> str:
     for c in categories:
         if c:
             counts[c] = counts.get(c, 0) + 1
-    return ", ".join(f"{k}={v}" for k, v in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+    return ", ".join(
+        f"{k}={v}" for k, v in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    )

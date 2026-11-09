@@ -1,13 +1,14 @@
 """Generic CSS-selector fallback for career pages with no ATS match: launches a headless browser,
 extracts job-card links, paginates, and returns {title, url} dicts filtered through _validate_job."""
+
 import asyncio
 import logging
 import re
 from urllib.parse import urlparse
 
-from backend.scraper._shared.browser import _get_browser, _new_page, _close_page
-from backend.scraper._shared.filters import _validate_job
 from backend.analyzer.location import CA_REGIONS, COUNTRY_NAMES, US_REGIONS, fold
+from backend.scraper._shared.browser import _close_page, _get_browser, _new_page
+from backend.scraper._shared.filters import _validate_job
 
 logger = logging.getLogger("jobnavigator.scraper.ats.generic")
 
@@ -26,8 +27,12 @@ logger = logging.getLogger("jobnavigator.scraper.ats.generic")
 # when a posting spans more sites than the card has room for. "Multiple Cities"
 # is deliberately absent: the parser reads it as a city, and a city called
 # "Multiple Cities" is worse than no place at all.
-_PLACE_WORDS = (set(COUNTRY_NAMES) | set(CA_REGIONS) | set(US_REGIONS)
-                | {"multiple locations", "various locations"})
+_PLACE_WORDS = (
+    set(COUNTRY_NAMES)
+    | set(CA_REGIONS)
+    | set(US_REGIONS)
+    | {"multiple locations", "various locations"}
+)
 
 # The label a card prints before the place ("… | Location | Sunnyvale").
 _PLACE_LABELS = {"location", "locations", "office", "offices", "job location"}
@@ -37,7 +42,8 @@ _PLACE_LABELS = {"location", "locations", "office", "offices", "job location"}
 # "Office" only with its colon: "Office Park" is a name, "Location Sunnyvale"
 # is Apple's label above the place.
 _HINT_LABEL = re.compile(
-    r"^\s*(?:job\s+)?(?:locations?\b\s*[:\-]?\s*|offices?\b\s*[:\-]\s*)", re.I)
+    r"^\s*(?:job\s+)?(?:locations?\b\s*[:\-]?\s*|offices?\b\s*[:\-]\s*)", re.I
+)
 
 
 def strip_place_label(text: str) -> str:
@@ -49,15 +55,53 @@ def strip_place_label(text: str) -> str:
     collapsed = re.sub(r"\s+", " ", text or "").strip()
     return _HINT_LABEL.sub("", collapsed).strip()
 
+
 # Card furniture: a button, a badge, an employment type. None of it is a place.
 _NOISE_SEGMENTS = {
-    "save", "saved", "save job", "unsave", "apply", "apply now", "easy apply",
-    "new", "featured", "hot", "urgent", "view job", "view details", "details",
-    "learn more", "read more", "share", "posted", "date posted", "job type",
-    "category", "department", "team", "function", "req id", "requisition id",
-    "full-time", "full time", "part-time", "part time", "fulltime", "parttime",
-    "intern", "internship", "contract", "contractor", "temporary", "permanent",
-    "regular", "employee", "student", "graduate", "entry level", "experienced",
+    "save",
+    "saved",
+    "save job",
+    "unsave",
+    "apply",
+    "apply now",
+    "easy apply",
+    "new",
+    "featured",
+    "hot",
+    "urgent",
+    "view job",
+    "view details",
+    "details",
+    "learn more",
+    "read more",
+    "share",
+    "posted",
+    "date posted",
+    "job type",
+    "category",
+    "department",
+    "team",
+    "function",
+    "req id",
+    "requisition id",
+    "full-time",
+    "full time",
+    "part-time",
+    "part time",
+    "fulltime",
+    "parttime",
+    "intern",
+    "internship",
+    "contract",
+    "contractor",
+    "temporary",
+    "permanent",
+    "regular",
+    "employee",
+    "student",
+    "graduate",
+    "entry level",
+    "experienced",
 }
 
 _MONTHS = "jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec"
@@ -68,7 +112,9 @@ _DATE_SEGMENT = re.compile(
     r"|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}"
     r"|\d{4}-\d{2}-\d{2}"
     r"|\d+\+?\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months)\s+ago"
-    r"|today|yesterday)$", re.I)
+    r"|today|yesterday)$",
+    re.I,
+)
 
 _ARRANGEMENT_WORD = re.compile(r"\b(remote|hybrid|on-?site|work from home)\b", re.I)
 # A card with no separator at all runs the place straight onto the previous
@@ -146,18 +192,69 @@ def _place_segments(segments: list) -> list:
 # The fallback below only fires when one segment is left after these go, so this
 # list is what keeps "Sales · Full-time · London" from answering "Sales".
 _NON_PLACE_WORDS = {
-    "sales", "marketing", "engineering", "design", "product", "product management",
-    "program management", "project management", "operations", "business operations",
-    "finance", "accounting", "legal", "compliance", "recruiting", "people",
-    "human resources", "talent", "support", "customer support", "customer success",
-    "research", "data", "data science", "security", "it", "information technology",
-    "business development", "corporate functions", "software engineering",
-    "machine learning", "consulting", "hardware", "software", "services",
-    "software and services", "communications", "growth", "strategy", "partnerships",
-    "community", "content", "analytics", "infrastructure", "platform", "solutions",
-    "technology", "administration", "facilities", "quality", "manufacturing",
-    "supply chain", "health", "education", "public policy", "trust and safety",
-    "corporate", "general", "other", "various", "all", "apply now", "apply",
+    "sales",
+    "marketing",
+    "engineering",
+    "design",
+    "product",
+    "product management",
+    "program management",
+    "project management",
+    "operations",
+    "business operations",
+    "finance",
+    "accounting",
+    "legal",
+    "compliance",
+    "recruiting",
+    "people",
+    "human resources",
+    "talent",
+    "support",
+    "customer support",
+    "customer success",
+    "research",
+    "data",
+    "data science",
+    "security",
+    "it",
+    "information technology",
+    "business development",
+    "corporate functions",
+    "software engineering",
+    "machine learning",
+    "consulting",
+    "hardware",
+    "software",
+    "services",
+    "software and services",
+    "communications",
+    "growth",
+    "strategy",
+    "partnerships",
+    "community",
+    "content",
+    "analytics",
+    "infrastructure",
+    "platform",
+    "solutions",
+    "technology",
+    "administration",
+    "facilities",
+    "quality",
+    "manufacturing",
+    "supply chain",
+    "health",
+    "education",
+    "public policy",
+    "trust and safety",
+    "corporate",
+    "general",
+    "other",
+    "various",
+    "all",
+    "apply now",
+    "apply",
 }
 # A place written as a proper noun: "London", "NEW YORK", "Sunnyvale".
 _PROPER_NOUN = re.compile(r"^[A-Z][A-Za-z.'’-]*(?:\s+[A-Z][A-Za-z.'’-]*){0,3}$")
@@ -176,9 +273,15 @@ def _fallback_place(segments: list, title: str = "") -> str | None:
     for segment in segments:
         text = segment.strip(" -–—,·•→")
         folded = fold(text)
-        if (not text or len(text) > 40 or folded in _NOISE_SEGMENTS
-                or folded in _NON_PLACE_WORDS or folded == fold(title)
-                or _is_date(text) or any(ch.isdigit() for ch in text)):
+        if (
+            not text
+            or len(text) > 40
+            or folded in _NOISE_SEGMENTS
+            or folded in _NON_PLACE_WORDS
+            or folded == fold(title)
+            or _is_date(text)
+            or any(ch.isdigit() for ch in text)
+        ):
             continue
         if not _PROPER_NOUN.match(text) and text != text.upper():
             continue
@@ -197,9 +300,14 @@ def _hint_place(hint: str) -> str | None:
     # Apple's cell prints its own label above the place: "Location\nSunnyvale".
     text = strip_place_label(hint)
     folded = fold(text)
-    if (not text or len(text) > _MAX_SEGMENT or _is_date(text)
-            or folded in _PLACE_LABELS or folded in _NOISE_SEGMENTS
-            or folded in _NON_PLACE_WORDS):
+    if (
+        not text
+        or len(text) > _MAX_SEGMENT
+        or _is_date(text)
+        or folded in _PLACE_LABELS
+        or folded in _NOISE_SEGMENTS
+        or folded in _NON_PLACE_WORDS
+    ):
         return None
     if _looks_like_place(text):
         return text
@@ -287,15 +395,19 @@ async def _card_location(el, title: str):
 
 # ── Route blocking ───────────────────────────────────────────────────────────
 
+
 async def _setup_route_blocks(page):
     """Block unwanted endpoints (e.g. eightfold similar_positions widget)."""
+
     async def _block_handler(route):
         logger.info(f"Blocked request: {route.request.url}")
         await route.abort()
+
     await page.route(re.compile(r"similar_positions"), _block_handler)
 
 
 # ── Wait for content ──────────────────────────────────────────────────────────
+
 
 async def _wait_for_content(page, wait_for_selector: str = None):
     """Wait for page content to render. Uses custom selector if provided, else 3s delay."""
@@ -312,25 +424,37 @@ async def _wait_for_content(page, wait_for_selector: str = None):
 
 # ── Extract job links from current page ───────────────────────────────────────
 
-async def _extract_job_links_from_page(page, base_url: str, debug: bool = False) -> list[dict]:
+
+async def _extract_job_links_from_page(
+    page, base_url: str, debug: bool = False
+) -> list[dict]:
     """Extract and validate job links from the currently loaded page; if debug=True, returns
     all found links with their validation status/reason."""
-    jobs_by_url = {}      # URL -> job dict (valid jobs)
-    rejected = []         # debug: rejected entries
+    jobs_by_url = {}  # URL -> job dict (valid jobs)
+    rejected = []  # debug: rejected entries
 
     # Specific selectors first — if these find results, skip the broad ones
     specific_selectors = [
-        '[class*="position-card"] a', '[class*="position-title"] a',
+        '[class*="position-card"] a',
+        '[class*="position-title"] a',
         '[data-automation-id="jobTitle"]',
-        '.job-listing a', '.job-card a', '.opening a',
-        '[data-job] a', '.career-listing a', '[role="listitem"] a',
-        'a.js-view-job',
+        ".job-listing a",
+        ".job-card a",
+        ".opening a",
+        "[data-job] a",
+        ".career-listing a",
+        '[role="listitem"] a',
+        "a.js-view-job",
     ]
     # Broad URL-pattern selectors — only used as fallback
     broad_selectors = [
-        'a[href*="/jobs/"]', 'a[href*="/job/"]',
-        'a[href*="/position"]', 'a[href*="/opening"]', 'a[href*="/role"]',
-        'a[href*="/viewjob"]', 'a[href*="/requisition"]',
+        'a[href*="/jobs/"]',
+        'a[href*="/job/"]',
+        'a[href*="/position"]',
+        'a[href*="/opening"]',
+        'a[href*="/role"]',
+        'a[href*="/viewjob"]',
+        'a[href*="/requisition"]',
         'a[href*="eightfold.ai/careers"]',
         'a[href*="/careers/"]',
     ]
@@ -366,7 +490,13 @@ async def _extract_job_links_from_page(page, base_url: str, debug: bool = False)
 
                     # Try to get title from a heading element inside the <a>
                     text = None
-                    for heading_sel in ('[class*="heading"]', '[class*="title"]', 'h2', 'h3', 'h4'):
+                    for heading_sel in (
+                        '[class*="heading"]',
+                        '[class*="title"]',
+                        "h2",
+                        "h3",
+                        "h4",
+                    ):
                         heading_el = await el.query_selector(heading_sel)
                         if heading_el:
                             text = (await heading_el.inner_text() or "").strip()
@@ -374,13 +504,20 @@ async def _extract_job_links_from_page(page, base_url: str, debug: bool = False)
                                 break
                     if not text:
                         text = (await el.inner_text() or "").strip()
-                    if '\n' in text:
-                        lines = [l.strip() for l in text.split('\n') if l.strip()]
+                    if "\n" in text:
+                        lines = [l.strip() for l in text.split("\n") if l.strip()]
                         text = lines[0] if lines else ""
 
                     if not text:
                         if debug:
-                            rejected.append({"title": "(empty)", "url": href, "selector": selector, "reason": "No text"})
+                            rejected.append(
+                                {
+                                    "title": "(empty)",
+                                    "url": href,
+                                    "selector": selector,
+                                    "reason": "No text",
+                                }
+                            )
                         continue
 
                     reason = _validate_job(text, href)
@@ -392,7 +529,14 @@ async def _extract_job_links_from_page(page, base_url: str, debug: bool = False)
                             job["locations"] = _split_places(place)
                         jobs_by_url[href] = job
                     elif debug:
-                        rejected.append({"title": text, "url": href, "selector": selector, "reason": reason})
+                        rejected.append(
+                            {
+                                "title": text,
+                                "url": href,
+                                "selector": selector,
+                                "reason": reason,
+                            }
+                        )
             except Exception:
                 continue
 
@@ -408,7 +552,14 @@ async def _extract_job_links_from_page(page, base_url: str, debug: bool = False)
 
 # ── Pagination ────────────────────────────────────────────────────────────────
 
-async def _extract_all_pages(page, base_url: str, max_pages: int = 5, debug: bool = False, wait_for_selector: str = None) -> list[dict] | tuple:
+
+async def _extract_all_pages(
+    page,
+    base_url: str,
+    max_pages: int = 5,
+    debug: bool = False,
+    wait_for_selector: str = None,
+) -> list[dict] | tuple:
     """Extract jobs from current page, then paginate through next pages."""
     all_jobs = []
     all_rejected = []
@@ -417,7 +568,9 @@ async def _extract_all_pages(page, base_url: str, max_pages: int = 5, debug: boo
 
     for page_num in range(max_pages):
         if debug:
-            page_jobs, page_rejected = await _extract_job_links_from_page(page, base_url, debug=True)
+            page_jobs, page_rejected = await _extract_job_links_from_page(
+                page, base_url, debug=True
+            )
             all_rejected.extend(page_rejected)
         else:
             page_jobs = await _extract_job_links_from_page(page, base_url)
@@ -430,7 +583,9 @@ async def _extract_all_pages(page, base_url: str, max_pages: int = 5, debug: boo
                 all_jobs.append(j)
                 new_on_page += 1
 
-        logger.info(f"Page {page_num + 1}: found {len(page_jobs)} links, {new_on_page} new")
+        logger.info(
+            f"Page {page_num + 1}: found {len(page_jobs)} links, {new_on_page} new"
+        )
 
         if page_num >= max_pages - 1:
             break
@@ -461,7 +616,9 @@ async def _click_next_page(page, debug: bool = False) -> bool | dict:
     debug_info = {"clicked": False, "candidates": []}
 
     # Detect eightfold pages by checking for their CSS module classes in the DOM
-    is_eightfold = await page.query_selector('[class*="pagination-module_pagination"]') is not None
+    is_eightfold = (
+        await page.query_selector('[class*="pagination-module_pagination"]') is not None
+    )
     if is_eightfold:
         next_selectors = [
             'button[class*="pagination-module_pagination-next"]',
@@ -474,11 +631,11 @@ async def _click_next_page(page, debug: bool = False) -> bool | dict:
             'button[aria-label*="Next" i]',
             'a[aria-label*="Next" i]',
             '[data-automation-id="lnkNextPage"]',
-            '.pagination-next a',
-            '.pagination a.next',
-            'a.next-page',
-            'button.next-page',
-            'li.next a',
+            ".pagination-next a",
+            ".pagination a.next",
+            "a.next-page",
+            "button.next-page",
+            "li.next a",
             'button[aria-label*="load more" i]',
             'button[aria-label*="Load more" i]',
             'button[aria-label*="Show more" i]',
@@ -504,24 +661,33 @@ async def _click_next_page(page, debug: bool = False) -> bool | dict:
                 tag = await btn.evaluate("el => el.tagName")
                 text = await btn.evaluate("el => el.innerText.trim().substring(0, 80)")
                 candidate = {
-                    "selector": selector, "tag": tag, "text": text,
-                    "visible": is_visible, "disabled": bool(is_disabled),
+                    "selector": selector,
+                    "tag": tag,
+                    "text": text,
+                    "visible": is_visible,
+                    "disabled": bool(is_disabled),
                     "aria_disabled": aria_disabled,
                 }
                 if debug:
                     debug_info["candidates"].append(candidate)
                 if is_visible and not is_disabled and aria_disabled != "true":
-                    logger.info(f"Pagination: clicking [{selector}] tag={tag} text='{text}'")
+                    logger.info(
+                        f"Pagination: clicking [{selector}] tag={tag} text='{text}'"
+                    )
                     try:
                         await btn.click(timeout=5000)
                     except Exception as click_err:
-                        logger.warning(f"Pagination: click failed ({click_err}), trying dispatch_event")
+                        logger.warning(
+                            f"Pagination: click failed ({click_err}), trying dispatch_event"
+                        )
                         if debug:
                             candidate["click_error"] = str(click_err)
                         try:
                             await btn.dispatch_event("click")
                         except Exception as de_err:
-                            logger.warning(f"Pagination: dispatch_event also failed ({de_err})")
+                            logger.warning(
+                                f"Pagination: dispatch_event also failed ({de_err})"
+                            )
                             if debug:
                                 candidate["dispatch_error"] = str(de_err)
                             continue
@@ -535,7 +701,11 @@ async def _click_next_page(page, debug: bool = False) -> bool | dict:
             continue
 
     # Text-based fallback — skip for eightfold (avoids false positives)
-    text_patterns = ["Next", "Load more", "Show more", "Load More", "Show More"] if not is_eightfold else []
+    text_patterns = (
+        ["Next", "Load more", "Show more", "Load More", "Show More"]
+        if not is_eightfold
+        else []
+    )
     for text_pat in text_patterns:
         try:
             btn = await page.query_selector(f'button:has-text("{text_pat}")')
@@ -545,10 +715,15 @@ async def _click_next_page(page, debug: bool = False) -> bool | dict:
                 is_visible = await btn.is_visible()
                 is_disabled = await btn.get_attribute("disabled")
                 tag = await btn.evaluate("el => el.tagName")
-                btn_text = await btn.evaluate("el => el.innerText.trim().substring(0, 80)")
+                btn_text = await btn.evaluate(
+                    "el => el.innerText.trim().substring(0, 80)"
+                )
                 candidate = {
-                    "selector": f':has-text("{text_pat}")', "tag": tag, "text": btn_text,
-                    "visible": is_visible, "disabled": bool(is_disabled),
+                    "selector": f':has-text("{text_pat}")',
+                    "tag": tag,
+                    "text": btn_text,
+                    "visible": is_visible,
+                    "disabled": bool(is_disabled),
                 }
                 if debug:
                     debug_info["candidates"].append(candidate)
@@ -573,7 +748,10 @@ async def _click_next_page(page, debug: bool = False) -> bool | dict:
 
 # ── Public entry point ───────────────────────────────────────────────────────
 
-async def scrape(url: str, browser=None, max_pages: int = 5, debug: bool = False) -> list[dict] | tuple:
+
+async def scrape(
+    url: str, browser=None, max_pages: int = 5, debug: bool = False
+) -> list[dict] | tuple:
     """Fallback scraper for career pages with no ATS match; launches its own browser if one isn't
     passed, then navigates, waits, extracts links, and paginates."""
     own_browser = browser is None
@@ -586,7 +764,9 @@ async def scrape(url: str, browser=None, max_pages: int = 5, debug: bool = False
             await _setup_route_blocks(page)
             await page.goto(url, wait_until="domcontentloaded", timeout=30000)
             await _wait_for_content(page)
-            result = await _extract_all_pages(page, url, max_pages=max_pages, debug=debug)
+            result = await _extract_all_pages(
+                page, url, max_pages=max_pages, debug=debug
+            )
             return result
         finally:
             await _close_page(page)

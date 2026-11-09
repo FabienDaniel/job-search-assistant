@@ -1,14 +1,24 @@
 """Company management endpoints."""
+
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import List, Optional
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from backend.models.db import get_db, Company, Job, Application, ScrapeLog, is_acknowledged
+from sqlalchemy.orm import Session
+
 from backend.accounts.settings import default_resume_ids as _default_resume_ids
+from backend.models.db import (
+    Application,
+    Company,
+    Job,
+    ScrapeLog,
+    get_db,
+    is_acknowledged,
+)
 from backend.scraper.ats.registry import scrape_type
 
 logger = logging.getLogger("jobnavigator.companies")
@@ -19,6 +29,7 @@ router = APIRouter(prefix="/companies", tags=["companies"])
 async def _fire_h1b_async(company_id: str):
     """Run H-1B lookup (used as BackgroundTasks target)."""
     from backend.analyzer.h1b_checker import fetch_h1b_for_company_id
+
     await fetch_h1b_for_company_id(company_id)
 
 
@@ -58,7 +69,8 @@ def list_companies(
 
     # Count applications: Application records + jobs with status='applied' (no double-counting)
     # Uses UNION of job IDs from both sources, then groups by company name
-    from sqlalchemy import union, select
+    from sqlalchemy import select, union
+
     app_job_ids = select(Application.job_id.label("jid")).distinct()
     applied_job_ids = select(Job.id.label("jid")).where(Job.status == "applied")
     all_applied = union(app_job_ids, applied_job_ids).subquery()
@@ -75,20 +87,27 @@ def list_companies(
 
     # H-1B metrics come from VisaCache (one query, mapped by normalized name).
     from backend.models.db import VisaCache
-    h1b_map = {r.name_key: r for r in db.query(VisaCache).filter(VisaCache.country == "US").all()}
+
+    h1b_map = {
+        r.name_key: r
+        for r in db.query(VisaCache).filter(VisaCache.country == "US").all()
+    }
 
     # Per-company feed aggregates (open roles, new-in-7d, average fit) — grouped
     # by normalized Job.company, then summed across each company's name + aliases.
     from datetime import timedelta
+
     def _norm(s):
         return (s or "").lower().replace(" ", "")
+
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
     open_by_key, week_by_key = {}, {}
     # "open roles" = jobs currently sitting in the feed (new or saved)
     for name, cnt in (
         db.query(Job.company, func.count(Job.id))
         .filter(Job.status.in_(("new", "saved")))
-        .group_by(Job.company).all()
+        .group_by(Job.company)
+        .all()
     ):
         open_by_key[_norm(name)] = open_by_key.get(_norm(name), 0) + (cnt or 0)
     # "+7d" = every job that landed (was discovered) in the last 7 days, whatever
@@ -96,14 +115,18 @@ def list_companies(
     for name, cnt in (
         db.query(Job.company, func.count(Job.id))
         .filter(Job.discovered_at >= week_ago)
-        .group_by(Job.company).all()
+        .group_by(Job.company)
+        .all()
     ):
         week_by_key[_norm(name)] = week_by_key.get(_norm(name), 0) + (cnt or 0)
     fitsum_by_key, fitcnt_by_key = {}, {}
     for name, s, cnt in (
-        db.query(Job.company, func.sum(Job.best_cv_score), func.count(Job.best_cv_score))
+        db.query(
+            Job.company, func.sum(Job.best_cv_score), func.count(Job.best_cv_score)
+        )
         .filter(Job.best_cv_score.isnot(None))
-        .group_by(Job.company).all()
+        .group_by(Job.company)
+        .all()
     ):
         k = _norm(name)
         fitsum_by_key[k] = fitsum_by_key.get(k, 0) + (s or 0)
@@ -123,33 +146,46 @@ def list_companies(
     # Latest ScrapeLog per company → surface the most recent run's error/warning
     # in Health right away (the /health/entities "down" state needs 3 bad runs).
     from sqlalchemy import and_
+
     latest_sub = (
         db.query(ScrapeLog.company_id, func.max(ScrapeLog.ran_at).label("mx"))
         .filter(ScrapeLog.company_id.isnot(None))
-        .group_by(ScrapeLog.company_id).subquery()
+        .group_by(ScrapeLog.company_id)
+        .subquery()
     )
     last_log = {
         str(l.company_id): l
-        for l in db.query(ScrapeLog).join(
-            latest_sub, and_(ScrapeLog.company_id == latest_sub.c.company_id,
-                             ScrapeLog.ran_at == latest_sub.c.mx)).all()
+        for l in db.query(ScrapeLog)
+        .join(
+            latest_sub,
+            and_(
+                ScrapeLog.company_id == latest_sub.c.company_id,
+                ScrapeLog.ran_at == latest_sub.c.mx,
+            ),
+        )
+        .all()
     }
 
     out = []
     for c in companies:
         open_jobs, open_week, avg_fit, app_count = _aggregates(c)
         ll = last_log.get(str(c.id))
-        out.append(_company_to_dict(
-            c,
-            application_count=app_count,
-            h1b=h1b_map.get((c.name or "").strip().lower()),
-            open_jobs=open_jobs, open_jobs_week=open_week, avg_fit=avg_fit,
-            last_error=(ll.error if ll else None),
-            last_run_warning=(bool(ll.is_warning) if ll else False),
-            last_run_at=(ll.ran_at.isoformat() if (ll and ll.ran_at) else None),
-            warning_acknowledged=is_acknowledged(
-                ll.ran_at if ll else None, c.warning_acknowledged_at),
-        ))
+        out.append(
+            _company_to_dict(
+                c,
+                application_count=app_count,
+                h1b=h1b_map.get((c.name or "").strip().lower()),
+                open_jobs=open_jobs,
+                open_jobs_week=open_week,
+                avg_fit=avg_fit,
+                last_error=(ll.error if ll else None),
+                last_run_warning=(bool(ll.is_warning) if ll else False),
+                last_run_at=(ll.ran_at.isoformat() if (ll and ll.ran_at) else None),
+                warning_acknowledged=is_acknowledged(
+                    ll.ran_at if ll else None, c.warning_acknowledged_at
+                ),
+            )
+        )
     return out
 
 
@@ -160,8 +196,11 @@ class _CompanyInputError(Exception):
 
     def response(self):
         from fastapi.responses import JSONResponse
-        return JSONResponse(status_code=self.status,
-                            content={"detail": self.code, "message": self.message})
+
+        return JSONResponse(
+            status_code=self.status,
+            content={"detail": self.code, "message": self.message},
+        )
 
 
 def _checked_resume_ids(db, value, stored=()) -> list:
@@ -171,10 +210,15 @@ def _checked_resume_ids(db, value, stored=()) -> list:
     already holds that is no longer valid (the résumé was deleted since) is dropped
     silently instead, so editing an older company never gets stuck on it."""
     import uuid as _uuid
-    from backend.models.db import Resume
+
     from backend.analyzer.cv_scorer import _PERSONA_KEY as PERSONA_ID
+    from backend.models.db import Resume
+
     bad_shape = _CompanyInputError(
-        422, "invalid_resume_ids", "selected_resume_ids must be a list of your base résumé ids")
+        422,
+        "invalid_resume_ids",
+        "selected_resume_ids must be a list of your base résumé ids",
+    )
     if value is None:
         return []
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
@@ -188,31 +232,49 @@ def _checked_resume_ids(db, value, stored=()) -> list:
         except ValueError:
             parsed[v] = None
     wanted = [u for u in parsed.values() if u is not None]
-    own = {str(r) for (r,) in db.query(Resume.id).filter(
-        Resume.id.in_(wanted), Resume.is_base == True).all()} if wanted else set()  # noqa: E712 (scoped)
+    own = (
+        {
+            str(r)
+            for (r,) in db.query(Resume.id)
+            .filter(Resume.id.in_(wanted), Resume.is_base == True)
+            .all()
+        }
+        if wanted
+        else set()
+    )  # noqa: E712 (scoped)
     stored = {str(s) for s in (stored or [])}
     out, invalid = [], []
     for v in value:
         if v == PERSONA_ID or (parsed.get(v) is not None and str(parsed[v]) in own):
             out.append(v)
         elif v in stored:
-            continue   # stale id already on the row: dropped
+            continue  # stale id already on the row: dropped
         else:
             invalid.append(v)
     if invalid:
         raise _CompanyInputError(
-            422, "invalid_resume_ids",
-            f"Not one of your base résumés: {', '.join(invalid[:5])}")
+            422,
+            "invalid_resume_ids",
+            f"Not one of your base résumés: {', '.join(invalid[:5])}",
+        )
     return out
 
 
 def _name_taken(name: str) -> _CompanyInputError:
-    return _CompanyInputError(409, "name_taken", f"You already have a company named {name}.")
+    return _CompanyInputError(
+        409, "name_taken", f"You already have a company named {name}."
+    )
 
 
 @router.post("")
-def create_company(data: CompanyCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    existing = db.query(Company).filter(func.lower(Company.name) == data.name.lower()).first()
+def create_company(
+    data: CompanyCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    existing = (
+        db.query(Company).filter(func.lower(Company.name) == data.name.lower()).first()
+    )
     if existing:
         return _name_taken(data.name).response()
     try:
@@ -242,7 +304,11 @@ def create_company(data: CompanyCreate, background_tasks: BackgroundTasks, db: S
         # QA F10 / T5-03: a concurrent create of the same name (two tabs) passed the check
         # above too; the unique constraint caught the second one.
         db.rollback()
-        taken = db.query(Company.id).filter(func.lower(Company.name) == data.name.lower()).first()
+        taken = (
+            db.query(Company.id)
+            .filter(func.lower(Company.name) == data.name.lower())
+            .first()
+        )
         if taken is None:
             raise
         return _name_taken(data.name).response()
@@ -257,6 +323,7 @@ def create_company(data: CompanyCreate, background_tasks: BackgroundTasks, db: S
 def company_clone_sources(db: Session = Depends(get_db)):
     """Other accounts' companies for the "Copy from…" picker: `{accounts: [{id, name, color, role, items: [{id, name, tier, active, scrape_urls, exists}]}]}`. Empty `accounts` with a single account; never the caller's own rows, notes or jobs."""
     from backend.accounts import admin
+
     return admin.company_clone_sources(db)
 
 
@@ -264,17 +331,26 @@ def company_clone_sources(db: Session = Depends(get_db)):
 def clone_company(body: dict, db: Session = Depends(get_db)):
     """Copy one company of another account (`{source_id}`) into this account: settings only, no jobs or notes, résumé choices dropped, due at once. 409 `needs_two_accounts`, 409 `name_taken` when this account already has that name, 404 `source_not_found` for an own or unknown id."""
     from fastapi.responses import JSONResponse
+
     from backend.accounts import admin
+
     try:
         new_id = admin.clone_company(db, (body or {}).get("source_id"))
     except admin.CloneError as e:
-        return JSONResponse(status_code=e.status, content={"detail": e.code, "message": e.message})
+        return JSONResponse(
+            status_code=e.status, content={"detail": e.code, "message": e.message}
+        )
     company = db.query(Company).filter(Company.id == new_id).first()
     return _company_to_dict(company)
 
 
 @router.patch("/{company_id}")
-def update_company(company_id: str, updates: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def update_company(
+    company_id: str,
+    updates: dict,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -283,15 +359,33 @@ def update_company(company_id: str, updates: dict, background_tasks: BackgroundT
     old_name = company.name
 
     allowed = {
-        "name", "active", "scrape_urls", "tier", "selected_resume_ids",
-        "playwright_enabled", "jobspy_search_term", "scrape_interval_minutes",
-        "title_include_expr", "title_exclude_keywords",
-        "wait_for_selector", "max_pages", "h1b_slug", "notes", "aliases", "auto_scoring_depth",
+        "name",
+        "active",
+        "scrape_urls",
+        "tier",
+        "selected_resume_ids",
+        "playwright_enabled",
+        "jobspy_search_term",
+        "scrape_interval_minutes",
+        "title_include_expr",
+        "title_exclude_keywords",
+        "wait_for_selector",
+        "max_pages",
+        "h1b_slug",
+        "notes",
+        "aliases",
+        "auto_scoring_depth",
     }
     if "selected_resume_ids" in updates:
         try:
-            updates = {**updates, "selected_resume_ids": _checked_resume_ids(
-                db, updates["selected_resume_ids"], stored=company.selected_resume_ids)}
+            updates = {
+                **updates,
+                "selected_resume_ids": _checked_resume_ids(
+                    db,
+                    updates["selected_resume_ids"],
+                    stored=company.selected_resume_ids,
+                ),
+            }
         except _CompanyInputError as e:
             return e.response()
     for key, value in updates.items():
@@ -304,9 +398,15 @@ def update_company(company_id: str, updates: dict, background_tasks: BackgroundT
             background_tasks.add_task(_fire_h1b_async, company_id)
 
     from backend.models.db import VisaCache
-    h1b = db.query(VisaCache).filter(
-        VisaCache.name_key == (company.name or "").strip().lower(), VisaCache.country == "US"
-    ).first()
+
+    h1b = (
+        db.query(VisaCache)
+        .filter(
+            VisaCache.name_key == (company.name or "").strip().lower(),
+            VisaCache.country == "US",
+        )
+        .first()
+    )
     return _company_to_dict(company, h1b=h1b)
 
 
@@ -318,8 +418,11 @@ def acknowledge_company_warning(company_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Company not found")
     company.warning_acknowledged_at = datetime.now(timezone.utc)
     db.commit()
-    return {"id": str(company.id), "name": company.name,
-            "warning_acknowledged_at": company.warning_acknowledged_at.isoformat()}
+    return {
+        "id": str(company.id),
+        "name": company.name,
+        "warning_acknowledged_at": company.warning_acknowledged_at.isoformat(),
+    }
 
 
 @router.delete("/{company_id}")
@@ -331,7 +434,8 @@ def delete_company(company_id: str, db: Session = Depends(get_db)):
     # ScrapeLog.company_id has no ON DELETE in the live schema (models/db.py declares
     # SET NULL, but there is no Alembic here), so orphan the audit rows instead of deleting them.
     db.query(ScrapeLog).filter(ScrapeLog.company_id == company.id).update(
-        {"company_id": None}, synchronize_session=False)
+        {"company_id": None}, synchronize_session=False
+    )
     db.delete(company)
     try:
         db.commit()
@@ -347,11 +451,14 @@ def delete_company(company_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/auto-create-from-jobs")
-def auto_create_from_jobs(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def auto_create_from_jobs(
+    background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+):
     """Scan all Job.company distinct values and create inactive Company records for unmatched names."""
     default_resume_ids = _default_resume_ids(db)
 
     from backend.models.db import get_company_all_names
+
     existing = set(get_company_all_names(db).keys())
     distinct_companies = db.query(Job.company).distinct().all()
     new_ids = []
@@ -361,7 +468,10 @@ def auto_create_from_jobs(background_tasks: BackgroundTasks, db: Session = Depen
             continue
         name = name.strip()
         company = Company(
-            name=name, tier=None, active=False, playwright_enabled=False,
+            name=name,
+            tier=None,
+            active=False,
+            playwright_enabled=False,
             selected_resume_ids=default_resume_ids,
         )
         db.add(company)
@@ -385,18 +495,19 @@ def bulk_activate(data: BulkActivate, db: Session = Depends(get_db)):
         # `tiers` is List[str] on the wire, so int() on a free-text value was an
         # unguarded ValueError -> 500 (R4-T1-19).
         try:
-            tier_ints = [int(t) for t in data.tiers if t != 'none']
+            tier_ints = [int(t) for t in data.tiers if t != "none"]
         except (TypeError, ValueError):
-            raise HTTPException(status_code=422,
-                                detail="tiers must be numbers or 'none'")
-        has_none = 'none' in data.tiers
+            raise HTTPException(
+                status_code=422, detail="tiers must be numbers or 'none'"
+            )
+        has_none = "none" in data.tiers
         if tier_ints and has_none:
             q = q.filter((Company.tier.in_(tier_ints)) | (Company.tier.is_(None)))
         elif tier_ints:
             q = q.filter(Company.tier.in_(tier_ints))
         elif has_none:
             q = q.filter(Company.tier.is_(None))
-    count = q.update({Company.active: data.active}, synchronize_session='fetch')
+    count = q.update({Company.active: data.active}, synchronize_session="fetch")
     db.commit()
     return {"updated": count, "active": data.active}
 
@@ -405,12 +516,19 @@ def bulk_activate(data: BulkActivate, db: Session = Depends(get_db)):
 async def refresh_h1b_all(db: Session = Depends(get_db)):
     """Fetch H-1B data for all companies that haven't been checked yet, or re-check all."""
     from backend.analyzer.h1b_checker import resolve_company_h1b
+
     companies = db.query(Company).all()
     updated = 0
     for company in companies:
         try:
-            data = await resolve_company_h1b(db, company.name, slug=company.h1b_slug,
-                                             allow_live=True, respect_budget=False, force=True)
+            data = await resolve_company_h1b(
+                db,
+                company.name,
+                slug=company.h1b_slug,
+                allow_live=True,
+                respect_budget=False,
+                force=True,
+            )
             if data:
                 updated += 1
         except Exception as e:
@@ -425,6 +543,7 @@ async def refresh_h1b_all(db: Session = Depends(get_db)):
 async def backfill_h1b_jobs(db: Session = Depends(get_db)):
     """Re-run check_job_h1b on all jobs with NULL h1b_verdict."""
     from backend.analyzer.h1b_checker import check_job_h1b
+
     jobs = db.query(Job).filter(Job.h1b_verdict.is_(None)).all()
     updated = 0
     for job in jobs:
@@ -446,16 +565,25 @@ async def test_scrape_company(company_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="No scrape URLs configured")
 
     from backend.scraper.sources.company_pages import preview
+
     try:
         return await preview(company, db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _company_to_dict(c: Company, application_count: int = 0, h1b=None,
-                     open_jobs: int = 0, open_jobs_week: int = 0, avg_fit=None,
-                     last_error=None, last_run_warning: bool = False, last_run_at=None,
-                     warning_acknowledged: bool = False) -> dict:
+def _company_to_dict(
+    c: Company,
+    application_count: int = 0,
+    h1b=None,
+    open_jobs: int = 0,
+    open_jobs_week: int = 0,
+    avg_fit=None,
+    last_error=None,
+    last_run_warning: bool = False,
+    last_run_at=None,
+    warning_acknowledged: bool = False,
+) -> dict:
     urls = c.scrape_urls or []
     detected_types = {url: scrape_type(url) for url in urls if url.strip()}
     # h1b is a VisaCache row (or None) for this company — H-1B metrics live there now.
@@ -484,14 +612,18 @@ def _company_to_dict(c: Company, application_count: int = 0, h1b=None,
         "last_error": last_error,
         "last_run_warning": last_run_warning,
         "last_run_at": last_run_at,
-        "warning_acknowledged_at": c.warning_acknowledged_at.isoformat() if c.warning_acknowledged_at else None,
+        "warning_acknowledged_at": c.warning_acknowledged_at.isoformat()
+        if c.warning_acknowledged_at
+        else None,
         # True while the acknowledgement still covers the newest run — the UI
         # mutes the warning instead of hiding it, so the history stays readable.
         "warning_acknowledged": warning_acknowledged,
         "h1b_lca_count": h1b.lca_count if h1b else None,
         "h1b_approval_rate": h1b.approval_rate if h1b else None,
         "h1b_median_salary": h1b.median_salary if h1b else None,
-        "h1b_last_checked": h1b.fetched_at.isoformat() if (h1b and h1b.fetched_at) else None,
+        "h1b_last_checked": h1b.fetched_at.isoformat()
+        if (h1b and h1b.fetched_at)
+        else None,
         "last_scraped_at": c.last_scraped_at.isoformat() if c.last_scraped_at else None,
         "notes": c.notes,
     }

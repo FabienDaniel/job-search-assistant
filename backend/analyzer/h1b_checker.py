@@ -1,15 +1,22 @@
 """H-1B company LCA data checker + JD body scan; H-1B metrics live in the VisaCache table so any job's source company can show H-1B info."""
+
+import asyncio
 import json
 import logging
 import re
 import time as _time
-import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from backend.models.db import SessionLocal, Company, Job, VisaCache, has_uncommitted_writes
 from backend.accounts.settings import get_setting
+from backend.models.db import (
+    Company,
+    Job,
+    SessionLocal,
+    VisaCache,
+    has_uncommitted_writes,
+)
 
 logger = logging.getLogger("jobnavigator.h1b")
 
@@ -25,7 +32,8 @@ class H1bRateLimited(Exception):
 
 class _LiveBudget:
     """Bounds inline live lookups during a scrape to MAX_LOOKUPS per rolling WINDOW, and stops after MAX_RATE_STRIKES consecutive rate-limit hits until it rolls over."""
-    WINDOW = 900          # seconds
+
+    WINDOW = 900  # seconds
     MAX_LOOKUPS = 10
     MAX_RATE_STRIKES = 3
 
@@ -61,22 +69,30 @@ async def _fetch_myvisajobs(company_name: str, h1b_slug: str = None) -> dict:
         if h1b_slug:
             slug = h1b_slug
         else:
-            slug = company_name.lower().replace(" ", "-").replace(".", "").replace(",", "")
+            slug = (
+                company_name.lower().replace(" ", "-").replace(".", "").replace(",", "")
+            )
         url = f"https://www.myvisajobs.com/employer/{slug}/"
 
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
             resp = await client.get(url, headers={"User-Agent": _UA})
 
             if resp.status_code in (429, 403):
-                raise H1bRateLimited(f"myvisajobs {resp.status_code} for {company_name}")
+                raise H1bRateLimited(
+                    f"myvisajobs {resp.status_code} for {company_name}"
+                )
 
             # Detect redirect to generic employers page (slug not found)
             if str(resp.url).rstrip("/").endswith("/employers"):
-                logger.warning(f"H-1B slug '{slug}' redirected to generic page for {company_name}")
+                logger.warning(
+                    f"H-1B slug '{slug}' redirected to generic page for {company_name}"
+                )
                 return {"lca_count": 0, "approval_rate": 0, "median_salary": 0}
 
             if resp.status_code != 200:
-                logger.warning(f"H-1B page returned {resp.status_code} for {company_name}")
+                logger.warning(
+                    f"H-1B page returned {resp.status_code} for {company_name}"
+                )
                 return {"lca_count": 0, "approval_rate": 0, "median_salary": 0}
 
             text = resp.text
@@ -86,23 +102,27 @@ async def _fetch_myvisajobs(company_name: str, h1b_slug: str = None) -> dict:
             median_salary = 0
 
             # LCA count: "LCA for H-1B: 9,362" or "filed 9,362 labor condition applications"
-            lca_match = re.search(r'LCA for H-1B:\s*([\d,]+)', text)
+            lca_match = re.search(r"LCA for H-1B:\s*([\d,]+)", text)
             if not lca_match:
-                lca_match = re.search(r'filed\s+([\d,]+)\s+labor condition', text, re.IGNORECASE)
+                lca_match = re.search(
+                    r"filed\s+([\d,]+)\s+labor condition", text, re.IGNORECASE
+                )
             if lca_match:
                 lca_count = int(lca_match.group(1).replace(",", ""))
 
             # Approval rate: compute from the "Certified" count vs lca_count if available.
-            certified_match = re.search(r'certified[^>]*>\s*([\d,]+)', text, re.IGNORECASE)
+            certified_match = re.search(
+                r"certified[^>]*>\s*([\d,]+)", text, re.IGNORECASE
+            )
             if certified_match and lca_count > 0:
                 certified = int(certified_match.group(1).replace(",", ""))
                 approval_rate = round((certified / lca_count) * 100, 1)
 
             # Salary: "H-1B Salary [$172,325]" or "$172,325" in salary table
-            salary_match = re.search(r'H-1B Salary.*?\$([\d,]+)', text, re.IGNORECASE)
+            salary_match = re.search(r"H-1B Salary.*?\$([\d,]+)", text, re.IGNORECASE)
             if not salary_match:
                 # Fallback: look for dollar amounts near "salary" or "average"
-                salary_match = re.search(r'\$([\d]{2,3},\d{3})', text)
+                salary_match = re.search(r"\$([\d]{2,3},\d{3})", text)
             if salary_match:
                 median_salary = int(salary_match.group(1).replace(",", ""))
 
@@ -121,8 +141,9 @@ async def _fetch_myvisajobs(company_name: str, h1b_slug: str = None) -> dict:
 
 async def _fetch_h1bdata(company_name: str) -> dict:
     """Fallback: parse h1bdata.info's raw DOL LCA disclosure rows into lca_count (row count) and median_salary; no approval_rate (LCA data, not USCIS decisions)."""
-    from urllib.parse import quote
     import statistics
+    from urllib.parse import quote
+
     url = f"https://h1bdata.info/index.php?em={quote(company_name)}"
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
         resp = await client.get(url, headers={"User-Agent": _UA})
@@ -134,12 +155,12 @@ async def _fetch_h1bdata(company_name: str) -> dict:
 
     salaries = []
     count = 0
-    for row in re.findall(r'<tr[^>]*>(.*?)</tr>', resp.text, re.S):
-        cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
+    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", resp.text, re.S):
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
         if len(cells) < 6:
             continue  # header / non-data row
         count += 1
-        sal = re.sub(r'<[^>]+>', '', cells[2]).strip().replace(",", "")
+        sal = re.sub(r"<[^>]+>", "", cells[2]).strip().replace(",", "")
         if sal.isdigit():
             salaries.append(int(sal))
     median = int(statistics.median(salaries)) if salaries else 0
@@ -158,7 +179,9 @@ async def fetch_company_h1b_data(company_name: str, h1b_slug: str = None) -> dic
 
     # MyVisaJobs was blocked or empty — try the fallback.
     try:
-        return await _fetch_h1bdata(company_name)  # reached (even zeros = legit negative)
+        return await _fetch_h1bdata(
+            company_name
+        )  # reached (even zeros = legit negative)
     except H1bRateLimited:
         pass  # fallback also blocked
     except Exception as e:
@@ -170,6 +193,7 @@ async def fetch_company_h1b_data(company_name: str, h1b_slug: str = None) -> dic
 
 
 # ── VisaCache: the single source of truth for company H-1B metrics ───────────
+
 
 def _name_key(name: str) -> str:
     return (name or "").strip().lower()
@@ -196,13 +220,17 @@ def _is_fresh(row, ttl_days) -> bool:
 def _read_cache(db, key):
     # populate_existing: a row this session loaded earlier may have been refreshed
     # since by another session's committed write; read the current values.
-    return (db.query(VisaCache)
-            .filter(VisaCache.name_key == key, VisaCache.country == "US")
-            .populate_existing().first())
+    return (
+        db.query(VisaCache)
+        .filter(VisaCache.name_key == key, VisaCache.country == "US")
+        .populate_existing()
+        .first()
+    )
 
 
 # VisaCache is install-wide (not AccountScoped), so the account-scoping listeners
 # leave these statements alone and no unscoped() is needed.
+
 
 def _has_data(data) -> bool:
     return (data["lca_count"] or 0) > 0 or (data["median_salary"] or 0) > 0
@@ -218,15 +246,24 @@ def _upsert_statement(dialect: str, key, name, slug, data):
         from sqlalchemy.dialects.sqlite import insert
     else:
         return None
-    from sqlalchemy import case, func
     import uuid as _uuid
+
+    from sqlalchemy import case, func
+
     t = VisaCache.__table__
     has_data = _has_data(data)
     stmt = insert(t).values(
-        id=_uuid.uuid4(), name_key=key, country="US", display_name=name, slug=slug,
-        lca_count=data["lca_count"], approval_rate=data["approval_rate"],
-        median_salary=data["median_salary"], has_data=has_data,
-        fetched_at=datetime.now(timezone.utc), last_error=None,
+        id=_uuid.uuid4(),
+        name_key=key,
+        country="US",
+        display_name=name,
+        slug=slug,
+        lca_count=data["lca_count"],
+        approval_rate=data["approval_rate"],
+        median_salary=data["median_salary"],
+        has_data=has_data,
+        fetched_at=datetime.now(timezone.utc),
+        last_error=None,
     )
     ex = stmt.excluded
     keep_old = func.coalesce(t.c.lca_count, 0) > 0
@@ -270,8 +307,12 @@ def _store_h1b(key, name, slug, data):
     except Exception as e:
         db.rollback()
         logger.warning("H-1B cache write failed for %s: %s", name, e)
-        return {"lca_count": data["lca_count"] or 0, "approval_rate": data["approval_rate"] or 0.0,
-                "median_salary": data["median_salary"] or 0, "has_data": _has_data(data)}
+        return {
+            "lca_count": data["lca_count"] or 0,
+            "approval_rate": data["approval_rate"] or 0.0,
+            "median_salary": data["median_salary"] or 0,
+            "has_data": _has_data(data),
+        }
     finally:
         db.close()
 
@@ -296,8 +337,15 @@ async def _fetch_and_store(key, name, slug, cached, respect_budget):
     return _store_h1b(key, name, slug, data)
 
 
-async def resolve_company_h1b(db, name, slug=None, allow_live=True,
-                              respect_budget=True, force=False, ttl_days=_TTL_DAYS):
+async def resolve_company_h1b(
+    db,
+    name,
+    slug=None,
+    allow_live=True,
+    respect_budget=True,
+    force=False,
+    ttl_days=_TTL_DAYS,
+):
     """Return H-1B metrics for a company name (dict) or None; cache-first, live fetch on a miss unless the budget/breaker blocks it.
 
     Reads through the caller's session but never writes through it: a fetched result
@@ -316,7 +364,10 @@ async def resolve_company_h1b(db, name, slug=None, allow_live=True,
     if not allow_live:
         return cached  # stale row, or None
     if has_uncommitted_writes(db):
-        logger.debug("H-1B live lookup for %s skipped: the caller's session holds uncommitted writes", name)
+        logger.debug(
+            "H-1B live lookup for %s skipped: the caller's session holds uncommitted writes",
+            name,
+        )
         return cached
     return await _fetch_and_store(key, name, slug, cached, respect_budget)
 
@@ -338,11 +389,15 @@ async def prefetch_company_h1b(names, slugs=None, ttl_days=_TTL_DAYS) -> int:
         return 0
     db = SessionLocal()
     try:
-        rows = db.query(VisaCache).filter(VisaCache.country == "US",
-                                          VisaCache.name_key.in_(list(wanted))).all()
+        rows = (
+            db.query(VisaCache)
+            .filter(VisaCache.country == "US", VisaCache.name_key.in_(list(wanted)))
+            .all()
+        )
         known = {r.name_key: (_row_to_dict(r), _is_fresh(r, ttl_days)) for r in rows}
         if slugs is None:
             from backend.models.db import build_company_lookup
+
             lookup = build_company_lookup(db)
             slugs = {k: lookup[k].h1b_slug for k in wanted if k in lookup}
     finally:
@@ -355,7 +410,9 @@ async def prefetch_company_h1b(names, slugs=None, ttl_days=_TTL_DAYS) -> int:
             continue
         if not _budget.allow():
             break  # the rest stay as they are; the H-1B cron fills them in
-        await _fetch_and_store(key, name, (slugs or {}).get(key), cached, respect_budget=True)
+        await _fetch_and_store(
+            key, name, (slugs or {}).get(key), cached, respect_budget=True
+        )
         looked_up += 1
     return looked_up
 
@@ -381,8 +438,9 @@ def _apply_h1b_data(db, row, key, name, slug, data):
     return row
 
 
-async def resolve_company_h1b_detached(name, slug=None, respect_budget=False,
-                                       force=True, ttl_days=_TTL_DAYS):
+async def resolve_company_h1b_detached(
+    name, slug=None, respect_budget=False, force=True, ttl_days=_TTL_DAYS
+):
     """`resolve_company_h1b` for background callers, with no session held across the fetch.
 
     Reads the cache in one short session, awaits MyVisaJobs with no connection
@@ -414,6 +472,7 @@ async def refresh_all_h1b():
     # Install-level (MT-7): VisaCache is shared, so the name list covers every account's
     # companies and jobs, whoever triggered the run.
     from backend.accounts.context import unscoped
+
     db = SessionLocal()
     try:
         with unscoped():
@@ -422,9 +481,13 @@ async def refresh_all_h1b():
             slug_map = {_name_key(c.name): c.h1b_slug for c in db.query(Company).all()}
 
             # 1) names to refresh: stale cache rows
-            stale = db.query(VisaCache).filter(
-                (VisaCache.fetched_at == None) | (VisaCache.fetched_at < cutoff)
-            ).all()
+            stale = (
+                db.query(VisaCache)
+                .filter(
+                    (VisaCache.fetched_at == None) | (VisaCache.fetched_at < cutoff)
+                )
+                .all()
+            )
             names = {(r.display_name or r.name_key) for r in stale}
             # 2) + job companies not cached at all
             for (n,) in db.query(Job.company).distinct().all():
@@ -437,7 +500,8 @@ async def refresh_all_h1b():
     updated = 0
     for name in names:
         data = await resolve_company_h1b_detached(
-            name, slug=slug_map.get(_name_key(name)), respect_budget=False, force=True)
+            name, slug=slug_map.get(_name_key(name)), respect_budget=False, force=True
+        )
         if data:
             updated += 1
         await asyncio.sleep(0.5)  # be polite to MyVisaJobs
@@ -445,7 +509,10 @@ async def refresh_all_h1b():
     db = SessionLocal()
     try:
         from backend.activity import log_activity
-        log_activity("h1b", f"H-1B refresh complete: {updated} companies fetched", db=db)
+
+        log_activity(
+            "h1b", f"H-1B refresh complete: {updated} companies fetched", db=db
+        )
         db.commit()
     finally:
         db.close()
@@ -464,7 +531,9 @@ async def fetch_h1b_for_company_id(company_id: str):
 
     try:
         # The MyVisaJobs round trip runs with the connection already released.
-        await resolve_company_h1b_detached(name, slug=slug, respect_budget=False, force=True)
+        await resolve_company_h1b_detached(
+            name, slug=slug, respect_budget=False, force=True
+        )
         logger.info("H-1B auto-fetched for %s", name)
     except Exception as e:
         logger.error(f"H-1B auto-fetch failed for company {company_id}: {e}")
@@ -513,19 +582,26 @@ def load_exclusion_phrases(db) -> list:
     return []
 
 
-async def check_job_h1b(job: Job, db, company_lookup: dict = None, phrases: list = None) -> None:
+async def check_job_h1b(
+    job: Job, db, company_lookup: dict = None, phrases: list = None
+) -> None:
     """Run H-1B checks on a job and update its fields; batch callers should pass `company_lookup` and `phrases` to avoid a full Companies scan and a Settings read per job."""
     if company_lookup is not None:
         company = company_lookup.get((job.company or "").strip().lower())
     else:
         from backend.models.db import find_company_by_name
+
         company = find_company_by_name(db, job.company or "")
 
     # H-1B metrics from VisaCache (live-on-miss, budget-bounded). The Company row,
     # when present, only supplies the per-company slug override.
     slug = company.h1b_slug if company else None
-    data = await resolve_company_h1b(db, job.company or "", slug=slug,
-                                     allow_live=True, respect_budget=True) or {}
+    data = (
+        await resolve_company_h1b(
+            db, job.company or "", slug=slug, allow_live=True, respect_budget=True
+        )
+        or {}
+    )
     lca_count = data.get("lca_count", 0) or 0
     approval_rate = data.get("approval_rate", 0.0) or 0.0
     job.h1b_company_lca_count = lca_count
@@ -546,5 +622,3 @@ async def check_job_h1b(job: Job, db, company_lookup: dict = None, phrases: list
     job._h1b_matched_phrase = jd_result["matched_phrase"]
 
     job.h1b_verdict = determine_h1b_verdict(lca_count, jd_result["jd_flag"])
-
-

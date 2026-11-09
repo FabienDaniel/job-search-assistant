@@ -1,17 +1,20 @@
 """Application-question autofill: generate an answer from persona + qa_bank."""
-from backend.analyzer.prompt_fence import fence, fence_notice
+
 import json as _json
 import logging
 import re as _re
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+
 from backend.accounts.owned import get_persona
-from backend.models.db import SessionLocal, Persona
 from backend.accounts.settings import get_setting
 from backend.analyzer.llm_client import call_autofill_llm, call_autofill_llm_stream
-from backend.analyzer.model_json import first_json_object
 from backend.analyzer.llm_logger import track_llm_call
+from backend.analyzer.model_json import first_json_object
+from backend.analyzer.prompt_fence import fence, fence_notice
 from backend.autofill_schema import ANSWER_SCHEMA, project_answers
+from backend.models.db import Persona, SessionLocal
 
 logger = logging.getLogger("jobnavigator.autofill")
 router = APIRouter(prefix="/autofill", tags=["autofill"])
@@ -19,8 +22,12 @@ router = APIRouter(prefix="/autofill", tags=["autofill"])
 
 def _flatten_persona(p: Persona) -> str:
     parts = []
-    for label, node in (("Contact", p.contact), ("Work authorization", p.work_auth),
-                        ("Preferences", p.preferences), ("Resume content", p.resume_content)):
+    for label, node in (
+        ("Contact", p.contact),
+        ("Work authorization", p.work_auth),
+        ("Preferences", p.preferences),
+        ("Resume content", p.resume_content),
+    ):
         if node:
             parts.append(f"{label}:\n{_json.dumps(node, indent=2)}")
     return "\n\n".join(parts) if parts else "(empty)"
@@ -35,7 +42,7 @@ def _trim_to_chars(text: str, max_chars: int):
     # away — otherwise a single early "e.g." would strand the reader mid-thought.
     end = max(cut.rfind("."), cut.rfind("!"), cut.rfind("?"))
     if end >= int(max_chars * 0.6):
-        return cut[:end + 1].rstrip(), True
+        return cut[: end + 1].rstrip(), True
     space = cut.rfind(" ")
     if space > 0:
         cut = cut[:space]
@@ -89,8 +96,12 @@ def _unescape_json_fragment(body: str) -> str:
     try:
         return _json.loads('"' + trimmed + '"')
     except ValueError:
-        return (trimmed.replace("\n", "\n").replace("\t", "\t")
-                       .replace('\\"', '"').replace("\\\\", "\\"))
+        return (
+            trimmed.replace("\n", "\n")
+            .replace("\t", "\t")
+            .replace('\\"', '"')
+            .replace("\\\\", "\\")
+        )
 
 
 def _extract_answer(raw: str) -> str:
@@ -117,7 +128,7 @@ def _extract_answer(raw: str) -> str:
     # and brace are not (the model hit its token budget mid-sentence).
     m = _re.search(r'["\']answer["\']\s*:\s*"', text)
     if m:
-        body = text[m.end():]
+        body = text[m.end() :]
         end = _last_unescaped_quote(body)
         if end > 0:
             body = body[:end]
@@ -129,8 +140,16 @@ def _extract_answer(raw: str) -> str:
     return "" if text.startswith("{") else text
 
 
-_JSON_ESCAPES = {'"': '"', "\\": "\\", "/": "/", "n": "\n", "t": "\t",
-                 "r": "\r", "b": "\b", "f": "\f"}
+_JSON_ESCAPES = {
+    '"': '"',
+    "\\": "\\",
+    "/": "/",
+    "n": "\n",
+    "t": "\t",
+    "r": "\r",
+    "b": "\b",
+    "f": "\f",
+}
 _ANSWER_PREFIX_RE = _re.compile(r'^\{\s*["\']answer["\']\s*:\s*"')
 
 
@@ -150,7 +169,7 @@ def _decode_json_string_body(body: str) -> tuple:
                 break
             nxt = body[i + 1]
             if nxt == "u":
-                hex_part = body[i + 2:i + 6]
+                hex_part = body[i + 2 : i + 6]
                 if len(hex_part) < 4:
                     break
                 out.append(chr(int(hex_part, 16)))
@@ -180,12 +199,12 @@ async def _clean_stream(chunks):
     quote is seen, discarding the rest of the envelope. Plain prose is passed
     through unchanged, incrementally, same as before this wrapper existed."""
     raw = ""
-    mode = None          # None (undecided) | "prose" | "json"
+    mode = None  # None (undecided) | "prose" | "json"
     fence_len = 0
     body_start = -1
     closed = False
-    emitted = 0          # chars of raw[fence_len:] already yielded, in prose mode
-    decoded_len = 0       # chars of the decoded answer already yielded, in json mode
+    emitted = 0  # chars of raw[fence_len:] already yielded, in prose mode
+    decoded_len = 0  # chars of the decoded answer already yielded, in json mode
     async for chunk in chunks:
         if closed or not chunk:
             continue
@@ -284,7 +303,9 @@ def autofill_config():
             "schema": ANSWER_SCHEMA,
             # Mirrors the Persona's "prefer not to answer" checkbox so the extension
             # can decline questions the Persona has no field for at all.
-            "decline_self_id": bool((persona.get("demographics") or {}).get("decline_demographics")),
+            "decline_self_id": bool(
+                (persona.get("demographics") or {}).get("decline_demographics")
+            ),
         }
     finally:
         db.close()
@@ -321,13 +342,18 @@ def _build_autofill_prompt(body: dict, *, want_provider: bool = False) -> dict:
             # Resolve provider/model for logging with the same resolver
             # call_autofill_llm dispatches through, so both stay in sync.
             from backend.analyzer.llm_client import resolve_llm_config
+
             _cfg = resolve_llm_config("autofill", db=db)
             provider, model = _cfg["provider"], _cfg["model"]
     finally:
         db.close()
 
     max_chars = body.get("max_chars")
-    max_chars = int(max_chars) if isinstance(max_chars, (int, str)) and str(max_chars).isdigit() else default_len
+    max_chars = (
+        int(max_chars)
+        if isinstance(max_chars, (int, str)) and str(max_chars).isdigit()
+        else default_len
+    )
 
     # Stable prefix (persona+bank+instructions) is cacheable; the per-question suffix
     # isn't. Split at the first {company} placeholder so the model sees each part once.
@@ -361,8 +387,13 @@ def _build_autofill_prompt(body: dict, *, want_provider: bool = False) -> dict:
 
     cached_prefix = _fill(before) or None
     suffix = _fill(suffix_template) + "\n\n" + fence_notice("APPLICATION QUESTION")
-    return {"cached_prefix": cached_prefix, "suffix": suffix,
-            "max_chars": max_chars, "provider": provider, "model": model}
+    return {
+        "cached_prefix": cached_prefix,
+        "suffix": suffix,
+        "max_chars": max_chars,
+        "provider": provider,
+        "model": model,
+    }
 
 
 @router.post("/answer")
@@ -378,8 +409,9 @@ async def autofill_answer(body: dict):
     max_tokens = max(96, min(900, max_chars // 4 + 96))
     try:
         async with track_llm_call("autofill", provider, model) as tracker:
-            resp = await call_autofill_llm(suffix, system, max_tokens=max_tokens,
-                                           cached_prefix=cached_prefix)
+            resp = await call_autofill_llm(
+                suffix, system, max_tokens=max_tokens, cached_prefix=cached_prefix
+            )
             tracker.record(resp)
         raw = (resp.get("text") or "").strip()
         # Extract the answer from the model's {"answer": ...} wrapper, discarding any
@@ -413,7 +445,9 @@ async def autofill_answer_stream(body: dict):
     if isinstance(refinements, list):
         lines = "\n".join(f"- {str(r).strip()}" for r in refinements if str(r).strip())
         if lines:
-            refine_block = f"\n\nApply these changes the candidate requested, in order:\n{lines}"
+            refine_block = (
+                f"\n\nApply these changes the candidate requested, in order:\n{lines}"
+            )
 
     # The template steers toward the {"answer": …} envelope /answer parses; this
     # path renders straight into a form field, so the envelope is suppressed here
@@ -424,9 +458,11 @@ async def autofill_answer_stream(body: dict):
         f"hard limit, not a target. Be concise and finish a sentence before reaching it. "
         f"Output only the answer text — no JSON, no quotes, no preamble, no labels."
     )
-    system = ("You write concise, truthful first-person job-application answers grounded "
-              "only in the provided profile. Respect the character limit strictly. "
-              "Output only the answer as plain prose.")
+    system = (
+        "You write concise, truthful first-person job-application answers grounded "
+        "only in the provided profile. Respect the character limit strictly. "
+        "Output only the answer as plain prose."
+    )
     # ~4 chars/token, so cap tokens near the char budget plus a small buffer.
     max_tokens = max(48, min(800, max_chars // 4 + 24))
 
@@ -435,8 +471,9 @@ async def autofill_answer_stream(body: dict):
             # R30 L-09: logged like /answer (duration, success, the pair). A stream carries no
             # usage, so its tokens are logged as 0.
             async with track_llm_call("autofill", provider, model):
-                raw_chunks = call_autofill_llm_stream(suffix, system, max_tokens=max_tokens,
-                                                      cached_prefix=cached_prefix)
+                raw_chunks = call_autofill_llm_stream(
+                    suffix, system, max_tokens=max_tokens, cached_prefix=cached_prefix
+                )
                 async for chunk in _clean_stream(raw_chunks):
                     if chunk:
                         yield f"data: {_json.dumps({'delta': chunk})}\n\n"
@@ -445,5 +482,8 @@ async def autofill_answer_stream(body: dict):
             logger.error(f"autofill stream failed: {e}")
             yield f"data: {_json.dumps({'error': 'autofill generation failed'})}\n\n"
 
-    return StreamingResponse(_events(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    return StreamingResponse(
+        _events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

@@ -31,6 +31,7 @@ batch that fixes them (MT-4 / MT-5 / MT-6): fixing a route turns its case into a
 which fails the suite until the entry is removed. Install-wide routes live in
 mt_leak_allowlist.py.
 """
+
 import inspect
 import json
 import re
@@ -44,12 +45,17 @@ from pydantic import BaseModel
 
 from backend.accounts.context import unscoped, use_account
 from backend.tests.mt_leak_allowlist import ALLOWLIST
-from backend.tests.r4_support import _clear_running_state, _no_outbound, account_token, client  # noqa: F401 (fixtures)
+from backend.tests.r4_support import (
+    _clear_running_state,
+    _no_outbound,
+    account_token,
+    client,
+)  # noqa: F401 (fixtures)
 
-MARKER = "ZZB-LEAK-7Q3X"          # in every text field of B's rows
-A_TEXT = "a-own-row"               # A's rows: no marker
-WRITE_TEXT = "A-WROTE-THIS"        # what A tries to write onto B's rows
-B_TOKEN = "zzbtok7q3x"             # B's tracer token (10 chars)
+MARKER = "ZZB-LEAK-7Q3X"  # in every text field of B's rows
+A_TEXT = "a-own-row"  # A's rows: no marker
+WRITE_TEXT = "A-WROTE-THIS"  # what A tries to write onto B's rows
+B_TOKEN = "zzbtok7q3x"  # B's tracer token (10 chars)
 A_TOKEN = "aaatok0001"
 
 
@@ -60,6 +66,7 @@ def _job_url(token):
 
 def _cl_token(token):
     return token[:-1] + "c"
+
 
 # ── Routes that leak today (worklist for MT-4..6; MT-PLAN.md "Unscoped call sites") ──
 # Value: "<batch>: why". Fixing a route makes its case XPASS (strict) -> delete the entry.
@@ -84,17 +91,30 @@ PARAM_MODELS = {
     "tracer_link_id": "tracer_link",
     "persona_id": "persona",
 }
-PLURAL_PARAMS = {"job_ids": "job", "resume_ids": "resume", "company_ids": "company",
-                 "search_ids": "search", "app_ids": "application",
-                 "selected_resume_ids": "resume"}
+PLURAL_PARAMS = {
+    "job_ids": "job",
+    "resume_ids": "resume",
+    "company_ids": "company",
+    "search_ids": "search",
+    "app_ids": "application",
+    "selected_resume_ids": "resume",
+}
 # `ids` in a bulk body means the ids of the router's own resource.
 PREFIX_RESOURCE = {
-    "/api/jobs": "job", "/api/applications": "application", "/api/companies": "company",
-    "/api/searches": "search", "/api/resumes": "resume", "/api/cover-letters": "cover_letter",
+    "/api/jobs": "job",
+    "/api/applications": "application",
+    "/api/companies": "company",
+    "/api/searches": "search",
+    "/api/resumes": "resume",
+    "/api/cover-letters": "cover_letter",
 }
 # Fields a dict body carries so an unscoped write on B's row actually changes it.
 WRITE_FIELDS = {
-    "/api/applications/interviews": {"what": WRITE_TEXT, "prep": WRITE_TEXT, "status": "done"},
+    "/api/applications/interviews": {
+        "what": WRITE_TEXT,
+        "prep": WRITE_TEXT,
+        "status": "done",
+    },
     "/api/applications": {"status": "rejected", "notes": WRITE_TEXT},
     "/api/jobs": {"status": "skip", "seen": True, "saved": False},
     "/api/companies": {"notes": WRITE_TEXT, "active": False},
@@ -103,14 +123,21 @@ WRITE_FIELDS = {
     "/api/cover-letters": {"name": WRITE_TEXT},
 }
 
-_UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\b[0-9a-f]{32}\b", re.I)
-_TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?")
+_UUID_RE = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\b[0-9a-f]{32}\b",
+    re.I,
+)
+_TS_RE = re.compile(
+    r"\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?"
+)
 
 
 # ── Route enumeration ────────────────────────────────────────────────────────
 
+
 def _api_routes():
     from backend.main import app
+
     out = []
     for r in app.routes:
         if isinstance(r, APIRoute):
@@ -148,96 +175,257 @@ def _resource_of(path):
 
 # ── Seeding ──────────────────────────────────────────────────────────────────
 
+
 def _ids():
-    return {k: uuid.uuid4() for k in (
-        "search", "company", "job", "job_new", "application", "interview", "resume", "tailored",
-        "cover_letter", "tracer_link", "click", "tracer_link_cl", "click_cl", "activity", "llm", "job_run", "scrape_log",
-        "location")}
+    return {
+        k: uuid.uuid4()
+        for k in (
+            "search",
+            "company",
+            "job",
+            "job_new",
+            "application",
+            "interview",
+            "resume",
+            "tailored",
+            "cover_letter",
+            "tracer_link",
+            "click",
+            "tracer_link_cl",
+            "click_cl",
+            "activity",
+            "llm",
+            "job_run",
+            "scrape_log",
+            "location",
+        )
+    }
 
 
 def _seed(db, account_id, ids, text, token, persona_id):
     """One row of every account-owned model for `account_id`, every text field = `text`."""
     from backend.models import db as m
+
     now = datetime.now(timezone.utc)
     with use_account(account_id):
         co_name = f"Co {text}"
         rows = [
-            m.Search(id=ids["search"], name=f"Search {text}", search_mode="keyword",
-                     search_term=text, sources=["indeed"], title_include_keywords=[text]),
-            m.Company(id=ids["company"], name=co_name, scrape_urls=[f"https://{token}.example/{text}"],
-                      notes=text, aliases=[f"alias {text}"], tier=1,
-                      selected_resume_ids=[str(ids["resume"])]),
-            m.Resume(id=ids["resume"], name=f"Resume {text}", is_base=True,
-                     json_data={"header": {"name": text}, "summary": text}),
+            m.Search(
+                id=ids["search"],
+                name=f"Search {text}",
+                search_mode="keyword",
+                search_term=text,
+                sources=["indeed"],
+                title_include_keywords=[text],
+            ),
+            m.Company(
+                id=ids["company"],
+                name=co_name,
+                scrape_urls=[f"https://{token}.example/{text}"],
+                notes=text,
+                aliases=[f"alias {text}"],
+                tier=1,
+                selected_resume_ids=[str(ids["resume"])],
+            ),
+            m.Resume(
+                id=ids["resume"],
+                name=f"Resume {text}",
+                is_base=True,
+                json_data={"header": {"name": text}, "summary": text},
+            ),
         ]
         db.add_all(rows)
         db.flush()
-        db.add(m.Job(
-            id=ids["job"], external_id=f"ext-{token}", content_hash=f"hash-{token}",
-            company=co_name, title=f"Title {text}", url=_job_url(token),
-            source="test", search_id=ids["search"], description=text, location=f"City {text}",
-            loc_country="US", loc_city=f"city{token}", status="applied", saved=True, seen=False,
-            cv_scores={f"Resume {text}": 81}, best_cv=f"Resume {text}", best_cv_score=81,
-            scoring_report={f"Resume {text}": {"summary": text}}, h1b_verdict="likely",
-            discovered_at=now - timedelta(days=1)))
+        db.add(
+            m.Job(
+                id=ids["job"],
+                external_id=f"ext-{token}",
+                content_hash=f"hash-{token}",
+                company=co_name,
+                title=f"Title {text}",
+                url=_job_url(token),
+                source="test",
+                search_id=ids["search"],
+                description=text,
+                location=f"City {text}",
+                loc_country="US",
+                loc_city=f"city{token}",
+                status="applied",
+                saved=True,
+                seen=False,
+                cv_scores={f"Resume {text}": 81},
+                best_cv=f"Resume {text}",
+                best_cv_score=81,
+                scoring_report={f"Resume {text}": {"summary": text}},
+                h1b_verdict="likely",
+                discovered_at=now - timedelta(days=1),
+            )
+        )
         # A second, untouched job: new, unscored, unsaved (the feed's default view and
         # the unscored counters only see jobs like this one).
-        db.add(m.Job(
-            id=ids["job_new"], external_id=f"ext-new-{token}", content_hash=f"hash-new-{token}",
-            company=co_name, title=f"Fresh {text}", url=f"https://{token}.example/new/1",
-            source="test", search_id=ids["search"], description=text, status="new",
-            discovered_at=now))
+        db.add(
+            m.Job(
+                id=ids["job_new"],
+                external_id=f"ext-new-{token}",
+                content_hash=f"hash-new-{token}",
+                company=co_name,
+                title=f"Fresh {text}",
+                url=f"https://{token}.example/new/1",
+                source="test",
+                search_id=ids["search"],
+                description=text,
+                status="new",
+                discovered_at=now,
+            )
+        )
         db.flush()
-        db.add_all([
-            m.JobLocation(id=ids["location"], job_id=ids["job"], country="US",
-                          city=f"city{token}", is_primary=True),
-            m.Resume(id=ids["tailored"], name=f"Tailored {text}", is_base=False,
-                     parent_id=ids["resume"], job_id=ids["job"],
-                     json_data={"header": {"name": text}, "_score": {"score": 70}}),
-            m.Application(id=ids["application"], job_id=ids["job"], status="interview",
-                          notes=text, next_action=text, applied_at=now - timedelta(days=2),
-                          status_transitions=[
-                              {"from": None, "to": "applied", "at": (now - timedelta(days=2)).isoformat(), "source": "ui"},
-                              {"from": "applied", "to": "interview", "at": now.isoformat(), "source": "ui"}]),
-        ])
+        db.add_all(
+            [
+                m.JobLocation(
+                    id=ids["location"],
+                    job_id=ids["job"],
+                    country="US",
+                    city=f"city{token}",
+                    is_primary=True,
+                ),
+                m.Resume(
+                    id=ids["tailored"],
+                    name=f"Tailored {text}",
+                    is_base=False,
+                    parent_id=ids["resume"],
+                    job_id=ids["job"],
+                    json_data={"header": {"name": text}, "_score": {"score": 70}},
+                ),
+                m.Application(
+                    id=ids["application"],
+                    job_id=ids["job"],
+                    status="interview",
+                    notes=text,
+                    next_action=text,
+                    applied_at=now - timedelta(days=2),
+                    status_transitions=[
+                        {
+                            "from": None,
+                            "to": "applied",
+                            "at": (now - timedelta(days=2)).isoformat(),
+                            "source": "ui",
+                        },
+                        {
+                            "from": "applied",
+                            "to": "interview",
+                            "at": now.isoformat(),
+                            "source": "ui",
+                        },
+                    ],
+                ),
+            ]
+        )
         db.flush()
-        db.add_all([
-            m.Interview(id=ids["interview"], application_id=ids["application"], what=text,
-                        where_text=text, prep=text, when_at=now + timedelta(days=1)),
-            m.CoverLetter(id=ids["cover_letter"], name=f"Letter {text}", job_id=ids["job"],
-                          resume_id=ids["resume"], json_data={"greeting": text, "body_paragraphs": [text]}),
-            m.Persona(id=persona_id, contact={"name": text, "email": f"{token}@example.com"},
-                      work_auth={"note": text}, demographics={}, compensation={"note": text},
-                      preferences={"note": text}, resume_content={"summary": text},
-                      qa_bank=[{"question": text, "answer": text}]),
-            m.ActivityLog(id=ids["activity"], type="scrape", message=text, company=co_name,
-                          details={"note": text}),
-            m.LlmCallLog(id=ids["llm"], purpose="score_light", provider="claude_api",
-                         model=f"model-{text}", job_id=ids["job"], input_tokens=100,
-                         output_tokens=10, cost_usd=1.25, success=False, error=text),
-            m.JobRun(id=ids["job_run"], job_type="scrape_all", trigger="manual",
-                     status="completed", started_at=now - timedelta(minutes=5), finished_at=now,
-                     duration_seconds=3.0, result_summary=text, meta={"note": text},
-                     target_job_id=ids["job"]),
-            m.ScrapeLog(id=ids["scrape_log"], search_id=ids["search"], company_id=ids["company"],
-                        source="jobspy", jobs_found=3, new_jobs=1, error=text, is_warning=True,
-                        source_breakdown={text: 3}),
-        ])
+        db.add_all(
+            [
+                m.Interview(
+                    id=ids["interview"],
+                    application_id=ids["application"],
+                    what=text,
+                    where_text=text,
+                    prep=text,
+                    when_at=now + timedelta(days=1),
+                ),
+                m.CoverLetter(
+                    id=ids["cover_letter"],
+                    name=f"Letter {text}",
+                    job_id=ids["job"],
+                    resume_id=ids["resume"],
+                    json_data={"greeting": text, "body_paragraphs": [text]},
+                ),
+                m.Persona(
+                    id=persona_id,
+                    contact={"name": text, "email": f"{token}@example.com"},
+                    work_auth={"note": text},
+                    demographics={},
+                    compensation={"note": text},
+                    preferences={"note": text},
+                    resume_content={"summary": text},
+                    qa_bank=[{"question": text, "answer": text}],
+                ),
+                m.ActivityLog(
+                    id=ids["activity"],
+                    type="scrape",
+                    message=text,
+                    company=co_name,
+                    details={"note": text},
+                ),
+                m.LlmCallLog(
+                    id=ids["llm"],
+                    purpose="score_light",
+                    provider="claude_api",
+                    model=f"model-{text}",
+                    job_id=ids["job"],
+                    input_tokens=100,
+                    output_tokens=10,
+                    cost_usd=1.25,
+                    success=False,
+                    error=text,
+                ),
+                m.JobRun(
+                    id=ids["job_run"],
+                    job_type="scrape_all",
+                    trigger="manual",
+                    status="completed",
+                    started_at=now - timedelta(minutes=5),
+                    finished_at=now,
+                    duration_seconds=3.0,
+                    result_summary=text,
+                    meta={"note": text},
+                    target_job_id=ids["job"],
+                ),
+                m.ScrapeLog(
+                    id=ids["scrape_log"],
+                    search_id=ids["search"],
+                    company_id=ids["company"],
+                    source="jobspy",
+                    jobs_found=3,
+                    new_jobs=1,
+                    error=text,
+                    is_warning=True,
+                    source_breakdown={text: 3},
+                ),
+            ]
+        )
         db.flush()
-        db.add_all([
-            m.TracerLink(id=ids["tracer_link"], token=token, resume_id=ids["resume"],
-                         destination_url=f"https://{token}.example/{text}", source_label=text),
-            m.TracerLink(id=ids["tracer_link_cl"], token=_cl_token(token),
-                         cover_letter_id=ids["cover_letter"],
-                         destination_url=f"https://{token}.example/cl/{text}", source_label=text),
-        ])
+        db.add_all(
+            [
+                m.TracerLink(
+                    id=ids["tracer_link"],
+                    token=token,
+                    resume_id=ids["resume"],
+                    destination_url=f"https://{token}.example/{text}",
+                    source_label=text,
+                ),
+                m.TracerLink(
+                    id=ids["tracer_link_cl"],
+                    token=_cl_token(token),
+                    cover_letter_id=ids["cover_letter"],
+                    destination_url=f"https://{token}.example/cl/{text}",
+                    source_label=text,
+                ),
+            ]
+        )
         db.flush()
-        db.add_all([
-            m.TracerClickEvent(id=ids["click"], tracer_link_id=ids["tracer_link"],
-                               referrer_host=f"{token}.{text}"),
-            m.TracerClickEvent(id=ids["click_cl"], tracer_link_id=ids["tracer_link_cl"],
-                               referrer_host=f"{token}.cl.{text}"),
-        ])
+        db.add_all(
+            [
+                m.TracerClickEvent(
+                    id=ids["click"],
+                    tracer_link_id=ids["tracer_link"],
+                    referrer_host=f"{token}.{text}",
+                ),
+                m.TracerClickEvent(
+                    id=ids["click_cl"],
+                    tracer_link_id=ids["tracer_link_cl"],
+                    referrer_host=f"{token}.cl.{text}",
+                ),
+            ]
+        )
         db.commit()
     db.expunge_all()
 
@@ -246,18 +434,31 @@ def _seed_memory_b(ids, b_account):
     """In-memory state that belongs to B: a running monitor entry and a search test result."""
     import backend.job_monitor as jm
     from backend.api import routes_searches as rs
-    jm._running[jm._make_key("search_run", str(ids["search"]), b_account)] = jm.RunningJob(
-        run_id=ids["job_run"], job_type="search_run", trigger="manual",
-        started_at=datetime.now(timezone.utc), scope_key=str(ids["search"]),
-        target_job_id=ids["job"], company_id=str(ids["company"]), meta={"search": MARKER},
-        account_id=b_account)
-    rs._test_results[str(ids["job_run"])] = {"status": "done", "result": {"jobs": [{"title": MARKER}]},
-                                             "account": str(b_account)}
+
+    jm._running[jm._make_key("search_run", str(ids["search"]), b_account)] = (
+        jm.RunningJob(
+            run_id=ids["job_run"],
+            job_type="search_run",
+            trigger="manual",
+            started_at=datetime.now(timezone.utc),
+            scope_key=str(ids["search"]),
+            target_job_id=ids["job"],
+            company_id=str(ids["company"]),
+            meta={"search": MARKER},
+            account_id=b_account,
+        )
+    )
+    rs._test_results[str(ids["job_run"])] = {
+        "status": "done",
+        "result": {"jobs": [{"title": MARKER}]},
+        "account": str(b_account),
+    }
 
 
 def _clear_memory_b(ids):
     import backend.job_monitor as jm
     from backend.api import routes_searches as rs
+
     for key in [k for k, r in jm._running.items() if r.run_id == ids["job_run"]]:
         jm._running.pop(key, None)
     rs._test_results.pop(str(ids["job_run"]), None)
@@ -265,10 +466,18 @@ def _clear_memory_b(ids):
 
 # ── Snapshots ────────────────────────────────────────────────────────────────
 
+
 def _owned_models():
     from backend.models.db import AccountScoped, Base
-    return sorted((mp.class_ for mp in Base.registry.mappers if issubclass(mp.class_, AccountScoped)),
-                  key=lambda c: c.__tablename__)
+
+    return sorted(
+        (
+            mp.class_
+            for mp in Base.registry.mappers
+            if issubclass(mp.class_, AccountScoped)
+        ),
+        key=lambda c: c.__tablename__,
+    )
 
 
 def _row_dict(obj):
@@ -278,6 +487,7 @@ def _row_dict(obj):
 def _snapshot(account_id):
     """Every row of `account_id` (plus its job locations and tracer clicks), as plain dicts."""
     from backend.models import db as m
+
     s = m.SessionLocal()
     try:
         with unscoped():
@@ -299,12 +509,15 @@ def _snapshot(account_id):
 
 
 def _fk_columns(model):
-    return [c for c in model.__table__.columns if c.foreign_keys and c.name != "account_id"]
+    return [
+        c for c in model.__table__.columns if c.foreign_keys and c.name != "account_id"
+    ]
 
 
 def _a_rows_touching_b(a_id, b_uuids):
     """A rows that point at a B row through a foreign key, or carry B's marker."""
     from backend.models import db as m
+
     bad = []
     s = m.SessionLocal()
     try:
@@ -325,8 +538,13 @@ def _a_rows_touching_b(a_id, b_uuids):
 
 # ── Request building ─────────────────────────────────────────────────────────
 
+
 def _b_value(kind, b):
-    return B_TOKEN if kind == "tracer_token" else (2 if kind == "persona" else str(b[kind]))
+    return (
+        B_TOKEN
+        if kind == "tracer_token"
+        else (2 if kind == "persona" else str(b[kind]))
+    )
 
 
 def _unwrap(ann):
@@ -363,13 +581,16 @@ def _example(name, ann, path, b):
 
 def _id_fields(path, b):
     """Every id-ish field a dict body may read, pointing at B's rows."""
-    body = {name: _b_value(kind, b) for name, kind in PARAM_MODELS.items()
-            if kind not in ("tracer_token", "persona")}
+    body = {
+        name: _b_value(kind, b)
+        for name, kind in PARAM_MODELS.items()
+        if kind not in ("tracer_token", "persona")
+    }
     body.update({name: [str(b[kind])] for name, kind in PLURAL_PARAMS.items()})
     res = _resource_of(path)
     if res:
         body["ids"] = [str(b[res])]
-    body["url"] = _job_url(B_TOKEN)   # dedup-by-URL lookups must not find B's job
+    body["url"] = _job_url(B_TOKEN)  # dedup-by-URL lookups must not find B's job
     return body
 
 
@@ -400,7 +621,12 @@ def _build_request(route, b):
 
     body = None
     for p in route.dependant.body_params:
-        ann = _unwrap(hints.get(p.name, sig.parameters[p.name].annotation if p.name in sig.parameters else dict))
+        ann = _unwrap(
+            hints.get(
+                p.name,
+                sig.parameters[p.name].annotation if p.name in sig.parameters else dict,
+            )
+        )
         if inspect.isclass(ann) and issubclass(ann, BaseModel):
             body = {}
             for fname, f in ann.model_fields.items():
@@ -436,7 +662,11 @@ def _scan(text, b, sent):
     if MARKER in text:
         found.append("marker")
     for ident in _b_identifiers(b):
-        if ident in text and ident not in sent and ident.replace("-", "") not in sent.replace("-", ""):
+        if (
+            ident in text
+            and ident not in sent
+            and ident.replace("-", "") not in sent.replace("-", "")
+        ):
             found.append(ident)
     return found
 
@@ -451,6 +681,7 @@ def _normalise(text):
 
 # ── Stubs: no network, no LLM, no browser, no background work ────────────────
 
+
 @pytest.fixture
 def launches(monkeypatch):
     """Record background launches instead of running them."""
@@ -462,14 +693,28 @@ def launches(monkeypatch):
 
     import backend.job_monitor as jm
     import backend.main as main_mod
-    from backend.api import routes_cover_letters, routes_jobs, routes_linkedin, routes_resumes
-    for mod in (jm, main_mod, routes_jobs, routes_cover_letters, routes_linkedin, routes_resumes):
+    from backend.api import (
+        routes_cover_letters,
+        routes_jobs,
+        routes_linkedin,
+        routes_resumes,
+    )
+
+    for mod in (
+        jm,
+        main_mod,
+        routes_jobs,
+        routes_cover_letters,
+        routes_linkedin,
+        routes_resumes,
+    ):
         monkeypatch.setattr(mod, "launch_background", _launch, raising=False)
 
     from starlette.background import BackgroundTasks
 
     def _add_task(self, func, *args, **kwargs):
         calls.append(repr((getattr(func, "__name__", str(func)), args, kwargs)))
+
     monkeypatch.setattr(BackgroundTasks, "add_task", _add_task)
     return calls
 
@@ -480,33 +725,46 @@ def _offline(monkeypatch):
 
     def _no_network(*a, **k):
         raise RuntimeError("network disabled in the leak harness")
+
     monkeypatch.setattr(httpx, "AsyncClient", _no_network)
 
     from backend.analyzer import llm_client
 
     async def _dispatch(*a, **k):
-        return {"text": "{}", "usage": {"input_tokens": 0, "output_tokens": 0,
-                                        "cache_read_tokens": 0, "cache_write_tokens": 0}}
+        return {
+            "text": "{}",
+            "usage": {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            },
+        }
 
     async def _stream(*a, **k):
         yield "ok"
+
     monkeypatch.setattr(llm_client, "_dispatch", _dispatch)
     monkeypatch.setattr(llm_client, "_stream_claude", _stream)
     monkeypatch.setattr(llm_client, "_stream_openai", _stream)
 
     async def _no_browser(*a, **k):
         raise RuntimeError("browser disabled in the leak harness")
-    from backend.scraper._shared import browser
+
     from backend.api import routes_resumes
+    from backend.scraper._shared import browser
+
     monkeypatch.setattr(browser, "_get_browser", _no_browser)
     monkeypatch.setattr(routes_resumes, "_get_browser", _no_browser)
 
     import jobspy
+
     monkeypatch.setattr(jobspy, "scrape_jobs", _no_network)
 
     # The Gmail OAuth client comes from .env; pin it so /gmail/connect answers the same with
     # or without one (CI has none and got a 503 that proves nothing).
     from backend.email_monitor import gmail_client
+
     monkeypatch.setattr(gmail_client, "GMAIL_CLIENT_ID", "leak-harness-client")
     monkeypatch.setattr(gmail_client, "GMAIL_CLIENT_SECRET", "leak-harness-secret")
     monkeypatch.setattr(gmail_client, "GMAIL_REFRESH_TOKEN", "")
@@ -514,9 +772,11 @@ def _offline(monkeypatch):
 
 # ── The cases ────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def accounts(test_db):
     from backend.models.db import Account
+
     a = test_db.query(Account).filter(Account.role == "owner").one()
     b = Account(name=f"Member {MARKER}", role="member", color="#888888")
     test_db.add(b)
@@ -540,18 +800,25 @@ def _act_as(client, direction, caller_id):
         assert r.status_code == 200, r.text
         assert client.cookies.get("jn_account")
     me = client.get("/api/auth/me")
-    assert me.status_code == 200 and me.json()["account"]["id"] == str(caller_id), me.text
+    assert me.status_code == 200 and me.json()["account"]["id"] == str(caller_id), (
+        me.text
+    )
 
 
 @pytest.mark.parametrize("direction", DIRECTIONS)
 @pytest.mark.parametrize("method,path", _route_cases())
-def test_route_does_not_leak_b(method, path, direction, client, test_db, accounts, launches):
+def test_route_does_not_leak_b(
+    method, path, direction, client, test_db, accounts, launches
+):
     """Caller A, victim B (B's rows carry MARKER). owner-via-header: A = owner with the
     X-Account-Token, B = member. member-via-cookie: A = member with the jn_account
     cookie from POST /api/auth/switch, B = owner."""
     owner_id, member_id = accounts
-    a_id, b_id = (owner_id, member_id) if direction == DIRECTIONS[0] else (member_id, owner_id)
+    a_id, b_id = (
+        (owner_id, member_id) if direction == DIRECTIONS[0] else (member_id, owner_id)
+    )
     from backend.models.db import Account
+
     for acc_id, name in ((a_id, "Caller account"), (b_id, f"Victim {MARKER}")):
         test_db.query(Account).filter(Account.id == acc_id).update({"name": name})
     test_db.commit()
@@ -572,7 +839,11 @@ def test_route_does_not_leak_b(method, path, direction, client, test_db, account
         return client.request(method, url, follow_redirects=False, **kw)
 
     def text_of(resp):
-        return resp.content.decode("utf-8", "ignore") + " " + resp.headers.get("location", "")
+        return (
+            resp.content.decode("utf-8", "ignore")
+            + " "
+            + resp.headers.get("location", "")
+        )
 
     problems = []
     before = None
@@ -597,16 +868,21 @@ def test_route_does_not_leak_b(method, path, direction, client, test_db, account
     if resp.status_code not in (403, 404, 422):
         hits = _scan(text, b, sent)
         if hits:
-            problems.append(f"response {resp.status_code} carries B data {hits[:3]}: {text[:300]}")
+            problems.append(
+                f"response {resp.status_code} carries B data {hits[:3]}: {text[:300]}"
+            )
     if before is not None:
         after = (resp.status_code, _normalise(text))
         if after != before:
-            problems.append(f"answer changed once B's rows exist: {before[0]} -> {after[0]}: "
-                            f"{before[1][:200]} || {after[1][:200]}")
+            problems.append(
+                f"answer changed once B's rows exist: {before[0]} -> {after[0]}: "
+                f"{before[1][:200]} || {after[1][:200]}"
+            )
     after_snap = _snapshot(b_id)
     if after_snap != snap:
         changed = sorted(set(snap) ^ set(after_snap)) + sorted(
-            k for k in set(snap) & set(after_snap) if snap[k] != after_snap[k])
+            k for k in set(snap) & set(after_snap) if snap[k] != after_snap[k]
+        )
         problems.append(f"B's rows changed: {changed[:5]}")
     b_uuids = {str(v) for v in b.values()}
     problems += _a_rows_touching_b(a_id, b_uuids)
@@ -614,10 +890,13 @@ def test_route_does_not_leak_b(method, path, direction, client, test_db, account
         if MARKER in call_repr or any(i in call_repr for i in b_uuids):
             problems.append(f"background work launched on B's data: {call_repr[:200]}")
 
-    assert not problems, f"{method} {path} leaks across accounts:\n  " + "\n  ".join(problems)
+    assert not problems, f"{method} {path} leaks across accounts:\n  " + "\n  ".join(
+        problems
+    )
 
 
 # ── Harness self-checks ──────────────────────────────────────────────────────
+
 
 def test_every_account_owned_model_is_seeded(test_db, accounts):
     """A new account-owned model must get a row in _seed, or the harness cannot see it."""
@@ -631,15 +910,27 @@ def test_every_account_owned_model_is_seeded(test_db, accounts):
 
 
 def test_every_path_parameter_is_mapped():
-    unmapped = sorted({f"{m} {p}: {{{prm.name}}}" for m, p, r in _api_routes()
-                       if (m, p) not in ALLOWLIST
-                       for prm in r.dependant.path_params if prm.name not in PARAM_MODELS})
+    unmapped = sorted(
+        {
+            f"{m} {p}: {{{prm.name}}}"
+            for m, p, r in _api_routes()
+            if (m, p) not in ALLOWLIST
+            for prm in r.dependant.path_params
+            if prm.name not in PARAM_MODELS
+        }
+    )
     assert not unmapped, f"unmapped path parameters (add to PARAM_MODELS): {unmapped}"
 
 
 def test_allowlist_and_known_leaks_name_real_routes():
     routes = {(m, p) for m, p, _ in _api_routes()}
-    assert not set(ALLOWLIST) - routes, f"stale allow-list entries: {set(ALLOWLIST) - routes}"
-    assert not set(KNOWN_LEAKS) - routes, f"stale KNOWN_LEAKS entries: {set(KNOWN_LEAKS) - routes}"
+    assert not set(ALLOWLIST) - routes, (
+        f"stale allow-list entries: {set(ALLOWLIST) - routes}"
+    )
+    assert not set(KNOWN_LEAKS) - routes, (
+        f"stale KNOWN_LEAKS entries: {set(KNOWN_LEAKS) - routes}"
+    )
     assert not set(ALLOWLIST) & set(KNOWN_LEAKS)
-    assert all(v.split(":")[0] in ("MT-4", "MT-5", "MT-6") for v in KNOWN_LEAKS.values())
+    assert all(
+        v.split(":")[0] in ("MT-4", "MT-5", "MT-6") for v in KNOWN_LEAKS.values()
+    )

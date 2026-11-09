@@ -9,6 +9,7 @@ address checks more than 10 RSS feeds a day ("You may only check a maximum of 10
 day", 2026-10-26). So one run reads one feed page and at most 6 job pages, one request every
 _GAP seconds, and an Eluta search should run once a day.
 """
+
 import asyncio
 import ssl
 import time
@@ -21,11 +22,17 @@ import httpx
 from backend.countries import split_country_suffix
 from backend.models.db import Search
 from backend.scraper._shared import job_boards
-from backend.scraper._shared.job_boards import Board, BoardError, make_row, term_of, too_old
 from backend.scraper._shared.html_text import html_to_text
+from backend.scraper._shared.job_boards import (
+    Board,
+    BoardError,
+    make_row,
+    term_of,
+    too_old,
+)
 
 _BASE = "https://www.eluta.ca"
-_MAX_PAGES = 1            # 20 items per RSS page
+_MAX_PAGES = 1  # 20 items per RSS page
 _MAX_DETAILS = 6
 _GAP = 3.0
 _RADIUS_KM = 50
@@ -64,9 +71,13 @@ def _items(xml_text: bytes) -> list:
     items = ET.fromstring(xml_text).findall("./channel/item")
     if len(items) == 1:
         title = (items[0].findtext("title") or "").strip()
-        if title.startswith("Too Many") or (items[0].findtext("link") or "").rstrip("/").endswith("/contact"):
+        if title.startswith("Too Many") or (items[0].findtext("link") or "").rstrip(
+            "/"
+        ).endswith("/contact"):
             reason = " ".join((items[0].findtext("description") or "").split())[:160]
-            raise BoardError(f"Eluta answered {title}" + (f": {reason}" if reason else ""))
+            raise BoardError(
+                f"Eluta answered {title}" + (f": {reason}" if reason else "")
+            )
     return items
 
 
@@ -76,10 +87,15 @@ def _row(it) -> dict:
     except (TypeError, ValueError):
         posted = None
     return make_row(
-        title=it.findtext("title"), company=(it.findtext("employer") or "").strip(),
-        url=(it.findtext("link") or "").split("?")[0], location=(it.findtext("location") or "").strip(),
-        description=html_to_text(it.findtext("description") or ""),   # a snippet until the detail fills it
-        posted=posted)
+        title=it.findtext("title"),
+        company=(it.findtext("employer") or "").strip(),
+        url=(it.findtext("link") or "").split("?")[0],
+        location=(it.findtext("location") or "").strip(),
+        description=html_to_text(
+            it.findtext("description") or ""
+        ),  # a snippet until the detail fills it
+        posted=posted,
+    )
 
 
 async def _list(client: httpx.AsyncClient, search: Search, limit: int) -> list:
@@ -94,7 +110,7 @@ async def _list(client: httpx.AsyncClient, search: Search, limit: int) -> list:
             items = _items(resp.content)
         except BoardError:
             if rows:
-                break               # keep what the earlier pages gave
+                break  # keep what the earlier pages gave
             raise
         batch = [_row(it) for it in items]
         fresh = [r for r in batch if not too_old(r, search.hours_old)]
@@ -110,11 +126,15 @@ async def _detail(client: httpx.AsyncClient, row: dict) -> None:
     if resp.status_code >= 400:
         raise BoardError(f"HTTP {resp.status_code} from {row['url']}")
     from bs4 import BeautifulSoup
+
     page = BeautifulSoup(resp.text, "html.parser")
     # The hiring organisation has its own empty <meta itemprop="description"> before the
     # posting's <div itemprop="description">, so take the longest element that holds text.
-    texts = [html_to_text(str(el)) for el in page.select('[itemtype*="JobPosting"] [itemprop="description"]')
-             if el.name != "meta"]
+    texts = [
+        html_to_text(str(el))
+        for el in page.select('[itemtype*="JobPosting"] [itemprop="description"]')
+        if el.name != "meta"
+    ]
     text = max(texts, key=len, default="")
     if text:
         row["description"] = text

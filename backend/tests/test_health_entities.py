@@ -1,13 +1,19 @@
 """GET /api/health/entities — flag active companies/searches with failing scrapes."""
-from datetime import datetime, timezone, timedelta
 
-from backend.models.db import Company, Search, ScrapeLog
+from datetime import datetime, timedelta, timezone
+
+from backend.models.db import Company, ScrapeLog, Search
 
 
 def _log(company_id=None, search_id=None, error=None, is_warning=False, ago_min=0):
     return ScrapeLog(
-        company_id=company_id, search_id=search_id, source="test",
-        jobs_found=0, new_jobs=0, error=error, is_warning=is_warning,
+        company_id=company_id,
+        search_id=search_id,
+        source="test",
+        jobs_found=0,
+        new_jobs=0,
+        error=error,
+        is_warning=is_warning,
         duration_seconds=0.0,
         ran_at=datetime.now(timezone.utc) - timedelta(minutes=ago_min),
     )
@@ -15,6 +21,7 @@ def _log(company_id=None, search_id=None, error=None, is_warning=False, ago_min=
 
 def _run():
     from backend.main import get_failing_entities
+
     return get_failing_entities()
 
 
@@ -53,7 +60,9 @@ def test_not_flagged_when_a_recent_scrape_succeeded(test_db):
     test_db.commit()
     test_db.add(_log(company_id=c.id, is_warning=True, ago_min=2))
     test_db.add(_log(company_id=c.id, is_warning=True, ago_min=1))
-    test_db.add(_log(company_id=c.id, is_warning=False, error=None, ago_min=0))  # success
+    test_db.add(
+        _log(company_id=c.id, is_warning=False, error=None, ago_min=0)
+    )  # success
     test_db.commit()
 
     r = _run()
@@ -102,6 +111,7 @@ def test_search_flagged_and_count(test_db):
 # worked". These tests pin which sentence the reason carries: the board name
 # when one board was quiet across the whole window, the original
 # "No results in the last N scrapes" in every other case.
+
 
 def _quiet_log(search_id, quiet_boards, ago_min, jobs_found=40):
     """A run that found jobs, where each named board returned no rows."""
@@ -182,7 +192,12 @@ def test_a_refused_board_still_wins_over_the_quiet_wording(test_db):
     test_db.add(s)
     test_db.commit()
     row = _quiet_log(s.id, ["indeed"], ago_min=0)
-    row.source_breakdown["zip_recruiter"] = {"seen": 0, "new": 0, "returned": 0, "error": "403"}
+    row.source_breakdown["zip_recruiter"] = {
+        "seen": 0,
+        "new": 0,
+        "returned": 0,
+        "error": "403",
+    }
     test_db.add(row)
     test_db.commit()
 
@@ -204,6 +219,7 @@ def test_inactive_search_not_flagged(test_db):
 
 
 # ── acknowledgement ──────────────────────────────────────────────────────────
+
 
 def test_acknowledged_company_not_flagged(test_db):
     c = Company(name="AckCo", active=True)
@@ -244,9 +260,13 @@ def test_failed_run_after_acknowledge_flags_again(test_db):
     test_db.commit()
     c.warning_acknowledged_at = datetime.now(timezone.utc) - timedelta(minutes=5)
     test_db.commit()
-    assert all(x["name"] != "ReAckCo" for x in _run()["companies"]), "acknowledged, so quiet"
+    assert all(x["name"] != "ReAckCo" for x in _run()["companies"]), (
+        "acknowledged, so quiet"
+    )
 
-    test_db.add(_log(company_id=c.id, error="still 404", ago_min=0))   # newer than the ack
+    test_db.add(
+        _log(company_id=c.id, error="still 404", ago_min=0)
+    )  # newer than the ack
     test_db.commit()
 
     row = next((x for x in _run()["companies"] if x["name"] == "ReAckCo"), None)

@@ -14,6 +14,7 @@ name and a renamed or duplicate-named résumé mixed or lost its scores. Now:
   *current* name, else its name when scored, else "Deleted résumé". A key that is not a
   résumé id (a 3.0 name key no migration could map, "Tailored", "Persona") is shown as it is.
 """
+
 import uuid
 from typing import Optional
 
@@ -48,10 +49,12 @@ class ScoringSet(dict):
         self.key_of[unique] = key
         return unique
 
-    def update(self, other=(), **kw):   # noqa: D102 - dict.update that keeps the keys too
+    def update(self, other=(), **kw):  # noqa: D102 - dict.update that keeps the keys too
         for label, text in dict(other, **kw).items():
             key = getattr(other, "key_of", {}).get(label, label)
-            if label in self and self.key_of.get(label, label) == key:   # the same entry again
+            if (
+                label in self and self.key_of.get(label, label) == key
+            ):  # the same entry again
                 super().__setitem__(label, text)
                 self.key_of[label] = key
             else:
@@ -82,6 +85,7 @@ def names_for(cv_texts, labels) -> dict:
 def _base_label(label: str, cv_texts) -> str:
     """The résumé's own name: a label made unique ("Name (2)") is stored without the suffix."""
     import re
+
     m = re.match(r"^(.*) \((\d+)\)$", label)
     if m and m.group(1) in cv_texts:
         return m.group(1)
@@ -91,6 +95,7 @@ def _base_label(label: str, cv_texts) -> str:
 def resume_names(db) -> dict:
     """{résumé id: current name} for the current account (the query is account-scoped)."""
     from backend.models.db import Resume
+
     return {str(rid): name for rid, name in db.query(Resume.id, Resume.name).all()}
 
 
@@ -116,7 +121,7 @@ def display(cv_scores, scoring_report, best_cv, snapshot, names: dict):
         return unique
 
     # Non-résumé keys ("Tailored", "Persona", legacy names, "_skipped") keep their own text first.
-    for key in (cv_scores or {}):
+    for key in cv_scores or {}:
         if not is_resume_key(key):
             label(key)
     scores = None if cv_scores is None else {label(k): v for k, v in cv_scores.items()}
@@ -133,5 +138,10 @@ def display_best(job, names: Optional[dict] = None, db=None) -> Optional[str]:
         return getattr(job, "best_cv", None)
     if names is None:
         names = resume_names(db) if db is not None else {}
-    return display(getattr(job, "cv_scores", None), None, job.best_cv,
-                   getattr(job, "cv_score_names", None), names)[2]
+    return display(
+        getattr(job, "cv_scores", None),
+        None,
+        job.best_cv,
+        getattr(job, "cv_score_names", None),
+        names,
+    )[2]

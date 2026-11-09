@@ -1,4 +1,5 @@
 """Deleting a tailored copy must clear its `Tailored` cv_scores entry, scoring_report entry, and any best_cv pointing at it."""
+
 from backend.api.routes_resumes import delete_resume
 from backend.models.db import Job, Resume
 
@@ -9,21 +10,42 @@ COPY2_ID = "7a777777-77a7-47a7-8777-777777777777"
 
 
 def _job(db, scores, report=None, best="Tailored", best_score=35.0):
-    db.add(Job(id=JOB_ID, external_id="ext-r3b05", title="PM", company="Anthropic",
-               url="https://x.test/1", cv_scores=scores, scoring_report=report,
-               best_cv=best, best_cv_score=best_score))
+    db.add(
+        Job(
+            id=JOB_ID,
+            external_id="ext-r3b05",
+            title="PM",
+            company="Anthropic",
+            url="https://x.test/1",
+            cv_scores=scores,
+            scoring_report=report,
+            best_cv=best,
+            best_cv_score=best_score,
+        )
+    )
 
 
 def _copies(db, *ids):
     db.add(Resume(id=BASE_ID, name="PM", is_base=True, json_data={}))
     for rid in ids:
-        db.add(Resume(id=rid, name="PM → Anthropic", is_base=False,
-                      parent_id=BASE_ID, job_id=JOB_ID, json_data={}))
+        db.add(
+            Resume(
+                id=rid,
+                name="PM → Anthropic",
+                is_base=False,
+                parent_id=BASE_ID,
+                job_id=JOB_ID,
+                json_data={},
+            )
+        )
 
 
 def test_tailored_score_and_report_are_dropped_and_best_recomputed(test_db):
-    _job(test_db, {"PM": 40, "Tailored": 35},
-         report={"PM": {"summary": "base"}, "Tailored": {"summary": "tailored"}})
+    _job(
+        test_db,
+        {"PM": 40, "Tailored": 35},
+        report={"PM": {"summary": "base"}, "Tailored": {"summary": "tailored"}},
+    )
     _copies(test_db, COPY_ID)
     test_db.commit()
 

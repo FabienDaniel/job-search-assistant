@@ -1,5 +1,6 @@
 """The company "Test scrape" must route a jobs.uber.com URL to the Uber handler,
 the same one the real scrape uses, not fall through to the generic reader."""
+
 import pytest
 
 from backend.models.db import Company
@@ -30,8 +31,12 @@ def _fake_uber(monkeypatch):
 
     async def fake_scrape(url, debug=False, **kw):
         calls.append((url, debug))
-        return [{"title": "Senior Product Manager",
-                 "url": "https://jobs.uber.com/en/jobs/160013/"}], []
+        return [
+            {
+                "title": "Senior Product Manager",
+                "url": "https://jobs.uber.com/en/jobs/160013/",
+            }
+        ], []
 
     monkeypatch.setattr(browser_mod, "_get_browser", fake_get_browser)
     monkeypatch.setattr(browser_mod, "_new_page", no_page)
@@ -43,8 +48,13 @@ def _fake_uber(monkeypatch):
 async def test_uber_url_is_read_by_the_uber_handler(test_db, _fake_uber):
     from backend.api.routes_companies import test_scrape_company
 
-    c = Company(name="ZZ Uber", active=True, scrape_urls=[URL],
-                title_include_expr="manager", title_exclude_keywords=[])
+    c = Company(
+        name="ZZ Uber",
+        active=True,
+        scrape_urls=[URL],
+        title_include_expr="manager",
+        title_exclude_keywords=[],
+    )
     test_db.add(c)
     test_db.commit()
 

@@ -1,4 +1,5 @@
 """Every job the scheduler registers shows a readable name in the schedules list, not its id."""
+
 import re
 from pathlib import Path
 
@@ -14,6 +15,7 @@ def _registered_ids():
 
 def test_every_scheduled_job_has_a_display_name():
     from backend.main import SCHEDULE_NAMES
+
     ids = _registered_ids()
     assert "scrape_all" in ids
     assert sorted(ids - set(SCHEDULE_NAMES)) == []

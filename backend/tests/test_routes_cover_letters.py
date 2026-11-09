@@ -1,28 +1,45 @@
 """Tests for /api/cover-letters — CRUD, templates, generate validation."""
+
 import uuid
+
 import pytest
 
-from backend.models.db import Setting, Resume, Job
+from backend.models.db import Job, Resume, Setting
 
 
 def _seed_first_run(db):
     db.add(Setting(key="dashboard_api_key", value=""))
-    db.add(Setting(key="cover_letter_prompt", value="Voice {voice_instruction} Len {length_instruction} JD {job_description}"))
+    db.add(
+        Setting(
+            key="cover_letter_prompt",
+            value="Voice {voice_instruction} Len {length_instruction} JD {job_description}",
+        )
+    )
     db.commit()
 
 
 def _make_resume(db, name="PM"):
-    r = Resume(id=uuid.uuid4(), name=name, is_base=True,
-               json_data={"header": {"name": "Jordan"}, "summary": "PM."})
+    r = Resume(
+        id=uuid.uuid4(),
+        name=name,
+        is_base=True,
+        json_data={"header": {"name": "Jordan"}, "summary": "PM."},
+    )
     db.add(r)
     db.commit()
     return r
 
 
 def _make_job(db, description="We need a fintech PM with roadmapping skills."):
-    j = Job(id=uuid.uuid4(), external_id=uuid.uuid4().hex, company="Acme",
-            title="Senior PM", url="https://acme.com/jobs/1", status="saved",
-            description=description)
+    j = Job(
+        id=uuid.uuid4(),
+        external_id=uuid.uuid4().hex,
+        company="Acme",
+        title="Senior PM",
+        url="https://acme.com/jobs/1",
+        status="saved",
+        description=description,
+    )
     db.add(j)
     db.commit()
     return j
@@ -30,12 +47,16 @@ def _make_job(db, description="We need a fintech PM with roadmapping skills."):
 
 # ── CRUD ─────────────────────────────────────────────────────────────────────
 
+
 def test_create_and_get(api_client, test_db):
     _seed_first_run(test_db)
-    resp = api_client.post("/api/cover-letters", json={
-        "name": "Acme letter",
-        "json_data": {"greeting": "Dear Team,", "body_paragraphs": ["Hello."]},
-    })
+    resp = api_client.post(
+        "/api/cover-letters",
+        json={
+            "name": "Acme letter",
+            "json_data": {"greeting": "Dear Team,", "body_paragraphs": ["Hello."]},
+        },
+    )
     assert resp.status_code == 201
     cid = resp.json()["id"]
 
@@ -67,9 +88,13 @@ def test_list_and_filter_by_job(api_client, test_db):
 def test_patch_updates_fields(api_client, test_db):
     _seed_first_run(test_db)
     cid = api_client.post("/api/cover-letters", json={"name": "Old"}).json()["id"]
-    resp = api_client.patch(f"/api/cover-letters/{cid}", json={
-        "name": "New", "json_data": {"greeting": "Hi,"},
-    })
+    resp = api_client.patch(
+        f"/api/cover-letters/{cid}",
+        json={
+            "name": "New",
+            "json_data": {"greeting": "Hi,"},
+        },
+    )
     assert resp.status_code == 200
     assert resp.json()["name"] == "New"
     assert resp.json()["json_data"]["greeting"] == "Hi,"
@@ -89,6 +114,7 @@ def test_get_missing_404(api_client, test_db):
 
 # ── Templates ────────────────────────────────────────────────────────────────
 
+
 def test_templates_endpoint(api_client, test_db):
     _seed_first_run(test_db)
     resp = api_client.get("/api/cover-letters/templates")
@@ -100,17 +126,25 @@ def test_templates_endpoint(api_client, test_db):
 
 # ── Generate validation ──────────────────────────────────────────────────────
 
+
 def test_generate_requires_resume_and_job(api_client, test_db):
     _seed_first_run(test_db)
     assert api_client.post("/api/cover-letters/generate", json={}).status_code == 400
-    assert api_client.post("/api/cover-letters/generate", json={"resume_id": str(uuid.uuid4())}).status_code == 400
+    assert (
+        api_client.post(
+            "/api/cover-letters/generate", json={"resume_id": str(uuid.uuid4())}
+        ).status_code
+        == 400
+    )
 
 
 def test_generate_404_on_missing_resume(api_client, test_db):
     _seed_first_run(test_db)
     job = _make_job(test_db)
-    resp = api_client.post("/api/cover-letters/generate",
-                           json={"resume_id": str(uuid.uuid4()), "job_id": str(job.id)})
+    resp = api_client.post(
+        "/api/cover-letters/generate",
+        json={"resume_id": str(uuid.uuid4()), "job_id": str(job.id)},
+    )
     assert resp.status_code == 404
 
 
@@ -121,8 +155,10 @@ def test_generate_400_when_no_jd_source(api_client, test_db):
     job = _make_job(test_db, description="")
     job.url = ""
     test_db.commit()
-    resp = api_client.post("/api/cover-letters/generate",
-                           json={"resume_id": str(resume.id), "job_id": str(job.id)})
+    resp = api_client.post(
+        "/api/cover-letters/generate",
+        json={"resume_id": str(resume.id), "job_id": str(job.id)},
+    )
     assert resp.status_code == 400
 
 
@@ -134,10 +170,13 @@ def test_generate_202_on_url_only_job(api_client, test_db, monkeypatch):
     job = _make_job(test_db, description="")
 
     import backend.api.routes_cover_letters as rcl
+
     monkeypatch.setattr(rcl, "launch_background", lambda *a, **kw: "run-124")
 
-    resp = api_client.post("/api/cover-letters/generate",
-                           json={"resume_id": str(resume.id), "job_id": str(job.id)})
+    resp = api_client.post(
+        "/api/cover-letters/generate",
+        json={"resume_id": str(resume.id), "job_id": str(job.id)},
+    )
     assert resp.status_code == 202
 
 
@@ -148,11 +187,18 @@ def test_generate_happy_path_returns_202(api_client, test_db, monkeypatch):
     job = _make_job(test_db)
 
     import backend.api.routes_cover_letters as rcl
+
     monkeypatch.setattr(rcl, "launch_background", lambda *a, **kw: "run-123")
 
-    resp = api_client.post("/api/cover-letters/generate",
-                           json={"resume_id": str(resume.id), "job_id": str(job.id),
-                                 "voice": "warm", "length": "concise"})
+    resp = api_client.post(
+        "/api/cover-letters/generate",
+        json={
+            "resume_id": str(resume.id),
+            "job_id": str(job.id),
+            "voice": "warm",
+            "length": "concise",
+        },
+    )
     assert resp.status_code == 202
     assert resp.json()["run_id"] == "run-123"
 
@@ -169,22 +215,27 @@ def test_generate_409_on_duplicate(api_client, test_db, monkeypatch):
         raise JobAlreadyRunningError("generate_cover_letter", 5.0)
 
     monkeypatch.setattr(rcl, "launch_background", _raise)
-    resp = api_client.post("/api/cover-letters/generate",
-                           json={"resume_id": str(resume.id), "job_id": str(job.id)})
+    resp = api_client.post(
+        "/api/cover-letters/generate",
+        json={"resume_id": str(resume.id), "job_id": str(job.id)},
+    )
     assert resp.status_code == 409
 
 
 def test_generate_persona_base_validates_content(api_client, test_db, monkeypatch):
     """resume_id='persona' fails fast when Persona has no resume_content, succeeds when it does."""
     from backend.models.db import Persona
+
     _seed_first_run(test_db)
     job = _make_job(test_db)
     test_db.add(Persona(id=1, resume_content={}))
     test_db.commit()
 
     # empty persona → 400
-    resp = api_client.post("/api/cover-letters/generate",
-                           json={"resume_id": "persona", "job_id": str(job.id)})
+    resp = api_client.post(
+        "/api/cover-letters/generate",
+        json={"resume_id": "persona", "job_id": str(job.id)},
+    )
     assert resp.status_code == 400
 
     # fill persona, stub launch_background → 202
@@ -192,30 +243,65 @@ def test_generate_persona_base_validates_content(api_client, test_db, monkeypatc
     p.resume_content = {"header": {"name": "Jordan"}, "summary": "PM."}
     test_db.commit()
     import backend.api.routes_cover_letters as rcl
+
     monkeypatch.setattr(rcl, "launch_background", lambda *a, **kw: "run-1")
-    resp = api_client.post("/api/cover-letters/generate",
-                           json={"resume_id": "persona", "job_id": str(job.id)})
+    resp = api_client.post(
+        "/api/cover-letters/generate",
+        json={"resume_id": "persona", "job_id": str(job.id)},
+    )
     assert resp.status_code == 202
 
 
 # ── Tracer cross-owner sharing ───────────────────────────────────────────────
 
+
 def test_tracer_link_is_shared_by_both_owners(test_db):
     """A resume and a cover letter for the same job derive the same {short_id}{stub} token, owned by both (see test_tracer_shared_owner.py for stats-level assertions)."""
     import uuid
-    from backend.models.db import Setting, Resume, Job, CoverLetter, TracerLink
+
     from backend.api.routes_resumes import _rewrite_urls_with_tracers
+    from backend.models.db import CoverLetter, Job, Resume, Setting, TracerLink
 
     test_db.add(Setting(key="tracer_links_enabled", value="true"))
     test_db.add(Setting(key="tracer_links_base_url", value="https://t.example.com"))
     test_db.add(Setting(key="tracer_links_url_style", value="path_jobid"))
-    job = Job(id=uuid.uuid4(), external_id=uuid.uuid4().hex, company="Acme", title="PM",
-              url="https://acme.com/1", status="saved", short_id=7777)
+    job = Job(
+        id=uuid.uuid4(),
+        external_id=uuid.uuid4().hex,
+        company="Acme",
+        title="PM",
+        url="https://acme.com/1",
+        status="saved",
+        short_id=7777,
+    )
     test_db.add(job)
-    resume = Resume(id=uuid.uuid4(), name="PM", is_base=False, job_id=job.id,
-                    json_data={"header": {"name": "V", "contact_items": [{"text": "LinkedIn", "url": "linkedin.com/in/v", "stub": "l"}]}})
-    cl = CoverLetter(id=uuid.uuid4(), name="PM CL", job_id=job.id,
-                     json_data={"header": {"name": "V", "contact_items": [{"text": "LinkedIn", "url": "linkedin.com/in/v", "stub": "l"}]}})
+    resume = Resume(
+        id=uuid.uuid4(),
+        name="PM",
+        is_base=False,
+        job_id=job.id,
+        json_data={
+            "header": {
+                "name": "V",
+                "contact_items": [
+                    {"text": "LinkedIn", "url": "linkedin.com/in/v", "stub": "l"}
+                ],
+            }
+        },
+    )
+    cl = CoverLetter(
+        id=uuid.uuid4(),
+        name="PM CL",
+        job_id=job.id,
+        json_data={
+            "header": {
+                "name": "V",
+                "contact_items": [
+                    {"text": "LinkedIn", "url": "linkedin.com/in/v", "stub": "l"}
+                ],
+            }
+        },
+    )
     test_db.add(resume)
     test_db.add(cl)
     test_db.commit()
@@ -223,7 +309,9 @@ def test_tracer_link_is_shared_by_both_owners(test_db):
     # Rewrite resume → creates link owned by resume, token "7777l"
     _rewrite_urls_with_tracers(resume.json_data, str(resume.id), test_db)
     # Rewrite CL → same token; it claims the row without releasing the résumé's
-    _rewrite_urls_with_tracers(cl.json_data, None, test_db, cover_letter_id=str(cl.id), job_id=cl.job_id)
+    _rewrite_urls_with_tracers(
+        cl.json_data, None, test_db, cover_letter_id=str(cl.id), job_id=cl.job_id
+    )
 
     link = test_db.query(TracerLink).filter(TracerLink.token == "7777l").first()
     assert link is not None
@@ -236,15 +324,27 @@ def test_tracer_link_is_shared_by_both_owners(test_db):
 def test_base_resume_stub_uses_zero_prefix(test_db):
     """A base resume has no job_id to namespace the token; in a *_jobid style with an explicit stub, the token is '0{stub}'."""
     import uuid
-    from backend.models.db import Setting, Resume, TracerLink
+
     from backend.api.routes_resumes import _rewrite_urls_with_tracers
+    from backend.models.db import Resume, Setting, TracerLink
 
     test_db.add(Setting(key="tracer_links_enabled", value="true"))
     test_db.add(Setting(key="tracer_links_base_url", value="https://t.example.com"))
     test_db.add(Setting(key="tracer_links_url_style", value="path_jobid"))
-    resume = Resume(id=uuid.uuid4(), name="Base", is_base=True, job_id=None,
-                    json_data={"header": {"name": "V", "contact_items": [
-                        {"text": "LinkedIn", "url": "linkedin.com/in/v", "stub": "li"}]}})
+    resume = Resume(
+        id=uuid.uuid4(),
+        name="Base",
+        is_base=True,
+        job_id=None,
+        json_data={
+            "header": {
+                "name": "V",
+                "contact_items": [
+                    {"text": "LinkedIn", "url": "linkedin.com/in/v", "stub": "li"}
+                ],
+            }
+        },
+    )
     test_db.add(resume)
     test_db.commit()
 
@@ -260,15 +360,25 @@ def test_base_resume_without_stub_stays_random(test_db):
     """No stub and no job short_id → fall back to a random token (not '0…'); it comes from
     `secrets.token_urlsafe(8)` since R4-T5-07, so ≥ 8 chars rather than the old 6."""
     import uuid
-    from backend.models.db import Setting, Resume, TracerLink
+
     from backend.api.routes_resumes import _rewrite_urls_with_tracers
+    from backend.models.db import Resume, Setting, TracerLink
 
     test_db.add(Setting(key="tracer_links_enabled", value="true"))
     test_db.add(Setting(key="tracer_links_base_url", value="https://t.example.com"))
     test_db.add(Setting(key="tracer_links_url_style", value="path_jobid"))
-    resume = Resume(id=uuid.uuid4(), name="Base", is_base=True, job_id=None,
-                    json_data={"header": {"name": "V", "contact_items": [
-                        {"text": "Portfolio", "url": "example.com/v"}]}})
+    resume = Resume(
+        id=uuid.uuid4(),
+        name="Base",
+        is_base=True,
+        job_id=None,
+        json_data={
+            "header": {
+                "name": "V",
+                "contact_items": [{"text": "Portfolio", "url": "example.com/v"}],
+            }
+        },
+    )
     test_db.add(resume)
     test_db.commit()
 
@@ -277,7 +387,7 @@ def test_base_resume_without_stub_stays_random(test_db):
     link = test_db.query(TracerLink).filter(TracerLink.resume_id == resume.id).first()
     assert link is not None
     assert len(link.token) >= 8
-    assert link.token != "0li"        # not the deterministic 0{stub} shape
+    assert link.token != "0li"  # not the deterministic 0{stub} shape
 
 
 def test_generate_inner_resolves_jd_from_url(test_db, monkeypatch):
@@ -286,6 +396,7 @@ def test_generate_inner_resolves_jd_from_url(test_db, monkeypatch):
     import asyncio
     from contextlib import asynccontextmanager
     from unittest.mock import MagicMock
+
     import backend.api.routes_cover_letters as rcl
 
     _seed_first_run(test_db)
@@ -295,23 +406,40 @@ def test_generate_inner_resolves_jd_from_url(test_db, monkeypatch):
     async def fake_fetch(url):
         return "Fetched JD: fintech PM, roadmapping."
 
-    monkeypatch.setattr("backend.scraper.ats._descriptions._fetch_job_description", fake_fetch)
+    monkeypatch.setattr(
+        "backend.scraper.ats._descriptions._fetch_job_description", fake_fetch
+    )
 
     seen = {}
 
-    async def fake_body(resume_data, preferences, jd, voice_instruction, length, prompt_template):
+    async def fake_body(
+        resume_data, preferences, jd, voice_instruction, length, prompt_template
+    ):
         seen["jd"] = jd
-        return {"greeting": "Dear Acme,", "body_paragraphs": ["p"], "closing": "Regards,",
-                "signature": "Jordan"}
+        return {
+            "greeting": "Dear Acme,",
+            "body_paragraphs": ["p"],
+            "closing": "Regards,",
+            "signature": "Jordan",
+        }
 
     @asynccontextmanager
     async def fake_track(*a, **kw):
         yield MagicMock()
 
-    asyncio.run(rcl._generate_inner(
-        str(resume.id), str(job.id), None, "concise", None, None,
-        lambda db, voice: (None, ""), fake_body, fake_track,
-    ))
+    asyncio.run(
+        rcl._generate_inner(
+            str(resume.id),
+            str(job.id),
+            None,
+            "concise",
+            None,
+            None,
+            lambda db, voice: (None, ""),
+            fake_body,
+            fake_track,
+        )
+    )
 
     assert seen["jd"] == "Fetched JD: fintech PM, roadmapping."
     test_db.expire_all()
@@ -320,11 +448,13 @@ def test_generate_inner_resolves_jd_from_url(test_db, monkeypatch):
 
 # ── Résumé-only template (`modern`) ──────────────────────────────────────────
 
+
 def test_generate_inner_skips_resume_only_template(test_db):
     """A résumé on `modern` (no letter version) gives the letter Garamond Modern, not a name that 422s on render."""
     import asyncio
     from contextlib import asynccontextmanager
     from unittest.mock import MagicMock
+
     import backend.api.routes_cover_letters as rcl
     from backend.models.db import CoverLetter
 
@@ -335,16 +465,30 @@ def test_generate_inner_skips_resume_only_template(test_db):
     job = _make_job(test_db)
 
     async def fake_body(*a):
-        return {"greeting": "Dear Acme,", "body_paragraphs": ["p"], "closing": "Regards,", "signature": "Jordan"}
+        return {
+            "greeting": "Dear Acme,",
+            "body_paragraphs": ["p"],
+            "closing": "Regards,",
+            "signature": "Jordan",
+        }
 
     @asynccontextmanager
     async def fake_track(*a, **kw):
         yield MagicMock()
 
-    asyncio.run(rcl._generate_inner(
-        str(resume.id), str(job.id), None, "concise", None, None,
-        lambda db, voice: (None, ""), fake_body, fake_track,
-    ))
+    asyncio.run(
+        rcl._generate_inner(
+            str(resume.id),
+            str(job.id),
+            None,
+            "concise",
+            None,
+            None,
+            lambda db, voice: (None, ""),
+            fake_body,
+            fake_track,
+        )
+    )
 
     test_db.expire_all()
     cl = test_db.query(CoverLetter).filter(CoverLetter.job_id == job.id).one()
@@ -361,6 +505,7 @@ def test_render_html_falls_back_for_resume_only_template():
 
 def test_render_html_still_rejects_a_path():
     from fastapi import HTTPException
+
     from backend.api.routes_cover_letters import _render_html
 
     with pytest.raises(HTTPException) as e:
@@ -370,11 +515,13 @@ def test_render_html_still_rejects_a_path():
 
 # ── Default template setting (cover_letter_template) ─────────────────────────
 
+
 def _generate_letter(test_db, resume_template):
     """Generate a letter from a résumé on `resume_template`; return the stored letter's template."""
     import asyncio
     from contextlib import asynccontextmanager
     from unittest.mock import MagicMock
+
     import backend.api.routes_cover_letters as rcl
     from backend.models.db import CoverLetter
 
@@ -384,18 +531,34 @@ def _generate_letter(test_db, resume_template):
     job = _make_job(test_db)
 
     async def fake_body(*a):
-        return {"greeting": "Dear Acme,", "body_paragraphs": ["p"], "closing": "Regards,", "signature": "Jordan"}
+        return {
+            "greeting": "Dear Acme,",
+            "body_paragraphs": ["p"],
+            "closing": "Regards,",
+            "signature": "Jordan",
+        }
 
     @asynccontextmanager
     async def fake_track(*a, **kw):
         yield MagicMock()
 
-    asyncio.run(rcl._generate_inner(
-        str(resume.id), str(job.id), None, "concise", None, None,
-        lambda db, voice: (None, ""), fake_body, fake_track,
-    ))
+    asyncio.run(
+        rcl._generate_inner(
+            str(resume.id),
+            str(job.id),
+            None,
+            "concise",
+            None,
+            None,
+            lambda db, voice: (None, ""),
+            fake_body,
+            fake_track,
+        )
+    )
     test_db.expire_all()
-    return test_db.query(CoverLetter).filter(CoverLetter.job_id == job.id).one().template
+    return (
+        test_db.query(CoverLetter).filter(CoverLetter.job_id == job.id).one().template
+    )
 
 
 def test_default_template_reads_the_setting(test_db):
@@ -404,7 +567,7 @@ def test_default_template_reads_the_setting(test_db):
     test_db.add(Setting(key="cover_letter_template", value="inter"))
     test_db.commit()
     assert _default_template_id(test_db) == "inter"
-    assert _default_template_id() == "garamond_alt"   # no db: the built-in default
+    assert _default_template_id() == "garamond_alt"  # no db: the built-in default
 
 
 @pytest.mark.parametrize("value", ["", "modern", "../resume_templates/modern"])
@@ -456,8 +619,16 @@ def test_last_selected_is_the_template_last_picked_in_the_editor(api_client, tes
     assert _generate_letter(test_db, "raleway") == "raleway"
     letter = api_client.post("/api/cover-letters", json={"name": "Blank"}).json()
     assert letter["template"] == "garamond_alt"
-    assert api_client.patch(f"/api/cover-letters/{letter['id']}", json={"template": "palatino"}).status_code == 200
-    assert api_client.post("/api/cover-letters", json={"name": "Next"}).json()["template"] == "palatino"
+    assert (
+        api_client.patch(
+            f"/api/cover-letters/{letter['id']}", json={"template": "palatino"}
+        ).status_code
+        == 200
+    )
+    assert (
+        api_client.post("/api/cover-letters", json={"name": "Next"}).json()["template"]
+        == "palatino"
+    )
     assert _generate_letter(test_db, "raleway") == "palatino"
 
 
@@ -485,8 +656,13 @@ def test_last_selected_stays_with_the_account_that_picked_it(test_db):
         test_db.commit()
     with use_account(owner.id):
         assert get_setting(test_db, "cover_letter_last_template") == "palatino"
-    member_row = test_db.query(Setting).filter(Setting.key == "cover_letter_last_template",
-                                               Setting.account_id == member.id).one()
+    member_row = (
+        test_db.query(Setting)
+        .filter(
+            Setting.key == "cover_letter_last_template", Setting.account_id == member.id
+        )
+        .one()
+    )
     assert member_row.value == "inter"
 
 
@@ -494,13 +670,35 @@ def test_create_without_template_uses_the_setting(api_client, test_db):
     _seed_first_run(test_db)
     test_db.add(Setting(key="cover_letter_template", value="palatino"))
     test_db.commit()
-    assert api_client.post("/api/cover-letters", json={"name": "Blank"}).json()["template"] == "palatino"
-    picked = api_client.post("/api/cover-letters", json={"name": "Picked", "template": "inter"})
+    assert (
+        api_client.post("/api/cover-letters", json={"name": "Blank"}).json()["template"]
+        == "palatino"
+    )
+    picked = api_client.post(
+        "/api/cover-letters", json={"name": "Picked", "template": "inter"}
+    )
     assert picked.json()["template"] == "inter"
 
 
-@pytest.mark.parametrize("value,status", [("inter", 200), ("", 200), ("same_as_resume", 200), ("last_selected", 200),
-                                          ("modern", 422), ("../x", 422), (5, 422)])
-def test_patch_settings_validates_cover_letter_template(api_client, test_db, value, status):
+@pytest.mark.parametrize(
+    "value,status",
+    [
+        ("inter", 200),
+        ("", 200),
+        ("same_as_resume", 200),
+        ("last_selected", 200),
+        ("modern", 422),
+        ("../x", 422),
+        (5, 422),
+    ],
+)
+def test_patch_settings_validates_cover_letter_template(
+    api_client, test_db, value, status
+):
     _seed_first_run(test_db)
-    assert api_client.patch("/api/settings", json={"cover_letter_template": value}).status_code == status
+    assert (
+        api_client.patch(
+            "/api/settings", json={"cover_letter_template": value}
+        ).status_code
+        == status
+    )

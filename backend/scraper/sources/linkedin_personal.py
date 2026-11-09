@@ -1,4 +1,5 @@
 """LinkedIn Personal source — scrapes /jobs/collections/recommended/ + /jobs/collections/top-applicant/."""
+
 import asyncio
 import json
 import logging
@@ -10,9 +11,9 @@ from datetime import datetime, timezone
 
 from sqlalchemy.exc import IntegrityError
 
-from backend.models.db import SessionLocal, Job, Search, get_existing_external_ids
 from backend.accounts.settings import get_setting
-from backend.scraper._shared.dedup import make_external_id, make_content_hash
+from backend.models.db import Job, Search, SessionLocal, get_existing_external_ids
+from backend.scraper._shared.dedup import make_content_hash, make_external_id
 from backend.scraper._shared.posting_links import counts_as_new
 from backend.scraper._shared.postings import resolve_short_links
 
@@ -23,11 +24,14 @@ def cookie_path() -> str:
     """The current account's LinkedIn Personal cookie jar (MT-16): the owner keeps
     /tmp/linkedin_cookies.json, a member's is under ~/.linkedin_api/accounts/<id>/."""
     from backend.accounts.credentials import linkedin_personal_cookies
+
     return linkedin_personal_cookies()
 
 
-NOT_SET_UP = ("LinkedIn is not set up for this account: add your LinkedIn email and "
-              "password in Settings › LinkedIn")
+NOT_SET_UP = (
+    "LinkedIn is not set up for this account: add your LinkedIn email and "
+    "password in Settings › LinkedIn"
+)
 
 
 def _check_set_up(email: str, password: str) -> None:
@@ -37,18 +41,19 @@ def _check_set_up(email: str, password: str) -> None:
     if email and password:
         return
     import os
+
     if not os.path.exists(cookie_path()):
         raise RuntimeError(NOT_SET_UP)
 
 
 # Delay ranges (seconds) — tuned to avoid 429s
-DELAY_BETWEEN_CARDS = (1.5, 3.0)       # after clicking each card
-DELAY_BEFORE_CLICK = (0.3, 0.7)        # before clicking a card
-DELAY_PAGE_LOAD = (3.0, 5.0)           # after navigating to a new page
-DELAY_BETWEEN_PAGES = (2.0, 4.0)       # between pagination pages
-DELAY_BETWEEN_COLLECTIONS = (5.0, 8.0) # between collections
-DELAY_ENRICHMENT = (5.0, 8.0)          # between enrichment page visits
-DELAY_SCROLL = (1.0, 2.0)              # between scroll iterations
+DELAY_BETWEEN_CARDS = (1.5, 3.0)  # after clicking each card
+DELAY_BEFORE_CLICK = (0.3, 0.7)  # before clicking a card
+DELAY_PAGE_LOAD = (3.0, 5.0)  # after navigating to a new page
+DELAY_BETWEEN_PAGES = (2.0, 4.0)  # between pagination pages
+DELAY_BETWEEN_COLLECTIONS = (5.0, 8.0)  # between collections
+DELAY_ENRICHMENT = (5.0, 8.0)  # between enrichment page visits
+DELAY_SCROLL = (1.0, 2.0)  # between scroll iterations
 
 ALL_COLLECTIONS = {
     "recommended": "https://www.linkedin.com/jobs/collections/recommended/",
@@ -68,8 +73,14 @@ async def _check_rate_limit(page) -> bool:
         if title and ("429" in title or "too many" in title.lower()):
             return True
         # Check for the rate limit message in body
-        body = await page.evaluate("() => document.body?.innerText?.substring(0, 500) || ''")
-        if body and ("429" in body or "too many requests" in body.lower() or "rate limit" in body.lower()):
+        body = await page.evaluate(
+            "() => document.body?.innerText?.substring(0, 500) || ''"
+        )
+        if body and (
+            "429" in body
+            or "too many requests" in body.lower()
+            or "rate limit" in body.lower()
+        ):
             return True
     except Exception:
         pass
@@ -78,11 +89,13 @@ async def _check_rate_limit(page) -> bool:
 
 class LinkedInRateLimitError(RuntimeError):
     """Raised when LinkedIn returns 429 and retries are exhausted."""
+
     pass
 
 
 class LinkedInSessionExpiredError(RuntimeError):
     """Raised when a collection lands on the login wall: every later collection would too."""
+
     pass
 
 
@@ -91,8 +104,10 @@ async def _handle_rate_limit(page, context_msg: str = "") -> bool:
     if not await _check_rate_limit(page):
         return False
     wait_time = random.uniform(60, 120)
-    logger.warning(f"LinkedIn 429 rate limit detected{' — ' + context_msg if context_msg else ''}. "
-                   f"Waiting {wait_time:.0f}s before retry...")
+    logger.warning(
+        f"LinkedIn 429 rate limit detected{' — ' + context_msg if context_msg else ''}. "
+        f"Waiting {wait_time:.0f}s before retry..."
+    )
     await asyncio.sleep(wait_time)
     return True
 
@@ -100,6 +115,7 @@ async def _handle_rate_limit(page, context_msg: str = "") -> bool:
 async def _get_linkedin_browser():
     """Launch Playwright Chromium with stealth settings + cookie persistence."""
     from playwright.async_api import async_playwright
+
     from backend.scraper._shared.browser import _STEALTH_ARGS, _USER_AGENT
 
     pw = await async_playwright().start()
@@ -168,7 +184,9 @@ _SIGNED_IN_SURFACES = ("/feed", "/mynetwork")
 async def _has_auth_cookie(context) -> bool:
     """`li_at` is LinkedIn's authentication cookie; without it the session is anonymous."""
     try:
-        return any(c.get("name") == "li_at" and c.get("value") for c in await context.cookies())
+        return any(
+            c.get("name") == "li_at" and c.get("value") for c in await context.cookies()
+        )
     except Exception:
         return False
 
@@ -222,13 +240,17 @@ async def _save_session(context, message: str) -> None:
 async def _login(page, context, email: str, password: str):
     """Log in to LinkedIn with credentials. Raises on CAPTCHA/challenge."""
     logger.info("Logging in to LinkedIn...")
-    await page.goto("https://www.linkedin.com/login", wait_until="domcontentloaded", timeout=30000)
+    await page.goto(
+        "https://www.linkedin.com/login", wait_until="domcontentloaded", timeout=30000
+    )
     await asyncio.sleep(random.uniform(1.5, 3.0))
 
     # An authenticated session redirects /login to the feed, so the username field never
     # renders; filling it would time out. Treat that redirect as the login.
     if await _is_logged_in(page, context):
-        await _save_session(context, "LinkedIn already signed in — /login redirected to the feed")
+        await _save_session(
+            context, "LinkedIn already signed in — /login redirected to the feed"
+        )
         return
 
     try:
@@ -238,7 +260,10 @@ async def _login(page, context, email: str, password: str):
         # the feed (already signed in), so the form never renders. Landing on a signed-in page is
         # a login, not a failure.
         if await _is_logged_in(page, context):
-            await _save_session(context, "LinkedIn already signed in — the login page redirected to the feed")
+            await _save_session(
+                context,
+                "LinkedIn already signed in — the login page redirected to the feed",
+            )
             return
         raise
 
@@ -261,7 +286,9 @@ async def _login(page, context, email: str, password: str):
             )
         # Might have landed on an unexpected page but still logged in
         if not await _is_logged_in(page, context):
-            raise RuntimeError(f"LinkedIn login failed — landed on unexpected page: {current_url}")
+            raise RuntimeError(
+                f"LinkedIn login failed — landed on unexpected page: {current_url}"
+            )
 
     await _save_cookies(context)
     logger.info("LinkedIn login successful, cookies saved")
@@ -282,7 +309,9 @@ async def _save_cookies(context):
 async def _ensure_logged_in(page, context, email: str, password: str):
     """Navigate to LinkedIn and ensure we're logged in (cookie or credential login)."""
     # Try loading feed with existing cookies
-    await page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=30000)
+    await page.goto(
+        "https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=30000
+    )
     await asyncio.sleep(random.uniform(2.0, 3.5))
 
     if await _is_logged_in(page, context):
@@ -308,12 +337,13 @@ def _parse_salary_text(text: str) -> dict:
     # "$45/hr" or "$8K/mo" is not a yearly figure (the bare-number rule below would read
     # $45 as $45K); keep it as text only.
     from backend.analyzer.salary_extractor import is_non_annual
+
     if is_non_annual(text):
         result["salary_text"] = text
         return result
     # Match $120K, $120,000, $120000, $120.5K etc.
     amounts = []
-    for m in re.finditer(r'\$([\d,]+(?:\.\d+)?)\s*([Kk])?', text):
+    for m in re.finditer(r"\$([\d,]+(?:\.\d+)?)\s*([Kk])?", text):
         num = float(m.group(1).replace(",", ""))
         if m.group(2):  # K suffix
             num *= 1000
@@ -336,8 +366,8 @@ async def _extract_detail_description(page) -> str:
         '[class*="jobs-description-content__text"]',
         '[class*="jobs-description__content"]',
         '[class*="jobs-box__html-content"]',
-        '.jobs-description',
-        '#job-details',
+        ".jobs-description",
+        "#job-details",
     ]:
         el = await page.query_selector(sel)
         if el:
@@ -375,7 +405,7 @@ async def _extract_detail_salary(page) -> str:
             text = (await el.inner_text()).strip()
             for line in text.split("\n"):
                 line = line.strip()
-                if "$" in line and re.search(r'\$[\d,]+', line):
+                if "$" in line and re.search(r"\$[\d,]+", line):
                     return line
     # Strategy 3: look for the metadata wrapper in cards (visible on the left panel)
     for sel in [
@@ -383,7 +413,9 @@ async def _extract_detail_salary(page) -> str:
         '[class*="metadata-wrapper"]',
     ]:
         # Find the currently active/selected card
-        active = await page.query_selector('[class*="job-card--active"]') or await page.query_selector('[class*="job-card-list__entity--active"]')
+        active = await page.query_selector(
+            '[class*="job-card--active"]'
+        ) or await page.query_selector('[class*="job-card-list__entity--active"]')
         if active:
             el = await active.query_selector(sel)
             if el:
@@ -395,7 +427,7 @@ async def _extract_detail_salary(page) -> str:
 
 async def _extract_apply_url(page, job_id: str = "") -> str:
     """Extract the external apply URL from the Apply button or embedded data; external Apply buttons are <a> tags linking to /redir/redirect/?url=..., while Easy Apply is a <button> with no href."""
-    from urllib.parse import urlparse, parse_qs, unquote
+    from urllib.parse import parse_qs, unquote, urlparse
 
     # Strategy 1: Find <a> tags whose text is "Apply" (not "Easy Apply")
     apply_url = await page.evaluate("""
@@ -444,7 +476,8 @@ async def _extract_apply_url(page, job_id: str = "") -> str:
 async def _search_code_elements_for_apply_url(page, job_id: str = "") -> str:
     """Search <code> elements in current page DOM for JSON containing apply URL."""
     try:
-        apply_url = await page.evaluate("""
+        apply_url = await page.evaluate(
+            """
         (jobId) => {
             const codes = document.querySelectorAll('code');
             for (const code of codes) {
@@ -527,7 +560,9 @@ async def _search_code_elements_for_apply_url(page, job_id: str = "") -> str:
 
             return '';
         }
-        """, job_id)
+        """,
+            job_id,
+        )
         if apply_url:
             logger.debug(f"Found apply URL for job {job_id}: {apply_url[:80]}")
             return apply_url
@@ -543,7 +578,9 @@ async def _enrich_apply_urls(page, jobs: list[dict]):
         logger.info("All jobs already have apply URLs, skipping enrichment")
         return
 
-    logger.info(f"Enriching apply URLs for {len(needs_enrichment)} jobs via individual pages")
+    logger.info(
+        f"Enriching apply URLs for {len(needs_enrichment)} jobs via individual pages"
+    )
     enriched = 0
     rate_limit_hits = 0
     for idx, j in enumerate(needs_enrichment):
@@ -557,10 +594,14 @@ async def _enrich_apply_urls(page, jobs: list[dict]):
             await asyncio.sleep(random.uniform(*DELAY_ENRICHMENT))
 
             # 429 check — abort enrichment gracefully (jobs are already collected)
-            if await _handle_rate_limit(page, f"enrichment {idx+1}/{len(needs_enrichment)}"):
+            if await _handle_rate_limit(
+                page, f"enrichment {idx + 1}/{len(needs_enrichment)}"
+            ):
                 rate_limit_hits += 1
                 if rate_limit_hits >= 2:
-                    logger.warning(f"Hit 429 twice during enrichment, skipping remaining {len(needs_enrichment) - idx} URLs")
+                    logger.warning(
+                        f"Hit 429 twice during enrichment, skipping remaining {len(needs_enrichment) - idx} URLs"
+                    )
                     break
                 await page.goto(
                     f"https://www.linkedin.com/jobs/view/{job_id}/",
@@ -569,7 +610,9 @@ async def _enrich_apply_urls(page, jobs: list[dict]):
                 )
                 await asyncio.sleep(random.uniform(*DELAY_ENRICHMENT))
                 if await _check_rate_limit(page):
-                    logger.warning(f"Still rate-limited after retry, skipping remaining {len(needs_enrichment) - idx} URLs")
+                    logger.warning(
+                        f"Still rate-limited after retry, skipping remaining {len(needs_enrichment) - idx} URLs"
+                    )
                     break
 
             url = await _extract_apply_url(page, job_id)
@@ -581,7 +624,9 @@ async def _enrich_apply_urls(page, jobs: list[dict]):
         except Exception as e:
             logger.debug(f"Apply URL enrichment failed for {job_id}: {e}")
 
-    logger.info(f"Apply URL enrichment: {enriched}/{len(needs_enrichment)} jobs enriched")
+    logger.info(
+        f"Apply URL enrichment: {enriched}/{len(needs_enrichment)} jobs enriched"
+    )
 
 
 async def _scroll_job_list(page):
@@ -615,10 +660,14 @@ async def _scroll_job_list(page):
 
     final_count = await page.evaluate(count_js)
     if final_count > initial_count:
-        logger.info(f"Scroll loaded {final_count - initial_count} cards ({initial_count} → {final_count})")
+        logger.info(
+            f"Scroll loaded {final_count - initial_count} cards ({initial_count} → {final_count})"
+        )
 
 
-async def _scrape_page_with_clicks(page, seen_ids: set, collection_name: str) -> list[dict]:
+async def _scrape_page_with_clicks(
+    page, seen_ids: set, collection_name: str
+) -> list[dict]:
     """Extract all cards on the page by clicking each to load its detail panel for salary + description, returning fully enriched job dicts."""
     await _scroll_job_list(page)
 
@@ -667,20 +716,28 @@ async def _scrape_page_with_clicks(page, seen_ids: set, collection_name: str) ->
                 continue
 
             # Clean LinkedIn title suffixes
-            title = re.sub(r'\s+with verification$', '', title, flags=re.IGNORECASE)
+            title = re.sub(r"\s+with verification$", "", title, flags=re.IGNORECASE)
 
             company = ""
             location = ""
             card_li = await link.evaluate_handle("el => el.closest('li')")
             card_el = card_li.as_element() if card_li else None
             if card_el:
-                for sel in ['[class*="subtitle"]', '[class*="company"]', '[class*="artdeco-entity-lockup__subtitle"]']:
+                for sel in [
+                    '[class*="subtitle"]',
+                    '[class*="company"]',
+                    '[class*="artdeco-entity-lockup__subtitle"]',
+                ]:
                     el = await card_el.query_selector(sel)
                     if el:
                         company = (await el.inner_text()).strip()
                         if company:
                             break
-                for sel in ['[class*="caption"]', '[class*="location"]', '[class*="artdeco-entity-lockup__caption"]']:
+                for sel in [
+                    '[class*="caption"]',
+                    '[class*="location"]',
+                    '[class*="artdeco-entity-lockup__caption"]',
+                ]:
                     el = await card_el.query_selector(sel)
                     if el:
                         location = (await el.inner_text()).strip()
@@ -703,7 +760,7 @@ async def _scrape_page_with_clicks(page, seen_ids: set, collection_name: str) ->
                 await asyncio.sleep(random.uniform(*DELAY_BETWEEN_CARDS))
 
                 # Check for 429 after loading detail
-                if await _handle_rate_limit(page, f"card {idx+1}/{len(ordered)}"):
+                if await _handle_rate_limit(page, f"card {idx + 1}/{len(ordered)}"):
                     # After waiting, re-click to retry
                     try:
                         await link.click()
@@ -721,20 +778,22 @@ async def _scrape_page_with_clicks(page, seen_ids: set, collection_name: str) ->
 
             primary_url = apply_url if apply_url else job_url
 
-            jobs.append({
-                "title": title,
-                "company": company,
-                "url": primary_url,
-                "linkedin_url": job_url,
-                "apply_url": apply_url,
-                "location": location,
-                "job_id": job_id,
-                "collection": collection_name,
-                "description": description,
-                "salary_text": salary_info["salary_text"],
-                "salary_min": salary_info["salary_min"],
-                "salary_max": salary_info["salary_max"],
-            })
+            jobs.append(
+                {
+                    "title": title,
+                    "company": company,
+                    "url": primary_url,
+                    "linkedin_url": job_url,
+                    "apply_url": apply_url,
+                    "location": location,
+                    "job_id": job_id,
+                    "collection": collection_name,
+                    "description": description,
+                    "salary_text": salary_info["salary_text"],
+                    "salary_min": salary_info["salary_min"],
+                    "salary_max": salary_info["salary_max"],
+                }
+            )
         except Exception as e:
             logger.debug(f"Error processing card {job_id}: {e}")
             continue
@@ -777,7 +836,9 @@ async def _scrape_collection(page, url: str, collection_name: str) -> list[dict]
                         f"Try again in 15-30 minutes."
                     )
                 # We have some jobs already, stop gracefully
-                logger.warning(f"Still rate-limited after retry, returning {len(all_jobs)} jobs collected so far")
+                logger.warning(
+                    f"Still rate-limited after retry, returning {len(all_jobs)} jobs collected so far"
+                )
                 break
 
         page_jobs = await _scrape_page_with_clicks(page, seen_ids, collection_name)
@@ -815,7 +876,9 @@ async def run(search: Search) -> dict:
         _check_set_up(email, password)
 
         collections_to_scrape = search.sources or ["recommended", "top-applicant"]
-        collections_to_scrape = [c for c in collections_to_scrape if c in ALL_COLLECTIONS]
+        collections_to_scrape = [
+            c for c in collections_to_scrape if c in ALL_COLLECTIONS
+        ]
         if not collections_to_scrape:
             collections_to_scrape = list(ALL_COLLECTIONS.keys())
 
@@ -834,7 +897,9 @@ async def run(search: Search) -> dict:
             except LinkedInSessionExpiredError:
                 raise
             except Exception as coll_err:
-                logger.warning(f"Collection '{coll_name}' error (continuing): {coll_err}")
+                logger.warning(
+                    f"Collection '{coll_name}' error (continuing): {coll_err}"
+                )
 
         # Deduplicate by job_id across collections
         seen_ids = set()
@@ -846,27 +911,36 @@ async def run(search: Search) -> dict:
 
         # Apply search-level + global title filters
         from backend.scraper._shared.filters import search_title_filters, title_kept
+
         _gte_db = SessionLocal()
         try:
             include_kw, exclude_kw = search_title_filters(search, _gte_db)
         finally:
             _gte_db.close()
-        kept_jobs = [j for j in unique_jobs if title_kept(j["title"], include_kw, exclude_kw)[0]]
+        kept_jobs = [
+            j for j in unique_jobs if title_kept(j["title"], include_kw, exclude_kw)[0]
+        ]
 
         # Company exclude (global + per-search + active companies if flag on)
         db_excl = SessionLocal()
         try:
             from backend.scraper._shared.filters import build_search_exclude_sets
-            global_exclude_set, search_exclude_set = build_search_exclude_sets(db_excl, search)
+
+            global_exclude_set, search_exclude_set = build_search_exclude_sets(
+                db_excl, search
+            )
             if global_exclude_set or search_exclude_set:
                 before = len(kept_jobs)
                 kept_jobs = [
-                    j for j in kept_jobs
+                    j
+                    for j in kept_jobs
                     if (j.get("company") or "").lower() not in global_exclude_set
                     and (j.get("company") or "").lower() not in search_exclude_set
                 ]
                 if len(kept_jobs) < before:
-                    logger.info(f"LinkedIn: company exclude removed {before - len(kept_jobs)} jobs")
+                    logger.info(
+                        f"LinkedIn: company exclude removed {before - len(kept_jobs)} jobs"
+                    )
         finally:
             db_excl.close()
 
@@ -885,17 +959,31 @@ async def run(search: Search) -> dict:
         try:
             existing_ids = get_existing_external_ids(db)
             # Load existing LinkedIn job IDs to skip jobs already imported via extension
-            existing_li_ids = {r[0] for r in db.query(Job.linkedin_job_id).filter(Job.linkedin_job_id != None).all()}
+            existing_li_ids = {
+                r[0]
+                for r in db.query(Job.linkedin_job_id)
+                .filter(Job.linkedin_job_id != None)
+                .all()
+            }
 
             # The loop below writes rows; H-1B lookups for the new jobs happen before it (S2-01).
             from backend.scraper._shared.analysis import prefetch_h1b
-            await prefetch_h1b([
-                j["company"] for j in kept_jobs
-                if not (j.get("job_id") and j["job_id"] in existing_li_ids)
-                and make_external_id(j["company"], j["title"], j.get("apply_url") or j["url"]) not in existing_ids
-            ])
 
-            landed = await resolve_short_links([j.get("apply_url") or j["url"] for j in kept_jobs])
+            await prefetch_h1b(
+                [
+                    j["company"]
+                    for j in kept_jobs
+                    if not (j.get("job_id") and j["job_id"] in existing_li_ids)
+                    and make_external_id(
+                        j["company"], j["title"], j.get("apply_url") or j["url"]
+                    )
+                    not in existing_ids
+                ]
+            )
+
+            landed = await resolve_short_links(
+                [j.get("apply_url") or j["url"] for j in kept_jobs]
+            )
             for j in kept_jobs:
                 # Use apply URL (company career page) as primary, LinkedIn URL as fallback
                 job_url = j.get("apply_url") or j["url"]
@@ -944,11 +1032,15 @@ async def run(search: Search) -> dict:
                 # H-1B check + language check + salary extraction
                 try:
                     from backend.analyzer.h1b_checker import check_job_h1b
-                    from backend.analyzer.salary_extractor import apply_salary_to_job
-                    from backend.analyzer.work_arrangement import apply_arrangement_to_job
                     from backend.analyzer.location import apply_location_to_job
+                    from backend.analyzer.salary_extractor import apply_salary_to_job
+                    from backend.analyzer.work_arrangement import (
+                        apply_arrangement_to_job,
+                    )
+
                     await check_job_h1b(job, db)
                     from backend.models.db import find_company_by_name
+
                     company_obj = find_company_by_name(db, j["company"])
                     apply_salary_to_job(job, getattr(job, "_h1b_median", None))
                     apply_arrangement_to_job(job)
@@ -958,7 +1050,9 @@ async def run(search: Search) -> dict:
 
                 if job.h1b_jd_flag:
                     _phrase = getattr(job, "_h1b_matched_phrase", None) or "?"
-                    logger.info(f"Skipping job (body exclusion): {j['title']} @ {job.company or j.get('company') or '?'} — matched phrase: {_phrase!r}")
+                    logger.info(
+                        f"Skipping job (body exclusion): {j['title']} @ {job.company or j.get('company') or '?'} — matched phrase: {_phrase!r}"
+                    )
                     continue
 
                 # Use savepoint so one duplicate doesn't kill the whole batch
@@ -969,10 +1063,14 @@ async def run(search: Search) -> dict:
                     new_jobs += counts_as_new(job)
                     existing_ids.add(ext_id)
                 except IntegrityError:
-                    logger.debug(f"Duplicate external_id for '{j['title']}' at {j.get('company')}, skipping")
+                    logger.debug(
+                        f"Duplicate external_id for '{j['title']}' at {j.get('company')}, skipping"
+                    )
                     continue
                 except Exception as e:
-                    logger.warning(f"Insert failed for '{j['title']}' at {j.get('company')} ({job_url}): {e}")
+                    logger.warning(
+                        f"Insert failed for '{j['title']}' at {j.get('company')} ({job_url}): {e}"
+                    )
                     continue
 
             # Update last_run_at
@@ -989,14 +1087,24 @@ async def run(search: Search) -> dict:
 
         duration = time.time() - start_time
         from backend.activity import log_activity
-        log_activity("scrape", f"LinkedIn personal '{search.name}': {new_jobs} new / {jobs_found} found in {duration:.1f}s")
 
-        return {"jobs_found": jobs_found, "new_jobs": new_jobs, "error": None, "duration": duration}
+        log_activity(
+            "scrape",
+            f"LinkedIn personal '{search.name}': {new_jobs} new / {jobs_found} found in {duration:.1f}s",
+        )
+
+        return {
+            "jobs_found": jobs_found,
+            "new_jobs": new_jobs,
+            "error": None,
+            "duration": duration,
+        }
 
     except Exception as e:
         duration = time.time() - start_time
         logger.error(f"LinkedIn personal scrape failed for '{search.name}': {e}")
         from backend.activity import log_activity
+
         log_activity("scrape", f"LinkedIn personal '{search.name}' failed: {e}")
         return {"jobs_found": 0, "new_jobs": 0, "error": str(e), "duration": duration}
     finally:
@@ -1009,6 +1117,7 @@ async def run(search: Search) -> dict:
 async def preview(search, db) -> dict:
     """Test endpoint handler — scrape collections, apply filters, enrich URLs, and return partial results with warnings if a stage fails rather than discarding earlier results."""
     import time as _time
+
     start = _time.time()
 
     pw = None
@@ -1026,7 +1135,9 @@ async def preview(search, db) -> dict:
         _check_set_up(email, password)
 
         collections_to_scrape = search.sources or ["recommended", "top-applicant"]
-        collections_to_scrape = [c for c in collections_to_scrape if c in ALL_COLLECTIONS]
+        collections_to_scrape = [
+            c for c in collections_to_scrape if c in ALL_COLLECTIONS
+        ]
         if not collections_to_scrape:
             collections_to_scrape = list(ALL_COLLECTIONS.keys())
 
@@ -1041,7 +1152,10 @@ async def preview(search, db) -> dict:
         return {
             "search_name": search.name,
             "error": str(e),
-            "config": {"mode": "linkedin_personal", "collections": collections_to_scrape},
+            "config": {
+                "mode": "linkedin_personal",
+                "collections": collections_to_scrape,
+            },
         }
 
     # --- Phase 2: Scrape collections (errors are non-fatal per collection) ---
@@ -1069,7 +1183,12 @@ async def preview(search, db) -> dict:
                 unique_jobs.append(j)
 
         raw_count = len(unique_jobs)
-        from backend.scraper._shared.filters import build_search_exclude_sets, search_title_filters, title_kept
+        from backend.scraper._shared.filters import (
+            build_search_exclude_sets,
+            search_title_filters,
+            title_kept,
+        )
+
         include_kw, exclude_kw = search_title_filters(search, db)
         global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
         all_exclude = list(global_exclude_set | search_exclude_set)
@@ -1083,7 +1202,10 @@ async def preview(search, db) -> dict:
                 pass
 
         from collections import Counter
-        collection_counts = Counter(j["collection"] for j in unique_jobs) if unique_jobs else Counter()
+
+        collection_counts = (
+            Counter(j["collection"] for j in unique_jobs) if unique_jobs else Counter()
+        )
         company_counts = Counter(j["company"] for j in unique_jobs if j.get("company"))
         company_breakdown = dict(company_counts.most_common(20))
 
@@ -1104,6 +1226,7 @@ async def preview(search, db) -> dict:
                 desc_text = j.get("description") or ""
                 if desc_text:
                     from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+
                     body_result = scan_jd_for_h1b_flags(desc_text, body_phrases)
                     if body_result["jd_flag"]:
                         kept = False
@@ -1147,7 +1270,10 @@ async def preview(search, db) -> dict:
             "company_exclude": [],
             "jobs": [],
             "warnings": warnings or None,
-            "config": {"mode": "linkedin_personal", "collections": collections_to_scrape},
+            "config": {
+                "mode": "linkedin_personal",
+                "collections": collections_to_scrape,
+            },
         }
 
     final_results = []
@@ -1165,20 +1291,22 @@ async def preview(search, db) -> dict:
         has_desc = bool(desc and len(desc) > 50)
         display_url = j.get("apply_url") or j.get("url", "")
 
-        final_results.append({
-            "title": j["title"],
-            "company": j.get("company", ""),
-            "url": display_url,
-            "linkedin_url": j.get("linkedin_url", ""),
-            "source": "linkedin_personal",
-            "location": j.get("location", ""),
-            "salary": salary,
-            "has_description": has_desc,
-            "desc_length": len(desc) if has_desc else 0,
-            "kept": r["kept"],
-            "reason": r["reason"],
-            "collection": j.get("collection", ""),
-        })
+        final_results.append(
+            {
+                "title": j["title"],
+                "company": j.get("company", ""),
+                "url": display_url,
+                "linkedin_url": j.get("linkedin_url", ""),
+                "source": "linkedin_personal",
+                "location": j.get("location", ""),
+                "salary": salary,
+                "has_description": has_desc,
+                "desc_length": len(desc) if has_desc else 0,
+                "kept": r["kept"],
+                "reason": r["reason"],
+                "collection": j.get("collection", ""),
+            }
+        )
 
     after_filter = sum(1 for r in final_results if r["kept"])
 

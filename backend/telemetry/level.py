@@ -3,12 +3,17 @@
 The owner's choice is the install setting `telemetry_level`; the env value JN_TELEMETRY
 (full | essentials | limited | off) overrides it and locks the choice in Settings.
 """
+
 import os
 import uuid
 
 FULL, ESSENTIALS, OFF, UNSET = "full", "essentials", "off", "unset"
-_ENV_VALUES = {"full": FULL, "essentials": ESSENTIALS, "limited": ESSENTIALS,
-               **{v: OFF for v in ("off", "0", "false", "no", "none", "disabled")}}
+_ENV_VALUES = {
+    "full": FULL,
+    "essentials": ESSENTIALS,
+    "limited": ESSENTIALS,
+    **{v: OFF for v in ("off", "0", "false", "no", "none", "disabled")},
+}
 INSTALL_ID_KEY = "telemetry_install_id"
 LAST_SENT_KEY = "telemetry_last_sent_at"
 
@@ -21,6 +26,7 @@ def env_level():
 def chosen_level(db):
     """The owner's choice: full, essentials or unset."""
     from backend.accounts.settings import get_install_setting
+
     value = str(get_install_setting(db, "telemetry_level") or "").strip().lower()
     return value if value in (FULL, ESSENTIALS) else UNSET
 
@@ -36,6 +42,7 @@ def sends_anything(level: str) -> bool:
 def install_id(db) -> str:
     """A random id for this install, created once (no commit when it already exists)."""
     from backend.accounts.settings import get_install_setting, put_setting
+
     value = get_install_setting(db, INSTALL_ID_KEY)
     if value:
         return value

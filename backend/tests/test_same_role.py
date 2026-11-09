@@ -1,8 +1,14 @@
 """same_role.py: two postings with one title are one role only when the text says so word for word.
 
 The cases are the ones found in 90 days of real postings (see the module docstring)."""
+
 from backend.scraper._shared.same_role import (
-    MIN_WORDS, is_template, other_words, role_words, same_text)
+    MIN_WORDS,
+    is_template,
+    other_words,
+    role_words,
+    same_text,
+)
 
 BODY = (
     "<p>About the team</p><p>The Payments Platform team builds the services that move money for "
@@ -14,7 +20,8 @@ BODY = (
     "teams</li><li>Strong written communication and a habit of writing things down</li><li>Comfort "
     "with SQL and data analysis to answer your own questions</li></ul><p>We value curiosity, ownership "
     "and kindness. We offer health benefits, a learning budget, parental leave and a flexible "
-    "schedule so you can do your best work wherever you are most productive.</p>")
+    "schedule so you can do your best work wherever you are most productive.</p>"
+)
 
 
 def _with(**swap):
@@ -33,8 +40,14 @@ def test_identical_text_is_one_role():
 
 
 def test_a_per_city_copy_differs_only_in_place_pay_and_ids():
-    seattle = BODY + "<p>Req R-482211-8. Based in Seattle, Washington. Pay $151,200.00 - $204,600.00 USD annually.</p>"
-    new_york = BODY + "<p>Req R-482211-3. Based in New York, New York. Pay $166,300.00 - $225,000.00 USD annually.</p>"
+    seattle = (
+        BODY
+        + "<p>Req R-482211-8. Based in Seattle, Washington. Pay $151,200.00 - $204,600.00 USD annually.</p>"
+    )
+    new_york = (
+        BODY
+        + "<p>Req R-482211-3. Based in New York, New York. Pay $166,300.00 - $225,000.00 USD annually.</p>"
+    )
     assert same_text(seattle, new_york, "Seattle, WA", "New York, NY")
 
 
@@ -71,33 +84,52 @@ def test_too_little_text_proves_nothing():
 
 
 def test_markup_and_entities_do_not_count():
-    other = BODY.replace("<p>", "<div>").replace("</p>", "</div>").replace("We value", "We&nbsp;value")
+    other = (
+        BODY.replace("<p>", "<div>")
+        .replace("</p>", "</div>")
+        .replace("We value", "We&nbsp;value")
+    )
     assert same_text(BODY, other)
 
 
 def test_a_text_the_company_uses_under_another_title_is_a_template():
     """Sierra's Spanish- and Portuguese-speaking strategists share one text."""
-    assert is_template(BODY, [BODY.replace("Senior Product Manager", "Staff Product Manager")])
-    assert not is_template(BODY, ["A different role entirely, about sales operations and quota planning."])
+    assert is_template(
+        BODY, [BODY.replace("Senior Product Manager", "Staff Product Manager")]
+    )
+    assert not is_template(
+        BODY, ["A different role entirely, about sales operations and quota planning."]
+    )
     assert not is_template(BODY, [])
 
 
 def test_title_variants_are_one_title():
     """PayPal's "Sr" and DigitalOcean's dash against comma, both from real postings."""
     from backend.scraper._shared.same_role import title_key
-    assert title_key("Sr Lead Product Manager") == title_key("Senior Lead Product Manager")
-    assert title_key("Principal Product Manager - Inference Engine") == \
-        title_key("Principal Product Manager, Inference Engine")
-    assert title_key("Sr. Mgr, Product & Growth") == title_key("Senior Manager, Product and Growth")
+
+    assert title_key("Sr Lead Product Manager") == title_key(
+        "Senior Lead Product Manager"
+    )
+    assert title_key("Principal Product Manager - Inference Engine") == title_key(
+        "Principal Product Manager, Inference Engine"
+    )
+    assert title_key("Sr. Mgr, Product & Growth") == title_key(
+        "Senior Manager, Product and Growth"
+    )
     assert title_key("Software Engineer 2") == title_key("Software Engineer II")
     assert title_key("Product Manager (R-482211)") == title_key("Product Manager")
 
 
 def test_titles_that_name_another_role_stay_apart():
     from backend.scraper._shared.same_role import title_key
+
     assert title_key("Software Engineer II") != title_key("Software Engineer III")
-    assert title_key("Strategist (Spanish speaking)") != title_key("Strategist (Brazilian Portuguese speaking)")
-    assert title_key("Product Manager, Safeguards (Cyber)") != title_key("Product Manager, Safeguards (Generalist)")
+    assert title_key("Strategist (Spanish speaking)") != title_key(
+        "Strategist (Brazilian Portuguese speaking)"
+    )
+    assert title_key("Product Manager, Safeguards (Cyber)") != title_key(
+        "Product Manager, Safeguards (Generalist)"
+    )
     assert title_key("Senior Product Manager") != title_key("Product Manager")
 
 
@@ -116,7 +148,12 @@ def test_a_city_only_the_text_names_is_a_place_word():
 
 def test_a_city_and_another_word_are_two_roles():
     us = "United States"
-    assert not same_text(_in("Boston"), _in("Denver").replace("card issuing", "merchant onboarding"), us, us)
+    assert not same_text(
+        _in("Boston"),
+        _in("Denver").replace("card issuing", "merchant onboarding"),
+        us,
+        us,
+    )
 
 
 def test_places_that_are_not_cities_still_count():
@@ -124,11 +161,14 @@ def test_places_that_are_not_cities_still_count():
     are also words or people (Phoenix, Orange, Davis) stay words."""
     assert not same_text(_in("North America"), _in("EMEA"))
     assert not same_text(BODY + " Join Project Phoenix.", BODY + " Join Project Atlas.")
-    assert not same_text(BODY + " Report to Jane Davis.", BODY + " Report to Jane Carson.")
+    assert not same_text(
+        BODY + " Report to Jane Davis.", BODY + " Report to Jane Carson."
+    )
 
 
 def test_a_state_code_that_is_a_word_needs_its_comma():
     from backend.scraper._shared.same_role import text_places
+
     assert "in" in role_words("We hire in Boston in person")
     assert "in" not in role_words("Boston, IN")
     assert text_places("Offices in Seattle, WA and Irvine.") == {"seattle", "irvine"}

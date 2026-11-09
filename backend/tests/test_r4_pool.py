@@ -19,6 +19,7 @@ Sessions are counted by wrapping `SessionLocal`, which every worker goes
 through; that is a truer measure than pool internals under the test suite's
 StaticPool.
 """
+
 import asyncio
 
 import pytest
@@ -29,7 +30,10 @@ from backend.tests.r4_support import client  # noqa: F401
 def _by_name(db, job) -> dict:
     """A job's scores as the API shows them (stored by résumé id since 3.1)."""
     from backend.analyzer.score_keys import display, resume_names
-    return display(job.cv_scores or {}, None, None, job.cv_score_names, resume_names(db))[0]
+
+    return display(
+        job.cv_scores or {}, None, None, job.cv_score_names, resume_names(db)
+    )[0]
 
 
 class SessionCounter:
@@ -47,6 +51,7 @@ class SessionCounter:
         worker's own sessions, not the request-scoped ones.
         """
         import backend.models.db as db_mod
+
         real = db_mod.SessionLocal
 
         def _factory(*a, **kw):
@@ -76,16 +81,25 @@ def counter():
 
 def _make_jobs(test_db, n):
     import uuid
+
     from sqlalchemy import null as sa_null
+
     from backend.models.db import Job
 
     ids = []
     for i in range(n):
         # cv_scores=NULL so the IS NULL branch of unscored_filter() matches.
-        job = Job(id=uuid.uuid4(), external_id=f"pool-{i}", content_hash=f"pool-h-{i}",
-                  company="Acme", title=f"Role {i}", url=f"https://x.test/{i}",
-                  description="A job description long enough to be scoreable. " * 5,
-                  status="new", cv_scores=sa_null())
+        job = Job(
+            id=uuid.uuid4(),
+            external_id=f"pool-{i}",
+            content_hash=f"pool-h-{i}",
+            company="Acme",
+            title=f"Role {i}",
+            url=f"https://x.test/{i}",
+            description="A job description long enough to be scoreable. " * 5,
+            status="new",
+            cv_scores=sa_null(),
+        )
         test_db.add(job)
         ids.append(str(job.id))
     test_db.commit()
@@ -94,11 +108,20 @@ def _make_jobs(test_db, n):
 
 def _seed_resume(test_db):
     import uuid
+
     from backend.models.db import Resume
 
-    test_db.add(Resume(id=uuid.uuid4(), name="PM", is_base=True,
-                       json_data={"summary": "Ten years of product work.",
-                                  "skills": {"core": ["Python"]}}))
+    test_db.add(
+        Resume(
+            id=uuid.uuid4(),
+            name="PM",
+            is_base=True,
+            json_data={
+                "summary": "Ten years of product work.",
+                "skills": {"core": ["Python"]},
+            },
+        )
+    )
     test_db.commit()
 
 
@@ -106,6 +129,7 @@ def _seed_resume(test_db):
 def _fresh_limiters():
     """The gates are process-wide and cached; give each test its own."""
     import backend.job_monitor as jm
+
     jm.reset_limiter()
     yield
     jm.reset_limiter()
@@ -113,14 +137,16 @@ def _fresh_limiters():
 
 # ══ 1. Bounded concurrency, and the pool is never drained ════════════════════
 
+
 @pytest.mark.asyncio
 async def test_thirty_scoring_tasks_keep_open_sessions_under_the_gate(
-        client, test_db, monkeypatch, counter, _fresh_limiters):
+    client, test_db, monkeypatch, counter, _fresh_limiters
+):
     """30 queued scoring tasks, LLM mocked with a sleep: never more sessions
     open at once than `scoring_max_concurrent`, and /health keeps answering."""
-    from backend.models.db import Setting
-    import backend.job_monitor as jm
     import backend.analyzer.cv_scorer as scorer
+    import backend.job_monitor as jm
+    from backend.models.db import Setting
 
     test_db.add(Setting(key="scoring_max_concurrent", value="3"))
     test_db.commit()
@@ -136,9 +162,15 @@ async def test_thirty_scoring_tasks_keep_open_sessions_under_the_gate(
         in_llm["peak"] = max(in_llm["peak"], in_llm["now"])
         try:
             await asyncio.sleep(0.02)
-            return {"text": '{"scores": {"PM": 71}, "best_cv": "PM"}',
-                    "usage": {"input_tokens": 10, "output_tokens": 5,
-                              "cache_read_tokens": 0, "cache_write_tokens": 0}}
+            return {
+                "text": '{"scores": {"PM": 71}, "best_cv": "PM"}',
+                "usage": {
+                    "input_tokens": 10,
+                    "output_tokens": 5,
+                    "cache_read_tokens": 0,
+                    "cache_write_tokens": 0,
+                },
+            }
         finally:
             in_llm["now"] -= 1
 
@@ -146,16 +178,22 @@ async def test_thirty_scoring_tasks_keep_open_sessions_under_the_gate(
     monkeypatch.setattr(scorer, "log_llm_call", lambda **kw: None)
 
     for i, jid in enumerate(job_ids):
-        jm.launch_background("analyze_job", scorer.score_single_job, trigger="manual",
-                             scope_key=f"pool-{i}",
-                             func_kwargs={"job_id": jid, "depth": "light"})
+        jm.launch_background(
+            "analyze_job",
+            scorer.score_single_job,
+            trigger="manual",
+            scope_key=f"pool-{i}",
+            func_kwargs={"job_id": jid, "depth": "light"},
+        )
 
     # …and the app answers while all 30 are queued.
     assert client.get("/health").status_code == 200
 
     deadline = asyncio.get_running_loop().time() + 20
     while any(r.job_type == "analyze_job" for r in jm._running.values()):
-        assert asyncio.get_running_loop().time() < deadline, "scoring tasks never drained"
+        assert asyncio.get_running_loop().time() < deadline, (
+            "scoring tasks never drained"
+        )
         await asyncio.sleep(0.02)
 
     assert client.get("/health").status_code == 200
@@ -168,11 +206,12 @@ async def test_thirty_scoring_tasks_keep_open_sessions_under_the_gate(
 
 @pytest.mark.asyncio
 async def test_the_gate_is_taken_before_a_session_is_opened(
-        client, test_db, monkeypatch, counter, _fresh_limiters):
+    client, test_db, monkeypatch, counter, _fresh_limiters
+):
     """A task waiting for its turn holds no connection at all."""
-    from backend.models.db import Setting
-    import backend.job_monitor as jm
     import backend.analyzer.cv_scorer as scorer
+    import backend.job_monitor as jm
+    from backend.models.db import Setting
 
     test_db.add(Setting(key="scoring_max_concurrent", value="1"))
     test_db.commit()
@@ -192,9 +231,13 @@ async def test_the_gate_is_taken_before_a_session_is_opened(
     monkeypatch.setattr(scorer, "log_llm_call", lambda **kw: None)
 
     for i, jid in enumerate(job_ids):
-        jm.launch_background("analyze_job", scorer.score_single_job, trigger="manual",
-                             scope_key=f"gate-{i}",
-                             func_kwargs={"job_id": jid, "depth": "light"})
+        jm.launch_background(
+            "analyze_job",
+            scorer.score_single_job,
+            trigger="manual",
+            scope_key=f"gate-{i}",
+            func_kwargs={"job_id": jid, "depth": "light"},
+        )
 
     await asyncio.wait_for(entered.wait(), timeout=5)
     # One task is mid-LLM and four are queued behind the gate: no session at all
@@ -204,15 +247,19 @@ async def test_the_gate_is_taken_before_a_session_is_opened(
 
     deadline = asyncio.get_running_loop().time() + 20
     while any(r.job_type == "analyze_job" for r in jm._running.values()):
-        assert asyncio.get_running_loop().time() < deadline, "scoring tasks never drained"
+        assert asyncio.get_running_loop().time() < deadline, (
+            "scoring tasks never drained"
+        )
         await asyncio.sleep(0.02)
 
 
 # ══ 2. No session is open across the LLM call ════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_no_session_is_open_while_the_llm_call_is_awaited(
-        test_db, monkeypatch, counter, _fresh_limiters):
+    test_db, monkeypatch, counter, _fresh_limiters
+):
     """Asserted from inside the mock, where a held connection cannot hide."""
     import backend.analyzer.cv_scorer as scorer
 
@@ -239,24 +286,27 @@ async def test_no_session_is_open_while_the_llm_call_is_awaited(
     # …and the result still landed.
     test_db.expire_all()
     from backend.models.db import Job
+
     job = test_db.query(Job).filter(Job.id == job_id).first()
     assert _by_name(test_db, job).get("PM") == 80
 
 
 @pytest.mark.asyncio
 async def test_batch_pipeline_holds_no_session_across_the_llm_call(
-        test_db, monkeypatch, counter, _fresh_limiters):
+    test_db, monkeypatch, counter, _fresh_limiters
+):
     """analyze_unscored_jobs used to keep one session open for a whole batch,
     LLM calls included."""
     import backend.analyzer.cv_scorer as scorer
-    from backend.models.db import Job
+    from backend.models.db import Job, Setting
 
-    from backend.models.db import Setting
     _seed_resume(test_db)
     _make_jobs(test_db, 4)
     for job in test_db.query(Job).all():
         job.saved = True
-    test_db.add(Setting(key="fit_score_threshold", value="999"))  # no Telegram round trip
+    test_db.add(
+        Setting(key="fit_score_threshold", value="999")
+    )  # no Telegram round trip
     test_db.commit()
 
     counter.install(monkeypatch, scorer)
@@ -280,7 +330,8 @@ async def test_batch_pipeline_holds_no_session_across_the_llm_call(
 
 @pytest.mark.asyncio
 async def test_a_failing_provider_does_not_loop_the_batch_pipeline(
-        test_db, monkeypatch, counter, _fresh_limiters):
+    test_db, monkeypatch, counter, _fresh_limiters
+):
     """A transient failure leaves cv_scores NULL on purpose (retry next pass);
     the batch loop must still terminate rather than re-select the same rows."""
     import backend.analyzer.cv_scorer as scorer
@@ -311,9 +362,11 @@ async def test_a_failing_provider_does_not_loop_the_batch_pipeline(
 
 # ══ 3. Page caching is bounded too ═══════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_page_caching_is_bounded_and_holds_no_session_while_fetching(
-        test_db, monkeypatch, counter, _fresh_limiters):
+    test_db, monkeypatch, counter, _fresh_limiters
+):
     """Twelve concurrent caches: at most four fetch at a time (one Chromium
     each, in the worst case) and none holds a connection while fetching."""
     import backend.scraper._shared.page_cache as ra
@@ -333,18 +386,28 @@ async def test_page_caching_is_bounded_and_holds_no_session_while_fetching(
             live["now"] -= 1
 
         class _Resp:
-            text = "<html><body>" + ("Real job description content. " * 40) + "</body></html>"
+            text = (
+                "<html><body>"
+                + ("Real job description content. " * 40)
+                + "</body></html>"
+            )
 
             def raise_for_status(self):
                 return None
+
         return _Resp()
 
     monkeypatch.setattr("backend.scraper._shared.url_safety.safe_get", fake_safe_get)
-    monkeypatch.setattr("backend.scraper._shared.url_safety.assert_public_http_url",
-                        lambda url: None)
+    monkeypatch.setattr(
+        "backend.scraper._shared.url_safety.assert_public_http_url", lambda url: None
+    )
 
-    await asyncio.gather(*[ra._cache_job_page(jid, f"https://x.test/{i}")
-                           for i, jid in enumerate(job_ids)])
+    await asyncio.gather(
+        *[
+            ra._cache_job_page(jid, f"https://x.test/{i}")
+            for i, jid in enumerate(job_ids)
+        ]
+    )
 
     assert live["peak"] <= 4, f"{live['peak']} page fetches at once (limit 4)"
     assert max(live["sessions"]) == 0, (
@@ -354,11 +417,13 @@ async def test_page_caching_is_bounded_and_holds_no_session_while_fetching(
 
     test_db.expire_all()
     from backend.models.db import Job
+
     cached = test_db.query(Job).filter(Job.page_cached_at.isnot(None)).count()
     assert cached == 12
 
 
 # ══ 4. The gate itself ═══════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_the_gate_is_reentrant_within_one_task(_fresh_limiters):
@@ -368,7 +433,7 @@ async def test_the_gate_is_reentrant_within_one_task(_fresh_limiters):
 
     limiter = jm.TaskLimiter("reentrancy-probe", 1)
     async with limiter:
-        async with limiter:      # would block forever on a plain Semaphore
+        async with limiter:  # would block forever on a plain Semaphore
             pass
     # …and the slot really was given back.
     await asyncio.wait_for(limiter.__aenter__(), timeout=1)
@@ -405,31 +470,37 @@ async def test_the_gate_still_blocks_across_tasks(_fresh_limiters):
 
 
 def test_scoring_gate_reads_its_limit_from_settings(test_db, _fresh_limiters):
-    from backend.models.db import Setting
     import backend.job_monitor as jm
+    from backend.models.db import Setting
 
     test_db.add(Setting(key="scoring_max_concurrent", value="7"))
     test_db.commit()
     assert jm.get_limiter("scoring").value == 7
     # A settings change drops the cached gate so the next use re-reads it.
     from backend.analyzer.cv_scorer import reset_scoring_semaphore
+
     reset_scoring_semaphore()
-    test_db.query(Setting).filter(Setting.key == "scoring_max_concurrent").first().value = "2"
+    test_db.query(Setting).filter(
+        Setting.key == "scoring_max_concurrent"
+    ).first().value = "2"
     test_db.commit()
     assert jm.get_limiter("scoring").value == 2
 
 
 def test_page_cache_gate_is_a_small_fixed_limit(_fresh_limiters):
     import backend.job_monitor as jm
+
     assert jm.get_limiter("page_cache").value == 4
 
 
 # ══ 5. A drained pool answers 503, it does not hang ══════════════════════════
 
+
 def test_a_pool_timeout_answers_503_from_a_handler(client, monkeypatch):
     """pool_timeout is 5 s on the real engine; whatever raises must become a
     503 with Retry-After, never a 500 or a stack trace."""
     from sqlalchemy.exc import TimeoutError as PoolTimeout
+
     from backend.main import app
     from backend.models.db import get_db
 
@@ -451,6 +522,7 @@ def test_health_needs_no_database(client, monkeypatch):
     """/health must answer with the pool fully drained — it is the endpoint the
     dashboard and the operator poll when everything else is stuck."""
     from sqlalchemy.exc import TimeoutError as PoolTimeout
+
     import backend.main as main_mod
 
     def _drained(*a, **kw):
@@ -464,6 +536,7 @@ def test_the_auth_middleware_answers_503_when_the_pool_is_drained(client, monkey
     """The middleware runs outside FastAPI's exception handlers, so it needs its
     own guard — without it a drained pool surfaced as a bare connection error."""
     from sqlalchemy.exc import TimeoutError as PoolTimeout
+
     import backend.main as main_mod
 
     class _DrainedSession:
@@ -483,8 +556,9 @@ def test_the_engine_fails_fast_instead_of_hanging():
     """Documents the pool settings the fix depends on (Postgres only — the test
     engine is SQLite, so read them off the module's kwargs)."""
     import backend.models.db as db_mod
+
     kwargs = db_mod._engine_kwargs
-    if "pool_size" not in kwargs:      # SQLite test run
+    if "pool_size" not in kwargs:  # SQLite test run
         pytest.skip("pool args are Postgres-only")
     assert kwargs["pool_timeout"] <= 10, "a drained pool must fail fast"
     assert kwargs["pool_size"] + kwargs["max_overflow"] <= 40

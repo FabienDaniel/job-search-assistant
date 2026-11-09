@@ -5,6 +5,7 @@ over the description marks roughly four jobs wrongly for each correct one, and
 every phrase in `test_description_noise_is_not_remote` was taken from a real
 posting in the feed.
 """
+
 import pytest
 
 from backend.analyzer.work_arrangement import (
@@ -21,8 +22,15 @@ from backend.analyzer.work_arrangement import (
 class FakeJob:
     """Only the attributes the extractor touches."""
 
-    def __init__(self, location=None, title=None, description=None,
-                 arr_remote=None, arr_hybrid=None, arr_onsite=None):
+    def __init__(
+        self,
+        location=None,
+        title=None,
+        description=None,
+        arr_remote=None,
+        arr_hybrid=None,
+        arr_onsite=None,
+    ):
         self.id = "job-1"
         self.location = location
         self.title = title
@@ -39,18 +47,22 @@ class FakeJob:
 
 # ── tier 1: the source's own field ───────────────────────────────────────────
 
-@pytest.mark.parametrize("value,expected", [
-    ("Remote", REMOTE),
-    ("REMOTE", REMOTE),
-    ("Hybrid", HYBRID),
-    ("On-site", ONSITE),
-    ("Onsite", ONSITE),
-    ("In Office", ONSITE),
-    ("Unspecified", None),
-    ("", None),
-    (None, None),
-    ("something we never saw", None),
-])
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("Remote", REMOTE),
+        ("REMOTE", REMOTE),
+        ("Hybrid", HYBRID),
+        ("On-site", ONSITE),
+        ("Onsite", ONSITE),
+        ("In Office", ONSITE),
+        ("Unspecified", None),
+        ("", None),
+        (None, None),
+        ("something we never saw", None),
+    ],
+)
 def test_structured_values(value, expected):
     assert from_structured(value) == expected
 
@@ -67,15 +79,19 @@ def test_structured_boolean_false_is_not_onsite():
 
 # ── tier 2/3: a token in location or title ───────────────────────────────────
 
-@pytest.mark.parametrize("text,expected", [
-    ("Remote", REMOTE),
-    ("Remote - US", REMOTE),
-    ("San Francisco, CA · Remote", REMOTE),
-    ("Seattle, WA · Hybrid", HYBRID),
-    ("Technical Leader (Remote)", REMOTE),
-    ("Staff Engineer [Hybrid]", HYBRID),
-    ("Vancouver, British Columbia, Canada", None),
-])
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Remote", REMOTE),
+        ("Remote - US", REMOTE),
+        ("San Francisco, CA · Remote", REMOTE),
+        ("Seattle, WA · Hybrid", HYBRID),
+        ("Technical Leader (Remote)", REMOTE),
+        ("Staff Engineer [Hybrid]", HYBRID),
+        ("Vancouver, British Columbia, Canada", None),
+    ],
+)
 def test_token_extraction(text, expected):
     assert from_token(text) == expected
 
@@ -84,16 +100,19 @@ def test_token_ignores_a_word_inside_another_word():
     assert from_token("Remotesensing Engineer") is None
 
 
-@pytest.mark.parametrize("title", [
-    # Every one of these is a real title from the feed, and each one names a
-    # product or a duty rather than a workplace.
-    "Remote Site Services Data Center Manager, Infrastructure Services",
-    "Lead Product Manager Remote Assistance",
-    "Manager, Remote Special Project – Studio Design & Development (PH)",
-    "Senior Product Manager, Remote Build",
-    "Staff Product Manager, Unistore (Hybrid Tables)",
-    "Technical Program Manager, Onsite Construction, Network Infrastructure",
-])
+@pytest.mark.parametrize(
+    "title",
+    [
+        # Every one of these is a real title from the feed, and each one names a
+        # product or a duty rather than a workplace.
+        "Remote Site Services Data Center Manager, Infrastructure Services",
+        "Lead Product Manager Remote Assistance",
+        "Manager, Remote Special Project – Studio Design & Development (PH)",
+        "Senior Product Manager, Remote Build",
+        "Staff Product Manager, Unistore (Hybrid Tables)",
+        "Technical Program Manager, Onsite Construction, Network Infrastructure",
+    ],
+)
 def test_a_title_that_only_names_a_product_resolves_nothing(title):
     """The description tier has always run these guards; the title tier now
     runs them too, and an unresolved title stays unresolved."""
@@ -101,17 +120,23 @@ def test_a_title_that_only_names_a_product_resolves_nothing(title):
 
 
 def test_a_noisy_word_does_not_take_the_real_one_with_it():
-    """"Hybrid Cloud" is not an arrangement; the "REMOTE" beside it is."""
+    """ "Hybrid Cloud" is not an arrangement; the "REMOTE" beside it is."""
     result = extract_arrangement(
-        title="Product Manager - AI Platforms and Hybrid Cloud - REMOTE")
+        title="Product Manager - AI Platforms and Hybrid Cloud - REMOTE"
+    )
     assert result["arrangements"] == {REMOTE}
 
 
-@pytest.mark.parametrize("title", [
-    "Senior Product Manager (Remote)", "Product Manager - Remote",
-    "Senior Product Manager, Growth (Remote US)", "Program Manager (Hybrid)",
-    "Sales Development Representative - New York, NY (On-Site)",
-])
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Senior Product Manager (Remote)",
+        "Product Manager - Remote",
+        "Senior Product Manager, Growth (Remote US)",
+        "Program Manager (Hybrid)",
+        "Sales Development Representative - New York, NY (On-Site)",
+    ],
+)
 def test_the_guards_leave_a_plain_title_alone(title):
     assert extract_arrangement(title=title)["arrangement"] is not None
 
@@ -127,8 +152,9 @@ def test_the_title_corpus_still_resolves():
 
     path = pathlib.Path(__file__).parent / "fixtures" / "arrangement_corpus.csv"
     with path.open(encoding="utf-8", newline="") as handle:
-        titles = [row["raw"] for row in csv.DictReader(handle)
-                  if row["kind"] == "title"]
+        titles = [
+            row["raw"] for row in csv.DictReader(handle) if row["kind"] == "title"
+        ]
 
     assert len(titles) > 50, "the corpus is the title column, not a sample"
     resolved = [t for t in titles if extract_arrangement(title=t)["arrangement"]]
@@ -137,48 +163,63 @@ def test_the_title_corpus_still_resolves():
 
 # ── tier 4: explicit phrases in the description ──────────────────────────────
 
-@pytest.mark.parametrize("description,expected", [
-    ("This role is 100% remote in Canada.", REMOTE),
-    ("We are hiring for a remote position on the platform team.", REMOTE),
-    ("All roles with the company are global and remote-based.", REMOTE),
-    ("This role is available in the following locations: Remote", REMOTE),
-    ("The majority of our employees can live and work anywhere in the U.S.", REMOTE),
-    ("This role operates in a hybrid capacity.", HYBRID),
-    ("You will be in the office for 3 days per week.", HYBRID),
-    ("Work Arrangement Hybrid: blending in-person and remote work.", HYBRID),
-    ("This position is fully on-site at our Vancouver location.", ONSITE),
-])
+
+@pytest.mark.parametrize(
+    "description,expected",
+    [
+        ("This role is 100% remote in Canada.", REMOTE),
+        ("We are hiring for a remote position on the platform team.", REMOTE),
+        ("All roles with the company are global and remote-based.", REMOTE),
+        ("This role is available in the following locations: Remote", REMOTE),
+        (
+            "The majority of our employees can live and work anywhere in the U.S.",
+            REMOTE,
+        ),
+        ("This role operates in a hybrid capacity.", HYBRID),
+        ("You will be in the office for 3 days per week.", HYBRID),
+        ("Work Arrangement Hybrid: blending in-person and remote work.", HYBRID),
+        ("This position is fully on-site at our Vancouver location.", ONSITE),
+    ],
+)
 def test_description_phrases(description, expected):
     assert extract_arrangement(description=description)["arrangement"] == expected
 
 
-@pytest.mark.parametrize("description", [
-    # Every one of these appeared in a real posting and a substring test
-    # would mark all of them remote.
-    "Establish module standards, remote state, and GitOps-based plan/apply pipelines.",
-    "Terraform proficiency: module authoring, state management, remote backends.",
-    "Secure network access for CI/CD and remote dev environments (Tailscale).",
-    "Secure Remote Access and Mobility via SSL and IPsec VPN.",
-    "Experience with device telemetry and remote lifecycle management.",
-    "Comfort collaborating asynchronously across remote-first, global engineering teams.",
-])
+@pytest.mark.parametrize(
+    "description",
+    [
+        # Every one of these appeared in a real posting and a substring test
+        # would mark all of them remote.
+        "Establish module standards, remote state, and GitOps-based plan/apply pipelines.",
+        "Terraform proficiency: module authoring, state management, remote backends.",
+        "Secure network access for CI/CD and remote dev environments (Tailscale).",
+        "Secure Remote Access and Mobility via SSL and IPsec VPN.",
+        "Experience with device telemetry and remote lifecycle management.",
+        "Comfort collaborating asynchronously across remote-first, global engineering teams.",
+    ],
+)
 def test_description_noise_is_not_remote(description):
     assert extract_arrangement(description=description)["arrangement"] is None
 
 
-@pytest.mark.parametrize("description", [
-    # "hybrid" is also an infrastructure word. None of these is a work arrangement.
-    "Experience designing hybrid-cloud deployments across AWS and on-prem.",
-    "You will own our hybrid cloud infrastructure and the service mesh.",
-    "Familiarity with hybrid network architecture and multi-cloud routing.",
-    "Build a hybrid search environment over Elasticsearch and pgvector.",
-])
+@pytest.mark.parametrize(
+    "description",
+    [
+        # "hybrid" is also an infrastructure word. None of these is a work arrangement.
+        "Experience designing hybrid-cloud deployments across AWS and on-prem.",
+        "You will own our hybrid cloud infrastructure and the service mesh.",
+        "Familiarity with hybrid network architecture and multi-cloud routing.",
+        "Build a hybrid search environment over Elasticsearch and pgvector.",
+    ],
+)
 def test_hybrid_noise_is_not_hybrid(description):
     assert extract_arrangement(description=description)["arrangement"] is None
 
 
 def test_label_form_of_hybrid_is_detected():
-    text = "Work Arrangement Hybrid: you will split your week between home and the office."
+    text = (
+        "Work Arrangement Hybrid: you will split your week between home and the office."
+    )
     assert extract_arrangement(description=text)["arrangement"] == HYBRID
 
 
@@ -188,19 +229,24 @@ def test_negated_remote_is_not_remote():
 
 
 def test_conditional_remote_is_not_remote():
-    text = ("The role is based out of a local office. However, we may be willing to "
-            "consider exceptionally qualified remote candidates within the US and Canada.")
+    text = (
+        "The role is based out of a local office. However, we may be willing to "
+        "consider exceptionally qualified remote candidates within the US and Canada."
+    )
     assert extract_arrangement(description=text)["arrangement"] is None
 
 
-@pytest.mark.parametrize("text", [
-    "You will be in the office Tuesday, Wednesday and Thursday. "
-    "As a perk, we also have up to four weeks per year of fully remote work!",
-    # The wording of a real posting: the count is a word, and "per week" sits
-    # between "office" and the weekday list.
-    "We have designated days in the office per week, Monday, Wednesday and "
-    "Thursday. As a perk, we also have up to four weeks per year of fully remote work!",
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "You will be in the office Tuesday, Wednesday and Thursday. "
+        "As a perk, we also have up to four weeks per year of fully remote work!",
+        # The wording of a real posting: the count is a word, and "per week" sits
+        # between "office" and the weekday list.
+        "We have designated days in the office per week, Monday, Wednesday and "
+        "Thursday. As a perk, we also have up to four weeks per year of fully remote work!",
+    ],
+)
 def test_hybrid_outranks_a_remote_perk(text):
     """A hybrid posting that also advertises remote weeks stays hybrid."""
     assert extract_arrangement(description=text)["arrangement"] == HYBRID
@@ -212,9 +258,28 @@ def test_html_description_is_stripped():
 
 
 _TAG_CASES = [
-    "", "plain text", "<", ">", "<>", "<<>>", "<a>", "a<b>c", "<a <b>", "<<<a>",
-    "<a>>", "<>a>", "x<>y<z>w", "<\n>", "<b>remote</b> & <i>", "<<<<", "a<b",
-    "<p>one</p><p>two", "><><", "<<>", "< >", "text <br/> more <",
+    "",
+    "plain text",
+    "<",
+    ">",
+    "<>",
+    "<<>>",
+    "<a>",
+    "a<b>c",
+    "<a <b>",
+    "<<<a>",
+    "<a>>",
+    "<>a>",
+    "x<>y<z>w",
+    "<\n>",
+    "<b>remote</b> & <i>",
+    "<<<<",
+    "a<b",
+    "<p>one</p><p>two",
+    "><><",
+    "<<>",
+    "< >",
+    "text <br/> more <",
 ]
 
 
@@ -225,6 +290,7 @@ def test_strip_tags_matches_the_old_regex(text):
     import re
 
     from backend.analyzer.work_arrangement import _strip_tags
+
     assert _strip_tags(text) == re.sub(r"<[^>]+>", " ", text)
 
 
@@ -233,15 +299,16 @@ def test_strip_tags_matches_the_old_regex_on_random_input():
     import re
 
     from backend.analyzer.work_arrangement import _strip_tags
+
     rng = random.Random(1234)
     for _ in range(3000):
         text = "".join(rng.choice("<>ab \n") for _ in range(rng.randint(0, 40)))
         assert _strip_tags(text) == re.sub(r"<[^>]+>", " ", text), repr(text)
 
 
-_PATHOLOGICAL = {                       # built in the test: a long id breaks PYTEST_CURRENT_TEST
+_PATHOLOGICAL = {  # built in the test: a long id breaks PYTEST_CURRENT_TEST
     "many_lt_one_gt": lambda: "<" * 200_000 + ">",
-    "many_lt_no_gt": lambda: "<" * 200_000,             # CodeQL's case: ~15 s before
+    "many_lt_no_gt": lambda: "<" * 200_000,  # CodeQL's case: ~15 s before
     "open_tags_one_gt": lambda: "<a" * 100_000 + ">",
     "empty_tags_then_lt": lambda: "<>" * 100_000 + "<" * 100_000 + ">",
 }
@@ -251,6 +318,7 @@ _PATHOLOGICAL = {                       # built in the test: a long id breaks PY
 def test_pathological_description_is_fast(case):
     """The old regex was quadratic on these (tens of seconds at this size)."""
     import time
+
     text = _PATHOLOGICAL[case]()
     started = time.perf_counter()
     extract_arrangement(description=text)
@@ -266,9 +334,11 @@ def test_unknown_description_stays_none():
 
 # ── cascade order ────────────────────────────────────────────────────────────
 
+
 def test_structured_field_beats_the_description():
     result = extract_arrangement(
-        description="This role is 100% remote.", structured="Hybrid")
+        description="This role is 100% remote.", structured="Hybrid"
+    )
     assert result["arrangement"] == HYBRID
     assert result["arrangement_source"] == "structured"
 
@@ -276,7 +346,8 @@ def test_structured_field_beats_the_description():
 def test_location_beats_the_description():
     result = extract_arrangement(
         location="Toronto, Ontario, Canada · Hybrid",
-        description="This role is 100% remote.")
+        description="This role is 100% remote.",
+    )
     assert result["arrangement"] == HYBRID
     assert result["arrangement_source"] == "location"
 
@@ -284,12 +355,14 @@ def test_location_beats_the_description():
 def test_title_beats_the_description():
     result = extract_arrangement(
         title="Staff Engineer (Remote)",
-        description="You will be in the office 3 days per week.")
+        description="You will be in the office 3 days per week.",
+    )
     assert result["arrangement"] == REMOTE
     assert result["arrangement_source"] == "title"
 
 
 # ── apply_arrangement_to_job ─────────────────────────────────────────────────
+
 
 def test_apply_sets_the_remote_flag():
     job = FakeJob(description="This role is 100% remote in Canada.")
@@ -314,7 +387,7 @@ def test_unknown_is_its_own_state_not_a_false():
 
 
 def test_a_posting_can_carry_two_arrangements():
-    """"Remote or Hybrid" answers either filter."""
+    """ "Remote or Hybrid" answers either filter."""
     job = FakeJob(location="Remote or Hybrid")
     apply_arrangement_to_job(job)
     assert job.flags == (True, True, False)
@@ -329,8 +402,12 @@ def test_a_structured_collection_sets_both_flags():
 
 def test_apply_does_not_overwrite_existing_flags():
     """A value the scraper already set wins over anything the cascade finds."""
-    job = FakeJob(description="This role is 100% remote.",
-                  arr_remote=False, arr_hybrid=True, arr_onsite=False)
+    job = FakeJob(
+        description="This role is 100% remote.",
+        arr_remote=False,
+        arr_hybrid=True,
+        arr_onsite=False,
+    )
     apply_arrangement_to_job(job)
     assert job.flags == (False, True, False)
 

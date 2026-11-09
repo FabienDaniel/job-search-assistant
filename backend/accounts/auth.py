@@ -76,6 +76,7 @@ Wrong PINs (QA F3 / R2-02, R2-04, R2-05; in-memory, per process, 429 with Retry-
   several members does not multiply them; while that counter is full or cooling the
   owner PIN does not cover members for that client.
 """
+
 import base64
 import hashlib
 import hmac
@@ -89,26 +90,28 @@ from collections import deque
 from typing import Optional
 
 COOKIE_NAME = "jn_account"
-COOKIE_MAX_AGE = 60 * 60 * 24 * 30          # same lifetime as jn_session
+COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # same lifetime as jn_session
 SECRET_KEY = "account_cookie_secret"
 OWNER_UNLOCK_SECONDS = 15 * 60
 
 TOKEN_HEADER = "X-Account-Token"
-TOKEN_MAX_AGE = 60 * 60 * 24 * 365           # API token: one year
+TOKEN_MAX_AGE = 60 * 60 * 24 * 365  # API token: one year
 KIND_COOKIE = "cookie"
 KIND_API = "api"
 
-PIN_MAX_FAILURES = 5                 # per (account, client) before a cooldown
-PIN_COOLDOWN_SECONDS = 30.0          # the first cooldown; doubles per consecutive cooldown
+PIN_MAX_FAILURES = 5  # per (account, client) before a cooldown
+PIN_COOLDOWN_SECONDS = 30.0  # the first cooldown; doubles per consecutive cooldown
 PIN_COOLDOWN_MAX_SECONDS = 15 * 60.0
 PIN_FAIL_WINDOW_SECONDS = 15 * 60.0  # failures older than this are forgotten
-PIN_STRIKE_RESET_SECONDS = 60 * 60.0  # no failure for this long -> the escalation restarts
-PIN_GLOBAL_MAX_FAILURES = 30         # per account over every client, within the window
-PIN_MAX_BUCKETS = 1024               # memory bound for the per-client counters
+PIN_STRIKE_RESET_SECONDS = (
+    60 * 60.0
+)  # no failure for this long -> the escalation restarts
+PIN_GLOBAL_MAX_FAILURES = 30  # per account over every client, within the window
+PIN_MAX_BUCKETS = 1024  # memory bound for the per-client counters
 
 ACCOUNT_REQUIRED = "account_required"
 INVALID_ACCOUNT_TOKEN = "invalid_account_token"
-AUTH_HEADER = "X-JN-Auth"                    # value "account" on an account_required 401
+AUTH_HEADER = "X-JN-Auth"  # value "account" on an account_required 401
 # QA F7 / R6-01: a dashboard tab sends the account it was loaded for on every write;
 # a write whose expected account is not the request's account (another tab switched
 # this browser) is refused with 409 `account_changed`. Every account-bound response
@@ -117,7 +120,7 @@ EXPECTED_ACCOUNT_HEADER = "X-Expected-Account"
 ACCOUNT_HEADER = "X-JN-Account"
 ACCOUNT_CHANGED = "account_changed"
 
-_SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2 ** 14, 8, 1
+_SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2**14, 8, 1
 
 
 def _now() -> float:
@@ -130,6 +133,7 @@ def _mono() -> float:
 
 # ── PIN hashing ──────────────────────────────────────────────────────────────
 
+
 def valid_pin_format(pin) -> bool:
     return isinstance(pin, str) and len(pin) == 4 and pin.isascii() and pin.isdigit()
 
@@ -138,7 +142,9 @@ def hash_pin(pin: str) -> str:
     if not valid_pin_format(pin):
         raise ValueError("a PIN is exactly 4 digits")
     salt = secrets.token_bytes(16)
-    digest = hashlib.scrypt(pin.encode(), salt=salt, n=_SCRYPT_N, r=_SCRYPT_R, p=_SCRYPT_P, dklen=32)
+    digest = hashlib.scrypt(
+        pin.encode(), salt=salt, n=_SCRYPT_N, r=_SCRYPT_R, p=_SCRYPT_P, dklen=32
+    )
     return f"scrypt${_SCRYPT_N}${_SCRYPT_R}${_SCRYPT_P}${salt.hex()}${digest.hex()}"
 
 
@@ -149,8 +155,14 @@ def verify_pin(pin, stored: Optional[str]) -> bool:
         algo, n, r, p, salt_hex, hash_hex = stored.split("$")
         if algo != "scrypt":
             return False
-        digest = hashlib.scrypt(pin.encode(), salt=bytes.fromhex(salt_hex),
-                                n=int(n), r=int(r), p=int(p), dklen=len(hash_hex) // 2)
+        digest = hashlib.scrypt(
+            pin.encode(),
+            salt=bytes.fromhex(salt_hex),
+            n=int(n),
+            r=int(r),
+            p=int(p),
+            dklen=len(hash_hex) // 2,
+        )
     except (ValueError, TypeError):
         return False
     return hmac.compare_digest(digest.hex(), hash_hex)
@@ -162,17 +174,39 @@ def pin_fingerprint(pin_hash: Optional[str]) -> str:
 
 # ── Accounts (plain rows, ≤5 per install) ────────────────────────────────────
 
+
 def load_accounts(db) -> list:
     """Every account as a dict, owner first then by creation. Account is not
     AccountScoped, so this sees every account under any context."""
     from backend.models.db import Account
-    rows = (db.query(Account.id, Account.name, Account.color, Account.role, Account.pin_hash,
-                     Account.created_at)
-            .all())
-    out = [{"id": r.id, "name": r.name, "color": r.color, "role": r.role, "pin_hash": r.pin_hash,
-            "created_at": r.created_at} for r in rows]
-    out.sort(key=lambda a: (a["role"] != "owner", a["created_at"] is None,
-                            a["created_at"].timestamp() if a["created_at"] else 0, a["name"] or ""))
+
+    rows = db.query(
+        Account.id,
+        Account.name,
+        Account.color,
+        Account.role,
+        Account.pin_hash,
+        Account.created_at,
+    ).all()
+    out = [
+        {
+            "id": r.id,
+            "name": r.name,
+            "color": r.color,
+            "role": r.role,
+            "pin_hash": r.pin_hash,
+            "created_at": r.created_at,
+        }
+        for r in rows
+    ]
+    out.sort(
+        key=lambda a: (
+            a["role"] != "owner",
+            a["created_at"] is None,
+            a["created_at"].timestamp() if a["created_at"] else 0,
+            a["name"] or "",
+        )
+    )
     return out
 
 
@@ -181,7 +215,9 @@ def load_accounts(db) -> list:
 # delete invalidate it (mapper events on Account, plus explicit calls after bulk
 # deletes); the TTL bounds any write the events cannot see (another worker, raw SQL).
 ACCOUNTS_CACHE_TTL = 5.0
-_accounts_cache: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()   # engine -> (monotonic time, [account dicts])
+_accounts_cache: "weakref.WeakKeyDictionary" = (
+    weakref.WeakKeyDictionary()
+)  # engine -> (monotonic time, [account dicts])
 _accounts_cache_lock = threading.Lock()
 
 
@@ -208,6 +244,7 @@ def cached_accounts(db) -> list:
 
 def _register_cache_events() -> None:
     from sqlalchemy import event
+
     from backend.models.db import Account
 
     def _drop(_mapper, _connection, _target):
@@ -222,8 +259,13 @@ _register_cache_events()
 
 def public_account(acc: dict) -> dict:
     """What the picker may show: no hashes, no data."""
-    return {"id": str(acc["id"]), "name": acc["name"], "color": acc["color"],
-            "role": acc["role"], "has_pin": bool(acc["pin_hash"])}
+    return {
+        "id": str(acc["id"]),
+        "name": acc["name"],
+        "color": acc["color"],
+        "role": acc["role"],
+        "has_pin": bool(acc["pin_hash"]),
+    }
 
 
 def _owner_of(accounts: list) -> Optional[dict]:
@@ -232,7 +274,11 @@ def _owner_of(accounts: list) -> Optional[dict]:
 
 def _find(accounts: list, account_id) -> Optional[dict]:
     try:
-        target = account_id if isinstance(account_id, uuid.UUID) else uuid.UUID(str(account_id))
+        target = (
+            account_id
+            if isinstance(account_id, uuid.UUID)
+            else uuid.UUID(str(account_id))
+        )
     except (ValueError, TypeError, AttributeError):
         return None
     return next((a for a in accounts if a["id"] == target), None)
@@ -257,12 +303,18 @@ def cookie_secret(db) -> bytes:
     if engine is not None and engine in _secret_cache:
         return _secret_cache[engine]
     from backend.accounts.settings import get_install_setting, put_setting
+
     value = (get_install_setting(db, SECRET_KEY) or "").strip()
     if not value:
         value = secrets.token_hex(32)
         try:
-            put_setting(db, SECRET_KEY, value, account_id=None,
-                        description="HMAC key that signs the jn_account cookie (generated)")
+            put_setting(
+                db,
+                SECRET_KEY,
+                value,
+                account_id=None,
+                description="HMAC key that signs the jn_account cookie (generated)",
+            )
             db.commit()
         except Exception:
             # Another request created it first (unique install key): use theirs.
@@ -282,6 +334,7 @@ def forget_secret_cache() -> None:
 
 # ── Cookie ───────────────────────────────────────────────────────────────────
 
+
 def _b64(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
@@ -298,7 +351,12 @@ def sign_cookie(secret: bytes, payload: dict) -> str:
 
 def read_cookie(secret: bytes, value: Optional[str]) -> Optional[dict]:
     """The payload of a well-signed, unexpired cookie, else None."""
-    if not value or not isinstance(value, str) or value.count(".") != 1 or not value.isascii():
+    if (
+        not value
+        or not isinstance(value, str)
+        or value.count(".") != 1
+        or not value.isascii()
+    ):
         return None
     body, sig = value.split(".")
     expected = _b64(hmac.new(secret, body.encode(), hashlib.sha256).digest())
@@ -315,20 +373,31 @@ def read_cookie(secret: bytes, value: Optional[str]) -> Optional[dict]:
     return payload
 
 
-def make_cookie_value(db, account: dict, unlocked_until: float = 0,
-                      unlock_id: Optional[str] = None) -> str:
+def make_cookie_value(
+    db, account: dict, unlocked_until: float = 0, unlock_id: Optional[str] = None
+) -> str:
     """An owner unlock ("u") is only written together with its live allowlist id ("n",
     from `grant_unlock`); without one the cookie is locked (QA F3 / R2-06)."""
     until = int(unlocked_until or 0) if unlock_id else 0
-    payload = {"k": KIND_COOKIE, "a": str(account["id"]), "p": pin_fingerprint(account["pin_hash"]),
-               "e": int(_now() + COOKIE_MAX_AGE), "u": until}
+    payload = {
+        "k": KIND_COOKIE,
+        "a": str(account["id"]),
+        "p": pin_fingerprint(account["pin_hash"]),
+        "e": int(_now() + COOKIE_MAX_AGE),
+        "u": until,
+    }
     if until:
         payload["n"] = unlock_id
     return sign_cookie(cookie_secret(db), payload)
 
 
-def set_account_cookie(response, db, account: dict, unlocked_until: float = 0,
-                       unlock_id: Optional[str] = None) -> None:
+def set_account_cookie(
+    response,
+    db,
+    account: dict,
+    unlocked_until: float = 0,
+    unlock_id: Optional[str] = None,
+) -> None:
     """Issue `jn_account` for `account` (also for MT-11 when a PIN change re-signs the
     caller's own cookie). Same flags and lifetime as jn_session."""
     response.set_cookie(
@@ -347,7 +416,7 @@ def clear_account_cookie(response) -> None:
 
 # ── Owner unlock allowlist (QA F3 / R2-06) ───────────────────────────────────
 
-_unlocks: dict = {}          # unlock id -> expiry (epoch s)
+_unlocks: dict = {}  # unlock id -> expiry (epoch s)
 _unlocks_lock = threading.Lock()
 
 
@@ -416,13 +485,19 @@ def account_from_cookie(db, accounts: list, value: Optional[str]):
 
 # ── API token (X-Account-Token) ──────────────────────────────────────────────
 
+
 def make_api_token(db, account: dict) -> str:
     """A signed per-account API token (module docstring). Issue it only after the
     caller has proven the account: its PIN when it has one, or an existing session
     for that same account."""
     now = int(_now())
-    payload = {"k": KIND_API, "a": str(account["id"]), "p": pin_fingerprint(account["pin_hash"]),
-               "i": now, "e": now + TOKEN_MAX_AGE}
+    payload = {
+        "k": KIND_API,
+        "a": str(account["id"]),
+        "p": pin_fingerprint(account["pin_hash"]),
+        "i": now,
+        "e": now + TOKEN_MAX_AGE,
+    }
     return sign_cookie(cookie_secret(db), payload)
 
 
@@ -443,17 +518,32 @@ def account_from_token(db, accounts: list, value: Optional[str]) -> Optional[dic
 
 # ── Request resolution ───────────────────────────────────────────────────────
 
-class Resolution:
-    __slots__ = ("account", "error", "unlocked_until", "via", "unlock_id", "clear_cookie")
 
-    def __init__(self, account=None, error=None, unlocked_until=0, via=None, unlock_id=None,
-                 clear_cookie=False):
+class Resolution:
+    __slots__ = (
+        "account",
+        "error",
+        "unlocked_until",
+        "via",
+        "unlock_id",
+        "clear_cookie",
+    )
+
+    def __init__(
+        self,
+        account=None,
+        error=None,
+        unlocked_until=0,
+        via=None,
+        unlock_id=None,
+        clear_cookie=False,
+    ):
         self.account = account
         self.error = error
         self.unlocked_until = unlocked_until
-        self.via = via   # 'token' | 'cookie' | 'single' | None
-        self.unlock_id = unlock_id          # the live owner-unlock id of the cookie (R2-06)
-        self.clear_cookie = clear_cookie    # a stale jn_account was presented (R2-03)
+        self.via = via  # 'token' | 'cookie' | 'single' | None
+        self.unlock_id = unlock_id  # the live owner-unlock id of the cookie (R2-06)
+        self.clear_cookie = clear_cookie  # a stale jn_account was presented (R2-03)
 
 
 def resolve_request(db, token: Optional[str], cookie: Optional[str]) -> Resolution:
@@ -467,7 +557,7 @@ def resolve_request(db, token: Optional[str], cookie: Optional[str]) -> Resoluti
     QA F3 / R2-03: only a browser with no `jn_account` cookie at all gets the one-account
     owner; a present cookie that does not verify (removed account, changed PIN, other
     install secret, garbage) -> `account_required` with `clear_cookie`."""
-    accounts = cached_accounts(db)   # QA F9 / T6-02
+    accounts = cached_accounts(db)  # QA F9 / T6-02
     if token:
         acc = account_from_token(db, accounts, token)
         if acc is None:
@@ -478,10 +568,14 @@ def resolve_request(db, token: Optional[str], cookie: Optional[str]) -> Resoluti
         until = float(payload.get("u") or 0)
         unlock_id = payload.get("n") if until else None
         if until and not unlock_live(unlock_id):
-            until, unlock_id = 0, None       # revoked, restarted or pre-F3: locked
-        return Resolution(account=acc, unlocked_until=until, via="cookie", unlock_id=unlock_id)
+            until, unlock_id = 0, None  # revoked, restarted or pre-F3: locked
+        return Resolution(
+            account=acc, unlocked_until=until, via="cookie", unlock_id=unlock_id
+        )
     if not accounts:
-        return Resolution(via=None)    # before the MT-1 migration: run as before (owner fallback)
+        return Resolution(
+            via=None
+        )  # before the MT-1 migration: run as before (owner fallback)
     if cookie:
         return Resolution(error=ACCOUNT_REQUIRED, clear_cookie=True)
     if len(accounts) == 1:
@@ -492,7 +586,7 @@ def resolve_request(db, token: Optional[str], cookie: Optional[str]) -> Resoluti
 # ── last_active_at (MT-11) ───────────────────────────────────────────────────
 
 TOUCH_INTERVAL_SECONDS = 60.0
-_touched: dict = {}   # str(account id) -> monotonic time of the last write
+_touched: dict = {}  # str(account id) -> monotonic time of the last write
 
 
 def touch_last_active(db, account_id, force: bool = False) -> bool:
@@ -509,10 +603,17 @@ def touch_last_active(db, account_id, force: bool = False) -> bool:
     _touched[key] = now
     try:
         from datetime import datetime, timezone
+
         from sqlalchemy import update
+
         from backend.models.db import Account
+
         t = Account.__table__
-        db.execute(update(t).where(t.c.id == account_id).values(last_active_at=datetime.now(timezone.utc)))
+        db.execute(
+            update(t)
+            .where(t.c.id == account_id)
+            .values(last_active_at=datetime.now(timezone.utc))
+        )
         db.commit()
         return True
     except Exception:
@@ -540,12 +641,12 @@ class _Bucket:
     __slots__ = ("fails", "last_fail", "until", "strikes", "inflight", "window", "seen")
 
     def __init__(self, now: float):
-        self.fails = 0           # wrong tries since the last cooldown/success (per client)
+        self.fails = 0  # wrong tries since the last cooldown/success (per client)
         self.last_fail = 0.0
-        self.until = 0.0         # cooling down until (monotonic)
-        self.strikes = 0         # consecutive cooldowns (escalation)
-        self.inflight = 0        # reserved attempts not settled yet
-        self.window = deque()    # global bucket: failure times within the window
+        self.until = 0.0  # cooling down until (monotonic)
+        self.strikes = 0  # consecutive cooldowns (escalation)
+        self.inflight = 0  # reserved attempts not settled yet
+        self.window = deque()  # global bucket: failure times within the window
         self.seen = now
 
 
@@ -559,7 +660,9 @@ def reset_pin_cooldowns() -> None:
 
 
 def _cooldown_for(strikes: int) -> float:
-    return min(PIN_COOLDOWN_MAX_SECONDS, PIN_COOLDOWN_SECONDS * (2 ** max(0, strikes - 1)))
+    return min(
+        PIN_COOLDOWN_MAX_SECONDS, PIN_COOLDOWN_SECONDS * (2 ** max(0, strikes - 1))
+    )
 
 
 def _age(b: "_Bucket", now: float) -> None:
@@ -576,8 +679,13 @@ def _age(b: "_Bucket", now: float) -> None:
 
 
 def _idle(b: "_Bucket", now: float) -> bool:
-    return (b.inflight == 0 and not b.until and not b.fails and not b.window
-            and (not b.strikes or now - b.last_fail > PIN_STRIKE_RESET_SECONDS))
+    return (
+        b.inflight == 0
+        and not b.until
+        and not b.fails
+        and not b.window
+        and (not b.strikes or now - b.last_fail > PIN_STRIKE_RESET_SECONDS)
+    )
 
 
 def _prune(now: float) -> None:
@@ -588,9 +696,12 @@ def _prune(now: float) -> None:
     for key in [k for k, b in _pin_buckets.items() if (_age(b, now) or _idle(b, now))]:
         _pin_buckets.pop(key, None)
     if len(_pin_buckets) > PIN_MAX_BUCKETS:
-        spare = sorted((b.seen, k) for k, b in _pin_buckets.items()
-                       if b.inflight == 0 and k[1] != GLOBAL_CLIENT)
-        for _, key in spare[:len(_pin_buckets) - PIN_MAX_BUCKETS]:
+        spare = sorted(
+            (b.seen, k)
+            for k, b in _pin_buckets.items()
+            if b.inflight == 0 and k[1] != GLOBAL_CLIENT
+        )
+        for _, key in spare[: len(_pin_buckets) - PIN_MAX_BUCKETS]:
             _pin_buckets.pop(key, None)
 
 
@@ -683,7 +794,13 @@ def _clear(account_id) -> None:
 
 
 class SwitchDenied(Exception):
-    def __init__(self, status: int, detail: str, retry_after: Optional[int] = None, tries_left=None):
+    def __init__(
+        self,
+        status: int,
+        detail: str,
+        retry_after: Optional[int] = None,
+        tries_left=None,
+    ):
         self.status = status
         self.detail = detail
         self.retry_after = retry_after
@@ -754,7 +871,9 @@ def check_switch(accounts: list, target: dict, pin, client: str = "") -> str:
         left, cooldown = _settle(target["id"], client, own_ok or owner_ok)
         if covering:
             # A request that never tested the owner's PIN releases its owner slot.
-            _settle(owner["id"], client, True if owner_ok else (None if own_ok else False))
+            _settle(
+                owner["id"], client, True if owner_ok else (None if own_ok else False)
+            )
     if own_ok:
         return "own_pin"
     if owner_ok:
@@ -774,12 +893,20 @@ def check_owner_pin(accounts: list, pin, client: str = "") -> None:
 
 # ── Route guard ──────────────────────────────────────────────────────────────
 
+
 def require_owner():
     """FastAPI dependency: 403 for a member (install-level jobs: backup, H-1B refresh,
     LinkedIn session). Owner, system code and no-context callers pass."""
     from fastapi import HTTPException
-    from backend.accounts.context import current_account, is_owner_unlocked, is_unscoped, owner_account_id
-    if is_unscoped() or is_owner_unlocked():   # MT-14: the owner entered their PIN here
+
+    from backend.accounts.context import (
+        current_account,
+        is_owner_unlocked,
+        is_unscoped,
+        owner_account_id,
+    )
+
+    if is_unscoped() or is_owner_unlocked():  # MT-14: the owner entered their PIN here
         return
     acc = current_account.get()
     if acc is None:

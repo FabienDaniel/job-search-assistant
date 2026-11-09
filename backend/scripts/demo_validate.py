@@ -6,6 +6,7 @@ Reads <dir>/data/data.json, <dir>/data/snapshots/. Prints every problem and exit
 when there is any. `--forbid` (or $DEMO_FORBID) lists strings that must not appear anywhere in the data
 (the owner's name and mail); any e-mail address outside example.com fails regardless.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -17,15 +18,67 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 ALLOWED_STATUSES = {"applied", "interview", "offer", "rejected"}
-NEXT = {None: {"applied"}, "applied": {"interview", "rejected"}, "interview": {"offer", "rejected"}, "offer": set(), "rejected": set()}
-JOB_KEYS = {"id", "external_id", "company", "title", "url", "source", "description", "location", "cv_scores", "best_cv", "best_score",
-            "scoring_report", "has_cached_page", "seen", "saved", "status", "discovered_at", "short_id"}
-APP_KEYS = {"id", "job_id", "status", "applied_at", "status_transitions", "updated_at", "company", "title", "url", "best_cv", "interviews"}
+NEXT = {
+    None: {"applied"},
+    "applied": {"interview", "rejected"},
+    "interview": {"offer", "rejected"},
+    "offer": set(),
+    "rejected": set(),
+}
+JOB_KEYS = {
+    "id",
+    "external_id",
+    "company",
+    "title",
+    "url",
+    "source",
+    "description",
+    "location",
+    "cv_scores",
+    "best_cv",
+    "best_score",
+    "scoring_report",
+    "has_cached_page",
+    "seen",
+    "saved",
+    "status",
+    "discovered_at",
+    "short_id",
+}
+APP_KEYS = {
+    "id",
+    "job_id",
+    "status",
+    "applied_at",
+    "status_transitions",
+    "updated_at",
+    "company",
+    "title",
+    "url",
+    "best_cv",
+    "interviews",
+}
 RESUME_KEYS = {"id", "name", "is_base", "template", "page_format", "json_data"}
 LETTER_KEYS = {"id", "name", "job_id", "template", "json_data"}
-REPORT_KEYS = {"summary", "breakdown", "requirement_mapping", "keyword_coverage_pct", "matched_keywords", "missing_keywords", "ats_tip"}
+REPORT_KEYS = {
+    "summary",
+    "breakdown",
+    "requirement_mapping",
+    "keyword_coverage_pct",
+    "matched_keywords",
+    "missing_keywords",
+    "ats_tip",
+}
 BREAKDOWN = ("skills", "experience", "domain", "role", "requirements")
-PERSONA_NODES = ("contact", "work_auth", "demographics", "compensation", "preferences", "resume_content", "qa_bank")
+PERSONA_NODES = (
+    "contact",
+    "work_auth",
+    "demographics",
+    "compensation",
+    "preferences",
+    "resume_content",
+    "qa_bank",
+)
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 
@@ -53,7 +106,12 @@ def validate(root: Path, forbid=()) -> list[str]:
     ref = date.fromisoformat(d["reference_date"])
 
     # schema
-    for coll, keys in (("jobs", JOB_KEYS), ("applications", APP_KEYS), ("resumes", RESUME_KEYS), ("cover_letters", LETTER_KEYS)):
+    for coll, keys in (
+        ("jobs", JOB_KEYS),
+        ("applications", APP_KEYS),
+        ("resumes", RESUME_KEYS),
+        ("cover_letters", LETTER_KEYS),
+    ):
         rows = d.get(coll)
         if not isinstance(rows, list) or not rows:
             err(f"{coll}: not a non-empty list")
@@ -76,6 +134,7 @@ def validate(root: Path, forbid=()) -> list[str]:
     if not any(a.get("disabled") for a in d.get("accounts", [])):
         err("accounts: no disabled second account")
     from backend.seed import DEFAULT_SETTINGS
+
     lost = [k for k in DEFAULT_SETTINGS if k not in d.get("settings", {})]
     if lost:
         err(f"settings: missing DEFAULT_SETTINGS keys {lost[:5]}...")
@@ -114,7 +173,9 @@ def validate(root: Path, forbid=()) -> list[str]:
             err(f"{label}: job {a['job_id']} not exported")
             continue
         if jobs[a["job_id"]]["status"] != "applied":
-            err(f"{label}: job status is {jobs[a['job_id']]['status']!r}, expected 'applied'")
+            err(
+                f"{label}: job status is {jobs[a['job_id']]['status']!r}, expected 'applied'"
+            )
         if a["status"] not in ALLOWED_STATUSES:
             err(f"{label}: status {a['status']!r} not in {sorted(ALLOWED_STATUSES)}")
         prev, last_at = None, ""
@@ -138,7 +199,12 @@ def validate(root: Path, forbid=()) -> list[str]:
     counts = {}
     for a in apps:
         counts[a["status"]] = counts.get(a["status"], 0) + 1
-    if not (counts.get("offer") and counts.get("rejected") and counts.get("interview") and counts.get("applied")):
+    if not (
+        counts.get("offer")
+        and counts.get("rejected")
+        and counts.get("interview")
+        and counts.get("applied")
+    ):
         err(f"applications: stage mix too thin {counts}")
 
     # featured jobs
@@ -153,7 +219,9 @@ def validate(root: Path, forbid=()) -> list[str]:
             continue
         label = f"featured {job['company']}"
         if set(p.get("scores", {})) != base_names:
-            err(f"{label}: scores for {sorted(p.get('scores', {}))}, expected {sorted(base_names)}")
+            err(
+                f"{label}: scores for {sorted(p.get('scores', {}))}, expected {sorted(base_names)}"
+            )
         for name, entry in p.get("scores", {}).items():
             rep, score = entry["report"], entry["score"]
             if REPORT_KEYS - set(rep):
@@ -161,7 +229,10 @@ def validate(root: Path, forbid=()) -> list[str]:
             bd = rep.get("breakdown", {})
             if set(bd) != set(BREAKDOWN) or sum(bd.values()) != score:
                 err(f"{label}/{name}: breakdown {bd} does not sum to {score}")
-            if job["cv_scores"].get(name) != score or (job.get("scoring_report") or {}).get(name) != rep:
+            if (
+                job["cv_scores"].get(name) != score
+                or (job.get("scoring_report") or {}).get(name) != rep
+            ):
                 err(f"{label}/{name}: job score/report differs from the prepared one")
             if not 5 <= len(rep.get("requirement_mapping", [])) <= 12:
                 err(f"{label}/{name}: requirement_mapping size")
@@ -176,22 +247,35 @@ def validate(root: Path, forbid=()) -> list[str]:
         if not base:
             err(f"{label}: tailored base résumé missing")
         else:
-            for be, te in zip(base["json_data"]["experience"], t["json_data"]["experience"]):
+            for be, te in zip(
+                base["json_data"]["experience"], t["json_data"]["experience"]
+            ):
                 if len(be["bullets"]) != len(te["bullets"]):
                     err(f"{label}: tailored bullet count differs for {be['company']}")
             if base["json_data"]["summary"] == t["json_data"]["summary"]:
                 err(f"{label}: tailored summary unchanged")
-            if not any(b != x for be, te in zip(base["json_data"]["experience"], t["json_data"]["experience"])
-                       for b, x in zip(be["bullets"], te["bullets"])):
+            if not any(
+                b != x
+                for be, te in zip(
+                    base["json_data"]["experience"], t["json_data"]["experience"]
+                )
+                for b, x in zip(be["bullets"], te["bullets"])
+            ):
                 err(f"{label}: tailoring changed no bullet")
         cl = (p.get("cover_letter") or {}).get("json_data") or {}
-        if len(cl.get("body_paragraphs", [])) != 3 or not cl.get("greeting") or not cl.get("signature"):
+        if (
+            len(cl.get("body_paragraphs", [])) != 3
+            or not cl.get("greeting")
+            or not cl.get("signature")
+        ):
             err(f"{label}: cover letter incomplete")
         af = p.get("autofill") or {}
         if "_default" not in af or len(af) < 3:
             err(f"{label}: autofill needs 2+ answers and _default")
         snap = root / "data" / "snapshots" / f"{jid}.html"
-        if p.get("snapshot") is False:   # posting expired before capture: the reader page shows its saved text
+        if (
+            p.get("snapshot") is False
+        ):  # posting expired before capture: the reader page shows its saved text
             if snap.exists():
                 err(f"{label}: marked without snapshot but the file exists")
         elif not snap.exists():
@@ -200,11 +284,17 @@ def validate(root: Path, forbid=()) -> list[str]:
             html = snap.read_text(encoding="utf-8")
             if re.search(r"<script|\son\w+\s*=|<iframe", html, re.I):
                 err(f"{label}: snapshot still has script/handler/frame")
-            if re.search(r"""(?:src|href)=["']https?://[^"']*\.(?:css|js|png|jpe?g|webp|woff2?|svg)""", html, re.I):
+            if re.search(
+                r"""(?:src|href)=["']https?://[^"']*\.(?:css|js|png|jpe?g|webp|woff2?|svg)""",
+                html,
+                re.I,
+            ):
                 err(f"{label}: snapshot references an external file")
             if re.search(r"""url\(\s*["']?https?://""", html):
                 err(f"{label}: snapshot css references an external url")
-    if (strong, middling, weak) == (0, 0, 0) or not (strong >= 3 and middling >= 5 and weak >= 3):
+    if (strong, middling, weak) == (0, 0, 0) or not (
+        strong >= 3 and middling >= 5 and weak >= 3
+    ):
         err(f"featured fit spread {strong}/{middling}/{weak} is not a realistic mix")
     for r in d["resumes"]:
         if not r["is_base"] and r.get("job_id") not in jobs:
@@ -213,20 +303,27 @@ def validate(root: Path, forbid=()) -> list[str]:
         if c["job_id"] not in jobs:
             err(f"cover letter {c['id']}: job missing")
 
-
     # privacy: owner strings and stray e-mail addresses
     forbid = [s.lower() for s in forbid if s]
     scan = dict(d)
-    for k in ("settings", "settings_defaults"):   # default Gmail sender patterns, not personal data
+    for k in (
+        "settings",
+        "settings_defaults",
+    ):  # default Gmail sender patterns, not personal data
         scan.pop(k, None)
-    texts = [json.dumps(scan, ensure_ascii=False)] + [p.read_text(encoding="utf-8", errors="replace") for p in (root / "data" / "snapshots").glob("*.html")]
+    texts = [json.dumps(scan, ensure_ascii=False)] + [
+        p.read_text(encoding="utf-8", errors="replace")
+        for p in (root / "data" / "snapshots").glob("*.html")
+    ]
     for text in texts:
         low = text.lower()
         for s in forbid:
             if s in low:
                 err(f"forbidden string {s!r} appears in the data")
         for m in set(EMAIL.findall(text)):
-            if not m.lower().endswith("@example.com") and not re.search(r"\.(png|jpe?g|svg|webp|gif)$", m, re.I):
+            if not m.lower().endswith("@example.com") and not re.search(
+                r"\.(png|jpe?g|svg|webp|gif)$", m, re.I
+            ):
                 err(f"e-mail address in the data: {m}")
     return sorted(set(errs))
 

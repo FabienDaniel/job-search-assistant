@@ -1,10 +1,13 @@
 """Tracer /cv/{token} endpoint: redirect must succeed even if click-log commit fails."""
+
 import uuid
+
 import pytest
 
 
 def _seed_first_run(db):
     from backend.models.db import Setting
+
     db.add(Setting(key="dashboard_api_key", value=""))
     db.commit()
 
@@ -13,6 +16,7 @@ def test_tracer_redirect_succeeds_normally(api_client, test_db):
     """Happy path: valid token -> 302 to destination URL + click recorded."""
     _seed_first_run(test_db)
     from backend.models.db import Resume, TracerLink
+
     resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)
     test_db.commit()
@@ -36,7 +40,8 @@ def test_tracer_redirect_succeeds_normally(api_client, test_db):
 
 def test_tracer_redirect_bypasses_api_key(api_client, test_db):
     """With a dashboard API key configured, the public /cv/{token} redirect must still work WITHOUT the key header — recruiters click it from a PDF with no key."""
-    from backend.models.db import Setting, Resume, TracerLink
+    from backend.models.db import Resume, Setting, TracerLink
+
     test_db.add(Setting(key="dashboard_api_key", value="secret-key-123"))
     resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)
@@ -68,7 +73,8 @@ def test_tracer_redirect_bypasses_api_key(api_client, test_db):
 
 def test_tracer_redirect_param_style_bypasses_and_redirects(api_client, test_db):
     """Param-style links (?cv=token on root) must also bypass auth and redirect, since resumes were exported in both /cv/{token} and ?cv={token} shapes."""
-    from backend.models.db import Setting, Resume, TracerLink
+    from backend.models.db import Resume, Setting, TracerLink
+
     test_db.add(Setting(key="dashboard_api_key", value="secret-key-123"))
     resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)
@@ -94,7 +100,10 @@ def test_tracer_redirect_param_style_bypasses_and_redirects(api_client, test_db)
 def test_root_without_cv_is_not_a_tracer(api_client, test_db):
     """Bare root path (no ?cv) must not be treated as a tracer redirect."""
     from backend.models.db import Setting
-    test_db.add(Setting(key="dashboard_api_key", value=""))  # first-run: middleware allows /
+
+    test_db.add(
+        Setting(key="dashboard_api_key", value="")
+    )  # first-run: middleware allows /
     test_db.commit()
     resp = api_client.get("/", follow_redirects=False)
     assert resp.status_code == 404
@@ -104,6 +113,7 @@ def test_tracer_redirect_survives_commit_failure(api_client, test_db, monkeypatc
     """A commit failure in click-log must NOT break the 302 redirect."""
     _seed_first_run(test_db)
     from backend.models.db import Resume, TracerLink
+
     resume = Resume(id=uuid.uuid4(), name="Test", is_base=True, json_data={})
     test_db.add(resume)
     test_db.commit()
@@ -121,10 +131,12 @@ def test_tracer_redirect_survives_commit_failure(api_client, test_db, monkeypatc
     # Patch Session.commit to fail only when a pending TracerClickEvent is being flushed —
     # other commits (e.g. the seeding above) succeed normally.
     from sqlalchemy.orm import Session as SASession
+
     original_commit = SASession.commit
 
     def broken_commit(self):
         from backend.models.db import TracerClickEvent
+
         pending_new = [obj for obj in self.new if isinstance(obj, TracerClickEvent)]
         if pending_new:
             raise RuntimeError("simulated click-log commit failure")

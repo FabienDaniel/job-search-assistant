@@ -1,6 +1,8 @@
 """Tests for SSRF defense in scraper/_shared/url_safety.py."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from backend.scraper._shared.url_safety import (
     UnsafeURLError,
@@ -10,8 +12,8 @@ from backend.scraper._shared.url_safety import (
     safe_get,
 )
 
-
 # ── _is_public_ip ────────────────────────────────────────────────────────────
+
 
 class TestIsPublicIP:
     def test_public_ipv4(self):
@@ -44,19 +46,22 @@ class TestIsPublicIP:
         assert _is_public_ip("not-an-ip") is False
         assert _is_public_ip("") is False
 
-    @pytest.mark.parametrize("ip", [
-        "::ffff:127.0.0.1",        # IPv4-mapped loopback
-        "::ffff:169.254.169.254",  # IPv4-mapped cloud metadata
-        "::ffff:10.0.0.1",
-        "2002:7f00:0001::",        # 6to4 wrapping 127.0.0.1
-        "2002:a9fe:a9fe::",        # 6to4 wrapping 169.254.169.254
-        "64:ff9b::7f00:1",         # NAT64 wrapping 127.0.0.1
-        "64:ff9b::a00:1",          # NAT64 wrapping 10.0.0.1
-        "fd00::1",                 # unique-local
-        "fe80::1",                 # link-local
-        "fec0::1",                 # site-local
-        "::",                      # unspecified
-    ])
+    @pytest.mark.parametrize(
+        "ip",
+        [
+            "::ffff:127.0.0.1",  # IPv4-mapped loopback
+            "::ffff:169.254.169.254",  # IPv4-mapped cloud metadata
+            "::ffff:10.0.0.1",
+            "2002:7f00:0001::",  # 6to4 wrapping 127.0.0.1
+            "2002:a9fe:a9fe::",  # 6to4 wrapping 169.254.169.254
+            "64:ff9b::7f00:1",  # NAT64 wrapping 127.0.0.1
+            "64:ff9b::a00:1",  # NAT64 wrapping 10.0.0.1
+            "fd00::1",  # unique-local
+            "fe80::1",  # link-local
+            "fec0::1",  # site-local
+            "::",  # unspecified
+        ],
+    )
     def test_ipv6_forms_that_reach_private_space_are_rejected(self, ip):
         assert _is_public_ip(ip) is False, f"{ip} should be rejected"
 
@@ -68,6 +73,7 @@ class TestIsPublicIP:
 
 
 # ── assert_public_http_url ───────────────────────────────────────────────────
+
 
 class TestAssertPublicURL:
     def test_rejects_empty(self):
@@ -129,10 +135,13 @@ class TestAssertPublicURL:
 
     def test_rejects_unresolvable_host(self, monkeypatch):
         import socket as _socket
+
         def raiser(host, port):
             raise _socket.gaierror("Name or service not known")
+
         monkeypatch.setattr(
-            "backend.scraper._shared.url_safety.socket.getaddrinfo", raiser,
+            "backend.scraper._shared.url_safety.socket.getaddrinfo",
+            raiser,
         )
         with pytest.raises(UnsafeURLError, match="DNS resolution"):
             assert_public_http_url("http://nonexistent.example/")
@@ -141,29 +150,39 @@ class TestAssertPublicURL:
         with pytest.raises(UnsafeURLError, match="host"):
             assert_public_http_url("http:///just-a-path")
 
-    @pytest.mark.parametrize("url", [
-        "http://2130706433/",          # decimal 127.0.0.1
-        "http://0x7f000001/",          # hex 127.0.0.1
-        "http://0177.0.0.1/",          # octal first octet
-        "http://127.1/",               # short form
-        "http://2852039166/",          # decimal 169.254.169.254
-        "http://0/",                   # 0.0.0.0
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://2130706433/",  # decimal 127.0.0.1
+            "http://0x7f000001/",  # hex 127.0.0.1
+            "http://0177.0.0.1/",  # octal first octet
+            "http://127.1/",  # short form
+            "http://2852039166/",  # decimal 169.254.169.254
+            "http://0/",  # 0.0.0.0
+        ],
+    )
     def test_rejects_legacy_numeric_ip_spellings(self, url, monkeypatch):
         """These never reach DNS: `ipaddress` refuses them but the C resolver would route them to loopback."""
+
         def boom(*a, **kw):
             raise AssertionError("must not hit DNS — the host is a numeric IP form")
-        monkeypatch.setattr("backend.scraper._shared.url_safety.socket.getaddrinfo", boom)
+
+        monkeypatch.setattr(
+            "backend.scraper._shared.url_safety.socket.getaddrinfo", boom
+        )
         with pytest.raises(UnsafeURLError, match="non-public"):
             assert_public_http_url(url)
 
-    @pytest.mark.parametrize("url", [
-        "http://[::ffff:127.0.0.1]/",
-        "http://[::ffff:169.254.169.254]/",
-        "http://[fd00::1]/",
-        "http://[fe80::1]/",
-        "http://[2002:7f00:1::]/",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://[::ffff:127.0.0.1]/",
+            "http://[::ffff:169.254.169.254]/",
+            "http://[fd00::1]/",
+            "http://[fe80::1]/",
+            "http://[2002:7f00:1::]/",
+        ],
+    )
     def test_rejects_ipv6_wrappers_around_private_space(self, url):
         with pytest.raises(UnsafeURLError):
             assert_public_http_url(url)
@@ -179,6 +198,7 @@ class TestAssertPublicURL:
 
 
 # ── resolve_public_http_url · the pinned target ──────────────────────────────
+
 
 class TestResolvedURL:
     def test_pins_the_request_to_the_resolved_ip(self, monkeypatch):
@@ -225,10 +245,14 @@ class TestResolvedURL:
             "backend.scraper._shared.url_safety.socket.getaddrinfo",
             lambda host, port: [(None, None, None, None, ("8.8.8.8", 0))],
         )
-        assert resolve_public_http_url("https://a.example").request_url == "https://8.8.8.8/"
+        assert (
+            resolve_public_http_url("https://a.example").request_url
+            == "https://8.8.8.8/"
+        )
 
 
 # ── safe_get ─────────────────────────────────────────────────────────────────
+
 
 class TestSafeGet:
     def _make_resp(self, *, status=200, is_redirect=False, location=None, text=""):
@@ -284,11 +308,14 @@ class TestSafeGet:
             return [(None, None, None, None, ("8.8.8.8", 0))]
 
         monkeypatch.setattr(
-            "backend.scraper._shared.url_safety.socket.getaddrinfo", fake_resolve,
+            "backend.scraper._shared.url_safety.socket.getaddrinfo",
+            fake_resolve,
         )
 
         redirect_resp = self._make_resp(
-            status=302, is_redirect=True, location="http://10.0.0.1/secret",
+            status=302,
+            is_redirect=True,
+            location="http://10.0.0.1/secret",
         )
         client = MagicMock()
         client.get = AsyncMock(return_value=redirect_resp)
@@ -311,8 +338,12 @@ class TestSafeGet:
         )
 
         responses = [
-            self._make_resp(status=302, is_redirect=True, location="https://b.example/"),
-            self._make_resp(status=302, is_redirect=True, location="https://c.example/"),
+            self._make_resp(
+                status=302, is_redirect=True, location="https://b.example/"
+            ),
+            self._make_resp(
+                status=302, is_redirect=True, location="https://c.example/"
+            ),
             self._make_resp(status=200, text="final"),
         ]
         client = MagicMock()
@@ -334,7 +365,9 @@ class TestSafeGet:
             "backend.scraper._shared.url_safety.socket.getaddrinfo",
             lambda host, port: [(None, None, None, None, ("8.8.8.8", 0))],
         )
-        infinite = self._make_resp(status=302, is_redirect=True, location="https://loop.example/")
+        infinite = self._make_resp(
+            status=302, is_redirect=True, location="https://loop.example/"
+        )
         client = MagicMock()
         client.get = AsyncMock(return_value=infinite)
         client.__aenter__ = AsyncMock(return_value=client)
@@ -381,8 +414,11 @@ class TestSafeGet:
             lambda host, port: [(None, None, None, None, (resolutions[host], 0))],
         )
         client = MagicMock()
-        client.get = AsyncMock(return_value=self._make_resp(
-            status=302, is_redirect=True, location="https://b.example/next"))
+        client.get = AsyncMock(
+            return_value=self._make_resp(
+                status=302, is_redirect=True, location="https://b.example/next"
+            )
+        )
         client.__aenter__ = AsyncMock(return_value=client)
         client.__aexit__ = AsyncMock(return_value=False)
         monkeypatch.setattr(
@@ -420,7 +456,8 @@ class TestSafeGet:
         out = await safe_get("https://a.example/")
         assert out.text == "second"
         assert [c[0][0] for c in client.get.call_args_list] == [
-            "https://8.8.8.8/", "https://8.8.4.4/",
+            "https://8.8.8.8/",
+            "https://8.8.4.4/",
         ]
 
     @pytest.mark.asyncio
@@ -452,8 +489,9 @@ class TestSafeGet:
             "backend.scraper._shared.url_safety.socket.getaddrinfo",
             lambda host, port: [(None, None, None, None, ("8.8.8.8", 0))],
         )
-        real = _httpx.Response(200, text="ok",
-                               request=_httpx.Request("GET", "https://8.8.8.8/acme"))
+        real = _httpx.Response(
+            200, text="ok", request=_httpx.Request("GET", "https://8.8.8.8/acme")
+        )
         client = MagicMock()
         client.get = AsyncMock(return_value=real)
         client.__aenter__ = AsyncMock(return_value=client)

@@ -1,4 +1,5 @@
 """Ashby ATS handler: GET api.ashbyhq.com/posting-api/job-board/{company}; host-matched (not substring) to avoid attacker-controlled paths, with department/location/team filters applied client-side by resolving IDs to names from the board HTML since the API doesn't return names itself."""
+
 import json
 import logging
 import re
@@ -7,8 +8,8 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 
 from backend.scraper._shared.browser import _USER_AGENT
-from backend.scraper._shared.filters import _validate_job
 from backend.scraper._shared.errors import raise_if_board_gone
+from backend.scraper._shared.filters import _validate_job
 from backend.scraper._shared.urls import host_matches
 
 logger = logging.getLogger("jobnavigator.scraper.ats.ashby")
@@ -24,9 +25,16 @@ def _resolve_group_names(page_text: str, filter_ids: set) -> set:
     filters a node and all its children (BFS over parent->children built from the embedded id/name JSON)."""
     if not filter_ids:
         return set()
-    name_by_id = dict(re.findall(r'"id"\s*:\s*"([0-9a-f-]{36})"\s*,\s*"name"\s*:\s*"([^"]+)"', page_text))
+    name_by_id = dict(
+        re.findall(
+            r'"id"\s*:\s*"([0-9a-f-]{36})"\s*,\s*"name"\s*:\s*"([^"]+)"', page_text
+        )
+    )
     children: dict = {}
-    for m in re.finditer(r'"id"\s*:\s*"([0-9a-f-]{36})"[^{}]*?"parent(?:Team|Department)Id"\s*:\s*"([0-9a-f-]{36})"', page_text):
+    for m in re.finditer(
+        r'"id"\s*:\s*"([0-9a-f-]{36})"[^{}]*?"parent(?:Team|Department)Id"\s*:\s*"([0-9a-f-]{36})"',
+        page_text,
+    ):
         children.setdefault(m.group(2), []).append(m.group(1))
     names, seen, stack = set(), set(), list(filter_ids)
     while stack:
@@ -47,7 +55,14 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
     path_parts = [p for p in parsed.path.strip("/").split("/") if p]
     if not path_parts:
         if debug:
-            return [], [{"title": "(none)", "url": url, "selector": "ashby_api", "reason": "No company slug in URL"}]
+            return [], [
+                {
+                    "title": "(none)",
+                    "url": url,
+                    "selector": "ashby_api",
+                    "reason": "No company slug in URL",
+                }
+            ]
         return []
     company_slug = path_parts[0]
 
@@ -57,7 +72,9 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
     filter_team_ids = set(qs.get("teamId", []))
 
     api_url = f"https://api.ashbyhq.com/posting-api/job-board/{company_slug}"
-    logger.info(f"Ashby API: {api_url} dept_filter={len(filter_dept_ids)} loc_filter={len(filter_location_ids)} team_filter={len(filter_team_ids)}")
+    logger.info(
+        f"Ashby API: {api_url} dept_filter={len(filter_dept_ids)} loc_filter={len(filter_location_ids)} team_filter={len(filter_team_ids)}"
+    )
 
     jobs = []
     rejected = []
@@ -69,21 +86,34 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
             if not debug:
                 raise_if_board_gone(resp.status_code, "Ashby", company_slug)
             if debug:
-                return [], [{"title": "(none)", "url": api_url, "selector": "ashby_api", "reason": f"HTTP {resp.status_code}"}]
+                return [], [
+                    {
+                        "title": "(none)",
+                        "url": api_url,
+                        "selector": "ashby_api",
+                        "reason": f"HTTP {resp.status_code}",
+                    }
+                ]
             return []
 
         data = json.loads(resp.text)
 
         # Ashby embeds ID→name mappings in the page HTML, not in the API response.
         # Fetch page once to resolve the filter IDs to names.
-        group_names = set()  # departmentId is Ashby's generic grouping filter — some boards group by
-                              # department, others by team (e.g. Plaid), so it may resolve to either
+        group_names = (
+            set()
+        )  # departmentId is Ashby's generic grouping filter — some boards group by
+        # department, others by team (e.g. Plaid), so it may resolve to either
         loc_names = set()
         if filter_dept_ids or filter_location_ids or filter_team_ids:
             try:
-                page_resp = await client.get(url, headers={"Accept": "text/html", "User-Agent": _USER_AGENT})
+                page_resp = await client.get(
+                    url, headers={"Accept": "text/html", "User-Agent": _USER_AGENT}
+                )
                 page_text = page_resp.text
-                group_names = _resolve_group_names(page_text, filter_dept_ids | filter_team_ids)
+                group_names = _resolve_group_names(
+                    page_text, filter_dept_ids | filter_team_ids
+                )
                 for loc_id in filter_location_ids:
                     # Location mapping uses "locationId"/"locationName" in job entries
                     m = re.search(
@@ -110,20 +140,38 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
                 job_team = (posting.get("team") or "").strip()
                 if job_dept not in group_names and job_team not in group_names:
                     if debug:
-                        rejected.append({"title": title, "url": job_url, "selector": "ashby_api", "reason": f"Dept '{job_dept}' / team '{job_team}' not in filter {group_names}"})
+                        rejected.append(
+                            {
+                                "title": title,
+                                "url": job_url,
+                                "selector": "ashby_api",
+                                "reason": f"Dept '{job_dept}' / team '{job_team}' not in filter {group_names}",
+                            }
+                        )
                     continue
 
             job_loc = (posting.get("location") or "").strip()
             # A posting open in several places carries the extra ones here; the
             # location filter has to read them too, or a New York filter drops
             # a posting whose primary line happens to say San Francisco.
-            secondary = [(entry or {}).get("location")
-                         for entry in (posting.get("secondaryLocations") or [])]
+            secondary = [
+                (entry or {}).get("location")
+                for entry in (posting.get("secondaryLocations") or [])
+            ]
             if loc_names:
-                places = [p for p in ([job_loc] + secondary) if isinstance(p, str) and p]
+                places = [
+                    p for p in ([job_loc] + secondary) if isinstance(p, str) and p
+                ]
                 if not any(ln.lower() in p.lower() for ln in loc_names for p in places):
                     if debug:
-                        rejected.append({"title": title, "url": job_url, "selector": "ashby_api", "reason": f"Location '{job_loc}' not in filter {loc_names}"})
+                        rejected.append(
+                            {
+                                "title": title,
+                                "url": job_url,
+                                "selector": "ashby_api",
+                                "reason": f"Location '{job_loc}' not in filter {loc_names}",
+                            }
+                        )
                     continue
 
             reason = _validate_job(title, job_url)
@@ -131,12 +179,24 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
                 # `workplaceType` is the arrangement. `isRemote` is not: a posting
                 # with workplaceType "Hybrid" still reports isRemote true, so it
                 # means "has a remote option", not "is a remote job".
-                jobs.append({"title": title, "url": job_url,
-                             "location": job_loc or None,
-                             "locations": [x for x in ([job_loc] + secondary) if x],
-                             "arrangement": posting.get("workplaceType") or None})
+                jobs.append(
+                    {
+                        "title": title,
+                        "url": job_url,
+                        "location": job_loc or None,
+                        "locations": [x for x in ([job_loc] + secondary) if x],
+                        "arrangement": posting.get("workplaceType") or None,
+                    }
+                )
             elif debug:
-                rejected.append({"title": title, "url": job_url, "selector": "ashby_api", "reason": reason})
+                rejected.append(
+                    {
+                        "title": title,
+                        "url": job_url,
+                        "selector": "ashby_api",
+                        "reason": reason,
+                    }
+                )
 
     logger.info(f"Ashby API: fetched {len(jobs)} jobs for {company_slug}")
     if debug:

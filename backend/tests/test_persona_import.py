@@ -1,4 +1,5 @@
 """POST /api/persona/import: replaces `contact` and `resume_content`; leaves the five autofill nodes untouched."""
+
 import uuid
 
 import pytest
@@ -10,6 +11,7 @@ def _seed(test_db):
     test_db.add(Setting(key="dashboard_api_key", value=""))
     test_db.commit()
     from backend.seed import seed_persona
+
     seed_persona(test_db)
 
 
@@ -28,10 +30,20 @@ RESUME_JSON = {
     },
     "summary": "PM with 9 years shipping platform work.",
     "experience": [
-        {"company": "Acme Inc.", "title": "Senior PM", "date": "2020–2024",
-         "location": "Boston, MA", "bullets": ["Shipped X", "Cut Y by 30%"]},
-        {"company": "Globex", "title": "PM", "date": "2017–2020",
-         "location": "Remote", "bullets": ["Ran Z"]},
+        {
+            "company": "Acme Inc.",
+            "title": "Senior PM",
+            "date": "2020–2024",
+            "location": "Boston, MA",
+            "bullets": ["Shipped X", "Cut Y by 30%"],
+        },
+        {
+            "company": "Globex",
+            "title": "PM",
+            "date": "2017–2020",
+            "location": "Remote",
+            "bullets": ["Ran Z"],
+        },
     ],
     "skills": {"Product": ["Roadmapping", "Discovery"], "Tools": ["Jira"]},
     "education": [{"school": "BU", "degree": "BSc", "location": "Boston, MA"}],
@@ -40,10 +52,17 @@ RESUME_JSON = {
 }
 
 
-def _make_base(test_db, name="Platform PM", json_data=None, is_base=True, parent_id=None):
-    r = Resume(name=name, is_base=is_base, parent_id=parent_id,
-               template="garamond_alt", page_format="letter",
-               json_data=json_data if json_data is not None else RESUME_JSON)
+def _make_base(
+    test_db, name="Platform PM", json_data=None, is_base=True, parent_id=None
+):
+    r = Resume(
+        name=name,
+        is_base=is_base,
+        parent_id=parent_id,
+        template="garamond_alt",
+        page_format="letter",
+        json_data=json_data if json_data is not None else RESUME_JSON,
+    )
     test_db.add(r)
     test_db.commit()
     test_db.refresh(r)
@@ -51,6 +70,7 @@ def _make_base(test_db, name="Platform PM", json_data=None, is_base=True, parent
 
 
 # ── from a base résumé ──────────────────────────────────────────────────────
+
 
 def test_import_from_base_resume_maps_contact_and_content(api_client, test_db):
     _seed(test_db)
@@ -84,8 +104,12 @@ def test_import_from_base_resume_maps_contact_and_content(api_client, test_db):
     assert "header" not in content
 
     assert data["summary"] == {
-        "roles": 2, "bullets": 3, "skill_groups": 2, "education": 1,
-        "projects": 1, "contact_items": len(contact),
+        "roles": 2,
+        "bullets": 3,
+        "skill_groups": 2,
+        "education": 1,
+        "projects": 1,
+        "contact_items": len(contact),
         "source": "resume:Platform PM",
     }
 
@@ -94,8 +118,15 @@ def test_import_overwrites_and_leaves_other_nodes_alone(api_client, test_db):
     """contact + resume_content are replaced wholesale; the five autofill nodes keep every value they had."""
     _seed(test_db)
     p = test_db.query(Persona).filter(Persona.id == 1).first()
-    p.contact = {"first_name": "Old", "email": "old@example.com", "current_company": "Nowhere"}
-    p.resume_content = {"summary": "old summary", "experience": [{"company": "Old Co", "bullets": []}]}
+    p.contact = {
+        "first_name": "Old",
+        "email": "old@example.com",
+        "current_company": "Nowhere",
+    }
+    p.resume_content = {
+        "summary": "old summary",
+        "experience": [{"company": "Old Co", "bullets": []}],
+    }
     p.work_auth = {"authorized_us": True}
     p.demographics = {"gender": "male"}
     p.compensation = {"desired_salary": "180000"}
@@ -119,7 +150,10 @@ def test_import_overwrites_and_leaves_other_nodes_alone(api_client, test_db):
     assert got["work_auth"] == {"authorized_us": True}
     assert got["demographics"] == {"gender": "male"}
     assert got["compensation"] == {"desired_salary": "180000"}
-    assert got["preferences"] == {"willing_remote": True, "preferred_locations": ["Boston"]}
+    assert got["preferences"] == {
+        "willing_remote": True,
+        "preferred_locations": ["Boston"],
+    }
     assert got["qa_bank"] == [{"question": "Why us?", "answer": "Because."}]
 
 
@@ -161,7 +195,9 @@ def test_import_does_not_alias_the_resume_row(api_client, test_db):
 def test_import_tailored_copy_rejected(api_client, test_db):
     _seed(test_db)
     base = _make_base(test_db)
-    copy = _make_base(test_db, name="Platform PM → Acme", is_base=False, parent_id=base.id)
+    copy = _make_base(
+        test_db, name="Platform PM → Acme", is_base=False, parent_id=base.id
+    )
 
     resp = api_client.post("/api/persona/import", json={"resume_id": str(copy.id)})
     assert resp.status_code == 400
@@ -174,21 +210,57 @@ def test_import_tailored_copy_rejected(api_client, test_db):
 
 # ── contact.current_company, from the latest role ───────────────────────────
 
-@pytest.mark.parametrize("experience,expected", [
-    # ordinary résumé order (newest first) — the 2024 end wins over the 2020 one
-    ([{"company": "Acme Inc.", "date": "2020–2024"}, {"company": "Globex", "date": "2017–2020"}], "Acme Inc."),
-    # an open-ended role outranks a later closing year wherever it sits in the list
-    ([{"company": "Acme Inc.", "date": "2018–2024"}, {"company": "Globex", "date": "Mar 2016 – Present"}], "Globex"),
-    # month resolves a same-year tie
-    ([{"company": "Acme Inc.", "date": "Jan 2019 – Mar 2021"}, {"company": "Globex", "date": "2015 – Nov 2021"}], "Globex"),
-    # "to" as the range separator, and a bare year
-    ([{"company": "Acme Inc.", "date": "2019 to 2023"}, {"company": "Globex", "date": "2021"}], "Acme Inc."),
-    # no parsable dates at all → the résumé's own order decides
-    ([{"company": "Acme Inc."}, {"company": "Globex"}], "Acme Inc."),
-    # rows without a company name are skipped
-    ([{"title": "Consultant", "date": "2022–Present"}, {"company": "Globex", "date": "2017–2020"}], "Globex"),
-])
-def test_import_sets_current_company_from_latest_role(api_client, test_db, experience, expected):
+
+@pytest.mark.parametrize(
+    "experience,expected",
+    [
+        # ordinary résumé order (newest first) — the 2024 end wins over the 2020 one
+        (
+            [
+                {"company": "Acme Inc.", "date": "2020–2024"},
+                {"company": "Globex", "date": "2017–2020"},
+            ],
+            "Acme Inc.",
+        ),
+        # an open-ended role outranks a later closing year wherever it sits in the list
+        (
+            [
+                {"company": "Acme Inc.", "date": "2018–2024"},
+                {"company": "Globex", "date": "Mar 2016 – Present"},
+            ],
+            "Globex",
+        ),
+        # month resolves a same-year tie
+        (
+            [
+                {"company": "Acme Inc.", "date": "Jan 2019 – Mar 2021"},
+                {"company": "Globex", "date": "2015 – Nov 2021"},
+            ],
+            "Globex",
+        ),
+        # "to" as the range separator, and a bare year
+        (
+            [
+                {"company": "Acme Inc.", "date": "2019 to 2023"},
+                {"company": "Globex", "date": "2021"},
+            ],
+            "Acme Inc.",
+        ),
+        # no parsable dates at all → the résumé's own order decides
+        ([{"company": "Acme Inc."}, {"company": "Globex"}], "Acme Inc."),
+        # rows without a company name are skipped
+        (
+            [
+                {"title": "Consultant", "date": "2022–Present"},
+                {"company": "Globex", "date": "2017–2020"},
+            ],
+            "Globex",
+        ),
+    ],
+)
+def test_import_sets_current_company_from_latest_role(
+    api_client, test_db, experience, expected
+):
     _seed(test_db)
     base = _make_base(test_db, json_data={**RESUME_JSON, "experience": experience})
 
@@ -221,6 +293,7 @@ def test_import_without_resume_id_or_file_400(api_client, test_db):
 
 # ── from a PDF ──────────────────────────────────────────────────────────────
 
+
 def test_import_pdf_uses_the_resume_parser(api_client, test_db, monkeypatch):
     """The PDF path calls routes_resumes.parse_resume_pdf, the same parser /api/resumes/import-pdf uses, and creates no Resume row."""
     _seed(test_db)
@@ -232,6 +305,7 @@ def test_import_pdf_uses_the_resume_parser(api_client, test_db, monkeypatch):
         return RESUME_JSON
 
     import backend.api.routes_resumes as rr
+
     monkeypatch.setattr(rr, "parse_resume_pdf", fake_parse)
 
     resp = api_client.post(
@@ -281,31 +355,39 @@ def test_import_pdf_unparseable_is_422(api_client, test_db):
 
 # ── the contact heuristics ──────────────────────────────────────────────────
 
-@pytest.mark.parametrize("text,expect", [
-    ("Boston, MA", {"city": "Boston", "state": "MA"}),
-    ("Berlin, Germany", {"city": "Berlin", "country": "Germany"}),
-    ("Austin, TX, USA", {"city": "Austin", "state": "TX", "country": "USA"}),
-    ("Boston, Massachusetts", {"city": "Boston", "state": "Massachusetts"}),
-    ("Remote", {"city": "Remote"}),
-])
+
+@pytest.mark.parametrize(
+    "text,expect",
+    [
+        ("Boston, MA", {"city": "Boston", "state": "MA"}),
+        ("Berlin, Germany", {"city": "Berlin", "country": "Germany"}),
+        ("Austin, TX, USA", {"city": "Austin", "state": "TX", "country": "USA"}),
+        ("Boston, Massachusetts", {"city": "Boston", "state": "Massachusetts"}),
+        ("Remote", {"city": "Remote"}),
+    ],
+)
 def test_location_split(text, expect):
     from backend.api.routes_persona import _split_location
+
     assert _split_location(text) == expect
 
 
 def test_contact_heuristics_without_labels():
     """Bare values with no url and no label word still classify."""
     from backend.api.routes_persona import _contact_from_header
-    out = _contact_from_header({
-        "name": "Mary Jane Watson",
-        "contact_items": [
-            {"text": "617-555-0142"},
-            {"text": "mary@example.com"},
-            {"text": "linkedin.com/in/mjw"},
-            {"text": "github.com/mjw"},
-            {"text": "New York, NY"},
-        ],
-    })
+
+    out = _contact_from_header(
+        {
+            "name": "Mary Jane Watson",
+            "contact_items": [
+                {"text": "617-555-0142"},
+                {"text": "mary@example.com"},
+                {"text": "linkedin.com/in/mjw"},
+                {"text": "github.com/mjw"},
+                {"text": "New York, NY"},
+            ],
+        }
+    )
     assert out["first_name"] == "Mary"
     assert out["last_name"] == "Jane Watson"
     assert out["phone"] == "617-555-0142"
@@ -317,5 +399,6 @@ def test_contact_heuristics_without_labels():
 
 def test_contact_heuristics_ignore_junk():
     from backend.api.routes_persona import _contact_from_header
+
     out = _contact_from_header({"name": "", "contact_items": ["not-a-dict", {}, None]})
     assert out == {}

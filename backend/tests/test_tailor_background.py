@@ -1,18 +1,21 @@
 """Tailoring semaphore + background-job behavior."""
+
 import asyncio
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from backend.models.db import Setting
 
-
 # The gate itself lives in job_monitor now (launch_background has to take it
 # before the worker opens a session), so these assert on the shared limiter.
+
 
 def test_semaphore_default_is_two(test_db):
     """Absent setting → limit 2."""
     import backend.api.routes_resumes as rr
     import backend.job_monitor as jm
+
     jm.reset_limiter("tailoring")
     assert rr._get_tailoring_semaphore().value == 2
 
@@ -23,6 +26,7 @@ def test_semaphore_reads_setting(test_db):
     test_db.commit()
     import backend.api.routes_resumes as rr
     import backend.job_monitor as jm
+
     jm.reset_limiter("tailoring")
     assert rr._get_tailoring_semaphore().value == 5
 
@@ -36,37 +40,54 @@ def test_reset_clears_cached_semaphore(test_db):
     assert rr._get_tailoring_semaphore().value == 2
     test_db.add(Setting(key="tailoring_max_concurrent", value="7"))
     test_db.commit()
-    assert rr._get_tailoring_semaphore().value == 2      # still the cached gate
+    assert rr._get_tailoring_semaphore().value == 2  # still the cached gate
     rr.reset_tailoring_semaphore()
     assert rr._get_tailoring_semaphore().value == 7
 
 
 @pytest.mark.asyncio
-async def test_tailor_endpoint_returns_202_with_run_id(api_client, test_db, monkeypatch):
+async def test_tailor_endpoint_returns_202_with_run_id(
+    api_client, test_db, monkeypatch
+):
     """POST /api/resumes/tailor returns 202 + run_id; body never blocks on LLM."""
-    from backend.models.db import Resume, Job
     import uuid as _uuid
 
+    from backend.models.db import Job, Resume
+
     test_db.add(Setting(key="dashboard_api_key", value=""))
-    test_db.add(Setting(key="cv_tailor_prompt", value="prompt {resume_json} {job_description}"))
+    test_db.add(
+        Setting(key="cv_tailor_prompt", value="prompt {resume_json} {job_description}")
+    )
     test_db.add(Setting(key="tailor_auto_quick_score", value="false"))
 
-    job = Job(external_id="t1", content_hash="t1c", company="Acme", title="PM",
-              description="Looking for PM with 3 years exp")
+    job = Job(
+        external_id="t1",
+        content_hash="t1c",
+        company="Acme",
+        title="PM",
+        description="Looking for PM with 3 years exp",
+    )
     test_db.add(job)
     test_db.flush()
-    base = Resume(name="Base", is_base=True, template="inter",
-                  json_data={"summary": "s", "experience": [], "skills": {}})
+    base = Resume(
+        name="Base",
+        is_base=True,
+        template="inter",
+        json_data={"summary": "s", "experience": [], "skills": {}},
+    )
     test_db.add(base)
     test_db.commit()
 
     # Stub the LLM so the impl can't block; we're testing the plumbing
     import backend.api.routes_resumes as rr
+
     async def fake_call(prompt, system, max_tokens):
         return {"text": '{"summary":"tailored"}', "usage": {}}
+
     monkeypatch.setattr("backend.analyzer.llm_client.call_cv_tailor_llm", fake_call)
     monkeypatch.setattr(rr, "_tailoring_semaphore", None, raising=False)
     import backend.job_monitor as mon
+
     monkeypatch.setattr(mon, "_running", {})
 
     resp = api_client.post(
@@ -80,28 +101,45 @@ async def test_tailor_endpoint_returns_202_with_run_id(api_client, test_db, monk
 
 
 @pytest.mark.asyncio
-async def test_tailor_creates_job_run_with_target_job_id(api_client, test_db, monkeypatch):
+async def test_tailor_creates_job_run_with_target_job_id(
+    api_client, test_db, monkeypatch
+):
     """Launched JobRun has target_job_id set to the Job we're tailoring for."""
-    from backend.models.db import Resume, Job, JobRun
+    from backend.models.db import Job, JobRun, Resume
 
     test_db.add(Setting(key="dashboard_api_key", value=""))
-    test_db.add(Setting(key="cv_tailor_prompt", value="prompt {resume_json} {job_description}"))
+    test_db.add(
+        Setting(key="cv_tailor_prompt", value="prompt {resume_json} {job_description}")
+    )
     test_db.add(Setting(key="tailor_auto_quick_score", value="false"))
 
-    job = Job(external_id="t2", content_hash="t2c", company="Acme", title="PM", description="jd")
+    job = Job(
+        external_id="t2",
+        content_hash="t2c",
+        company="Acme",
+        title="PM",
+        description="jd",
+    )
     test_db.add(job)
     test_db.flush()
-    base = Resume(name="Base", is_base=True, template="inter",
-                  json_data={"summary": "s", "experience": [], "skills": {}})
+    base = Resume(
+        name="Base",
+        is_base=True,
+        template="inter",
+        json_data={"summary": "s", "experience": [], "skills": {}},
+    )
     test_db.add(base)
     test_db.commit()
 
     async def fake_call(prompt, system, max_tokens):
         return {"text": '{"summary":"tailored"}', "usage": {}}
+
     monkeypatch.setattr("backend.analyzer.llm_client.call_cv_tailor_llm", fake_call)
     import backend.job_monitor as mon
+
     monkeypatch.setattr(mon, "_running", {})
     import backend.api.routes_resumes as rr
+
     monkeypatch.setattr(rr, "_tailoring_semaphore", None, raising=False)
 
     resp = api_client.post(

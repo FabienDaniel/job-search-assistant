@@ -5,6 +5,7 @@ Postgres has no `json = jsonb` operator, so a `'{}'::jsonb` literal in this
 filter raises UndefinedFunction. That aborted every auto-scoring pass after a
 scrape, and the only trace was the `error` column of the `scrape_all` JobRun.
 """
+
 import os
 
 import pytest
@@ -20,10 +21,12 @@ def _count_unscored():
 
 
 def _compiled_for_postgres():
-    return str(_count_unscored().compile(
-        dialect=postgresql.dialect(),
-        compile_kwargs={"literal_binds": True},
-    ))
+    return str(
+        _count_unscored().compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
 
 
 def test_the_unscored_filter_carries_no_jsonb_cast():
@@ -40,8 +43,17 @@ def test_the_unscored_filter_selects_null_and_empty_scores(test_db):
     from sqlalchemy import null as sa_null
 
     for tag, scores in (("null", sa_null()), ("empty", {}), ("scored", {"PM": 70})):
-        test_db.add(Job(id=uuid.uuid4(), external_id=tag, content_hash=tag,
-                        company="Acme", title=tag, status="new", cv_scores=scores))
+        test_db.add(
+            Job(
+                id=uuid.uuid4(),
+                external_id=tag,
+                content_hash=tag,
+                company="Acme",
+                title=tag,
+                status="new",
+                cv_scores=scores,
+            )
+        )
     test_db.commit()
 
     assert test_db.execute(_count_unscored()).scalar() == 2

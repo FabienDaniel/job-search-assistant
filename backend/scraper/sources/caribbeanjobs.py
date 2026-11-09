@@ -8,6 +8,7 @@ Location, Category, Recruiter, rbet, SortBy — are forwarded verbatim, `Page` i
 paginate) and/or `search_term` (used as `Keywords`, overriding any Keywords in direct_url); at
 least one must be set.
 """
+
 import asyncio
 import json
 import logging
@@ -20,24 +21,35 @@ from urllib.parse import parse_qsl, urljoin, urlparse
 import httpx
 from sqlalchemy.exc import IntegrityError
 
-from backend.models.db import (
-    SessionLocal, Job, Search, get_existing_external_ids,
-)
 from backend.accounts.settings import get_setting
 from backend.analyzer import salary_extractor
 from backend.analyzer.salary_extractor import extract_salary
-from backend.scraper._shared.dedup import make_external_id, make_content_hash, mark_ignored
-from backend.scraper._shared.posting_links import counts_as_new
-from backend.scraper._shared.filters import (build_search_exclude_sets, company_included,
-                                             search_title_filters, title_kept)
+from backend.models.db import (
+    Job,
+    Search,
+    SessionLocal,
+    get_existing_external_ids,
+)
 from backend.scraper._shared.analysis import analyze_inline, prefetch_h1b
 from backend.scraper._shared.bot_wall import is_bot_wall
+from backend.scraper._shared.dedup import (
+    make_content_hash,
+    make_external_id,
+    mark_ignored,
+)
+from backend.scraper._shared.filters import (
+    build_search_exclude_sets,
+    company_included,
+    search_title_filters,
+    title_kept,
+)
+from backend.scraper._shared.posting_links import counts_as_new
 
 logger = logging.getLogger("jobnavigator.caribbeanjobs")
 
 BASE = "https://www.caribbeanjobs.com"
 LIST_URL = f"{BASE}/ShowResults.aspx"
-_MAX_PAGES = 50         # defensive cap: 1250 listing rows / scrape
+_MAX_PAGES = 50  # defensive cap: 1250 listing rows / scrape
 # Detail pages: two at a time, about a second apart with a little jitter, to stay gentle on a
 # small board (a 100-job run takes about a minute, fine for a scheduled scrape).
 _DETAIL_CONCURRENCY = 2
@@ -52,8 +64,10 @@ _UA = "JobNavigator/1.0 (+https://github.com/vesaias/JobNavigator)"
 # challenge (seen from our install on every request, with any User-Agent). The scraper does
 # not try to pass the challenge. The editor shows the same block in
 # frontend/src/sourceBlocks.js (`MODE_BLOCKS.caribbeanjobs`); change both places together.
-CLOUDFLARE_BLOCKED = ("CaribbeanJobs is behind a Cloudflare challenge from this network; "
-                      "the scraper cannot pass it (HTTP {status})")
+CLOUDFLARE_BLOCKED = (
+    "CaribbeanJobs is behind a Cloudflare challenge from this network; "
+    "the scraper cannot pass it (HTTP {status})"
+)
 
 
 class CloudflareChallenge(RuntimeError):
@@ -90,12 +104,16 @@ def _strip_html(html_str: str) -> str:
         return ""
     try:
         from bs4 import BeautifulSoup
+
         s = re.sub(r"(?i)<br\s*/?>", "\n", html_str)
         s = re.sub(r"(?i)</(p|div|li|h[1-6]|tr|ul|ol)>", "\n", s)
-        text = BeautifulSoup(s, "html.parser").get_text()  # no separator → inline words stay joined
+        text = BeautifulSoup(
+            s, "html.parser"
+        ).get_text()  # no separator → inline words stay joined
         return re.sub(r"\n{3,}", "\n\n", text).strip()
     except Exception:
         import html as _html
+
         return _html.unescape(re.sub(r"<[^>]+>", " ", html_str)).strip()
 
 
@@ -145,7 +163,7 @@ def _parse_salary(text: str) -> tuple[int | None, int | None]:
     if not text:
         return None, None
     nums = [int(n.replace(",", "")) for n in re.findall(r"\d[\d,]*", text)]
-    nums = [n for n in nums if n >= 1000]   # ignore stray small numbers in prose
+    nums = [n for n in nums if n >= 1000]  # ignore stray small numbers in prose
     if not nums:
         return None, None
     if len(nums) == 1:
@@ -173,8 +191,12 @@ def _usd_annual(j: dict) -> tuple[int | None, int | None]:
     """(min, max) to store as a structured salary: only an explicit-USD, annual amount (or one
     with no period from salary_extractor.UNSTATED_PERIOD_FLOOR up: an unlabelled USD 4,000 on
     this board is monthly pay). Anything else is not comparable with the US salaries the app shows."""
-    return salary_extractor.yearly_usd(j.get("salary_min"), j.get("salary_max"),
-                                       j.get("salary_currency") or "", j.get("salary_unit") or "")
+    return salary_extractor.yearly_usd(
+        j.get("salary_min"),
+        j.get("salary_max"),
+        j.get("salary_currency") or "",
+        j.get("salary_unit") or "",
+    )
 
 
 def _salary_display(j: dict) -> str | None:
@@ -244,7 +266,11 @@ def _job_posting_ld(soup) -> dict:
 
 def _ld_location(ld: dict) -> str:
     addr = ((ld.get("jobLocation") or {}).get("address")) or {}
-    parts = [addr.get("addressLocality"), addr.get("addressRegion"), addr.get("addressCountry")]
+    parts = [
+        addr.get("addressLocality"),
+        addr.get("addressRegion"),
+        addr.get("addressCountry"),
+    ]
     return ", ".join(p.strip() for p in parts if isinstance(p, str) and p.strip())
 
 
@@ -252,6 +278,7 @@ def _parse_detail(html: str, fallback: dict) -> dict:
     """Enrich a listing row with the detail page: full description, posting date, salary and
     employment type. JSON-LD first, HTML selectors as the fallback."""
     from bs4 import BeautifulSoup
+
     soup = BeautifulSoup(html, "html.parser")
     ld = _job_posting_ld(soup)
     out = dict(fallback)
@@ -277,7 +304,9 @@ def _parse_detail(html: str, fallback: dict) -> dict:
         if et and str(et).lower() != "default":
             out["employment_type"] = str(et)
         base_salary = ld.get("baseSalary") or {}
-        value = (base_salary.get("value") if isinstance(base_salary, dict) else None) or {}
+        value = (
+            base_salary.get("value") if isinstance(base_salary, dict) else None
+        ) or {}
         if not isinstance(value, dict):
             value = {"minValue": value}
         sal_min, sal_max = _parse_salary(str(value.get("minValue") or ""))
@@ -291,15 +320,29 @@ def _parse_detail(html: str, fallback: dict) -> dict:
         if sal_min:
             out["salary_min"], out["salary_max"] = sal_min, sal_max
             raw = f"{value.get('minValue') or ''} {value.get('maxValue') or ''}"
-            currency = str(base_salary.get("currency") or value.get("currency") or "").strip().upper()
-            out["salary_currency"] = currency or _currency_of(raw) or fallback.get("salary_currency") or ""
-            unit_text = str(value.get("unitText") or base_salary.get("unitText") or "").strip()
-            out["salary_unit"] = ((_unit_of(unit_text) or unit_text.upper())
-                                  or _unit_of(raw) or fallback.get("salary_unit") or "")
+            currency = (
+                str(base_salary.get("currency") or value.get("currency") or "")
+                .strip()
+                .upper()
+            )
+            out["salary_currency"] = (
+                currency or _currency_of(raw) or fallback.get("salary_currency") or ""
+            )
+            unit_text = str(
+                value.get("unitText") or base_salary.get("unitText") or ""
+            ).strip()
+            out["salary_unit"] = (
+                (_unit_of(unit_text) or unit_text.upper())
+                or _unit_of(raw)
+                or fallback.get("salary_unit")
+                or ""
+            )
         valid = ld.get("validThrough")
         if valid:
             try:
-                if datetime.fromisoformat(str(valid).replace("Z", "+00:00")) < datetime.now(timezone.utc):
+                if datetime.fromisoformat(
+                    str(valid).replace("Z", "+00:00")
+                ) < datetime.now(timezone.utc):
                     out["expired"] = True
             except ValueError:
                 pass
@@ -344,16 +387,19 @@ async def _get(client: httpx.AsyncClient, url: str, params: dict | None = None):
     for attempt in range(_RATE_LIMIT_TRIES - 1):
         if resp.status_code != 429:
             return resp
-        wait = _retry_after(resp) or 5.0 * (2 ** attempt)
+        wait = _retry_after(resp) or 5.0 * (2**attempt)
         logger.warning(f"caribbeanjobs rate-limited (429); waiting {wait:.0f}s")
         await asyncio.sleep(wait)
         resp = await client.get(url, params=params)
     return resp
 
 
-async def _fetch_keyword(client: httpx.AsyncClient, base: dict, keyword: str, wanted: int) -> list[dict]:
+async def _fetch_keyword(
+    client: httpx.AsyncClient, base: dict, keyword: str, wanted: int
+) -> list[dict]:
     """Paginate one keyword query up to `wanted` rows."""
     from bs4 import BeautifulSoup
+
     out: list[dict] = []
     for page in range(1, _MAX_PAGES + 1):
         if wanted <= 0 or len(out) >= wanted:
@@ -375,13 +421,15 @@ async def _fetch_keyword(client: httpx.AsyncClient, base: dict, keyword: str, wa
     return out[:wanted] if wanted > 0 else []
 
 
-async def _fetch_listings(client: httpx.AsyncClient, base: dict, keywords: list[str], wanted: int) -> list[dict]:
+async def _fetch_listings(
+    client: httpx.AsyncClient, base: dict, keywords: list[str], wanted: int
+) -> list[dict]:
     """Run each keyword query (an OR of comma-separated alternatives — the board ANDs bare words
     and has no reliable OR) and merge them, keeping one row per canonical job URL. An empty
     `keywords` is a single URL-filters-only query."""
     out: list[dict] = []
     seen: set[str] = set()
-    for keyword in (keywords or [None]):
+    for keyword in keywords or [None]:
         if len(out) >= wanted:
             break
         for job in await _fetch_keyword(client, base, keyword, wanted - len(out)):
@@ -398,8 +446,12 @@ def _detail_gap() -> float:
     return _DETAIL_GAP + random.uniform(-_DETAIL_JITTER, _DETAIL_JITTER)
 
 
-async def _fetch_details(client: httpx.AsyncClient, candidates: list[dict], cache: dict | None = None,
-                         halt: dict | None = None) -> dict:
+async def _fetch_details(
+    client: httpx.AsyncClient,
+    candidates: list[dict],
+    cache: dict | None = None,
+    halt: dict | None = None,
+) -> dict:
     """Fetch each kept job's page (bounded concurrency) and parse the full description. Keyed by
     URL. Only a page that answered 200 is returned: a job whose page failed, was challenged or
     stayed throttled is left out, and the run skips it until a later run reads the page (R30
@@ -429,13 +481,20 @@ async def _fetch_details(client: httpx.AsyncClient, candidates: list[dict], cach
                 return
             try:
                 resp = await _get(client, job["url"])
-                stop = ("still rate-limited (429) after retries" if resp.status_code == 429
-                        else "behind a Cloudflare challenge" if _is_cloudflare_challenge(resp) else None)
+                stop = (
+                    "still rate-limited (429) after retries"
+                    if resp.status_code == 429
+                    else "behind a Cloudflare challenge"
+                    if _is_cloudflare_challenge(resp)
+                    else None
+                )
                 if stop:
                     # Never cached; the job stays out of the dedup set and is read next run.
                     if not halt.get("reason"):
-                        logger.warning(f"caribbeanjobs job pages {stop}; "
-                                       f"the remaining job pages wait for the next run")
+                        logger.warning(
+                            f"caribbeanjobs job pages {stop}; "
+                            f"the remaining job pages wait for the next run"
+                        )
                     halt["reason"] = stop
                     return
                 if resp.status_code == 200:
@@ -443,9 +502,11 @@ async def _fetch_details(client: httpx.AsyncClient, candidates: list[dict], cach
                     if cache is not None:
                         cache[job["url"]] = dict(details[job["url"]])
                 else:
-                    logger.info(f"caribbeanjobs job page not read (HTTP {resp.status_code}): "
-                                f"{job['url']}; tried again next run")
-                await asyncio.sleep(_detail_gap())   # be polite to a small board
+                    logger.info(
+                        f"caribbeanjobs job page not read (HTTP {resp.status_code}): "
+                        f"{job['url']}; tried again next run"
+                    )
+                await asyncio.sleep(_detail_gap())  # be polite to a small board
             except Exception as e:
                 logger.debug(f"caribbeanjobs detail failed for {job['url']}: {e}")
 
@@ -480,7 +541,9 @@ def _store_ignored(db, search: Search, j: dict, existing_ids: set) -> bool:
     except IntegrityError:
         return False
     except Exception as e:
-        logger.warning(f"Insert failed for ignored job '{j['title']}' ({j['url']}): {e}")
+        logger.warning(
+            f"Insert failed for ignored job '{j['title']}' ({j['url']}): {e}"
+        )
         return False
     existing_ids.add(ext_id)
     return True
@@ -508,17 +571,24 @@ async def run(search: Search, shared=None) -> dict:
         db = SessionLocal()
         try:
             include_kw, exclude_kw = search_title_filters(search, db)
-            global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
+            global_exclude_set, search_exclude_set = build_search_exclude_sets(
+                db, search
+            )
             existing_ids = get_existing_external_ids(db)
             detail_cache = halt = None
             if shared is not None:
                 listings = await shared.get(
-                    lambda: _fetch_listings_for(search, shared.params.get("results_wanted") or wanted))
+                    lambda: _fetch_listings_for(
+                        search, shared.params.get("results_wanted") or wanted
+                    )
+                )
                 listings = listings[:wanted]
                 detail_cache = shared.memo.setdefault("caribbeanjobs_details", {})
                 halt = shared.memo.setdefault("caribbeanjobs_halt", {})
 
-            async with httpx.AsyncClient(timeout=30, headers={"User-Agent": _UA}) as client:
+            async with httpx.AsyncClient(
+                timeout=30, headers={"User-Agent": _UA}
+            ) as client:
                 if shared is None:
                     listings = await _fetch_listings_for(search, wanted)
                 candidates = []
@@ -530,22 +600,41 @@ async def run(search: Search, shared=None) -> dict:
                     if not company_included(j.get("company"), search.company_filter)[0]:
                         continue
                     company_lower = (j.get("company") or "").lower()
-                    if company_lower in global_exclude_set or company_lower in search_exclude_set:
+                    if (
+                        company_lower in global_exclude_set
+                        or company_lower in search_exclude_set
+                    ):
                         continue
-                    seen += 1   # rows the board returned that our filters keep, before dedup
-                    if make_external_id(j["company"], j["title"], j["url"]) in existing_ids:
+                    seen += (
+                        1  # rows the board returned that our filters keep, before dedup
+                    )
+                    if (
+                        make_external_id(j["company"], j["title"], j["url"])
+                        in existing_ids
+                    ):
                         continue
                     candidates.append(j)
                 # A single search calls exactly as before; only a shared fetch passes its cache
                 # and its stop.
-                extra = {"cache": detail_cache, "halt": halt} if detail_cache is not None else {}
+                extra = (
+                    {"cache": detail_cache, "halt": halt}
+                    if detail_cache is not None
+                    else {}
+                )
                 details = await _fetch_details(client, candidates, **extra)
 
-            logger.info(f"caribbeanjobs '{search.name}': {len(listings)} rows / {seen} seen / {len(candidates)} new to fetch")
+            logger.info(
+                f"caribbeanjobs '{search.name}': {len(listings)} rows / {seen} seen / {len(candidates)} new to fetch"
+            )
 
             # The loop below writes rows; H-1B lookups happen before it (S2-01).
-            await prefetch_h1b([(details[j["url"]].get("company") or j.get("company"))
-                                for j in candidates if j["url"] in details])
+            await prefetch_h1b(
+                [
+                    (details[j["url"]].get("company") or j.get("company"))
+                    for j in candidates
+                    if j["url"] in details
+                ]
+            )
 
             new_jobs = 0
             ignored_jobs = 0
@@ -565,12 +654,17 @@ async def run(search: Search, shared=None) -> dict:
                 if ok:
                     ok, why = company_included(j.get("company"), search.company_filter)
                 company_lower = (j.get("company") or "").lower()
-                if ok and (company_lower in global_exclude_set or company_lower in search_exclude_set):
+                if ok and (
+                    company_lower in global_exclude_set
+                    or company_lower in search_exclude_set
+                ):
                     ok, why = False, "company excluded"
                 if not ok:
                     # Kept as "ignored", as JobSpy keeps a title-filtered row, so the next run
                     # dedups its URL instead of reading the page again. Not a new job.
-                    logger.info(f"caribbeanjobs: '{j['title']}' @ {j.get('company')} ignored after the detail page ({why})")
+                    logger.info(
+                        f"caribbeanjobs: '{j['title']}' @ {j.get('company')} ignored after the detail page ({why})"
+                    )
                     if _store_ignored(db, search, j, existing_ids):
                         ignored_jobs += 1
                     continue
@@ -586,7 +680,9 @@ async def run(search: Search, shared=None) -> dict:
                 local_salary = None if usd_min else _salary_display(j)
                 description = j.get("description") or ""
                 if local_salary:
-                    description = f"{description}\n\nSalary (as posted): {local_salary}".strip()
+                    description = (
+                        f"{description}\n\nSalary (as posted): {local_salary}".strip()
+                    )
                 job = Job(
                     external_id=ext_id,
                     content_hash=make_content_hash(j["company"], j["title"]),
@@ -613,20 +709,30 @@ async def run(search: Search, shared=None) -> dict:
                 try:
                     await analyze_inline(job, db=db)
                 except Exception as e:
-                    logger.warning(f"caribbeanjobs inline analysis failed for {j['title']}: {e}")
+                    logger.warning(
+                        f"caribbeanjobs inline analysis failed for {j['title']}: {e}"
+                    )
 
                 if not usd_min and job.salary_source == "posting":
                     # The JD extractor reads a bare "$" as USD, but on this board it is usually
                     # the island's own dollar: keep only a figure the description names as USD.
-                    found = extract_salary(job.description or "", getattr(job, "_h1b_median", None),
-                                           explicit_usd=True)
-                    job.salary_min, job.salary_max = found["salary_min"], found["salary_max"]
+                    found = extract_salary(
+                        job.description or "",
+                        getattr(job, "_h1b_median", None),
+                        explicit_usd=True,
+                    )
+                    job.salary_min, job.salary_max = (
+                        found["salary_min"],
+                        found["salary_max"],
+                    )
                     job.salary_source = found["salary_source"]
 
                 if job.h1b_jd_flag:
                     # Kept as "ignored" (as company scrapes do), so its URL is in the dedup set
                     # and the page is read once rather than on every run. Not a new job.
-                    logger.info(f"Ignored (body exclusion): {j['title']} @ {j.get('company', '?')}")
+                    logger.info(
+                        f"Ignored (body exclusion): {j['title']} @ {j.get('company', '?')}"
+                    )
                     mark_ignored(job)
 
                 try:
@@ -639,10 +745,14 @@ async def run(search: Search, shared=None) -> dict:
                         ignored_jobs += 1
                     existing_ids.add(ext_id)
                 except IntegrityError:
-                    logger.debug(f"Duplicate external_id for '{j['title']}' @ {j.get('company')}, skipping")
+                    logger.debug(
+                        f"Duplicate external_id for '{j['title']}' @ {j.get('company')}, skipping"
+                    )
                     continue
                 except Exception as e:
-                    logger.warning(f"Insert failed for '{j['title']}' @ {j.get('company')} ({j['url']}): {e}")
+                    logger.warning(
+                        f"Insert failed for '{j['title']}' @ {j.get('company')} ({j['url']}): {e}"
+                    )
                     continue
 
             search_obj = db.query(Search).filter(Search.id == search.id).first()
@@ -654,17 +764,35 @@ async def run(search: Search, shared=None) -> dict:
 
         duration = time.time() - start
         from backend.activity import log_activity
-        log_activity("scrape", f"caribbeanjobs '{search.name}': {new_jobs} new / {seen} seen"
-                     + (f" ({ignored_jobs} filtered out after the job page)" if ignored_jobs else "")
-                     + (f" ({unread} job pages not read; the next run tries them again)" if unread else "")
-                     + f" in {duration:.1f}s")
-        return {"jobs_found": seen, "new_jobs": new_jobs, "ignored_jobs": ignored_jobs,
-                "error": None, "duration": duration}
+
+        log_activity(
+            "scrape",
+            f"caribbeanjobs '{search.name}': {new_jobs} new / {seen} seen"
+            + (
+                f" ({ignored_jobs} filtered out after the job page)"
+                if ignored_jobs
+                else ""
+            )
+            + (
+                f" ({unread} job pages not read; the next run tries them again)"
+                if unread
+                else ""
+            )
+            + f" in {duration:.1f}s",
+        )
+        return {
+            "jobs_found": seen,
+            "new_jobs": new_jobs,
+            "ignored_jobs": ignored_jobs,
+            "error": None,
+            "duration": duration,
+        }
 
     except Exception as e:
         duration = time.time() - start
         logger.error(f"caribbeanjobs scrape failed for '{search.name}': {e}")
         from backend.activity import log_activity
+
         log_activity("scrape", f"caribbeanjobs '{search.name}' failed: {e}")
         return {"jobs_found": 0, "new_jobs": 0, "error": str(e), "duration": duration}
 
@@ -679,12 +807,17 @@ async def preview(search: Search, db) -> dict:
         base, keywords = _query_plan(search)
 
         async with httpx.AsyncClient(timeout=30, headers={"User-Agent": _UA}) as client:
-            unique = await _fetch_listings(client, base, keywords, search.results_wanted or 100)
+            unique = await _fetch_listings(
+                client, base, keywords, search.results_wanted or 100
+            )
 
             survivors = []
             for j in unique:
                 kept, _ = title_kept(j["title"], include_kw, exclude_kw)
-                if kept and company_included(j.get("company"), search.company_filter)[0]:
+                if (
+                    kept
+                    and company_included(j.get("company"), search.company_filter)[0]
+                ):
                     cl = (j.get("company") or "").lower()
                     if cl not in global_exclude_set and cl not in search_exclude_set:
                         survivors.append(j)
@@ -695,7 +828,10 @@ async def preview(search: Search, db) -> dict:
 
         raw_count = len(unique)
         from collections import Counter
-        company_breakdown = dict(Counter(j["company"] for j in unique if j.get("company")).most_common(20))
+
+        company_breakdown = dict(
+            Counter(j["company"] for j in unique if j.get("company")).most_common(20)
+        )
 
         body_raw = get_setting(db, "body_exclusion_phrases")
         body_phrases = []
@@ -723,6 +859,7 @@ async def preview(search: Search, db) -> dict:
                 kept, reason = False, "Expired posting"
             if kept and body_phrases and j.get("description"):
                 from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+
                 br = scan_jd_for_h1b_flags(j["description"], body_phrases)
                 if br["jd_flag"]:
                     kept = False
@@ -736,28 +873,32 @@ async def preview(search: Search, db) -> dict:
             if unread and kept and body_phrases:
                 # No job page read for this row: the body scan saw only the blurb.
                 row_extra["body_checked"] = False
-            results.append({
-                **row_extra,
-                "title": j["title"],
-                "company": j.get("company", ""),
-                "url": j.get("url", ""),
-                "source": "caribbeanjobs",
-                "location": j.get("location", ""),
-                "salary": salary,
-                "has_description": bool(desc and len(desc) > 50),
-                "desc_length": len(desc),
-                "kept": kept,
-                "reason": reason if not kept else None,
-                "employment_type": j.get("employment_type") or None,
-                "posted": j.get("posted"),
-            })
+            results.append(
+                {
+                    **row_extra,
+                    "title": j["title"],
+                    "company": j.get("company", ""),
+                    "url": j.get("url", ""),
+                    "source": "caribbeanjobs",
+                    "location": j.get("location", ""),
+                    "salary": salary,
+                    "has_description": bool(desc and len(desc) > 50),
+                    "desc_length": len(desc),
+                    "kept": kept,
+                    "reason": reason if not kept else None,
+                    "employment_type": j.get("employment_type") or None,
+                    "posted": j.get("posted"),
+                }
+            )
 
         after_filter = sum(1 for r in results if r["kept"])
         preview_note = None
         if len(survivors) > len(sampled):
-            preview_note = (f"Details sampled: the job pages of the first {len(sampled)} of "
-                            f"{len(survivors)} jobs that passed the title and company filters were read. "
-                            f"The rest show the listing's short blurb; a run reads every new job's page.")
+            preview_note = (
+                f"Details sampled: the job pages of the first {len(sampled)} of "
+                f"{len(survivors)} jobs that passed the title and company filters were read. "
+                f"The rest show the listing's short blurb; a run reads every new job's page."
+            )
         return {
             "search_name": search.name,
             "duration": round(time.time() - start, 1),
@@ -787,5 +928,8 @@ async def preview(search: Search, db) -> dict:
             "search_name": search.name,
             "error": str(e),
             "duration": round(time.time() - start, 1),
-            "config": {"mode": "caribbeanjobs", "search_term": search.search_term or ""},
+            "config": {
+                "mode": "caribbeanjobs",
+                "search_term": search.search_term or "",
+            },
         }

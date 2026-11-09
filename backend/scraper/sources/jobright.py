@@ -1,4 +1,5 @@
 """Jobright.ai source — personalized recommendations + search via REST API."""
+
 import asyncio
 import json
 import logging
@@ -7,12 +8,11 @@ import time
 from datetime import datetime, timezone
 
 import httpx
-
 from sqlalchemy.exc import IntegrityError
 
-from backend.models.db import SessionLocal, Job, Search, get_existing_external_ids
 from backend.accounts.settings import get_setting, set_setting
-from backend.scraper._shared.dedup import make_external_id, make_content_hash
+from backend.models.db import Job, Search, SessionLocal, get_existing_external_ids
+from backend.scraper._shared.dedup import make_content_hash, make_external_id
 from backend.scraper._shared.posting_links import counts_as_new
 from backend.scraper._shared.postings import resolve_short_links
 
@@ -21,6 +21,7 @@ logger = logging.getLogger("jobnavigator.jobright")
 
 class SessionExpiredError(Exception):
     """Raised when Jobright session is invalid/expired mid-scrape."""
+
     pass
 
 
@@ -91,12 +92,16 @@ async def _ensure_session(force_relogin: bool = False) -> str:
                         cookies={"SESSION_ID": session_id},
                     )
                     if resp.status_code in (401, 403):
-                        logger.info(f"Jobright session returned {resp.status_code}, re-logging in")
+                        logger.info(
+                            f"Jobright session returned {resp.status_code}, re-logging in"
+                        )
                     else:
                         data = resp.json()
                         if data.get("success"):
                             return session_id
-                        logger.info(f"Jobright session invalid (success=false): {data.get('message', '')}")
+                        logger.info(
+                            f"Jobright session invalid (success=false): {data.get('message', '')}"
+                        )
             except Exception as e:
                 logger.info(f"Jobright session validation failed: {e}")
         elif force_relogin:
@@ -107,14 +112,18 @@ async def _ensure_session(force_relogin: bool = False) -> str:
         if not email or not password:
             # T7-11 / QA F5: a member on its own Jobright section with nothing set reads ""
             # here (never the owner's credentials), so its copied search fails with this.
-            raise RuntimeError("Jobright is not set up for this account: set your Jobright "
-                               "email and password in Settings › Jobright.ai")
+            raise RuntimeError(
+                "Jobright is not set up for this account: set your Jobright "
+                "email and password in Settings › Jobright.ai"
+            )
 
         session_id = await _login(email, password)
 
         # Persist session for reuse across restarts, stamping when it was obtained —
         # the cookie is redacted on GET /settings, so age is the only signal left.
-        from datetime import datetime as _dt, timezone as _tz
+        from datetime import datetime as _dt
+        from datetime import timezone as _tz
+
         _save_setting(db, "jobright_session_id", session_id)
         _save_setting(db, "jobright_session_obtained_at", _dt.now(_tz.utc).isoformat())
         return session_id
@@ -122,7 +131,9 @@ async def _ensure_session(force_relogin: bool = False) -> str:
         db.close()
 
 
-async def _fetch_recommendations(session_id: str, position: int, count: int = 20, refresh: bool = False) -> list[dict] | None:
+async def _fetch_recommendations(
+    session_id: str, position: int, count: int = 20, refresh: bool = False
+) -> list[dict] | None:
     """Fetch a page of recommendations; refresh=True (position=0 only) forces Jobright to regenerate its pool. Returns None when rate-limit retries are exhausted (caller should stop), or raises SessionExpiredError on 401."""
     params = {"position": position, "count": count}
     if refresh:
@@ -139,18 +150,26 @@ async def _fetch_recommendations(session_id: str, position: int, count: int = 20
             if resp.status_code in (403, 429):
                 if attempt < MAX_RETRIES:
                     wait = RETRY_BACKOFF[attempt]
-                    logger.warning(f"Jobright {resp.status_code} at position={position}, waiting {wait}s (retry {attempt + 1}/{MAX_RETRIES})")
+                    logger.warning(
+                        f"Jobright {resp.status_code} at position={position}, waiting {wait}s (retry {attempt + 1}/{MAX_RETRIES})"
+                    )
                     await asyncio.sleep(wait)
                     continue
                 else:
-                    logger.error(f"Jobright {resp.status_code} at position={position}, retries exhausted — stopping pagination")
+                    logger.error(
+                        f"Jobright {resp.status_code} at position={position}, retries exhausted — stopping pagination"
+                    )
                     return None  # signal caller to stop
             resp.raise_for_status()
             data = resp.json()
             if not data.get("success"):
                 msg = data.get("message", "")
                 # Some auth failures come as success=false with a message
-                if "login" in msg.lower() or "auth" in msg.lower() or "session" in msg.lower():
+                if (
+                    "login" in msg.lower()
+                    or "auth" in msg.lower()
+                    or "session" in msg.lower()
+                ):
                     raise SessionExpiredError(f"Jobright API auth error: {msg}")
                 raise RuntimeError(f"Jobright recommendations API error: {data}")
             return data.get("result", {}).get("jobList", [])
@@ -175,7 +194,9 @@ async def _fetch_search_ssr(keyword: str, location: str = "") -> tuple[list[dict
         resp = await client.get(f"{SITE_BASE}/jobs/search", params=params)
         resp.raise_for_status()
 
-        match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', resp.text, re.DOTALL)
+        match = re.search(
+            r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', resp.text, re.DOTALL
+        )
         if not match:
             logger.warning("Jobright SSR: __NEXT_DATA__ not found")
             return [], 0
@@ -194,15 +215,16 @@ def _parse_salary(salary_desc: str) -> tuple:
     # "$45/hr" or "$8K/mo" is not a yearly figure (the bare-number rule below would read
     # $45 as $45K); the text stays in salary_text.
     from backend.analyzer.salary_extractor import is_non_annual
+
     if is_non_annual(salary_desc):
         return None, None
 
     # Match patterns like $120K, $120,000, $120000
-    amounts = re.findall(r'\$[\d,]+(?:\.\d+)?[Kk]?', salary_desc)
+    amounts = re.findall(r"\$[\d,]+(?:\.\d+)?[Kk]?", salary_desc)
     parsed = []
     for a in amounts:
-        num_str = a.replace('$', '').replace(',', '')
-        if num_str.upper().endswith('K'):
+        num_str = a.replace("$", "").replace(",", "")
+        if num_str.upper().endswith("K"):
             parsed.append(int(float(num_str[:-1]) * 1000))
         else:
             val = int(float(num_str))
@@ -230,7 +252,9 @@ def _build_description(jr: dict) -> str:
     responsibilities = jr.get("coreResponsibilities") or []
     if responsibilities:
         if isinstance(responsibilities, list):
-            parts.append("Responsibilities:\n" + "\n".join(f"- {r}" for r in responsibilities))
+            parts.append(
+                "Responsibilities:\n" + "\n".join(f"- {r}" for r in responsibilities)
+            )
         elif isinstance(responsibilities, str):
             parts.append("Responsibilities:\n" + responsibilities)
 
@@ -309,7 +333,9 @@ async def run(search: Search) -> dict:
                 search.location or "",
             )
             all_jobs = [_parse_job(r) for r in raw_list]
-            logger.info(f"Jobright search '{search.search_term}': {len(all_jobs)} jobs (total: {total})")
+            logger.info(
+                f"Jobright search '{search.search_term}': {len(all_jobs)} jobs (total: {total})"
+            )
         else:
             # Paginate with a delay between pages; refresh=true on the first page forces
             # Jobright to regenerate its pool (cache empties after prior scrapes).
@@ -321,21 +347,29 @@ async def run(search: Search) -> dict:
                     await asyncio.sleep(DELAY_BETWEEN_PAGES)
                 try:
                     raw_list = await _fetch_recommendations(
-                        session_id, position, page_size,
+                        session_id,
+                        position,
+                        page_size,
                         refresh=(position == 0),
                     )
                 except SessionExpiredError:
                     if reauth_attempted:
-                        logger.error("Jobright: session expired again after re-auth — aborting")
+                        logger.error(
+                            "Jobright: session expired again after re-auth — aborting"
+                        )
                         break
-                    logger.warning("Jobright: session expired mid-scrape (401), re-authenticating...")
+                    logger.warning(
+                        "Jobright: session expired mid-scrape (401), re-authenticating..."
+                    )
                     reauth_attempted = True
                     session_id = await _ensure_session(force_relogin=True)
                     continue  # retry same position with new session
 
                 if raw_list is None:
                     # 403/429 retries exhausted — stop gracefully with what we have
-                    logger.warning(f"Jobright: stopping pagination at position={position} due to rate limit")
+                    logger.warning(
+                        f"Jobright: stopping pagination at position={position} due to rate limit"
+                    )
                     break
                 if not raw_list:
                     empty_pages += 1
@@ -347,7 +381,9 @@ async def run(search: Search) -> dict:
                 for r in raw_list:
                     all_jobs.append(_parse_job(r))
                 position += page_size
-                logger.debug(f"Jobright recommendations: fetched {len(all_jobs)} so far (position={position})")
+                logger.debug(
+                    f"Jobright recommendations: fetched {len(all_jobs)} so far (position={position})"
+                )
 
             all_jobs = all_jobs[:results_wanted]
             logger.info(f"Jobright recommendations: {len(all_jobs)} jobs fetched")
@@ -365,27 +401,36 @@ async def run(search: Search) -> dict:
 
         # Apply search-level + global title filters
         from backend.scraper._shared.filters import search_title_filters, title_kept
+
         _gte_db = SessionLocal()
         try:
             include_kw, exclude_kw = search_title_filters(search, _gte_db)
         finally:
             _gte_db.close()
-        kept_jobs = [j for j in unique_jobs if title_kept(j["title"], include_kw, exclude_kw)[0]]
+        kept_jobs = [
+            j for j in unique_jobs if title_kept(j["title"], include_kw, exclude_kw)[0]
+        ]
 
         # Company exclude (global + per-search + active companies if flag on)
         db_excl = SessionLocal()
         try:
             from backend.scraper._shared.filters import build_search_exclude_sets
-            global_exclude_set, search_exclude_set = build_search_exclude_sets(db_excl, search)
+
+            global_exclude_set, search_exclude_set = build_search_exclude_sets(
+                db_excl, search
+            )
             if global_exclude_set or search_exclude_set:
                 before = len(kept_jobs)
                 kept_jobs = [
-                    j for j in kept_jobs
+                    j
+                    for j in kept_jobs
                     if (j.get("company") or "").lower() not in global_exclude_set
                     and (j.get("company") or "").lower() not in search_exclude_set
                 ]
                 if len(kept_jobs) < before:
-                    logger.info(f"Jobright: company exclude removed {before - len(kept_jobs)} jobs")
+                    logger.info(
+                        f"Jobright: company exclude removed {before - len(kept_jobs)} jobs"
+                    )
         finally:
             db_excl.close()
 
@@ -396,12 +441,18 @@ async def run(search: Search) -> dict:
             before = len(kept_jobs)
             kept_jobs = [j for j in kept_jobs if j.get("salary_min")]
             if len(kept_jobs) < before:
-                logger.info(f"Jobright: salary filter removed {before - len(kept_jobs)} jobs")
+                logger.info(
+                    f"Jobright: salary filter removed {before - len(kept_jobs)} jobs"
+                )
         if min_score > 0:
             before = len(kept_jobs)
-            kept_jobs = [j for j in kept_jobs if (j.get("display_score") or 0) >= min_score]
+            kept_jobs = [
+                j for j in kept_jobs if (j.get("display_score") or 0) >= min_score
+            ]
             if len(kept_jobs) < before:
-                logger.info(f"Jobright: score filter (<{min_score}) removed {before - len(kept_jobs)} jobs")
+                logger.info(
+                    f"Jobright: score filter (<{min_score}) removed {before - len(kept_jobs)} jobs"
+                )
 
         jobs_found = len(kept_jobs)
 
@@ -413,18 +464,32 @@ async def run(search: Search) -> dict:
 
             # The loop below writes rows; H-1B lookups for the new jobs happen before it (S2-01).
             from backend.scraper._shared.analysis import prefetch_h1b
-            await prefetch_h1b([j["company"] for j in kept_jobs
-                                if make_external_id(j["company"], j["title"], j["url"]) not in existing_ids])
+
+            await prefetch_h1b(
+                [
+                    j["company"]
+                    for j in kept_jobs
+                    if make_external_id(j["company"], j["title"], j["url"])
+                    not in existing_ids
+                ]
+            )
 
             landed = await resolve_short_links([j["url"] for j in kept_jobs])
             # Jobright's description is its own AI summary: new jobs get the employer's text
             # from their own link, so copies of one role can be proven (employer_text.py).
             from backend.scraper._shared.employer_text import employer_descriptions
-            fresh = [j for j in kept_jobs
-                     if make_external_id(j["company"], j["title"], j["url"]) not in existing_ids]
+
+            fresh = [
+                j
+                for j in kept_jobs
+                if make_external_id(j["company"], j["title"], j["url"])
+                not in existing_ids
+            ]
             swapped = await employer_descriptions(fresh, landed)
             if swapped:
-                logger.info(f"Jobright: employer description for {swapped}/{len(fresh)} new jobs")
+                logger.info(
+                    f"Jobright: employer description for {swapped}/{len(fresh)} new jobs"
+                )
             for j in kept_jobs:
                 job_url = j["url"]
                 ext_id = make_external_id(j["company"], j["title"], job_url)
@@ -433,7 +498,9 @@ async def run(search: Search) -> dict:
 
                 # Also check jobright URL to avoid duplicates
                 if j.get("jobright_url") and j["jobright_url"] != job_url:
-                    alt_id = make_external_id(j["company"], j["title"], j["jobright_url"])
+                    alt_id = make_external_id(
+                        j["company"], j["title"], j["jobright_url"]
+                    )
                     if alt_id in existing_ids:
                         continue
 
@@ -466,11 +533,15 @@ async def run(search: Search) -> dict:
                 # H-1B check + language check + salary extraction
                 try:
                     from backend.analyzer.h1b_checker import check_job_h1b
-                    from backend.analyzer.salary_extractor import apply_salary_to_job
-                    from backend.analyzer.work_arrangement import apply_arrangement_to_job
                     from backend.analyzer.location import apply_location_to_job
+                    from backend.analyzer.salary_extractor import apply_salary_to_job
+                    from backend.analyzer.work_arrangement import (
+                        apply_arrangement_to_job,
+                    )
+
                     await check_job_h1b(job, db)
                     from backend.models.db import find_company_by_name
+
                     company_obj = find_company_by_name(db, j["company"])
                     apply_salary_to_job(job, getattr(job, "_h1b_median", None))
                     # workModel is Jobright's own field, parsed in _parse_job.
@@ -481,7 +552,9 @@ async def run(search: Search) -> dict:
 
                 if job.h1b_jd_flag:
                     _phrase = getattr(job, "_h1b_matched_phrase", None) or "?"
-                    logger.info(f"Skipping job (body exclusion): {j['title']} @ {job.company or j.get('company') or '?'} — matched phrase: {_phrase!r}")
+                    logger.info(
+                        f"Skipping job (body exclusion): {j['title']} @ {job.company or j.get('company') or '?'} — matched phrase: {_phrase!r}"
+                    )
                     continue
 
                 try:
@@ -491,10 +564,14 @@ async def run(search: Search) -> dict:
                     new_jobs += counts_as_new(job)
                     existing_ids.add(ext_id)
                 except IntegrityError:
-                    logger.debug(f"Duplicate external_id for '{j['title']}' at {j.get('company')}, skipping")
+                    logger.debug(
+                        f"Duplicate external_id for '{j['title']}' at {j.get('company')}, skipping"
+                    )
                     continue
                 except Exception as e:
-                    logger.warning(f"Insert failed for '{j['title']}' at {j.get('company')} ({job_url}): {e}")
+                    logger.warning(
+                        f"Insert failed for '{j['title']}' at {j.get('company')} ({job_url}): {e}"
+                    )
                     continue
 
             # Update last_run_at
@@ -508,14 +585,24 @@ async def run(search: Search) -> dict:
 
         duration = time.time() - start_time
         from backend.activity import log_activity
-        log_activity("scrape", f"Jobright '{search.name}': {new_jobs} new / {jobs_found} found in {duration:.1f}s")
 
-        return {"jobs_found": jobs_found, "new_jobs": new_jobs, "error": None, "duration": duration}
+        log_activity(
+            "scrape",
+            f"Jobright '{search.name}': {new_jobs} new / {jobs_found} found in {duration:.1f}s",
+        )
+
+        return {
+            "jobs_found": jobs_found,
+            "new_jobs": new_jobs,
+            "error": None,
+            "duration": duration,
+        }
 
     except Exception as e:
         duration = time.time() - start_time
         logger.error(f"Jobright scrape failed for '{search.name}': {e}")
         from backend.activity import log_activity
+
         log_activity("scrape", f"Jobright '{search.name}' failed: {e}")
         return {"jobs_found": 0, "new_jobs": 0, "error": str(e), "duration": duration}
 
@@ -548,20 +635,28 @@ async def preview(search, db) -> dict:
                     await asyncio.sleep(DELAY_BETWEEN_PAGES)
                 try:
                     raw_list = await _fetch_recommendations(
-                        session_id, position, page_size,
+                        session_id,
+                        position,
+                        page_size,
                         refresh=(position == 0),
                     )
                 except SessionExpiredError:
                     if reauth_attempted:
-                        logger.error("Jobright test: session expired again after re-auth — aborting")
+                        logger.error(
+                            "Jobright test: session expired again after re-auth — aborting"
+                        )
                         break
-                    logger.warning("Jobright test: session expired (401), re-authenticating...")
+                    logger.warning(
+                        "Jobright test: session expired (401), re-authenticating..."
+                    )
                     reauth_attempted = True
                     session_id = await _ensure_session(force_relogin=True)
                     continue
 
                 if raw_list is None:
-                    logger.warning(f"Jobright test: stopping at position={position} due to rate limit")
+                    logger.warning(
+                        f"Jobright test: stopping at position={position} due to rate limit"
+                    )
                     break
                 if not raw_list:
                     empty_pages += 1
@@ -610,12 +705,14 @@ async def preview(search, db) -> dict:
             }
 
         from backend.scraper._shared.filters import search_title_filters, title_kept
+
         include_kw, exclude_kw = search_title_filters(search, db)
         min_score = search.min_fit_score or 0
         require_salary = getattr(search, "require_salary", False)
 
         # Company exclude sets (global + per-search + active companies when flag on)
         from backend.scraper._shared.filters import build_search_exclude_sets
+
         global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
         all_exclude = list(global_exclude_set | search_exclude_set)
 
@@ -630,6 +727,7 @@ async def preview(search, db) -> dict:
 
         # Company breakdown
         from collections import Counter
+
         company_counts = Counter(j["company"] for j in unique_jobs if j.get("company"))
         company_breakdown = dict(company_counts.most_common(20))
 
@@ -653,6 +751,7 @@ async def preview(search, db) -> dict:
                 desc = j.get("description") or ""
                 if desc:
                     from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+
                     body_result = scan_jd_for_h1b_flags(desc, body_phrases)
                     if body_result["jd_flag"]:
                         kept = False
@@ -682,24 +781,26 @@ async def preview(search, db) -> dict:
             desc = j.get("description") or ""
             has_desc = bool(desc and len(desc) > 50)
 
-            results.append({
-                "title": title,
-                "company": j.get("company", ""),
-                "url": j.get("url", ""),
-                "jobright_url": j.get("jobright_url", ""),
-                "source": "jobright",
-                "location": j.get("location", ""),
-                "salary": salary,
-                "has_description": has_desc,
-                "desc_length": len(desc) if has_desc else 0,
-                "kept": kept,
-                "reason": reason,
-                "seniority": j.get("seniority"),
-                "work_model": j.get("work_model"),
-                "h1b_status": j.get("h1b_status"),
-                "display_score": j.get("display_score"),
-                "posted": j.get("posted"),
-            })
+            results.append(
+                {
+                    "title": title,
+                    "company": j.get("company", ""),
+                    "url": j.get("url", ""),
+                    "jobright_url": j.get("jobright_url", ""),
+                    "source": "jobright",
+                    "location": j.get("location", ""),
+                    "salary": salary,
+                    "has_description": has_desc,
+                    "desc_length": len(desc) if has_desc else 0,
+                    "kept": kept,
+                    "reason": reason,
+                    "seniority": j.get("seniority"),
+                    "work_model": j.get("work_model"),
+                    "h1b_status": j.get("h1b_status"),
+                    "display_score": j.get("display_score"),
+                    "posted": j.get("posted"),
+                }
+            )
 
         after_filter = sum(1 for r in results if r["kept"])
 

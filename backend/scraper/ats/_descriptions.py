@@ -1,5 +1,6 @@
 """ATS-specific job description fetchers; _fetch_description_ats dispatches to each
 supported ATS's API before _fetch_job_description falls back to generic HTML extraction."""
+
 import asyncio
 import functools
 import html as _html_module
@@ -34,8 +35,9 @@ def _resolve_branded_greenhouse_slug(host: str) -> str | None:
         return None
     host = host.lower()
     # Lazy import to avoid circular imports during module init.
-    from backend.models.db import SessionLocal, Company
     from backend.accounts.context import unscoped
+    from backend.models.db import Company, SessionLocal
+
     db = SessionLocal()
     try:
         # Build {host: slug} from companies that have a Greenhouse scrape_url. Host → slug is
@@ -45,7 +47,7 @@ def _resolve_branded_greenhouse_slug(host: str) -> str | None:
             companies = db.query(Company).all()
         for c in companies:
             slug = None
-            for u in (c.scrape_urls or []):
+            for u in c.scrape_urls or []:
                 u_host = (urlparse(u).hostname or "").lower()
                 if u_host in ("job-boards.greenhouse.io", "boards.greenhouse.io"):
                     parts = [p for p in urlparse(u).path.strip("/").split("/") if p]
@@ -55,23 +57,27 @@ def _resolve_branded_greenhouse_slug(host: str) -> str | None:
             if not slug:
                 continue
             # Match if the requested host appears in the company's other scrape_urls.
-            for u in (c.scrape_urls or []):
+            for u in c.scrape_urls or []:
                 u_host = (urlparse(u).hostname or "").lower()
                 if u_host == host:
                     return slug
             # Best-effort: derive candidate company-domain keys from the name (dotted
             # form, e.g. C3.ai -> c3.ai; and stripped, e.g. "JPMorgan Chase" -> jpmorganchase).
             name_lower = (c.name or "").lower().strip()
-            name_dotted = name_lower.replace(" ", "")           # "C3.ai" → "c3.ai"
-            name_stripped = name_dotted.replace(".", "")        # "c3.ai" → "c3ai"
+            name_dotted = name_lower.replace(" ", "")  # "C3.ai" → "c3.ai"
+            name_stripped = name_dotted.replace(".", "")  # "c3.ai" → "c3ai"
             for cand in (name_dotted, name_stripped):
                 if not cand:
                     continue
-                if host == cand:                                  # c3.ai == c3.ai
+                if host == cand:  # c3.ai == c3.ai
                     return slug
-                if host.split(".")[1:2] == [cand]:                # careers.nebius.com
+                if host.split(".")[1:2] == [cand]:  # careers.nebius.com
                     return slug
-                if host.startswith(cand + ".") or host in (cand + ".com", cand + ".ai", cand + ".io"):
+                if host.startswith(cand + ".") or host in (
+                    cand + ".com",
+                    cand + ".ai",
+                    cand + ".io",
+                ):
                     return slug
         return None
     finally:
@@ -86,9 +92,9 @@ async def _fetch_job_description(url: str, job: dict = None) -> str | None:
     writes them onto it here, so no second request is made for them.
     """
     from backend.scraper._shared.url_safety import (
+        UnsafeURLError,
         assert_public_http_url,
         safe_get,
-        UnsafeURLError,
     )
 
     # SSRF gate — URLs end up here from scraped JD content and extension submits.
@@ -108,6 +114,7 @@ async def _fetch_job_description(url: str, job: dict = None) -> str | None:
 
     # A levels.fyi job page's visible text is only a cookie banner and a landing blurb
     from backend.scraper._shared.levels_jobs import is_levels_job
+
     if is_levels_job(url):
         return None
 
@@ -127,22 +134,26 @@ async def _fetch_job_description(url: str, job: dict = None) -> str | None:
             if soup is None:
                 logger.info(f"No description block on LinkedIn page {url}")
                 return None
-        for tag in soup.find_all(["script", "style", "nav", "footer", "header", "noscript", "svg", "img"]):
+        for tag in soup.find_all(
+            ["script", "style", "nav", "footer", "header", "noscript", "svg", "img"]
+        ):
             tag.decompose()
         text = soup.get_text(separator="\n", strip=True)[:30_000]
         if len(text) < 100:
             return None
         # Detect SPA garbage (JSON config blobs from JS-rendered pages): check the
         # first 500 non-title chars for a JSON object/array start.
-        body = text[text.index('\n'):] if '\n' in text[:200] else text
+        body = text[text.index("\n") :] if "\n" in text[:200] else text
         body_start = body.lstrip()[:500]
-        if body_start.startswith('{') or body_start.startswith('['):
+        if body_start.startswith("{") or body_start.startswith("["):
             logger.debug(f"Rejected JSON blob description from {url}")
             return None
         # Also reject if text has too many JSON structural chars
         json_like = len(re.findall(r'[{}"\[\]]', text))
         if json_like > len(text) * 0.10:
-            logger.debug(f"Rejected config-heavy description from {url} ({json_like}/{len(text)} JSON chars)")
+            logger.debug(
+                f"Rejected config-heavy description from {url} ({json_like}/{len(text)} JSON chars)"
+            )
             return None
         return text
     except UnsafeURLError as e:
@@ -162,15 +173,25 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
 
     # Lazy imports to avoid circular imports.
     from backend.scraper.ats.oracle_hcm import _oracle_hcm_host
-    from backend.scraper.ats.workday import _parse_workday_url, _LOCALE_PATH_RE, detail_locations
+    from backend.scraper.ats.workday import (
+        _LOCALE_PATH_RE,
+        _parse_workday_url,
+        detail_locations,
+    )
 
     parsed = urlparse(url)
 
     # ── Levels.fyi job page: the text is in its page data, the visible page is a cookie banner ──
     from backend.scraper._shared import levels_jobs
+
     if levels_jobs.is_levels_job(url):
         data = await levels_jobs.fetch_job(url)
-        if data and job is not None and data.get("application_url") and not job.get("application_url"):
+        if (
+            data
+            and job is not None
+            and data.get("application_url")
+            and not job.get("application_url")
+        ):
             job["application_url"] = data["application_url"]
         return (data or {}).get("description")
 
@@ -187,7 +208,11 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
             if p == "job" and i + 1 < len(path_parts):
                 job_id = path_parts[i + 1]
         if job_id:
-            finder = f"ById;Id=%22{job_id}%22,siteNumber={site}" if site else f"ById;Id=%22{job_id}%22"
+            finder = (
+                f"ById;Id=%22{job_id}%22,siteNumber={site}"
+                if site
+                else f"ById;Id=%22{job_id}%22"
+            )
             api_url = (
                 f"{api_origin}/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails"
                 f"?expand=all&onlyData=true&finder={finder}"
@@ -200,9 +225,13 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                     if items:
                         req = items[0]
                         parts = []
-                        for field in ("ExternalDescriptionStr", "CorporateDescriptionStr",
-                                      "ExternalResponsibilitiesStr", "ExternalQualificationsStr",
-                                      "OrganizationDescriptionStr"):
+                        for field in (
+                            "ExternalDescriptionStr",
+                            "CorporateDescriptionStr",
+                            "ExternalResponsibilitiesStr",
+                            "ExternalQualificationsStr",
+                            "OrganizationDescriptionStr",
+                        ):
                             val = req.get(field)
                             if val and val.strip():
                                 soup = BeautifulSoup(val, "html.parser")
@@ -257,10 +286,15 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
     elif _host_matches(url, "apply.careers.microsoft.com") and "/job/" in parsed.path:
         eightfold_job_id = parsed.path.rstrip("/").split("/")[-1]
     if eightfold_job_id:
-        api_url = f"{parsed.scheme}://{parsed.hostname}/api/apply/v2/jobs/{eightfold_job_id}"
+        api_url = (
+            f"{parsed.scheme}://{parsed.hostname}/api/apply/v2/jobs/{eightfold_job_id}"
+        )
         try:
             async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                resp = await client.get(api_url, headers={"Accept": "application/json", "User-Agent": _USER_AGENT})
+                resp = await client.get(
+                    api_url,
+                    headers={"Accept": "application/json", "User-Agent": _USER_AGENT},
+                )
                 if resp.status_code == 200:
                     data = json.loads(resp.text)
                     desc_html = data.get("job_description", "")
@@ -268,24 +302,40 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                         soup = BeautifulSoup(desc_html, "html.parser")
                         text = soup.get_text(separator="\n", strip=True)
                         if len(text) >= 50:
-                            logger.debug(f"Eightfold API description for {url}: {len(text)} chars")
+                            logger.debug(
+                                f"Eightfold API description for {url}: {len(text)} chars"
+                            )
                             return text[:30_000]
         except Exception as e:
             logger.debug(f"Eightfold API failed for {url}: {e}")
 
     # ── Apple: jobs.apple.com/en-us/details/{id}/... ──
     if _host_matches(url, "jobs.apple.com") and "/details/" in url:
-        m = re.search(r'/details/(\d+)', url)
+        m = re.search(r"/details/(\d+)", url)
         if m:
             apple_job_id = m.group(1)
             api_url = f"https://jobs.apple.com/api/v1/jobDetails/{apple_job_id}"
             try:
-                async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                    resp = await client.get(api_url, headers={"Accept": "application/json", "User-Agent": _USER_AGENT})
+                async with httpx.AsyncClient(
+                    timeout=15, follow_redirects=True
+                ) as client:
+                    resp = await client.get(
+                        api_url,
+                        headers={
+                            "Accept": "application/json",
+                            "User-Agent": _USER_AGENT,
+                        },
+                    )
                     if resp.status_code == 200:
                         data = json.loads(resp.text).get("res", {})
                         parts = []
-                        for field in ("jobSummary", "description", "responsibilities", "minimumQualifications", "preferredQualifications"):
+                        for field in (
+                            "jobSummary",
+                            "description",
+                            "responsibilities",
+                            "minimumQualifications",
+                            "preferredQualifications",
+                        ):
                             val = data.get(field, "")
                             if val:
                                 parts.append(val)
@@ -293,9 +343,11 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                         ppld = data.get("postingPostLocationData", {})
                         for locale_data in ppld.values():
                             for loc_data in locale_data.values():
-                                footer = (loc_data.get("postingSupplementFooter") or {}).get("content", "")
+                                footer = (
+                                    loc_data.get("postingSupplementFooter") or {}
+                                ).get("content", "")
                                 if footer and "$" in footer:
-                                    clean = re.sub(r'<[^>]+>', ' ', footer).strip()
+                                    clean = re.sub(r"<[^>]+>", " ", footer).strip()
                                     parts.append(clean)
                                     break
                             else:
@@ -303,7 +355,9 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                             break
                         text = "\n\n".join(parts)
                         if len(text) >= 50:
-                            logger.debug(f"Apple API description for {url}: {len(text)} chars")
+                            logger.debug(
+                                f"Apple API description for {url}: {len(text)} chars"
+                            )
                             return text[:30_000]
             except Exception as e:
                 logger.debug(f"Apple API failed for {url}: {e}")
@@ -313,12 +367,19 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
     if "uber.com/careers/" in url.lower():
         try:
             async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                resp = await client.get(url, headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                })
+                resp = await client.get(
+                    url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0",
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    },
+                )
                 if resp.status_code == 200:
-                    ld_match = re.search(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', resp.text, re.DOTALL)
+                    ld_match = re.search(
+                        r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
+                        resp.text,
+                        re.DOTALL,
+                    )
                     if ld_match:
                         ld_data = json.loads(ld_match.group(1))
                         if ld_data.get("description"):
@@ -326,29 +387,40 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                             soup = BeautifulSoup(desc_html, "html.parser")
                             text = soup.get_text(separator="\n", strip=True)
                             if len(text) >= 50:
-                                logger.debug(f"Uber JSON-LD description for {url}: {len(text)} chars")
+                                logger.debug(
+                                    f"Uber JSON-LD description for {url}: {len(text)} chars"
+                                )
                                 return text[:30_000]
         except Exception as e:
             logger.debug(f"Uber description failed for {url}: {e}")
         return None
 
     # ── Meta Careers: metacareers.com/v2/jobs/{id} ──
-    if _host_matches(url, "metacareers.com") and ("/jobs/" in url or "/job_details/" in url):
+    if _host_matches(url, "metacareers.com") and (
+        "/jobs/" in url or "/job_details/" in url
+    ):
         try:
             async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+                resp = await client.get(
+                    url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    },
+                )
                 if resp.status_code == 200:
                     parts = []
                     for field in ("description", "responsibilities", "qualifications"):
                         m = re.search(rf'"{field}":"(.*?)"', resp.text)
                         if m and len(m.group(1)) > 30:
-                            text = m.group(1).encode().decode('unicode_escape')
-                            text = re.sub(r'&nbsp;', ' ', text)
-                            text = re.sub(r'<[^>]+>', '\n', text)
+                            text = m.group(1).encode().decode("unicode_escape")
+                            text = re.sub(r"&nbsp;", " ", text)
+                            text = re.sub(r"<[^>]+>", "\n", text)
                             parts.append(text.strip())
                     desc = "\n\n".join(parts)
                     if len(desc) >= 50:
-                        logger.debug(f"Meta Careers description for {url}: {len(desc)} chars")
+                        logger.debug(
+                            f"Meta Careers description for {url}: {len(desc)} chars"
+                        )
                         return desc[:30_000]
         except Exception as e:
             logger.debug(f"Meta Careers description failed for {url}: {e}")
@@ -356,9 +428,14 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
 
     # ── Ashby: jobs.ashbyhq.com/{company}/{id} ──
     if _host_matches(url, "jobs.ashbyhq.com"):
+
         def _ashby_append_comp(desc, posting_data):
             """Append Ashby compensation summary to description for salary extraction."""
-            comp = posting_data.get("scrapeableCompensationSalarySummary") or posting_data.get("compensationTierSummary") or ""
+            comp = (
+                posting_data.get("scrapeableCompensationSalarySummary")
+                or posting_data.get("compensationTierSummary")
+                or ""
+            )
             if comp and "$" in comp:
                 desc = desc + "\n\nCompensation: " + comp
             return desc
@@ -368,11 +445,17 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
             company_slug = path_parts[0]
             job_id = path_parts[1]
             try:
-                async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+                async with httpx.AsyncClient(
+                    timeout=15, follow_redirects=True
+                ) as client:
                     # Try 1: page HTML with __appData (works for companies with SSR)
-                    resp = await client.get(url, headers={"Accept": "text/html", "User-Agent": _USER_AGENT})
+                    resp = await client.get(
+                        url, headers={"Accept": "text/html", "User-Agent": _USER_AGENT}
+                    )
                     if resp.status_code == 200:
-                        m = re.search(r'window\.__appData\s*=\s*(\{.*?\});', resp.text, re.DOTALL)
+                        m = re.search(
+                            r"window\.__appData\s*=\s*(\{.*?\});", resp.text, re.DOTALL
+                        )
                         if m:
                             data = json.loads(m.group(1))
                             posting = data.get("posting") or {}
@@ -384,11 +467,15 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                                     desc = soup.get_text(separator="\n", strip=True)
                             if len(desc) >= 50:
                                 desc = _ashby_append_comp(desc, posting)
-                                logger.debug(f"Ashby page description for {url}: {len(desc)} chars")
+                                logger.debug(
+                                    f"Ashby page description for {url}: {len(desc)} chars"
+                                )
                                 return desc[:30_000]
 
                     # Try 2: full board API (works when SSR returns null posting)
-                    api_url = f"https://api.ashbyhq.com/posting-api/job-board/{company_slug}"
+                    api_url = (
+                        f"https://api.ashbyhq.com/posting-api/job-board/{company_slug}"
+                    )
                     resp2 = await client.get(api_url)
                     if resp2.status_code == 200:
                         for posting in resp2.json().get("jobs", []):
@@ -401,7 +488,9 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                                         desc = soup.get_text(separator="\n", strip=True)
                                 if len(desc) >= 50:
                                     desc = _ashby_append_comp(desc, posting)
-                                    logger.debug(f"Ashby API description for {url}: {len(desc)} chars")
+                                    logger.debug(
+                                        f"Ashby API description for {url}: {len(desc)} chars"
+                                    )
                                     return desc[:30_000]
                                 break
             except Exception as e:
@@ -445,14 +534,22 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                     f"{company_slug}/postings/{id_segment}"
                 )
                 try:
-                    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                        resp = await client.get(api_url, headers={"Accept": "application/json"})
+                    async with httpx.AsyncClient(
+                        timeout=15, follow_redirects=True
+                    ) as client:
+                        resp = await client.get(
+                            api_url, headers={"Accept": "application/json"}
+                        )
                         if resp.status_code == 200:
                             data = json.loads(resp.text)
                             sections = (data.get("jobAd") or {}).get("sections") or {}
                             parts = []
-                            for key in ("companyDescription", "jobDescription",
-                                        "qualifications", "additionalInformation"):
+                            for key in (
+                                "companyDescription",
+                                "jobDescription",
+                                "qualifications",
+                                "additionalInformation",
+                            ):
                                 section = sections.get(key) or {}
                                 html_text = section.get("text") or ""
                                 if html_text:
@@ -478,7 +575,11 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
     # back to common hostname patterns. greenhouse.io itself is handled below.
     qs = parse_qs(parsed.query)
     gh_jid_vals = qs.get("gh_jid") or []
-    if gh_jid_vals and gh_jid_vals[0].isdigit() and not _host_matches(url, "greenhouse.io"):
+    if (
+        gh_jid_vals
+        and gh_jid_vals[0].isdigit()
+        and not _host_matches(url, "greenhouse.io")
+    ):
         gh_jid = gh_jid_vals[0]
         host_parts = (parsed.hostname or "").split(".")
         slug_candidates: list[tuple[str, str]] = []  # (slug, source-tag for logs)
@@ -494,12 +595,20 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
         except Exception as e:
             logger.debug(f"Branded Greenhouse company lookup failed: {e}")
         # Priority 2: hostname-pattern fallback for hosts not yet seeded.
-        if len(host_parts) >= 3 and host_parts[0] in ("careers", "jobs", "work", "join"):
+        if len(host_parts) >= 3 and host_parts[0] in (
+            "careers",
+            "jobs",
+            "work",
+            "join",
+        ):
             cand = host_parts[1]
             if cand and cand not in (s for s, _ in slug_candidates):
                 slug_candidates.append((cand, "host-subdomain"))
-        if host_parts and host_parts[0] not in ("www",) \
-                and host_parts[0] not in (s for s, _ in slug_candidates):
+        if (
+            host_parts
+            and host_parts[0] not in ("www",)
+            and host_parts[0] not in (s for s, _ in slug_candidates)
+        ):
             slug_candidates.append((host_parts[0], "host-bare"))
 
         # Source URL's registrable-ish domain, used to confirm the API result came
@@ -512,7 +621,9 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                 if not _GH_SLUG_RE.match(slug):
                     logger.debug(f"Branded Greenhouse: rejecting unsafe slug {slug!r}")
                     continue
-                api_url = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs/{gh_jid}"
+                api_url = (
+                    f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs/{gh_jid}"
+                )
                 try:
                     resp = await client.get(api_url)
                 except Exception as e:
@@ -529,9 +640,17 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                 if source != "mapped":
                     api_abs = (data.get("absolute_url") or "").lower()
                     api_host = (urlparse(api_abs).hostname or "").lower()
-                    api_root = ".".join(api_host.split(".")[-2:]) if "." in api_host else api_host
-                    if src_root and api_root and src_root != api_root \
-                            and "greenhouse.io" not in api_host:
+                    api_root = (
+                        ".".join(api_host.split(".")[-2:])
+                        if "." in api_host
+                        else api_host
+                    )
+                    if (
+                        src_root
+                        and api_root
+                        and src_root != api_root
+                        and "greenhouse.io" not in api_host
+                    ):
                         logger.debug(
                             f"Branded Greenhouse: slug {slug!r} ({source}) returned "
                             f"posting from {api_host} but source was {src_host} — rejecting"
@@ -540,7 +659,9 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                 content_html = data.get("content", "")
                 if not content_html:
                     continue
-                content_html = _html_module.unescape(_html_module.unescape(content_html))
+                content_html = _html_module.unescape(
+                    _html_module.unescape(content_html)
+                )
                 soup = BeautifulSoup(content_html, "html.parser")
                 text = soup.get_text(separator="\n", strip=True)
                 if len(text) >= 50:
@@ -577,6 +698,7 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                 company_slug = (query.get("for") or [""])[0]
                 if not company_slug:
                     from backend.scraper._shared.url_safety import safe_get
+
                     landed = urlparse(str((await safe_get(url, timeout=15)).url))
                     company_slug = (parse_qs(landed.query).get("for") or [""])[0]
         if company_slug and job_id:
@@ -587,7 +709,9 @@ async def _fetch_description_ats(url: str, job: dict = None) -> str | None:
                     data = json.loads(resp.text)
                     content_html = data.get("content", "")
                     if content_html:
-                        content_html = _html_module.unescape(_html_module.unescape(content_html))
+                        content_html = _html_module.unescape(
+                            _html_module.unescape(content_html)
+                        )
                         soup = BeautifulSoup(content_html, "html.parser")
                         text = soup.get_text(separator="\n", strip=True)
                         if len(text) >= 50:
@@ -602,11 +726,15 @@ async def _fetch_descriptions_parallel(jobs_to_fetch, max_concurrent=5):
     sem = asyncio.Semaphore(max_concurrent)
 
     async def fetch_one(job_dict):
-        if job_dict.get("description"):   # the board's own API sent it (Uber): no page request
+        if job_dict.get(
+            "description"
+        ):  # the board's own API sent it (Uber): no page request
             return job_dict, job_dict["description"]
         async with sem:
             desc = await _fetch_job_description(job_dict["url"], job=job_dict)
             return job_dict, desc
 
-    results = await asyncio.gather(*[fetch_one(j) for j in jobs_to_fetch], return_exceptions=True)
+    results = await asyncio.gather(
+        *[fetch_one(j) for j in jobs_to_fetch], return_exceptions=True
+    )
     return results

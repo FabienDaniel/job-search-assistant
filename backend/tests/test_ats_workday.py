@@ -1,20 +1,27 @@
 """Tests for ats/workday.py — detection + API mock."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 
 def test_is_workday_detects_myworkdayjobs():
     from backend.scraper.ats.workday import is_workday
+
     assert is_workday("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite")
 
 
 def test_is_workday_detects_locale_prefix():
     from backend.scraper.ats.workday import is_workday
-    assert is_workday("https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite")
+
+    assert is_workday(
+        "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite"
+    )
 
 
 def test_is_workday_rejects_non_workday():
     from backend.scraper.ats.workday import is_workday
+
     assert not is_workday("https://boards.greenhouse.io/acme")
     assert not is_workday("https://jobs.lever.co/acme")
     assert not is_workday("https://example.com/careers")
@@ -22,11 +29,13 @@ def test_is_workday_rejects_non_workday():
 
 def test_is_workday_rejects_path_injection():
     from backend.scraper.ats.workday import is_workday
+
     assert not is_workday("https://evil.com/?x=myworkdayjobs.com")
 
 
 def test_parse_workday_url_extracts_components():
     from backend.scraper.ats.workday import _parse_workday_url
+
     url = "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
     origin, company, site, facets = _parse_workday_url(url)
     assert origin == "https://nvidia.wd5.myworkdayjobs.com"
@@ -37,6 +46,7 @@ def test_parse_workday_url_extracts_components():
 
 def test_parse_workday_url_skips_locale_prefix():
     from backend.scraper.ats.workday import _parse_workday_url
+
     url = "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite"
     origin, company, site, facets = _parse_workday_url(url)
     assert site == "NVIDIAExternalCareerSite"  # NOT "en-US"
@@ -44,6 +54,7 @@ def test_parse_workday_url_skips_locale_prefix():
 
 def test_parse_workday_url_captures_facets():
     from backend.scraper.ats.workday import _parse_workday_url
+
     url = "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite?locations=abc123&timeType=def456"
     origin, company, site, facets = _parse_workday_url(url)
     assert "locations" in facets
@@ -57,7 +68,7 @@ async def test_scrape_workday_calls_api(monkeypatch):
         '{"total": 2, "jobPostings": ['
         '{"title": "Senior Product Manager", "externalPath": "/job/123", "locationsText": "San Francisco"},'
         '{"title": "Staff Software Engineer", "externalPath": "/job/456", "locationsText": "Remote"}'
-        ']}'
+        "]}"
     )
 
     mock_resp = MagicMock()
@@ -72,6 +83,7 @@ async def test_scrape_workday_calls_api(monkeypatch):
     monkeypatch.setattr("httpx.AsyncClient", lambda **kw: mock_client)
 
     from backend.scraper.ats.workday import scrape
+
     jobs = await scrape("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite")
 
     assert isinstance(jobs, list)
@@ -96,6 +108,7 @@ async def test_scrape_workday_handles_http_error(monkeypatch):
     monkeypatch.setattr("httpx.AsyncClient", lambda **kw: mock_client)
 
     from backend.scraper.ats.workday import scrape
+
     jobs = await scrape("https://nvidia.wd5.myworkdayjobs.com/Site")
     assert jobs == []
 
@@ -104,12 +117,14 @@ async def test_scrape_workday_handles_http_error(monkeypatch):
 async def test_scrape_workday_bad_url(monkeypatch):
     """scrape() returns empty for unparseable URL."""
     from backend.scraper.ats.workday import scrape
+
     # URL with no site segment
     jobs = await scrape("https://nvidia.wd5.myworkdayjobs.com/")
     assert jobs == []
 
 
 # ── the 2,000-result ceiling ───────────────────────────────────────────────
+
 
 class _FakeBoard:
     """A Workday board that behaves like the live API at the ceiling.
@@ -137,34 +152,62 @@ class _FakeBoard:
 
     async def post(self, url, json=None, headers=None):
         import json as _json
+
         applied, offset, limit = json["appliedFacets"], json["offset"], json["limit"]
         self.calls.append(dict(applied))
         rows = [p for p in self.postings if self._match(p, applied)]
         real = len(rows)
         start = offset if offset < 2000 else offset % 2000
-        page = rows[start:start + limit]
+        page = rows[start : start + limit]
         facets = []
         if "jobFamilyGroup" in self.facets_offered:
             cats = {}
             for p in rows:
                 cats[p["cat"]] = cats.get(p["cat"], 0) + 1
-            facets.append({"facetParameter": "jobFamilyGroup",
-                           "values": [{"id": k, "descriptor": k, "count": v} for k, v in cats.items()]})
+            facets.append(
+                {
+                    "facetParameter": "jobFamilyGroup",
+                    "values": [
+                        {"id": k, "descriptor": k, "count": v} for k, v in cats.items()
+                    ],
+                }
+            )
         if "country" in self.facets_offered:
             ctr = {}
             for p in rows:
                 for c in p["countries"]:
                     ctr[c] = ctr.get(c, 0) + 1
-            facets.append({"facetParameter": "locationMainGroup", "values": [
-                {"facetParameter": "country", "descriptor": "Locations",
-                 "values": [{"id": k, "descriptor": k, "count": v} for k, v in ctr.items()]}]})
+            facets.append(
+                {
+                    "facetParameter": "locationMainGroup",
+                    "values": [
+                        {
+                            "facetParameter": "country",
+                            "descriptor": "Locations",
+                            "values": [
+                                {"id": k, "descriptor": k, "count": v}
+                                for k, v in ctr.items()
+                            ],
+                        }
+                    ],
+                }
+            )
         resp = MagicMock()
         resp.status_code = 200
-        resp.text = _json.dumps({"total": min(real, 2000) if offset == 0 else 0,
-                                 "jobPostings": [{"title": f"Engineer {p['n']}",
-                                                  "externalPath": f"/job/X/Engineer_{p['n']}",
-                                                  "locationsText": "Santa Clara"} for p in page],
-                                 "facets": facets if offset == 0 else []})
+        resp.text = _json.dumps(
+            {
+                "total": min(real, 2000) if offset == 0 else 0,
+                "jobPostings": [
+                    {
+                        "title": f"Engineer {p['n']}",
+                        "externalPath": f"/job/X/Engineer_{p['n']}",
+                        "locationsText": "Santa Clara",
+                    }
+                    for p in page
+                ],
+                "facets": facets if offset == 0 else [],
+            }
+        )
         return resp
 
 
@@ -190,9 +233,14 @@ def _postings(spec):
 
 @pytest.mark.asyncio
 async def test_board_over_the_ceiling_is_split_and_nothing_is_missed(monkeypatch):
-    board = _board(monkeypatch, _postings([("eng", 1700, ["US"]), ("sales", 600, ["US", "DE"]),
-                                          ("ops", 400, ["DE"])]))
+    board = _board(
+        monkeypatch,
+        _postings(
+            [("eng", 1700, ["US"]), ("sales", 600, ["US", "DE"]), ("ops", 400, ["DE"])]
+        ),
+    )
     from backend.scraper.ats.workday import scrape
+
     jobs = await scrape("https://nvidia.wd5.myworkdayjobs.com/Site")
     assert len(jobs) == 2700
     assert len({j["url"] for j in jobs}) == 2700
@@ -203,9 +251,14 @@ async def test_board_over_the_ceiling_is_split_and_nothing_is_missed(monkeypatch
 @pytest.mark.asyncio
 async def test_part_still_at_the_ceiling_is_split_again(monkeypatch):
     # every facet has a part over the ceiling: category first (fewer requests), then country
-    board = _board(monkeypatch, _postings([("eng", 1500, ["US"]), ("eng", 1000, ["DE"]),
-                                          ("sales", 600, ["US", "DE"])]))
+    board = _board(
+        monkeypatch,
+        _postings(
+            [("eng", 1500, ["US"]), ("eng", 1000, ["DE"]), ("sales", 600, ["US", "DE"])]
+        ),
+    )
     from backend.scraper.ats.workday import scrape
+
     jobs = await scrape("https://nvidia.wd5.myworkdayjobs.com/Site")
     assert len({j["url"] for j in jobs}) == 3100
     assert any(set(c) == {"jobFamilyGroup", "country"} for c in board.calls)
@@ -218,6 +271,7 @@ async def test_split_keeps_the_filters_in_the_company_url(monkeypatch):
         p["keep"] = "n"
     board = _board(monkeypatch, postings)
     from backend.scraper.ats.workday import scrape
+
     jobs = await scrape("https://nvidia.wd5.myworkdayjobs.com/Site?keep=y")
     assert len(jobs) == 2430
     assert all(c.get("keep") == ["y"] for c in board.calls)
@@ -225,8 +279,11 @@ async def test_split_keeps_the_filters_in_the_company_url(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_board_under_the_ceiling_is_one_walk(monkeypatch):
-    board = _board(monkeypatch, _postings([("eng", 1200, ["US"]), ("sales", 300, ["US"])]))
+    board = _board(
+        monkeypatch, _postings([("eng", 1200, ["US"]), ("sales", 300, ["US"])])
+    )
     from backend.scraper.ats.workday import scrape
+
     jobs = await scrape("https://nvidia.wd5.myworkdayjobs.com/Site")
     assert len(jobs) == 1500
     assert all(c == {} for c in board.calls)
@@ -237,6 +294,7 @@ async def test_board_under_the_ceiling_is_one_walk(monkeypatch):
 async def test_ceiling_without_a_facet_keeps_what_it_has(monkeypatch, caplog):
     _board(monkeypatch, _postings([("eng", 2600, ["US"])]), facets_offered=())
     from backend.scraper.ats.workday import scrape
+
     with caplog.at_level("WARNING"):
         jobs = await scrape("https://nvidia.wd5.myworkdayjobs.com/Site")
     assert len(jobs) == 2000
@@ -245,12 +303,30 @@ async def test_ceiling_without_a_facet_keeps_what_it_has(monkeypatch, caplog):
 
 def test_facet_options_flattens_nested_location_groups():
     from backend.scraper.ats.workday import _facet_options
-    opts = _facet_options([
-        {"facetParameter": "jobFamilyGroup", "values": [{"id": "a", "count": 3}, {"id": "b", "count": 0}]},
-        {"facetParameter": "locationMainGroup", "values": [
-            {"facetParameter": "locationHierarchy2", "values": [{"id": "office", "count": 5}]},
-            {"facetParameter": "locationHierarchy1", "values": [{"id": "us", "count": 4}, {"id": "de", "count": 1}]},
-        ]},
-    ])
-    assert opts == [("jobFamilyGroup", [("a", 3)]), ("locationHierarchy2", [("office", 5)]),
-                    ("locationHierarchy1", [("us", 4), ("de", 1)])]
+
+    opts = _facet_options(
+        [
+            {
+                "facetParameter": "jobFamilyGroup",
+                "values": [{"id": "a", "count": 3}, {"id": "b", "count": 0}],
+            },
+            {
+                "facetParameter": "locationMainGroup",
+                "values": [
+                    {
+                        "facetParameter": "locationHierarchy2",
+                        "values": [{"id": "office", "count": 5}],
+                    },
+                    {
+                        "facetParameter": "locationHierarchy1",
+                        "values": [{"id": "us", "count": 4}, {"id": "de", "count": 1}],
+                    },
+                ],
+            },
+        ]
+    )
+    assert opts == [
+        ("jobFamilyGroup", [("a", 3)]),
+        ("locationHierarchy2", [("office", 5)]),
+        ("locationHierarchy1", [("us", 4), ("de", 1)]),
+    ]

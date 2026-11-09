@@ -1,12 +1,13 @@
 """get_all_running() exposes target_job_id."""
+
 import uuid
 from datetime import datetime, timezone
 
 
 def test_active_includes_target_job_id(monkeypatch):
     """Each entry in /api/monitor/active returns target_job_id (str or None)."""
-    from backend.job_monitor import RunningJob, get_all_running
     import backend.job_monitor as mon
+    from backend.job_monitor import RunningJob, get_all_running
 
     job_uuid = uuid.uuid4()
     fake = {
@@ -38,8 +39,8 @@ def test_active_includes_target_job_id(monkeypatch):
 
 def test_active_includes_company_id_for_company_scrape(monkeypatch):
     """A company_scrape entry carries the Company id, not just a scope_key."""
-    from backend.job_monitor import RunningJob, get_all_running
     import backend.job_monitor as mon
+    from backend.job_monitor import RunningJob, get_all_running
 
     company_uuid = str(uuid.uuid4())
     fake = {
@@ -62,13 +63,14 @@ def test_active_includes_company_id_for_company_scrape(monkeypatch):
 
     by_type = {r["job_type"]: r for r in get_all_running()}
     assert by_type["company_scrape"]["company_id"] == company_uuid
-    assert by_type["company_scrape"]["scope_key"] == company_uuid   # unchanged
+    assert by_type["company_scrape"]["scope_key"] == company_uuid  # unchanged
     assert by_type["scrape_all"]["company_id"] is None
 
 
 def test_launch_background_stores_company_id(monkeypatch):
     """launch_background(company_id=...) lands on the in-memory run record."""
     import asyncio
+
     import backend.job_monitor as mon
 
     monkeypatch.setattr(mon, "_insert_job_run", lambda *a, **k: None)
@@ -83,8 +85,11 @@ def test_launch_background_stores_company_id(monkeypatch):
 
     async def _drive():
         mon.launch_background(
-            "company_scrape", _body, trigger="manual",
-            scope_key=company_uuid, company_id=company_uuid,
+            "company_scrape",
+            _body,
+            trigger="manual",
+            scope_key=company_uuid,
+            company_id=company_uuid,
         )
         rows = mon.get_all_running()
         assert len(rows) == 1

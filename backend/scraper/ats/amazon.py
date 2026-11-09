@@ -5,18 +5,19 @@ string against the same endpoint. Reading it directly costs one HTTP request
 instead of a browser, and it carries the fields the card does not print: every
 site of a multi-site posting, and the posting's ONSITE/REMOTE type.
 """
+
 import json
 import logging
-from urllib.parse import urlparse, parse_qs, urlencode
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 
-from backend.scraper._shared.urls import host_matches
 from backend.scraper._shared.filters import _validate_job
+from backend.scraper._shared.urls import host_matches
 
 logger = logging.getLogger("jobnavigator.scraper.ats.amazon")
 
-_PAGE = 100          # the feed's own maximum per request
+_PAGE = 100  # the feed's own maximum per request
 _MAX_PAGES = 5
 
 
@@ -43,8 +44,9 @@ def _locations_of(posting: dict) -> list[str]:
             continue
         if not isinstance(data, dict):
             continue
-        text = (data.get("normalizedLocation")
-                or data.get("locationNonStemming") or "").strip()
+        text = (
+            data.get("normalizedLocation") or data.get("locationNonStemming") or ""
+        ).strip()
         if text and text not in out:
             out.append(text)
     return out
@@ -96,8 +98,14 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
             if resp.status_code != 200:
                 logger.warning(f"Amazon Jobs returned {resp.status_code}")
                 if debug:
-                    rejected.append({"title": "(none)", "url": api_url,
-                                     "selector": "amazon_json", "reason": f"HTTP {resp.status_code}"})
+                    rejected.append(
+                        {
+                            "title": "(none)",
+                            "url": api_url,
+                            "selector": "amazon_json",
+                            "reason": f"HTTP {resp.status_code}",
+                        }
+                    )
                 break
             data = json.loads(resp.text)
             postings = data.get("jobs", [])
@@ -110,13 +118,24 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
                 job_url = f"{parsed.scheme}://{parsed.netloc}{path}" if path else ""
                 reason = _validate_job(title, job_url)
                 if reason is None:
-                    jobs.append({"title": title, "url": job_url,
-                                 "location": (p.get("location") or "").strip() or None,
-                                 "locations": _locations_of(p),
-                                 "arrangement": _arrangement_of(p)})
+                    jobs.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "location": (p.get("location") or "").strip() or None,
+                            "locations": _locations_of(p),
+                            "arrangement": _arrangement_of(p),
+                        }
+                    )
                 elif debug:
-                    rejected.append({"title": title, "url": job_url,
-                                     "selector": "amazon_json", "reason": reason})
+                    rejected.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "selector": "amazon_json",
+                            "reason": reason,
+                        }
+                    )
 
             offset += len(postings)
             if offset >= data.get("hits", 0) or len(postings) < _PAGE:

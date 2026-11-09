@@ -1,5 +1,6 @@
 """Oracle HCM ATS handler — REST API at {host}/hcmRestApi/resources/latest/recruitingCEJobRequisitions.
 Detection matches direct oraclecloud.com/hcmUI/CandidateExperience URLs and known custom career subdomains (e.g. careers.oracle.com)."""
+
 import json
 import logging
 from urllib.parse import parse_qs, unquote, urlparse
@@ -19,9 +20,8 @@ _ORACLE_HCM_HOSTS = {
 
 def is_oracle_hcm(url: str) -> bool:
     """Check if URL is an Oracle HCM CandidateExperience job board (direct URL, or a /sites/.../jobs path whose host maps to an Oracle HCM backend)."""
-    return (
-        "oraclecloud.com/hcmUI/CandidateExperience" in url
-        or ("/sites/" in url and "/jobs" in url and _oracle_hcm_host(url) is not None)
+    return "oraclecloud.com/hcmUI/CandidateExperience" in url or (
+        "/sites/" in url and "/jobs" in url and _oracle_hcm_host(url) is not None
     )
 
 
@@ -99,11 +99,13 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
                 finder_parts.append(f"selectedPostingDatesFacet={posting_dates}")
             if flex_fields:
                 finder_parts.append(f"selectedFlexFieldsFacets={flex_fields}")
-            finder_parts.extend([
-                "sortBy=POSTING_DATES_DESC",
-                f"limit={limit}",
-                f"offset={offset}",
-            ])
+            finder_parts.extend(
+                [
+                    "sortBy=POSTING_DATES_DESC",
+                    f"limit={limit}",
+                    f"offset={offset}",
+                ]
+            )
 
             api_url = (
                 f"{api_origin}/hcmRestApi/resources/latest/recruitingCEJobRequisitions"
@@ -113,7 +115,9 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
 
             resp = await client.get(api_url)
             if resp.status_code != 200:
-                logger.warning(f"Oracle HCM API returned {resp.status_code} for {api_origin}/.../{site}")
+                logger.warning(
+                    f"Oracle HCM API returned {resp.status_code} for {api_origin}/.../{site}"
+                )
                 break
             try:
                 data = json.loads(resp.text)
@@ -140,15 +144,32 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
                     primary = (req.get("PrimaryLocation") or "").strip()
                     places = [primary] if primary else []
                     for extra in req.get("secondaryLocations") or []:
-                        name = (extra.get("Name") or "").strip() if isinstance(extra, dict) else ""
+                        name = (
+                            (extra.get("Name") or "").strip()
+                            if isinstance(extra, dict)
+                            else ""
+                        )
                         if name and name not in places:
                             places.append(name)
-                    jobs.append({"title": title, "url": job_url,
-                                 "location": primary or None,
-                                 "locations": places,
-                                 "arrangement": (req.get("WorkplaceType") or "").strip() or None})
+                    jobs.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "location": primary or None,
+                            "locations": places,
+                            "arrangement": (req.get("WorkplaceType") or "").strip()
+                            or None,
+                        }
+                    )
                 elif debug:
-                    rejected.append({"title": title, "url": job_url, "selector": "oracle_hcm_api", "reason": reason})
+                    rejected.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "selector": "oracle_hcm_api",
+                            "reason": reason,
+                        }
+                    )
 
             offset += len(req_list)
             if offset >= total or len(req_list) == 0:

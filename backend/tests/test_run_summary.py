@@ -1,4 +1,5 @@
 """JobRun.result_summary must actually reach the DB: a tracked_run body assigns `run.summary`, and a launch_background coroutine's returned string is stored."""
+
 import asyncio
 from datetime import timezone
 
@@ -85,11 +86,14 @@ async def test_launch_background_uses_returned_string(session):
 
     row = _row(session, "summary_job_d")
     assert row.status == "completed"
-    assert row.result_summary == "3 replies classified"   # stripped
+    assert row.result_summary == "3 replies classified"  # stripped
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("returned,label", [(None, "none"), (0, "zero"), ("", "empty"), ("   ", "blank"), ({"a": 1}, "dict")])
+@pytest.mark.parametrize(
+    "returned,label",
+    [(None, "none"), (0, "zero"), ("", "empty"), ("   ", "blank"), ({"a": 1}, "dict")],
+)
 async def test_launch_background_ignores_non_string_returns(session, returned, label):
     async def worker():
         return returned

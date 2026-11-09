@@ -1,10 +1,14 @@
 """llm_call_log must record the provider/model that actually dispatched — every feature resolves the pair once through llm_client.resolve_llm_config() so the cost report never prices against the wrong model."""
+
 import pytest
 
-from backend.models.db import Setting, LlmCallLog
+from backend.models.db import LlmCallLog, Setting
 
-
-PRIMARY = {"llm_provider": "claude_code", "llm_model": "claude-sonnet-5", "anthropic_api_key": "pk"}
+PRIMARY = {
+    "llm_provider": "claude_code",
+    "llm_model": "claude-sonnet-5",
+    "anthropic_api_key": "pk",
+}
 
 
 def _seed_primary_only(db):
@@ -17,7 +21,9 @@ def _seed_primary_only(db):
     db.commit()
 
 
-@pytest.mark.parametrize("feature", ["", "email", "cv_tailor", "cover_letter", "autofill", "scoring"])
+@pytest.mark.parametrize(
+    "feature", ["", "email", "cv_tailor", "cover_letter", "autofill", "scoring"]
+)
 def test_resolve_falls_back_to_primary(test_db, feature):
     from backend.analyzer.llm_client import resolve_llm_config
 
@@ -40,14 +46,19 @@ def test_resolve_prefers_feature_override(test_db):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("feature,purpose,fn_name", [
-    ("", "pdf", "call_llm"),
-    ("email", "email", "call_email_llm"),
-    ("cv_tailor", "tailor", "call_cv_tailor_llm"),
-    ("cover_letter", "cover_letter", "call_cover_letter_llm"),
-    ("autofill", "autofill", "call_autofill_llm"),
-])
-async def test_logged_pair_equals_dispatched_pair(test_db, monkeypatch, feature, purpose, fn_name):
+@pytest.mark.parametrize(
+    "feature,purpose,fn_name",
+    [
+        ("", "pdf", "call_llm"),
+        ("email", "email", "call_email_llm"),
+        ("cv_tailor", "tailor", "call_cv_tailor_llm"),
+        ("cover_letter", "cover_letter", "call_cover_letter_llm"),
+        ("autofill", "autofill", "call_autofill_llm"),
+    ],
+)
+async def test_logged_pair_equals_dispatched_pair(
+    test_db, monkeypatch, feature, purpose, fn_name
+):
     """With per-feature settings empty and the primary set, the row logged by track_llm_call names exactly the pair _dispatch was called with."""
     import backend.analyzer.llm_client as L
     from backend.analyzer.llm_logger import track_llm_call
@@ -55,10 +66,26 @@ async def test_logged_pair_equals_dispatched_pair(test_db, monkeypatch, feature,
     _seed_primary_only(test_db)
     dispatched = []
 
-    async def fake_dispatch(provider, model, api_key, prompt, system, max_tokens, cached_prefix=None, effort=""):
+    async def fake_dispatch(
+        provider,
+        model,
+        api_key,
+        prompt,
+        system,
+        max_tokens,
+        cached_prefix=None,
+        effort="",
+    ):
         dispatched.append((provider, model))
-        return {"text": "ok", "usage": {"input_tokens": 10, "output_tokens": 2,
-                                        "cache_read_tokens": 0, "cache_write_tokens": 0}}
+        return {
+            "text": "ok",
+            "usage": {
+                "input_tokens": 10,
+                "output_tokens": 2,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            },
+        }
 
     monkeypatch.setattr(L, "_dispatch", fake_dispatch)
 
@@ -86,7 +113,16 @@ async def test_logged_pair_follows_fallback_dispatch(test_db, monkeypatch):
     test_db.commit()
     monkeypatch.setattr(L.asyncio, "sleep", _no_sleep)
 
-    async def fake_dispatch(provider, model, api_key, prompt, system, max_tokens, cached_prefix=None, effort=""):
+    async def fake_dispatch(
+        provider,
+        model,
+        api_key,
+        prompt,
+        system,
+        max_tokens,
+        cached_prefix=None,
+        effort="",
+    ):
         if provider == "claude_code":
             raise RuntimeError("primary down")
         return {"text": "ok", "usage": {}}
@@ -108,20 +144,35 @@ async def _no_sleep(*_a, **_kw):
 @pytest.mark.asyncio
 async def test_cover_letter_body_reports_dispatched_pair(test_db, monkeypatch):
     """generate_cover_letter_body hands the caller the pair that ran, which routes_cover_letters._generate_inner logs."""
-    import backend.analyzer.llm_client as L
     import backend.analyzer.cover_letter_generator as G
+    import backend.analyzer.llm_client as L
 
     _seed_primary_only(test_db)
 
-    async def fake_dispatch(provider, model, api_key, prompt, system, max_tokens, cached_prefix=None, effort=""):
-        return {"text": '{"greeting":"Dear team,","body_paragraphs":["a"],'
-                        '"closing":"Sincerely,","signature":"Me"}',
-                "usage": {"input_tokens": 5, "output_tokens": 1}}
+    async def fake_dispatch(
+        provider,
+        model,
+        api_key,
+        prompt,
+        system,
+        max_tokens,
+        cached_prefix=None,
+        effort="",
+    ):
+        return {
+            "text": '{"greeting":"Dear team,","body_paragraphs":["a"],'
+            '"closing":"Sincerely,","signature":"Me"}',
+            "usage": {"input_tokens": 5, "output_tokens": 1},
+        }
 
     monkeypatch.setattr(L, "_dispatch", fake_dispatch)
 
     out = await G.generate_cover_letter_body(
-        {"summary": "s"}, {}, "JD text", "voice", "standard",
+        {"summary": "s"},
+        {},
+        "JD text",
+        "voice",
+        "standard",
         "{resume}\n{preferences}\n{job_description}\n{voice}\n{length}",
     )
     assert out["_llm"]["provider"] == "claude_code"

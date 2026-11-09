@@ -10,6 +10,7 @@ When nothing set the context: with `MT_STRICT=1` (tests) a query on an account-o
 model raises `AccountContextMissing`; otherwise it falls back to the owner account, so
 a single-user install behaves exactly as before.
 """
+
 import functools
 import logging
 import os
@@ -21,7 +22,9 @@ from typing import Optional
 
 logger = logging.getLogger("jobnavigator.accounts")
 
-current_account: ContextVar[Optional[uuid.UUID]] = ContextVar("jn_current_account", default=None)
+current_account: ContextVar[Optional[uuid.UUID]] = ContextVar(
+    "jn_current_account", default=None
+)
 _unscoped: ContextVar[bool] = ContextVar("jn_unscoped", default=False)
 
 
@@ -78,6 +81,7 @@ def drop_foreign(sessions) -> None:
     if not sessions:
         return
     from backend.accounts.scoping import drop_foreign_rows
+
     for s in sessions:
         drop_foreign_rows(s)
 
@@ -146,8 +150,11 @@ def _is_missing_table(exc: BaseException) -> bool:
     """The accounts table does not exist yet (fresh DB before the migration, partial test
     schemas): SQLite "no such table", Postgres UndefinedTable "does not exist"."""
     text = str(getattr(exc, "orig", None) or exc).lower()
-    return "no such table" in text or ("relation" in text and "does not exist" in text) \
+    return (
+        "no such table" in text
+        or ("relation" in text and "does not exist" in text)
         or type(getattr(exc, "orig", None)).__name__ == "UndefinedTable"
+    )
 
 
 def owner_id_for_session(session) -> Optional[uuid.UUID]:
@@ -165,12 +172,21 @@ def owner_id_for_session(session) -> Optional[uuid.UUID]:
     if cached is not None:
         return cached
     from sqlalchemy import select
+
     from backend.models.db import Account
+
     t = Account.__table__
     try:
-        row = session.connection().execute(
-            select(t.c.id).where(t.c.role == "owner").order_by(t.c.created_at).limit(1)
-        ).first()
+        row = (
+            session.connection()
+            .execute(
+                select(t.c.id)
+                .where(t.c.role == "owner")
+                .order_by(t.c.created_at)
+                .limit(1)
+            )
+            .first()
+        )
     except Exception as e:
         if _is_missing_table(e):
             logger.debug("owner lookup: no accounts table yet: %s", e)
@@ -185,6 +201,7 @@ def owner_id_for_session(session) -> Optional[uuid.UUID]:
 def owner_account_id() -> Optional[uuid.UUID]:
     """The owner id for the app's own SessionLocal (middleware, background entry points)."""
     from backend.models import db as db_mod
+
     engine = _engine_of(db_mod.SessionLocal.kw.get("bind"))
     cached = _owner_ids.get(engine) if engine is not None else None
     if cached is not None:
@@ -203,7 +220,8 @@ def resolve_account(session) -> Optional[uuid.UUID]:
         return acc
     if strict_mode():
         raise AccountContextMissing(
-            "No account context: wrap the code in use_account(...) or unscoped() (MT_STRICT=1)")
+            "No account context: wrap the code in use_account(...) or unscoped() (MT_STRICT=1)"
+        )
     return owner_id_for_session(session)
 
 
@@ -222,10 +240,12 @@ def owner_context():
 
 def as_owner(func):
     """Decorate an async entry point so it runs in the owner context when none is set."""
+
     @functools.wraps(func)
     async def _wrapped(*args, **kwargs):
         with owner_context():
             return await func(*args, **kwargs)
+
     return _wrapped
 
 
@@ -256,14 +276,17 @@ def run_in_clean_context(fn, *args, **kwargs):
     """Call `fn` inside a brand-new, empty contextvars.Context (nothing the caller set
     is visible, and nothing `fn` sets leaks back)."""
     import contextvars
+
     return contextvars.Context().run(fn, *args, **kwargs)
 
 
 def scheduled_job(func):
     """Decorate a scheduler entry point: it starts from a clean account context (then
     applies its own `as_owner` / `for_each_account`)."""
+
     @functools.wraps(func)
     async def _wrapped(*args, **kwargs):
         with no_account_context():
             return await func(*args, **kwargs)
+
     return _wrapped
