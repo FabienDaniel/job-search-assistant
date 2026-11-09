@@ -9,6 +9,7 @@ Run it from the backend container after an intended parser change:
 
     python -m backend.tests.fixtures.generate_location_golden
 """
+
 import csv
 import pathlib
 

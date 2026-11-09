@@ -4,6 +4,7 @@ Every dependency here is remote and will fail in production sooner or later. The
 contract under test is that a failure degrades one feature and never takes the
 scheduler, the run history or the job row with it.
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timezone
@@ -12,8 +13,13 @@ import pytest
 from sqlalchemy import event
 
 from backend.tests.r4_support import (  # noqa: F401
-    client, _clear_running_state, _no_outbound, assert_clean,
-    make_job, make_resume, set_setting,
+    _clear_running_state,
+    _no_outbound,
+    assert_clean,
+    client,
+    make_job,
+    make_resume,
+    set_setting,
 )
 
 
@@ -36,16 +42,19 @@ def _utc_tz_on_jobrun_load():
 def _no_backoff_sleep(monkeypatch):
     """call_llm backs off 2/4/8 s per attempt — 14 s per provider without this."""
     import backend.analyzer.llm_client as lc
+
     real_sleep = asyncio.sleep
 
     async def _instant(seconds, *a, **kw):
         # Only the retry backoff (2/4/8 s) is skipped; short waits tests use to let
         # a background task finish stay real.
         await real_sleep(0 if seconds >= 2 else seconds)
+
     monkeypatch.setattr(lc.asyncio, "sleep", _instant)
 
 
 # ── Fault factories ──────────────────────────────────────────────────────────
+
 
 class RateLimited(Exception):
     """Stand-in for a provider 429."""
@@ -72,15 +81,25 @@ def _seed_scoring(db):
     set_setting(db, "scoring_output_light", '{"scores": {CV_NAMES_HERE}}')
     set_setting(db, "scoring_output_full", '{"scores": {CV_NAMES_HERE}}')
     set_setting(db, "prompt_caching_enabled", "false")
-    return make_resume(db, name="Base", json_data={
-        "header": {"name": "A"},
-        "experience": [{"title": "PM", "company": "X",
-                        "bullets": ["Shipped a product", "Led a team"]}],
-        "skills": ["product", "roadmap"],
-    })
+    return make_resume(
+        db,
+        name="Base",
+        json_data={
+            "header": {"name": "A"},
+            "experience": [
+                {
+                    "title": "PM",
+                    "company": "X",
+                    "bullets": ["Shipped a product", "Led a team"],
+                }
+            ],
+            "skills": ["product", "roadmap"],
+        },
+    )
 
 
 # ══ LLM failures during scoring ══════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("fault", list(FAULTS))
@@ -94,9 +113,12 @@ async def test_llm_failure_leaves_the_job_unscored(test_db, monkeypatch, fault):
 
     async def _boom(*a, **k):
         raise FAULTS[fault]
+
     monkeypatch.setattr(lc, "_dispatch", _boom)
 
-    summary = await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light")
+    summary = await score_single_job(
+        str(job.id), cv_ids=[str(resume.id)], depth="light"
+    )
     assert summary == "Scoring failed"
     test_db.expire_all()
     fresh = test_db.query(Job).filter(Job.id == job.id).first()
@@ -116,6 +138,7 @@ async def test_llm_failure_is_recorded_in_the_llm_call_log(test_db, monkeypatch,
 
     async def _boom(*a, **k):
         raise FAULTS[fault]
+
     monkeypatch.setattr(lc, "_dispatch", _boom)
 
     await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light")
@@ -139,12 +162,21 @@ async def test_llm_failure_run_is_visible_in_the_run_history(test_db, monkeypatc
 
     async def _boom(*a, **k):
         raise FAULTS["529"]
+
     monkeypatch.setattr(lc, "_dispatch", _boom)
 
-    jm.launch_background("analyze_job", score_single_job, trigger="manual",
-                         scope_key=str(job.id), target_job_id=job.id,
-                         func_kwargs={"job_id": str(job.id), "cv_ids": [str(resume.id)],
-                                      "depth": "light"})
+    jm.launch_background(
+        "analyze_job",
+        score_single_job,
+        trigger="manual",
+        scope_key=str(job.id),
+        target_job_id=job.id,
+        func_kwargs={
+            "job_id": str(job.id),
+            "cv_ids": [str(resume.id)],
+            "depth": "light",
+        },
+    )
     await asyncio.sleep(0.2)
     test_db.expire_all()
     row = test_db.query(JobRun).filter(JobRun.job_type == "analyze_job").first()
@@ -165,12 +197,21 @@ async def test_llm_failure_marks_the_run_failed_not_completed(test_db, monkeypat
 
     async def _boom(*a, **k):
         raise FAULTS["529"]
+
     monkeypatch.setattr(lc, "_dispatch", _boom)
 
-    jm.launch_background("analyze_job", score_single_job, trigger="manual",
-                         scope_key=str(job.id), target_job_id=job.id,
-                         func_kwargs={"job_id": str(job.id), "cv_ids": [str(resume.id)],
-                                      "depth": "light"})
+    jm.launch_background(
+        "analyze_job",
+        score_single_job,
+        trigger="manual",
+        scope_key=str(job.id),
+        target_job_id=job.id,
+        func_kwargs={
+            "job_id": str(job.id),
+            "cv_ids": [str(resume.id)],
+            "depth": "light",
+        },
+    )
     await asyncio.sleep(0.2)
     test_db.expire_all()
     row = test_db.query(JobRun).filter(JobRun.job_type == "analyze_job").first()
@@ -188,10 +229,13 @@ async def test_a_malformed_llm_response_is_not_persisted(test_db, monkeypatch):
 
     async def _junk(*a, **k):
         return {"text": '{"scores": null}', "usage": {}}
+
     monkeypatch.setattr(lc, "_dispatch", _junk)
 
-    assert await score_single_job(str(job.id), cv_ids=[str(resume.id)],
-                                  depth="light") == "Scoring failed"
+    assert (
+        await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light")
+        == "Scoring failed"
+    )
     test_db.expire_all()
     assert not test_db.query(Job).filter(Job.id == job.id).first().cv_scores
 
@@ -207,6 +251,7 @@ async def test_partial_llm_scores_still_persist_what_arrived(test_db, monkeypatc
 
     async def _ok(*a, **k):
         return {"text": '{"scores": {"Base": 72}, "best_cv": "Base"}', "usage": {}}
+
     monkeypatch.setattr(lc, "_dispatch", _ok)
 
     await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light")
@@ -214,14 +259,18 @@ async def test_partial_llm_scores_still_persist_what_arrived(test_db, monkeypatc
     fresh = test_db.query(Job).filter(Job.id == job.id).first()
     # stored by résumé id (3.1); the model's "Base" label maps to the résumé it named
     assert fresh.cv_scores == {str(resume.id): 72} and fresh.best_cv_score == 72
-    assert fresh.best_cv == str(resume.id) and fresh.cv_score_names == {str(resume.id): "Base"}
+    assert fresh.best_cv == str(resume.id) and fresh.cv_score_names == {
+        str(resume.id): "Base"
+    }
 
 
 # ══ Retry + fallback inside call_llm ═════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_primary_is_retried_four_times_before_the_fallback(test_db, monkeypatch):
     import backend.analyzer.llm_client as lc
+
     set_setting(test_db, "llm_provider", "claude_api")
     set_setting(test_db, "llm_model", "primary-model")
     set_setting(test_db, "llm_fallback_provider", "openai")
@@ -229,12 +278,21 @@ async def test_primary_is_retried_four_times_before_the_fallback(test_db, monkey
 
     calls = []
 
-    async def _dispatch(provider, model, api_key, prompt, system, max_tokens,
-                        cached_prefix=None, effort=""):
+    async def _dispatch(
+        provider,
+        model,
+        api_key,
+        prompt,
+        system,
+        max_tokens,
+        cached_prefix=None,
+        effort="",
+    ):
         calls.append(model)
         if model == "primary-model":
             raise FAULTS["529"]
         return {"text": "ok", "usage": {}}
+
     monkeypatch.setattr(lc, "_dispatch", _dispatch)
 
     res = await lc.call_llm("p", "s")
@@ -244,8 +302,11 @@ async def test_primary_is_retried_four_times_before_the_fallback(test_db, monkey
 
 
 @pytest.mark.asyncio
-async def test_a_transient_primary_failure_does_not_reach_the_fallback(test_db, monkeypatch):
+async def test_a_transient_primary_failure_does_not_reach_the_fallback(
+    test_db, monkeypatch
+):
     import backend.analyzer.llm_client as lc
+
     set_setting(test_db, "llm_provider", "claude_api")
     set_setting(test_db, "llm_model", "primary-model")
     set_setting(test_db, "llm_fallback_provider", "openai")
@@ -253,12 +314,21 @@ async def test_a_transient_primary_failure_does_not_reach_the_fallback(test_db, 
 
     calls = []
 
-    async def _dispatch(provider, model, api_key, prompt, system, max_tokens,
-                        cached_prefix=None, effort=""):
+    async def _dispatch(
+        provider,
+        model,
+        api_key,
+        prompt,
+        system,
+        max_tokens,
+        cached_prefix=None,
+        effort="",
+    ):
         calls.append(model)
         if len(calls) == 1:
             raise FAULTS["429"]
         return {"text": "ok", "usage": {}}
+
     monkeypatch.setattr(lc, "_dispatch", _dispatch)
 
     res = await lc.call_llm("p", "s")
@@ -269,6 +339,7 @@ async def test_a_transient_primary_failure_does_not_reach_the_fallback(test_db, 
 @pytest.mark.asyncio
 async def test_both_providers_down_raises_one_error_naming_both(test_db, monkeypatch):
     import backend.analyzer.llm_client as lc
+
     set_setting(test_db, "llm_provider", "claude_api")
     set_setting(test_db, "llm_model", "primary-model")
     set_setting(test_db, "llm_fallback_provider", "openai")
@@ -276,6 +347,7 @@ async def test_both_providers_down_raises_one_error_naming_both(test_db, monkeyp
 
     async def _boom(*a, **k):
         raise FAULTS["timeout"]
+
     monkeypatch.setattr(lc, "_dispatch", _boom)
 
     with pytest.raises(RuntimeError) as e:
@@ -286,6 +358,7 @@ async def test_both_providers_down_raises_one_error_naming_both(test_db, monkeyp
 @pytest.mark.asyncio
 async def test_without_a_fallback_the_primary_error_propagates(test_db, monkeypatch):
     import backend.analyzer.llm_client as lc
+
     set_setting(test_db, "llm_provider", "claude_api")
     set_setting(test_db, "llm_model", "primary-model")
     set_setting(test_db, "llm_fallback_provider", "")
@@ -293,6 +366,7 @@ async def test_without_a_fallback_the_primary_error_propagates(test_db, monkeypa
 
     async def _boom(*a, **k):
         raise FAULTS["429"]
+
     monkeypatch.setattr(lc, "_dispatch", _boom)
 
     with pytest.raises(RateLimited):
@@ -313,11 +387,20 @@ async def test_the_fallback_pair_is_what_gets_logged(test_db, monkeypatch):
     set_setting(test_db, "llm_fallback_provider", "openai")
     set_setting(test_db, "llm_fallback_model", "fallback-model")
 
-    async def _dispatch(provider, model, api_key, prompt, system, max_tokens,
-                        cached_prefix=None, effort=""):
+    async def _dispatch(
+        provider,
+        model,
+        api_key,
+        prompt,
+        system,
+        max_tokens,
+        cached_prefix=None,
+        effort="",
+    ):
         if model == "primary-model":
             raise FAULTS["529"]
         return {"text": '{"scores": {"Base": 60}}', "usage": {}}
+
     monkeypatch.setattr(lc, "_dispatch", _dispatch)
 
     await score_single_job(str(job.id), cv_ids=[str(resume.id)], depth="light")
@@ -329,9 +412,11 @@ async def test_the_fallback_pair_is_what_gets_logged(test_db, monkeypatch):
 
 # ══ Gmail ════════════════════════════════════════════════════════════════════
 
+
 def _fake_httpx(monkeypatch, module, *, status=200, payload=None, raises=None):
     """Point a module's httpx.AsyncClient at a canned response (or an exception)."""
     from unittest.mock import AsyncMock, MagicMock
+
     import httpx
 
     resp = MagicMock()
@@ -354,21 +439,30 @@ def _fake_httpx(monkeypatch, module, *, status=200, payload=None, raises=None):
 
 
 @pytest.mark.asyncio
-async def test_gmail_token_expiry_returns_no_token_and_does_not_raise(test_db, monkeypatch):
+async def test_gmail_token_expiry_returns_no_token_and_does_not_raise(
+    test_db, monkeypatch
+):
     import backend.email_monitor.gmail_client as gc
+
     monkeypatch.setattr(gc, "GMAIL_REFRESH_TOKEN", "expired-token")
-    _fake_httpx(monkeypatch, gc, status=400,
-                payload={"error": "invalid_grant", "error_description": "Token expired"})
+    _fake_httpx(
+        monkeypatch,
+        gc,
+        status=400,
+        payload={"error": "invalid_grant", "error_description": "Token expired"},
+    )
     assert await gc._get_access_token() == ""
     assert await gc.check_emails() is None
 
 
 @pytest.mark.asyncio
-async def test_gmail_token_expiry_leaves_the_scheduler_run_completed(test_db, monkeypatch):
+async def test_gmail_token_expiry_leaves_the_scheduler_run_completed(
+    test_db, monkeypatch
+):
     """An expired token is an operator problem, not a crashed job."""
     import backend.email_monitor.gmail_client as gc
-    from backend.scheduler import run_email_check
     from backend.models.db import JobRun
+    from backend.scheduler import run_email_check
 
     monkeypatch.setattr(gc, "GMAIL_REFRESH_TOKEN", "expired-token")
     _fake_httpx(monkeypatch, gc, status=400, payload={"error": "invalid_grant"})
@@ -381,20 +475,22 @@ async def test_gmail_token_expiry_leaves_the_scheduler_run_completed(test_db, mo
 
 @pytest.mark.asyncio
 async def test_gmail_network_failure_marks_the_run_failed_without_killing_the_scheduler(
-        test_db, monkeypatch):
+    test_db, monkeypatch
+):
     import backend.email_monitor.gmail_client as gc
-    from backend.scheduler import run_email_check
     from backend.models.db import JobRun
+    from backend.scheduler import run_email_check
 
     monkeypatch.setattr(gc, "GMAIL_REFRESH_TOKEN", "tok")
     _fake_httpx(monkeypatch, gc, raises=ConnectionError("gmail unreachable"))
 
     with pytest.raises(ConnectionError):
-        await run_email_check()      # APScheduler catches and logs this
+        await run_email_check()  # APScheduler catches and logs this
     test_db.expire_all()
     row = test_db.query(JobRun).filter(JobRun.job_type == "email_check").first()
     assert row.status == "failed" and "gmail unreachable" in (row.error or "")
     import backend.job_monitor as jm
+
     assert "email_check" not in jm._running
 
 
@@ -402,9 +498,11 @@ async def test_gmail_network_failure_marks_the_run_failed_without_killing_the_sc
 async def test_gmail_list_error_response_is_swallowed(test_db, monkeypatch):
     """A 403 on the messages list must not raise — the next tick retries."""
     import backend.email_monitor.gmail_client as gc
+
     monkeypatch.setattr(gc, "GMAIL_REFRESH_TOKEN", "tok")
 
     from unittest.mock import AsyncMock, MagicMock
+
     token_resp = MagicMock(status_code=200)
     token_resp.json = MagicMock(return_value={"access_token": "at"})
     list_resp = MagicMock(status_code=403, text="quota exceeded")
@@ -421,10 +519,14 @@ async def test_gmail_list_error_response_is_swallowed(test_db, monkeypatch):
 
 # ══ Telegram ═════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind", ["network", "http_500", "timeout"])
-async def test_telegram_send_failure_returns_false_instead_of_raising(monkeypatch, kind):
+async def test_telegram_send_failure_returns_false_instead_of_raising(
+    monkeypatch, kind
+):
     import backend.notifier.telegram as tg
+
     monkeypatch.setattr(tg, "TELEGRAM_BOT_TOKEN", "bot-token")
 
     if kind == "network":
@@ -440,19 +542,29 @@ async def test_telegram_send_failure_returns_false_instead_of_raising(monkeypatc
 @pytest.mark.asyncio
 async def test_telegram_unconfigured_returns_false(monkeypatch):
     import backend.notifier.telegram as tg
+
     monkeypatch.setattr(tg, "TELEGRAM_BOT_TOKEN", "")
     assert await tg._send_message("123", "hello") is False
 
 
 @pytest.mark.asyncio
-async def test_a_dead_telegram_does_not_fail_the_scrape_health_check(test_db, monkeypatch):
+async def test_a_dead_telegram_does_not_fail_the_scrape_health_check(
+    test_db, monkeypatch
+):
     import backend.notifier.telegram as tg
     from backend.models.db import ScrapeLog
     from backend.scheduler import check_scrape_health
 
     for _ in range(3):
-        test_db.add(ScrapeLog(source="indeed", jobs_found=0, new_jobs=0,
-                              is_warning=True, ran_at=datetime.now(timezone.utc)))
+        test_db.add(
+            ScrapeLog(
+                source="indeed",
+                jobs_found=0,
+                new_jobs=0,
+                is_warning=True,
+                ran_at=datetime.now(timezone.utc),
+            )
+        )
     test_db.commit()
 
     monkeypatch.setattr(tg, "TELEGRAM_BOT_TOKEN", "bot-token")
@@ -461,22 +573,30 @@ async def test_a_dead_telegram_does_not_fail_the_scrape_health_check(test_db, mo
 
     async def _boom(*a, **k):
         raise ConnectionError("telegram down")
+
     monkeypatch.setattr(tg, "_send_message", _boom, raising=False)
 
-    await check_scrape_health()      # must not raise
+    await check_scrape_health()  # must not raise
 
 
 @pytest.mark.asyncio
 async def test_a_dead_telegram_leaves_the_scrape_run_completed(test_db, monkeypatch):
+    import backend.analyzer.cv_scorer as scorer
     import backend.notifier.telegram as tg
     import backend.scraper.orchestrator as orch
-    import backend.analyzer.cv_scorer as scorer
     from backend.models.db import JobRun, ScrapeLog
     from backend.scheduler import run_all_scrapes
 
     for _ in range(3):
-        test_db.add(ScrapeLog(source="indeed", jobs_found=0, new_jobs=0,
-                              is_warning=True, ran_at=datetime.now(timezone.utc)))
+        test_db.add(
+            ScrapeLog(
+                source="indeed",
+                jobs_found=0,
+                new_jobs=0,
+                is_warning=True,
+                ran_at=datetime.now(timezone.utc),
+            )
+        )
     test_db.commit()
 
     async def _noop(*a, **k):
@@ -484,14 +604,23 @@ async def test_a_dead_telegram_leaves_the_scrape_run_completed(test_db, monkeypa
 
     async def _one_empty_source(*a, **k):
         from backend.models.db import SessionLocal
+
         s = SessionLocal()
         try:
-            s.add(ScrapeLog(source="indeed", jobs_found=0, new_jobs=0, is_warning=True,
-                            ran_at=datetime.now(timezone.utc)))
+            s.add(
+                ScrapeLog(
+                    source="indeed",
+                    jobs_found=0,
+                    new_jobs=0,
+                    is_warning=True,
+                    ran_at=datetime.now(timezone.utc),
+                )
+            )
             s.commit()
         finally:
             s.close()
         return {}
+
     monkeypatch.setattr(orch, "run_all", _one_empty_source)
     monkeypatch.setattr(scorer, "analyze_unscored_jobs", _noop)
     monkeypatch.setattr(tg, "_is_enabled", lambda: True, raising=False)
@@ -499,6 +628,7 @@ async def test_a_dead_telegram_leaves_the_scrape_run_completed(test_db, monkeypa
 
     async def _boom(*a, **k):
         raise ConnectionError("telegram down")
+
     monkeypatch.setattr(tg, "_send_message", _boom, raising=False)
 
     await run_all_scrapes()
@@ -515,6 +645,7 @@ async def test_telegram_test_trigger_survives_a_dead_bot(client, test_db, monkey
 
     async def _boom():
         raise ConnectionError("telegram down")
+
     monkeypatch.setattr(tg, "send_test_message", _boom, raising=False)
 
     assert_clean(client.post("/api/telegram/test"), 202)
@@ -527,6 +658,7 @@ async def test_telegram_test_trigger_survives_a_dead_bot(client, test_db, monkey
 
 
 # ── R4 fix-loop regressions (R4-T1-28) ───────────────────────────────────────
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("fault", list(FAULTS))
@@ -542,12 +674,21 @@ async def test_every_llm_fault_kind_marks_the_run_failed(test_db, monkeypatch, f
 
     async def _boom(*a, **k):
         raise FAULTS[fault]
+
     monkeypatch.setattr(lc, "_dispatch", _boom)
 
-    jm.launch_background("analyze_job", score_single_job, trigger="manual",
-                         scope_key=str(job.id), target_job_id=job.id,
-                         func_kwargs={"job_id": str(job.id), "cv_ids": [str(resume.id)],
-                                      "depth": "light"})
+    jm.launch_background(
+        "analyze_job",
+        score_single_job,
+        trigger="manual",
+        scope_key=str(job.id),
+        target_job_id=job.id,
+        func_kwargs={
+            "job_id": str(job.id),
+            "cv_ids": [str(resume.id)],
+            "depth": "light",
+        },
+    )
     await asyncio.sleep(0.2)
     test_db.expire_all()
     row = test_db.query(JobRun).filter(JobRun.job_type == "analyze_job").first()
@@ -570,7 +711,9 @@ async def test_a_healthy_run_is_still_completed(test_db):
     await asyncio.sleep(0.1)
     test_db.expire_all()
     row = test_db.query(JobRun).filter(JobRun.job_type == "r4_ok_probe").first()
-    assert row.status == "completed" and row.result_summary == "All good" and not row.error
+    assert (
+        row.status == "completed" and row.result_summary == "All good" and not row.error
+    )
 
 
 @pytest.mark.asyncio

@@ -5,6 +5,7 @@ MT-19: runs per account (scheduler: `gmail_account_ids()`), each with its own re
 own_always setting). The three GMAIL_* names below are the install's .env values; the
 client id/secret are the OAuth app every account consents through, the refresh token is
 the owner's pre-MT-19 fallback."""
+
 import asyncio
 import base64
 import json
@@ -14,10 +15,10 @@ from datetime import datetime, timezone
 
 import httpx
 
-from backend.config import GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN
-from backend.models.db import SessionLocal, Application
 from backend.accounts.settings import get_setting, set_setting
+from backend.config import GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN
 from backend.email_monitor.response_parser import classify_email
+from backend.models.db import Application, SessionLocal
 
 logger = logging.getLogger("jobnavigator.gmail")
 
@@ -41,6 +42,7 @@ async def _get_access_token() -> str:
     `invalid_grant` → "" without calling Google. A new `invalid_grant` marks the account
     expired (Settings shows Reconnect) and returns ""."""
     from backend.email_monitor import gmail_auth
+
     db = SessionLocal()
     try:
         token, source = gmail_auth.resolve_token(db)
@@ -48,17 +50,22 @@ async def _get_access_token() -> str:
             logger.warning("No Gmail token for this account, skipping email check")
             return ""
         if gmail_auth.is_expired(db, token):
-            logger.info("Gmail token for this account is expired (invalid_grant), reconnect in Settings")
+            logger.info(
+                "Gmail token for this account is expired (invalid_grant), reconnect in Settings"
+            )
             return ""
         client_id, client_secret = gmail_auth.client_config()
 
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(TOKEN_URL, data={
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "refresh_token": token,
-                "grant_type": "refresh_token",
-            })
+            resp = await client.post(
+                TOKEN_URL,
+                data={
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "refresh_token": token,
+                    "grant_type": "refresh_token",
+                },
+            )
 
             if resp.status_code != 200:
                 logger.error(f"Gmail token refresh failed: {resp.text}")
@@ -70,7 +77,6 @@ async def _get_access_token() -> str:
             return resp.json().get("access_token", "")
     finally:
         db.close()
-
 
 
 def _extract_email_domain(from_header: str) -> str:
@@ -97,8 +103,12 @@ def _load_processed_ids(db) -> set:
 def _save_processed_ids(db, processed_ids: set):
     """Save processed Gmail message IDs to settings (keep last 500)."""
     id_list = list(processed_ids)[-500:]
-    set_setting(db, "gmail_processed_ids", json.dumps(id_list),
-                description="Processed Gmail message IDs for dedup (auto-managed)")
+    set_setting(
+        db,
+        "gmail_processed_ids",
+        json.dumps(id_list),
+        description="Processed Gmail message IDs for dedup (auto-managed)",
+    )
     db.commit()
 
 
@@ -115,8 +125,8 @@ def _build_gmail_query(db) -> str:
             pass
     sender_parts = []
     for s in sender_patterns:
-        if s.startswith('@') or '.' in s and '@' not in s:
-            sender_parts.append(f'from:{s}' if s.startswith('@') else f'from:@{s}')
+        if s.startswith("@") or "." in s and "@" not in s:
+            sender_parts.append(f"from:{s}" if s.startswith("@") else f"from:@{s}")
         else:
             sender_parts.append(f'from:"{s}"')
 
@@ -167,15 +177,19 @@ def _get_active_apps_for_llm(db) -> list:
         job = app.job
         if not job:
             continue
-        applied_at = app.applied_at.strftime("%Y-%m-%d") if app.applied_at else "unknown"
-        result.append({
-            "index": i,
-            "id": app.id,
-            "company": job.company or "Unknown",
-            "title": job.title or "Unknown",
-            "status": app.status,
-            "applied_at": applied_at,
-        })
+        applied_at = (
+            app.applied_at.strftime("%Y-%m-%d") if app.applied_at else "unknown"
+        )
+        result.append(
+            {
+                "index": i,
+                "id": app.id,
+                "company": job.company or "Unknown",
+                "title": job.title or "Unknown",
+                "status": app.status,
+                "applied_at": applied_at,
+            }
+        )
     return result
 
 
@@ -186,6 +200,7 @@ def _apply_email_to_app(db, matched_app, class_type: str, body: str, subject: st
     matched_app.last_email_snippet = snippet
 
     from backend.models.db import record_transition, utcnow
+
     if class_type == "positive":
         # Positive recruiter response on an applied row -> interview.
         if matched_app.status == "applied":
@@ -199,13 +214,16 @@ def _apply_email_to_app(db, matched_app, class_type: str, body: str, subject: st
     logger.info(f"Email classified as '{class_type}' for application {matched_app.id}")
 
 
-def _apply_llm_result_to_app(db, matched_app, llm_result: dict, body: str, subject: str):
+def _apply_llm_result_to_app(
+    db, matched_app, llm_result: dict, body: str, subject: str
+):
     """Apply LLM classification result to an application."""
     snippet = body[:200] if body else subject[:200]
     matched_app.last_email_received = datetime.now(timezone.utc)
     matched_app.last_email_snippet = snippet
 
     from backend.models.db import record_transition, utcnow
+
     new_status = llm_result["status"]
 
     # Only transition forward, never backward
@@ -290,8 +308,13 @@ async def check_emails():
                     processed_ids.add(msg_id)
                     continue
 
-                if classification["confidence"] >= 0.8 and class_type in ("positive", "rejection"):
-                    matched_app = _match_email_to_application(db, from_header, subject, body, sender_domain)
+                if classification["confidence"] >= 0.8 and class_type in (
+                    "positive",
+                    "rejection",
+                ):
+                    matched_app = _match_email_to_application(
+                        db, from_header, subject, body, sender_domain
+                    )
                     if matched_app:
                         _apply_email_to_app(db, matched_app, class_type, body, subject)
                     processed_ids.add(msg_id)
@@ -299,18 +322,28 @@ async def check_emails():
 
                 # Low confidence or ambiguous — try LLM pass 2 (max 5 per run)
                 from backend.email_monitor.response_parser import classify_email_llm
+
                 if llm_calls_this_run >= 5:
-                    logger.info("LLM call limit reached (5), deferring remaining ambiguous emails to next run")
+                    logger.info(
+                        "LLM call limit reached (5), deferring remaining ambiguous emails to next run"
+                    )
                     continue
                 active_apps = _get_active_apps_for_llm(db)
-                llm_result = await classify_email_llm(from_header, subject, body, active_apps)
+                llm_result = await classify_email_llm(
+                    from_header, subject, body, active_apps
+                )
                 llm_calls_this_run += 1
                 await asyncio.sleep(2)  # Rate limit between LLM calls
 
                 if llm_result:
-                    threshold = int(get_setting(db, "email_llm_confidence_threshold") or 70)
+                    threshold = int(
+                        get_setting(db, "email_llm_confidence_threshold") or 70
+                    )
 
-                    if llm_result["confidence"] >= threshold and llm_result["status"] != "no_change":
+                    if (
+                        llm_result["confidence"] >= threshold
+                        and llm_result["status"] != "no_change"
+                    ):
                         match_idx = llm_result.get("match_index")
                         matched_app = None
                         matched_company = ""
@@ -319,8 +352,11 @@ async def check_emails():
                             matched_company = app_info.get("company", "")
                             # A filtered query, not Query.get(): an identity-map hit skips
                             # the account criteria (MT-6).
-                            matched_app = db.query(Application).filter(
-                                Application.id == app_info["id"]).first()
+                            matched_app = (
+                                db.query(Application)
+                                .filter(Application.id == app_info["id"])
+                                .first()
+                            )
 
                         # Guards against the LLM force-matching an email onto the wrong company's
                         # application (e.g. an Amazon email onto a Kpler application).
@@ -334,11 +370,14 @@ async def check_emails():
                             matched_app = None
 
                         if matched_app:
-                            _apply_llm_result_to_app(db, matched_app, llm_result, body, subject)
+                            _apply_llm_result_to_app(
+                                db, matched_app, llm_result, body, subject
+                            )
 
                         # Status + confidence only — a summary paraphrasing the recruiter's email
                         # body is not something we want persisted in activity_log.
                         from backend.activity import log_activity
+
                         log_activity(
                             "email",
                             f"LLM classified email → {llm_result.get('status', '?')} "
@@ -347,6 +386,7 @@ async def check_emails():
                         )
                     else:
                         from backend.activity import log_activity
+
                         log_activity(
                             "email",
                             f"LLM low confidence ({llm_result['confidence']}): status={llm_result.get('status', '?')}",
@@ -358,12 +398,18 @@ async def check_emails():
         _save_processed_ids(db, processed_ids)
 
         from backend.activity import log_activity
-        log_activity("email", f"Email check: {len(messages)} messages found from known domains", db=db)
+
+        log_activity(
+            "email",
+            f"Email check: {len(messages)} messages found from known domains",
+            db=db,
+        )
         db.commit()
 
     except Exception as e:
         logger.error(f"Email check failed: {e}")
         from backend.activity import log_activity
+
         log_activity("email", f"Email check failed: {e}")
         raise  # Let tracked_run / caller mark the JobRun as failed
     finally:
@@ -379,13 +425,15 @@ def _extract_body(payload: dict) -> str:
     if html:
         try:
             from bs4 import BeautifulSoup
+
             soup = BeautifulSoup(html, "html.parser")
             for tag in soup(["script", "style", "head"]):
                 tag.decompose()
             return soup.get_text(separator="\n", strip=True)
         except Exception:
             import re
-            return re.sub(r'<[^>]+>', '', html).strip()
+
+            return re.sub(r"<[^>]+>", "", html).strip()
     return ""
 
 
@@ -411,16 +459,33 @@ def _extract_mime(payload: dict, mime_type: str) -> str:
 # Common legal/entity suffixes and filler words dropped when deriving a company's
 # identifying tokens, so "Kpler Technologies Inc." matches on "kpler".
 _COMPANY_SUFFIXES = {
-    "inc", "llc", "ltd", "limited", "gmbh", "ag", "sa", "plc", "co", "corp",
-    "corporation", "company", "technologies", "technology", "labs", "group",
-    "holdings", "international", "the",
+    "inc",
+    "llc",
+    "ltd",
+    "limited",
+    "gmbh",
+    "ag",
+    "sa",
+    "plc",
+    "co",
+    "corp",
+    "corporation",
+    "company",
+    "technologies",
+    "technology",
+    "labs",
+    "group",
+    "holdings",
+    "international",
+    "the",
 }
 
 
 def _company_tokens(company: str) -> list:
     """Identifying tokens for a company name (drop entity suffixes + very short tokens)."""
     toks = [
-        t for t in re.findall(r"[a-z0-9]+", (company or "").lower())
+        t
+        for t in re.findall(r"[a-z0-9]+", (company or "").lower())
         if t not in _COMPANY_SUFFIXES and len(t) >= 3
     ]
     if not toks:  # name was all suffixes / short tokens — fall back to whatever we have
@@ -428,8 +493,9 @@ def _company_tokens(company: str) -> list:
     return toks
 
 
-def _email_matches_company(company: str, from_header: str, subject: str,
-                           body: str, sender_domain: str) -> bool:
+def _email_matches_company(
+    company: str, from_header: str, subject: str, body: str, sender_domain: str
+) -> bool:
     """True iff an email plausibly belongs to `company`, matching on From/domain/subject (authoritative)
     or the full company name in the body (weak fallback); job title is deliberately never used."""
     if not company or not company.strip():
@@ -447,7 +513,9 @@ def _email_matches_company(company: str, from_header: str, subject: str,
     return full in (body or "").lower()
 
 
-def _match_email_to_application(db, from_header: str, subject: str, body: str, sender_domain: str):
+def _match_email_to_application(
+    db, from_header: str, subject: str, body: str, sender_domain: str
+):
     """Match an email to an active application anchored on the sender; a body-only company
     match is used only as a fallback after every app is checked for a stronger sender match."""
     active_statuses = ["applied", "interview"]
@@ -465,6 +533,10 @@ def _match_email_to_application(db, from_header: str, subject: str, body: str, s
             return app
         # Weak: the full company name appears only in the body — remember it, but keep
         # scanning in case a later app is a stronger (sender-based) match.
-        if body_fallback is None and company.strip() and company.lower().strip() in body_lower:
+        if (
+            body_fallback is None
+            and company.strip()
+            and company.lower().strip() in body_lower
+        ):
             body_fallback = app
     return body_fallback

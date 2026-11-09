@@ -1,7 +1,9 @@
 """GET /api/monitor/finished — recently-finished per-job runs, with status; lets the dashboard resolve OK/NOK using the run's actual status, which can't be inferred from job fields for re-runs."""
+
 import uuid
-from datetime import datetime, timezone, timedelta
-from backend.models.db import Setting, JobRun
+from datetime import datetime, timedelta, timezone
+
+from backend.models.db import JobRun, Setting
 
 
 def _seed(test_db):
@@ -10,8 +12,13 @@ def _seed(test_db):
 
 
 def _run(test_db, job_id, job_type, status, finished_at):
-    r = JobRun(job_type=job_type, trigger="manual", status=status,
-               target_job_id=job_id, finished_at=finished_at)
+    r = JobRun(
+        job_type=job_type,
+        trigger="manual",
+        status=status,
+        target_job_id=job_id,
+        finished_at=finished_at,
+    )
     test_db.add(r)
     test_db.commit()
     return r

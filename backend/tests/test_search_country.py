@@ -5,6 +5,7 @@ Canadian cities asked the US Indeed site. Indeed answered HTTP 200 with an empty
 result list: no exception, no error row, no rows. These tests pin the country as
 a per-search value and pin the backfill that derives it from existing rows.
 """
+
 import pytest
 
 from backend.models.db import Search
@@ -16,8 +17,13 @@ def _search(db, **kw):
     kw.setdefault("title_exclude_keywords", [])
     kw.setdefault("company_filter", [])
     kw.setdefault("company_exclude", [])
-    s = Search(name="Country probe", search_mode="keyword", active=True,
-               search_term="program manager", **kw)
+    s = Search(
+        name="Country probe",
+        search_mode="keyword",
+        active=True,
+        search_term="program manager",
+        **kw,
+    )
     db.add(s)
     db.commit()
     return s
@@ -49,17 +55,22 @@ def _with_null_country(db, search):
 def _first_run_auth(db):
     """Empty dashboard_api_key triggers the middleware's first-run bypass."""
     from backend.models.db import Setting
+
     db.add(Setting(key="dashboard_api_key", value=""))
     db.commit()
 
 
 # ── the scraper hands the search's own country to jobspy ─────────────────────
 
-@pytest.mark.parametrize("stored,expected", [
-    ("canada", "canada"),
-    ("poland", "poland"),
-    ("usa", "usa"),
-])
+
+@pytest.mark.parametrize(
+    "stored,expected",
+    [
+        ("canada", "canada"),
+        ("poland", "poland"),
+        ("usa", "usa"),
+    ],
+)
 def test_scrape_kwargs_carry_the_search_country(test_db, monkeypatch, stored, expected):
     from backend.scraper.sources.jobspy import _run_sync
 
@@ -100,6 +111,7 @@ def test_test_preview_sends_the_search_country(api_client, test_db, monkeypatch)
 
 # ── the API write path validates the field ───────────────────────────────────
 
+
 def _payload(**kw):
     body = {"name": "New search", "search_mode": "keyword", "search_term": "pm"}
     body.update(kw)
@@ -120,7 +132,9 @@ def test_create_stores_the_canonical_spelling(api_client, test_db):
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
     assert resp.json()["country"] == "usa"
 
-    resp = api_client.post("/api/searches", json=_payload(name="Second", country="CANADA"))
+    resp = api_client.post(
+        "/api/searches", json=_payload(name="Second", country="CANADA")
+    )
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
     assert resp.json()["country"] == "canada"
 
@@ -166,20 +180,25 @@ def test_countries_endpoint_lists_the_library_names(api_client, test_db):
 
 # ── the one-time backfill ────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("location,expected", [
-    ("Toronto, Canada", "canada"),          # last comma-separated segment
-    ("Warsaw, Poland", "poland"),
-    ("Canada", "canada"),                   # the whole trimmed string
-    ("  poland  ", "poland"),
-    ("United States", "usa"),
-    ("US", "usa"),                          # any alias jobspy accepts
-    ("Remote", "usa"),                      # no match -> the default
-    ("", "usa"),
-    (None, "usa"),
-    ("Springfield, Nowhereland", "usa"),
-])
+
+@pytest.mark.parametrize(
+    "location,expected",
+    [
+        ("Toronto, Canada", "canada"),  # last comma-separated segment
+        ("Warsaw, Poland", "poland"),
+        ("Canada", "canada"),  # the whole trimmed string
+        ("  poland  ", "poland"),
+        ("United States", "usa"),
+        ("US", "usa"),  # any alias jobspy accepts
+        ("Remote", "usa"),  # no match -> the default
+        ("", "usa"),
+        (None, "usa"),
+        ("Springfield, Nowhereland", "usa"),
+    ],
+)
 def test_country_from_location(location, expected):
     from backend.countries import country_from_location
+
     assert country_from_location(location) == expected
 
 
@@ -211,7 +230,7 @@ def test_backfill_is_idempotent(test_db):
     test_db.refresh(search)
     assert search.country == "usa"
 
-    search.country = "canada"     # a later user edit
+    search.country = "canada"  # a later user edit
     test_db.commit()
     _backfill_search_country(test_db)
     test_db.refresh(search)
@@ -226,17 +245,27 @@ def test_the_migration_adds_the_column_before_it_sets_the_default():
     so it must come after and must not ride on the ADD COLUMN line.
     """
     import inspect
+
     import backend.seed as seed
 
     lines = [l.strip() for l in inspect.getsource(seed.run_migrations).splitlines()]
-    add = [i for i, l in enumerate(lines) if "ADD COLUMN IF NOT EXISTS country" in l
-           or l.startswith("_ADD_COUNTRY_COLUMN")]
-    default = [i for i, l in enumerate(lines) if "ALTER COLUMN country SET DEFAULT" in l]
+    add = [
+        i
+        for i, l in enumerate(lines)
+        if "ADD COLUMN IF NOT EXISTS country" in l
+        or l.startswith("_ADD_COUNTRY_COLUMN")
+    ]
+    default = [
+        i for i, l in enumerate(lines) if "ALTER COLUMN country SET DEFAULT" in l
+    ]
     assert add, "the searches.country migration disappeared"
     assert default, "later inserts still need the column default"
-    assert "DEFAULT" not in seed._ADD_COUNTRY_COLUMN.upper(), \
+    assert "DEFAULT" not in seed._ADD_COUNTRY_COLUMN.upper(), (
         f"ADD COLUMN must not carry a default: {seed._ADD_COUNTRY_COLUMN}"
-    assert min(default) > max(add), "SET DEFAULT must run after ADD COLUMN, not before it"
+    )
+    assert min(default) > max(add), (
+        "SET DEFAULT must run after ADD COLUMN, not before it"
+    )
 
 
 def test_run_migrations_calls_the_country_backfill(test_db, monkeypatch):
@@ -261,8 +290,11 @@ def test_the_backfill_is_skipped_when_the_column_was_not_added(test_db, monkeypa
 
     called = []
     monkeypatch.setattr(seed, "_backfill_search_country", lambda db: called.append(db))
-    monkeypatch.setattr(seed, "run_migration_statements",
-                        lambda db, statements: [seed._ADD_COUNTRY_COLUMN])
+    monkeypatch.setattr(
+        seed,
+        "run_migration_statements",
+        lambda db, statements: [seed._ADD_COUNTRY_COLUMN],
+    )
 
     seed.run_migrations(test_db)
 
@@ -280,12 +312,13 @@ def test_a_raising_backfill_does_not_abort_the_migration(test_db, monkeypatch):
     # A clean statement list, so the backfill is really reached (see above).
     monkeypatch.setattr(seed, "run_migration_statements", lambda db, statements: [])
 
-    seed.run_migrations(test_db)      # raises if the guard is missing
+    seed.run_migrations(test_db)  # raises if the guard is missing
 
 
 def test_aliases_read_jobspy_1_4_names_and_alias_table():
     """jobspy 1.4: a member's value is its name, other spellings sit in model.country_aliases."""
     from jobspy.model import Country
+
     from backend.countries import _aliases, normalize_country, supported_countries
 
     assert _aliases(Country.USA) == ["usa", "us", "united states"]

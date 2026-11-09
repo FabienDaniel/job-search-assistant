@@ -6,12 +6,18 @@ scraper already wrote is never overwritten. Run the dry pass first and read the 
     python -m backend.scripts.backfill_work_arrangement            # dry run
     python -m backend.scripts.backfill_work_arrangement --commit   # write
 """
+
 import argparse
 import collections
 import logging
 import sys
 
-from backend.analyzer.work_arrangement import HYBRID, ONSITE, REMOTE, extract_arrangement
+from backend.analyzer.work_arrangement import (
+    HYBRID,
+    ONSITE,
+    REMOTE,
+    extract_arrangement,
+)
 from backend.models.db import Job, SessionLocal
 
 logger = logging.getLogger("jobnavigator.backfill.arrangement")
@@ -25,9 +31,15 @@ def run(commit: bool = False, limit: int = None) -> dict:
     tally = collections.Counter()
     by_tier = collections.Counter()
     try:
-        query = db.query(Job.id).filter(
-            Job.arr_remote.is_(None), Job.arr_hybrid.is_(None), Job.arr_onsite.is_(None)
-        ).order_by(Job.discovered_at)
+        query = (
+            db.query(Job.id)
+            .filter(
+                Job.arr_remote.is_(None),
+                Job.arr_hybrid.is_(None),
+                Job.arr_onsite.is_(None),
+            )
+            .order_by(Job.discovered_at)
+        )
         if limit:
             query = query.limit(limit)
 
@@ -35,7 +47,7 @@ def run(commit: bool = False, limit: int = None) -> dict:
         # invalidates the cursor on Postgres ("named cursor isn't valid anymore")
         ids = [row[0] for row in query.all()]
         for start in range(0, len(ids), BATCH):
-            chunk = ids[start:start + BATCH]
+            chunk = ids[start : start + BATCH]
             for job in db.query(Job).filter(Job.id.in_(chunk)).all():
                 tally["scanned"] += 1
                 result = extract_arrangement(
@@ -71,15 +83,20 @@ def run(commit: bool = False, limit: int = None) -> dict:
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--commit", action="store_true",
-                        help="write the results; without it nothing is saved")
-    parser.add_argument("--limit", type=int, default=None,
-                        help="stop after this many unresolved jobs")
+    parser.add_argument(
+        "--commit",
+        action="store_true",
+        help="write the results; without it nothing is saved",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, help="stop after this many unresolved jobs"
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     # QA F4 / R1-10: every account's jobs (with no context only the owner's are seen).
     from backend.accounts.background import acting_as, all_account_ids
+
     tally, by_tier = collections.Counter(), collections.Counter()
     for account in all_account_ids():
         with acting_as(account):

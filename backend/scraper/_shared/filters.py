@@ -1,5 +1,6 @@
 """Title/URL filtering helpers + title expression parser: the central "is this a
 valid job posting?" gate all scrapers run jobs through before DB insert."""
+
 import json
 import re
 from urllib.parse import urlparse
@@ -34,7 +35,7 @@ def build_search_exclude_sets(db, search) -> tuple[set, set]:
                 continue
             if c.name:
                 search_set.add(c.name.lower())
-            for alias in (c.aliases or []):
+            for alias in c.aliases or []:
                 if alias:
                     search_set.add(alias.lower())
 
@@ -44,57 +45,196 @@ def build_search_exclude_sets(db, search) -> tuple[set, set]:
 # ── Garbage-title filtering ─────────────────────────────────────────────────
 # Known garbage strings to discard (case-insensitive exact match)
 GARBAGE_TITLES = {
-    "apply", "apply now", "contact", "contact us", "search", "search jobs",
-    "back", "next", "previous", "filter", "filters", "reset", "clear",
-    "sign in", "sign up", "login", "log in", "register", "submit",
-    "load more", "show more", "view all", "see all", "close", "menu",
-    "home", "about", "about us", "privacy", "terms", "cookie", "cookies",
-    "accept", "decline", "subscribe", "follow", "share", "save",
-    "join talent network", "join our talent network", "talent network",
-    "sign up for alerts", "sign up for job alerts", "job alerts",
-    "create job alert", "set up job alert", "email me jobs",
-    "explore careers", "explore opportunities", "why work here",
-    "our culture", "our values", "benefits", "open roles",
-    "university", "universities", "internships", "intern program",
-    "early careers", "students", "student programs", "students + early careers",
-    "early careers / internships", "application and interview tips",
+    "apply",
+    "apply now",
+    "contact",
+    "contact us",
+    "search",
+    "search jobs",
+    "back",
+    "next",
+    "previous",
+    "filter",
+    "filters",
+    "reset",
+    "clear",
+    "sign in",
+    "sign up",
+    "login",
+    "log in",
+    "register",
+    "submit",
+    "load more",
+    "show more",
+    "view all",
+    "see all",
+    "close",
+    "menu",
+    "home",
+    "about",
+    "about us",
+    "privacy",
+    "terms",
+    "cookie",
+    "cookies",
+    "accept",
+    "decline",
+    "subscribe",
+    "follow",
+    "share",
+    "save",
+    "join talent network",
+    "join our talent network",
+    "talent network",
+    "sign up for alerts",
+    "sign up for job alerts",
+    "job alerts",
+    "create job alert",
+    "set up job alert",
+    "email me jobs",
+    "explore careers",
+    "explore opportunities",
+    "why work here",
+    "our culture",
+    "our values",
+    "benefits",
+    "open roles",
+    "university",
+    "universities",
+    "internships",
+    "intern program",
+    "early careers",
+    "students",
+    "student programs",
+    "students + early careers",
+    "early careers / internships",
+    "application and interview tips",
     "job search",
-    "blog", "events", "news", "newsroom", "podcast",
-    "learn more", "read more", "find out more", "get started",
-    "all locations", "all departments", "all categories",
-    "accessibility", "equal opportunity", "eeo", "privacy policy",
-    "terms of use", "terms and conditions", "sitemap",
-    "careers blog", "my profile", "my account", "my applications",
-    "locations", "teams", "departments", "categories",
+    "blog",
+    "events",
+    "news",
+    "newsroom",
+    "podcast",
+    "learn more",
+    "read more",
+    "find out more",
+    "get started",
+    "all locations",
+    "all departments",
+    "all categories",
+    "accessibility",
+    "equal opportunity",
+    "eeo",
+    "privacy policy",
+    "terms of use",
+    "terms and conditions",
+    "sitemap",
+    "careers blog",
+    "my profile",
+    "my account",
+    "my applications",
+    "locations",
+    "teams",
+    "departments",
+    "categories",
     # job-site navigation (Uber's "Saved jobs" was its only "job" for four months)
-    "saved jobs", "my saved jobs", "saved positions", "job cart", "my jobs", "my job cart",
-    "recently viewed jobs", "all jobs", "view all jobs", "see all jobs", "browse jobs",
-    "browse all jobs", "back to jobs", "back to search", "back to search results",
-    "candidate home", "candidate login", "candidate profile", "job seeker login",
+    "saved jobs",
+    "my saved jobs",
+    "saved positions",
+    "job cart",
+    "my jobs",
+    "my job cart",
+    "recently viewed jobs",
+    "all jobs",
+    "view all jobs",
+    "see all jobs",
+    "browse jobs",
+    "browse all jobs",
+    "back to jobs",
+    "back to search",
+    "back to search results",
+    "candidate home",
+    "candidate login",
+    "candidate profile",
+    "job seeker login",
 }
 
 # Substrings that indicate garbage even in longer text
 GARBAGE_SUBSTRINGS = [
-    "join talent network", "join our talent", "talent community",
-    "sign up for job alert", "create job alert", "email me jobs",
-    "cookie settings", "cookie preferences", "privacy policy",
-    "equal opportunity employer", "© 20", "open roles",
+    "join talent network",
+    "join our talent",
+    "talent community",
+    "sign up for job alert",
+    "create job alert",
+    "email me jobs",
+    "cookie settings",
+    "cookie preferences",
+    "privacy policy",
+    "equal opportunity employer",
+    "© 20",
+    "open roles",
     "life at ",  # "Life at Stripe", "Life at Google", etc.
 ]
 
 # Language names used in locale switchers — these are navigation, not job titles
 _LOCALE_NAMES = {
-    "nederlands", "deutsch", "français", "español", "português", "italiano",
-    "polski", "svenska", "norsk", "dansk", "suomi", "čeština", "română",
-    "magyar", "türkçe", "bahasa indonesia", "bahasa melayu", "tiếng việt",
-    "english", "english (us)", "english (uk)",
-    "日本語", "한국어", "中文", "简体中文", "繁體中文", "ภาษาไทย", "العربية", "עברית",
+    "nederlands",
+    "deutsch",
+    "français",
+    "español",
+    "português",
+    "italiano",
+    "polski",
+    "svenska",
+    "norsk",
+    "dansk",
+    "suomi",
+    "čeština",
+    "română",
+    "magyar",
+    "türkçe",
+    "bahasa indonesia",
+    "bahasa melayu",
+    "tiếng việt",
+    "english",
+    "english (us)",
+    "english (uk)",
+    "日本語",
+    "한국어",
+    "中文",
+    "简体中文",
+    "繁體中文",
+    "ภาษาไทย",
+    "العربية",
+    "עברית",
 }
 # A locale switcher names the language in English and in itself: "German, Deutsch", "English, English".
 _LANGUAGE_NAMES = _LOCALE_NAMES | {
-    "german", "french", "spanish", "portuguese", "italian", "dutch", "polish", "swedish", "norwegian",
-    "danish", "finnish", "czech", "romanian", "hungarian", "turkish", "indonesian", "malay",
-    "vietnamese", "japanese", "korean", "chinese", "thai", "arabic", "hebrew", "english",
+    "german",
+    "french",
+    "spanish",
+    "portuguese",
+    "italian",
+    "dutch",
+    "polish",
+    "swedish",
+    "norwegian",
+    "danish",
+    "finnish",
+    "czech",
+    "romanian",
+    "hungarian",
+    "turkish",
+    "indonesian",
+    "malay",
+    "vietnamese",
+    "japanese",
+    "korean",
+    "chinese",
+    "thai",
+    "arabic",
+    "hebrew",
+    "english",
 }
 _LOCALE_PAIR = re.compile(r"^\s*([^,()\-–]+?)\s*(?:,|\s[-–]\s)\s*([^,()\-–]+?)\s*$")
 
@@ -106,28 +246,29 @@ def _is_locale_pair(title_lower: str) -> bool:
 
 # ── Boolean expression parser for title_include_expr ──────────────────────────
 
+
 def _tokenize(expr: str) -> list[str]:
     tokens = []
     i = 0
     while i < len(expr):
         if expr[i].isspace():
             i += 1
-        elif expr[i] == '(':
-            tokens.append('(')
+        elif expr[i] == "(":
+            tokens.append("(")
             i += 1
-        elif expr[i] == ')':
-            tokens.append(')')
+        elif expr[i] == ")":
+            tokens.append(")")
             i += 1
         elif expr[i] == '"':
-            j = expr.index('"', i + 1) if '"' in expr[i + 1:] else len(expr)
-            tokens.append(expr[i + 1:j])
+            j = expr.index('"', i + 1) if '"' in expr[i + 1 :] else len(expr)
+            tokens.append(expr[i + 1 : j])
             i = j + 1
         else:
             j = i
-            while j < len(expr) and expr[j] not in '() \t' and expr[j] != '"':
+            while j < len(expr) and expr[j] not in "() \t" and expr[j] != '"':
                 j += 1
             word = expr[i:j]
-            if word.upper() in ('AND', 'OR'):
+            if word.upper() in ("AND", "OR"):
                 tokens.append(word.upper())
             else:
                 tokens.append(word)
@@ -137,40 +278,40 @@ def _tokenize(expr: str) -> list[str]:
 
 def _parse_expr(tokens, pos):
     left, pos = _parse_and(tokens, pos)
-    while pos < len(tokens) and tokens[pos] == 'OR':
+    while pos < len(tokens) and tokens[pos] == "OR":
         pos += 1
         right, pos = _parse_and(tokens, pos)
-        left = ('OR', left, right)
+        left = ("OR", left, right)
     return left, pos
 
 
 def _parse_and(tokens, pos):
     left, pos = _parse_atom(tokens, pos)
-    while pos < len(tokens) and tokens[pos] == 'AND':
+    while pos < len(tokens) and tokens[pos] == "AND":
         pos += 1
         right, pos = _parse_atom(tokens, pos)
-        left = ('AND', left, right)
+        left = ("AND", left, right)
     return left, pos
 
 
 def _parse_atom(tokens, pos):
     if pos >= len(tokens):
-        return ('WORD', ''), pos
-    if tokens[pos] == '(':
+        return ("WORD", ""), pos
+    if tokens[pos] == "(":
         pos += 1
         node, pos = _parse_expr(tokens, pos)
-        if pos < len(tokens) and tokens[pos] == ')':
+        if pos < len(tokens) and tokens[pos] == ")":
             pos += 1
         return node, pos
-    return ('WORD', tokens[pos]), pos + 1
+    return ("WORD", tokens[pos]), pos + 1
 
 
 def _eval_expr(node, title_lower):
-    if node[0] == 'WORD':
+    if node[0] == "WORD":
         return node[1].lower() in title_lower
-    elif node[0] == 'AND':
+    elif node[0] == "AND":
         return _eval_expr(node[1], title_lower) and _eval_expr(node[2], title_lower)
-    elif node[0] == 'OR':
+    elif node[0] == "OR":
         return _eval_expr(node[1], title_lower) or _eval_expr(node[2], title_lower)
     return True
 
@@ -185,15 +326,21 @@ def match_title_expr(expr: str, title: str) -> bool:
 
 # ── Search title filters ──────────────────────────────────────────────────────
 
+
 def search_title_filters(search, db) -> tuple[list, list]:
     """(include, exclude) title keywords of one search; exclude merges the global list."""
     from backend.models.db import get_global_title_exclude
+
     include_kw = search.title_include_keywords or []
-    exclude_kw = list(set((search.title_exclude_keywords or []) + get_global_title_exclude(db)))
+    exclude_kw = list(
+        set((search.title_exclude_keywords or []) + get_global_title_exclude(db))
+    )
     return include_kw, exclude_kw
 
 
-def title_filter_hit(title: str, include_kw: list, exclude_kw: list) -> tuple[str | None, list]:
+def title_filter_hit(
+    title: str, include_kw: list, exclude_kw: list
+) -> tuple[str | None, list]:
     """The title rule that drops a title, for callers that word their own reason:
     ("include", include_kw) when no include keyword is a substring of it,
     ("exclude", the matched keywords) when exclude keywords are whole words of it,
@@ -201,13 +348,19 @@ def title_filter_hit(title: str, include_kw: list, exclude_kw: list) -> tuple[st
     tl = title.lower()
     if include_kw and not any(kw.lower() in tl for kw in include_kw):
         return "include", list(include_kw)
-    matched = [kw for kw in exclude_kw or [] if re.search(r'\b' + re.escape(kw.lower()) + r'\b', tl)]
+    matched = [
+        kw
+        for kw in exclude_kw or []
+        if re.search(r"\b" + re.escape(kw.lower()) + r"\b", tl)
+    ]
     if matched:
         return "exclude", matched
     return None, []
 
 
-def title_kept(title: str, include_kw: list, exclude_kw: list) -> tuple[bool, str | None]:
+def title_kept(
+    title: str, include_kw: list, exclude_kw: list
+) -> tuple[bool, str | None]:
     """(kept, reason) with the reason the previews show (see title_filter_hit)."""
     rule, keywords = title_filter_hit(title, include_kw, exclude_kw)
     if rule == "include":
@@ -221,13 +374,16 @@ def company_included(company: str, company_filter: list) -> tuple[bool, str | No
     """(kept, reason) for a search's "Company include · exact" list: an exact,
     case-insensitive name match (as JobSpy's `apply_company_filter`); an empty list keeps
     every company. The reason reads as the keyword preview's."""
-    names = {(c or "").strip().lower() for c in (company_filter or []) if (c or "").strip()}
+    names = {
+        (c or "").strip().lower() for c in (company_filter or []) if (c or "").strip()
+    }
     if not names or (company or "").strip().lower() in names:
         return True, None
     return False, f"Company filter: {', '.join(c for c in company_filter if c)}"
 
 
 # ── Job validation ────────────────────────────────────────────────────────────
+
 
 def _validate_job(title: str, url: str) -> str | None:
     """Validate a scraped job entry. Returns None if valid, or rejection reason."""
@@ -242,19 +398,19 @@ def _validate_job(title: str, url: str) -> str | None:
             return f"Garbage substring: '{sub}'"
     if title_lower in _LOCALE_NAMES or _is_locale_pair(title_lower):
         return "Locale/language name"
-    if re.match(r'^[\d\s\-\.]+$', title_clean):
+    if re.match(r"^[\d\s\-\.]+$", title_clean):
         return "Title is just numbers/symbols"
 
     if not url:
         return "No URL"
     url_lower = url.lower()
-    if not (url_lower.startswith('http://') or url_lower.startswith('https://')):
+    if not (url_lower.startswith("http://") or url_lower.startswith("https://")):
         # Covers mailto:, javascript:, relative paths — anything non-http(s)
         return "Bad URL scheme"
     parsed = urlparse(url)
     if not parsed.netloc:
         return "No host in URL"
-    if parsed.path in ('/', '') and not parsed.query:
+    if parsed.path in ("/", "") and not parsed.query:
         return "Root URL (not a job link)"
 
     return None
@@ -262,17 +418,24 @@ def _validate_job(title: str, url: str) -> str | None:
 
 # ── Per-company keyword filters ───────────────────────────────────────────────
 
-def _apply_company_filters(jobs: list[dict], company, global_title_exclude: list = None) -> tuple[list[dict], list[dict]]:
+
+def _apply_company_filters(
+    jobs: list[dict], company, global_title_exclude: list = None
+) -> tuple[list[dict], list[dict]]:
     """Filter jobs using per-company title_include_expr and title_exclude_keywords; returns (kept, rejected)."""
     include_expr = company.title_include_expr
-    merged = list(set((company.title_exclude_keywords or []) + (global_title_exclude or [])))
+    merged = list(
+        set((company.title_exclude_keywords or []) + (global_title_exclude or []))
+    )
     exclude_kws = [kw.lower() for kw in merged]
 
     kept = []
     rejected = []
     for j in jobs:
         title_lower = j["title"].lower()
-        if any(re.search(r'\b' + re.escape(kw) + r'\b', title_lower) for kw in exclude_kws):
+        if any(
+            re.search(r"\b" + re.escape(kw) + r"\b", title_lower) for kw in exclude_kws
+        ):
             rejected.append(j)
             continue
         if include_expr and include_expr.strip():

@@ -8,6 +8,7 @@ scoring, cover letters, PDF import, autofill) so none of them has to keep its
 own brace regex, and one plain message stands in for the decoder's
 "Expecting value: line 1 column 1 (char 0)" when the reply carries no JSON.
 """
+
 import json
 
 # What the user reads when a reply cannot be parsed; the decoder's own message
@@ -44,7 +45,7 @@ def first_json_object(text: str):
             if depth:
                 depth -= 1
                 if depth == 0 and start >= 0:
-                    return text[start:i + 1]
+                    return text[start : i + 1]
     return None
 
 
@@ -58,7 +59,9 @@ def parse_model_json(raw_response: str) -> dict:
             return json.loads(candidate)
         except json.JSONDecodeError as e:
             last_err = e
-    raise last_err or json.JSONDecodeError("no JSON object found", raw_response or "", 0)
+    raise last_err or json.JSONDecodeError(
+        "no JSON object found", raw_response or "", 0
+    )
 
 
 def require_model_json(raw_response: str) -> dict:

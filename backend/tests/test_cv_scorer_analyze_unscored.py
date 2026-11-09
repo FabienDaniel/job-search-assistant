@@ -1,6 +1,8 @@
 """Tests for cv_scorer.analyze_unscored_jobs — entity filter + default CV fallback + no-text skip."""
-import pytest
+
 import asyncio
+
+import pytest
 from sqlalchemy import null as sa_null
 from sqlalchemy.orm import sessionmaker
 
@@ -8,12 +10,15 @@ from sqlalchemy.orm import sessionmaker
 @pytest.fixture
 def scorer_ready_db(test_db, monkeypatch):
     """In-memory DB with Setting rows scorer needs + SessionLocal patched."""
-    from backend.models.db import Setting, Resume
+    from backend.models.db import Resume, Setting
 
     # Core settings required by _score_job_inner
     settings = [
         ("scoring_rubric", "RUBRIC TEXT"),
-        ("scoring_output_light", 'JSON: {"scores": {CV_NAMES_HERE}, "best_cv": "CV_NAME"}'),
+        (
+            "scoring_output_light",
+            'JSON: {"scores": {CV_NAMES_HERE}, "best_cv": "CV_NAME"}',
+        ),
         ("scoring_output_full", "FULL SCHEMA CV_NAMES_HERE CV_NAME"),
         ("llm_model", "claude-sonnet-4-6"),
         ("llm_provider", "claude_api"),
@@ -44,17 +49,19 @@ def scorer_ready_db(test_db, monkeypatch):
     # Patch SessionLocal used inside cv_scorer so the module sees the test DB
     TestSession = sessionmaker(bind=test_db.get_bind())
     import backend.analyzer.cv_scorer as scorer
+
     monkeypatch.setattr(scorer, "SessionLocal", TestSession)
 
     # Fresh semaphore per test (avoid leaking state between tests)
-    monkeypatch.setattr(scorer, "_get_scoring_semaphore",
-                        lambda: asyncio.Semaphore(5))
+    monkeypatch.setattr(scorer, "_get_scoring_semaphore", lambda: asyncio.Semaphore(5))
 
     return {"db": test_db, "Session": TestSession, "resume": resume}
 
 
 @pytest.mark.asyncio
-async def test_analyze_unscored_jobs_only_scores_entities_with_auto_scoring(scorer_ready_db, monkeypatch):
+async def test_analyze_unscored_jobs_only_scores_entities_with_auto_scoring(
+    scorer_ready_db, monkeypatch
+):
     """Jobs from companies with auto_scoring_depth='off' are skipped; 'light' companies get scored."""
     from backend.models.db import Company, Job
 
@@ -72,12 +79,26 @@ async def test_analyze_unscored_jobs_only_scores_entities_with_auto_scoring(scor
     desc_off = "SCORE_ME_OFF: Senior product manager position. " + ("Detail. " * 10)
 
     # cv_scores=sa_null() so the IS NULL branch of unscored_filter() matches.
-    job_on = Job(external_id="j1", content_hash="h1", company="ScoreOnCo",
-                 title="Senior PM", url="https://x.com/1", status="new",
-                 description=desc_on, cv_scores=sa_null())
-    job_off = Job(external_id="j2", content_hash="h2", company="ScoreOffCo",
-                  title="Senior PM", url="https://x.com/2", status="new",
-                  description=desc_off, cv_scores=sa_null())
+    job_on = Job(
+        external_id="j1",
+        content_hash="h1",
+        company="ScoreOnCo",
+        title="Senior PM",
+        url="https://x.com/1",
+        status="new",
+        description=desc_on,
+        cv_scores=sa_null(),
+    )
+    job_off = Job(
+        external_id="j2",
+        content_hash="h2",
+        company="ScoreOffCo",
+        title="Senior PM",
+        url="https://x.com/2",
+        status="new",
+        description=desc_off,
+        cv_scores=sa_null(),
+    )
     db.add(job_on)
     db.add(job_off)
     db.commit()
@@ -91,14 +112,19 @@ async def test_analyze_unscored_jobs_only_scores_entities_with_auto_scoring(scor
             scored_markers.append("off")
         return {
             "text": '{"scores":{"Default":75},"best_cv":"Default"}',
-            "usage": {"input_tokens": 100, "output_tokens": 20,
-                      "cache_read_tokens": 0, "cache_write_tokens": 0},
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            },
         }
 
     monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm", fake_call_llm)
     monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call", lambda **kw: None)
 
     from backend.analyzer.cv_scorer import analyze_unscored_jobs
+
     await analyze_unscored_jobs(status="new")
 
     assert "on" in scored_markers, (
@@ -124,9 +150,14 @@ async def test_analyze_unscored_skips_jobs_with_no_text(scorer_ready_db, monkeyp
 
     # No description, no cached page, no URL → _get_job_text returns None
     no_text_job = Job(
-        external_id="nt1", content_hash="hnt1", company="NoTextCo",
-        title="Senior PM", url=None, status="new",
-        description=None, cv_scores=sa_null(),
+        external_id="nt1",
+        content_hash="hnt1",
+        company="NoTextCo",
+        title="Senior PM",
+        url=None,
+        status="new",
+        description=None,
+        cv_scores=sa_null(),
     )
     db.add(no_text_job)
     db.commit()
@@ -137,14 +168,19 @@ async def test_analyze_unscored_skips_jobs_with_no_text(scorer_ready_db, monkeyp
         call_llm_invocations.append(True)
         return {
             "text": '{"scores":{"Default":75},"best_cv":"Default"}',
-            "usage": {"input_tokens": 100, "output_tokens": 20,
-                      "cache_read_tokens": 0, "cache_write_tokens": 0},
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            },
         }
 
     monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm", fake_call_llm)
     monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call", lambda **kw: None)
 
     from backend.analyzer.cv_scorer import analyze_unscored_jobs
+
     await analyze_unscored_jobs(status="new")
 
     assert not call_llm_invocations, "Expected no LLM call for job with no text"
@@ -157,22 +193,34 @@ async def test_analyze_unscored_skips_jobs_with_no_text(scorer_ready_db, monkeyp
 
 
 @pytest.mark.asyncio
-async def test_analyze_unscored_uses_default_cv_when_no_selected(scorer_ready_db, monkeypatch):
+async def test_analyze_unscored_uses_default_cv_when_no_selected(
+    scorer_ready_db, monkeypatch
+):
     """A company with empty selected_resume_ids falls back to the default CV from settings."""
     from backend.models.db import Company, Job
 
     db = scorer_ready_db["db"]
 
     # selected_resume_ids=[] → fallback to default CV
-    co = Company(name="DefaultCVCo", scrape_urls=[], auto_scoring_depth="light",
-                 selected_resume_ids=[])
+    co = Company(
+        name="DefaultCVCo",
+        scrape_urls=[],
+        auto_scoring_depth="light",
+        selected_resume_ids=[],
+    )
     db.add(co)
     db.commit()
 
-    job = Job(external_id="d1", content_hash="hd1", company="DefaultCVCo",
-              title="Senior PM", url="https://x.com/d1", status="new",
-              description="Senior product manager position. " * 10,
-              cv_scores=sa_null())
+    job = Job(
+        external_id="d1",
+        content_hash="hd1",
+        company="DefaultCVCo",
+        title="Senior PM",
+        url="https://x.com/d1",
+        status="new",
+        description="Senior product manager position. " * 10,
+        cv_scores=sa_null(),
+    )
     db.add(job)
     db.commit()
 
@@ -182,14 +230,19 @@ async def test_analyze_unscored_uses_default_cv_when_no_selected(scorer_ready_db
         captured["prefix"] = cached_prefix or ""
         return {
             "text": '{"scores":{"Default":75},"best_cv":"Default"}',
-            "usage": {"input_tokens": 100, "output_tokens": 20,
-                      "cache_read_tokens": 0, "cache_write_tokens": 0},
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            },
         }
 
     monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm", fake_call_llm)
     monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call", lambda **kw: None)
 
     from backend.analyzer.cv_scorer import analyze_unscored_jobs
+
     await analyze_unscored_jobs(status="new")
 
     # The default CV's extracted_text should be embedded in the cached prefix

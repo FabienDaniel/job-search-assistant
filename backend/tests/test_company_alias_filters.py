@@ -1,4 +1,5 @@
 """Company aliases collapse in filter list + expand in filter application (#aliases)."""
+
 from backend.models.db import Company, Job, Setting
 
 
@@ -25,11 +26,31 @@ def test_companies_list_collapses_aliases(api_client, test_db):
     """Three jobs under three Amazon aliases -> /api/jobs/companies/list returns just 'Amazon'."""
     _seed_first_run(test_db)
     _seed_amazon_with_aliases(test_db)
-    test_db.add_all([
-        Job(external_id="a1", content_hash="ah1", company="Amazon", title="PM", status="new"),
-        Job(external_id="a2", content_hash="ah2", company="Audible", title="PM", status="new"),
-        Job(external_id="a3", content_hash="ah3", company="Prime Video & Amazon MGM Studios", title="PM", status="new"),
-    ])
+    test_db.add_all(
+        [
+            Job(
+                external_id="a1",
+                content_hash="ah1",
+                company="Amazon",
+                title="PM",
+                status="new",
+            ),
+            Job(
+                external_id="a2",
+                content_hash="ah2",
+                company="Audible",
+                title="PM",
+                status="new",
+            ),
+            Job(
+                external_id="a3",
+                content_hash="ah3",
+                company="Prime Video & Amazon MGM Studios",
+                title="PM",
+                status="new",
+            ),
+        ]
+    )
     test_db.commit()
 
     resp = api_client.get("/api/jobs/companies/list")
@@ -41,10 +62,24 @@ def test_companies_list_passes_orphans_through(api_client, test_db):
     """A job with a company that has no Company record stays as its raw name."""
     _seed_first_run(test_db)
     _seed_amazon_with_aliases(test_db)
-    test_db.add_all([
-        Job(external_id="o1", content_hash="oh1", company="Amazon", title="PM", status="new"),
-        Job(external_id="o2", content_hash="oh2", company="UnknownCo Inc.", title="PM", status="new"),
-    ])
+    test_db.add_all(
+        [
+            Job(
+                external_id="o1",
+                content_hash="oh1",
+                company="Amazon",
+                title="PM",
+                status="new",
+            ),
+            Job(
+                external_id="o2",
+                content_hash="oh2",
+                company="UnknownCo Inc.",
+                title="PM",
+                status="new",
+            ),
+        ]
+    )
     test_db.commit()
 
     resp = api_client.get("/api/jobs/companies/list")
@@ -55,12 +90,38 @@ def test_jobs_filter_expands_aliases(api_client, test_db):
     """company=Amazon should match jobs whose raw Job.company is 'Audible' or 'AWS'."""
     _seed_first_run(test_db)
     _seed_amazon_with_aliases(test_db)
-    test_db.add_all([
-        Job(external_id="f1", content_hash="fh1", company="Amazon", title="PM", status="new"),
-        Job(external_id="f2", content_hash="fh2", company="Audible", title="PM", status="new"),
-        Job(external_id="f3", content_hash="fh3", company="AWS", title="PM", status="new"),
-        Job(external_id="f4", content_hash="fh4", company="Google", title="PM", status="new"),
-    ])
+    test_db.add_all(
+        [
+            Job(
+                external_id="f1",
+                content_hash="fh1",
+                company="Amazon",
+                title="PM",
+                status="new",
+            ),
+            Job(
+                external_id="f2",
+                content_hash="fh2",
+                company="Audible",
+                title="PM",
+                status="new",
+            ),
+            Job(
+                external_id="f3",
+                content_hash="fh3",
+                company="AWS",
+                title="PM",
+                status="new",
+            ),
+            Job(
+                external_id="f4",
+                content_hash="fh4",
+                company="Google",
+                title="PM",
+                status="new",
+            ),
+        ]
+    )
     test_db.commit()
 
     resp = api_client.get("/api/jobs?company=Amazon")
@@ -71,17 +132,26 @@ def test_jobs_filter_expands_aliases(api_client, test_db):
 
 def test_update_application_returns_canonical_company(api_client, test_db):
     """PATCH /api/applications/{id} response should include canonical company name when alias matched."""
-    from backend.models.db import Company, Job, Application, Setting
+    from backend.models.db import Application, Company, Job, Setting
+
     test_db.add(Setting(key="dashboard_api_key", value=""))
-    test_db.add(Company(
-        name="Amazon",
-        tier=1,
-        scrape_urls=[],
-        aliases=["Audible"],
-        active=True,
-        playwright_enabled=True,
-    ))
-    job = Job(external_id="upd1", content_hash="uh1", company="Audible", title="PM", status="applied")
+    test_db.add(
+        Company(
+            name="Amazon",
+            tier=1,
+            scrape_urls=[],
+            aliases=["Audible"],
+            active=True,
+            playwright_enabled=True,
+        )
+    )
+    job = Job(
+        external_id="upd1",
+        content_hash="uh1",
+        company="Audible",
+        title="PM",
+        status="applied",
+    )
     test_db.add(job)
     test_db.flush()
     app_row = Application(job_id=job.id, status="applied")

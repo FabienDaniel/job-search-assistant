@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "resume_templates"
 
 
@@ -33,4 +32,3 @@ def test_resume_template_repeats_preview_margins_on_every_page(name):
     assert ".page { width: auto; padding: 0; margin: 0; }" in source, (
         f"{name} must remove wrapper padding when @page margins take over"
     )
-

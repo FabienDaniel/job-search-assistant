@@ -1,12 +1,13 @@
 """Acknowledging a scrape warning, and keeping switched-off entities (paused searches, inactive companies) out of the rail health dot and attention counts."""
-from datetime import datetime, timezone, timedelta
+
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi import HTTPException
 
 from backend.api.routes_companies import acknowledge_company_warning
 from backend.api.routes_searches import acknowledge_search_warning
-from backend.models.db import Company, Search, ScrapeLog, is_acknowledged
+from backend.models.db import Company, ScrapeLog, Search, is_acknowledged
 
 MISSING_ID = "d4dddddd-ddd4-4dd4-8ddd-dddddddddddd"
 
@@ -16,6 +17,7 @@ def _now():
 
 
 # ── POST /api/companies/{id}/acknowledge ─────────────────────────────────────
+
 
 def test_acknowledge_company_stamps_now(test_db):
     c = Company(name="AckEndpointCo", active=True)
@@ -42,6 +44,7 @@ def test_acknowledge_company_404_on_unknown_id(test_db):
 
 
 # ── POST /api/searches/{id}/acknowledge ──────────────────────────────────────
+
 
 def test_acknowledge_search_stamps_now(test_db):
     s = Search(name="AckEndpointSearch", search_mode="keyword", active=True)
@@ -76,6 +79,7 @@ def test_acknowledge_search_409_on_builtin_extension_searches(test_db, mode):
 
 # ── is_acknowledged() ────────────────────────────────────────────────────────
 
+
 def test_is_acknowledged_compares_against_the_newest_run():
     ack = _now()
     assert is_acknowledged(ack - timedelta(minutes=1), ack) is True
@@ -94,18 +98,30 @@ def test_is_acknowledged_tolerates_naive_datetimes():
 
 # ── scheduler run summary ────────────────────────────────────────────────────
 
+
 def test_scrape_summary_ignores_switched_off_entities(test_db):
     from backend.scheduler import _scrape_summary
+
     live = Search(name="Live", search_mode="keyword", active=True)
     paused = Search(name="Paused", search_mode="keyword", active=False)
     off_co = Company(name="OffCo", active=False)
     test_db.add_all([live, paused, off_co])
     test_db.commit()
 
-    test_db.add(ScrapeLog(search_id=live.id, source="linkedin", jobs_found=4, new_jobs=2))
-    test_db.add(ScrapeLog(search_id=paused.id, source="indeed", jobs_found=0, error="403"))
-    test_db.add(ScrapeLog(company_id=off_co.id, source="playwright_url", jobs_found=0, is_warning=True))
-    bad_board = ScrapeLog(search_id=paused.id, source="jobspy", jobs_found=1, new_jobs=0)
+    test_db.add(
+        ScrapeLog(search_id=live.id, source="linkedin", jobs_found=4, new_jobs=2)
+    )
+    test_db.add(
+        ScrapeLog(search_id=paused.id, source="indeed", jobs_found=0, error="403")
+    )
+    test_db.add(
+        ScrapeLog(
+            company_id=off_co.id, source="playwright_url", jobs_found=0, is_warning=True
+        )
+    )
+    bad_board = ScrapeLog(
+        search_id=paused.id, source="jobspy", jobs_found=1, new_jobs=0
+    )
     bad_board.source_breakdown = {"zip_recruiter": {"error": "403"}}
     test_db.add(bad_board)
     test_db.commit()
@@ -126,12 +142,14 @@ def test_scrape_summary_does_not_call_a_productive_run_empty(test_db):
     was true only while is_warning meant jobs_found == 0.
     """
     from backend.scheduler import _scrape_summary
+
     live = Search(name="Live", search_mode="keyword", active=True)
     test_db.add(live)
     test_db.commit()
 
-    row = ScrapeLog(search_id=live.id, source="jobspy", jobs_found=40, new_jobs=12,
-                    is_warning=True)
+    row = ScrapeLog(
+        search_id=live.id, source="jobspy", jobs_found=40, new_jobs=12, is_warning=True
+    )
     row.source_breakdown = {
         "indeed": {"seen": 0, "new": 0, "returned": 0},
         "linkedin": {"seen": 40, "new": 12, "returned": 40},
@@ -148,11 +166,19 @@ def test_scrape_summary_does_not_call_a_productive_run_empty(test_db):
 def test_scrape_summary_still_counts_a_genuinely_empty_run(test_db):
     """The control: no error, no board detail, nothing found — still "empty"."""
     from backend.scheduler import _scrape_summary
+
     live = Search(name="Live", search_mode="keyword", active=True)
     test_db.add(live)
     test_db.commit()
-    test_db.add(ScrapeLog(search_id=live.id, source="levels_fyi", jobs_found=0,
-                          new_jobs=0, is_warning=True))
+    test_db.add(
+        ScrapeLog(
+            search_id=live.id,
+            source="levels_fyi",
+            jobs_found=0,
+            new_jobs=0,
+            is_warning=True,
+        )
+    )
     test_db.commit()
 
     assert "1 empty" in _scrape_summary(_now() - timedelta(hours=1))
@@ -160,10 +186,13 @@ def test_scrape_summary_still_counts_a_genuinely_empty_run(test_db):
 
 def test_scrape_summary_still_reports_active_entities(test_db):
     from backend.scheduler import _scrape_summary
+
     live = Search(name="Live", search_mode="keyword", active=True)
     test_db.add(live)
     test_db.commit()
-    test_db.add(ScrapeLog(search_id=live.id, source="indeed", jobs_found=0, error="403"))
+    test_db.add(
+        ScrapeLog(search_id=live.id, source="indeed", jobs_found=0, error="403")
+    )
     test_db.commit()
 
     assert "1 failed" in _scrape_summary(_now() - timedelta(hours=1))

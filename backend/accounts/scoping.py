@@ -21,14 +21,19 @@ is passed to `use_account` / `acting_as` / `for_each_account` as `session=`, whi
 other accounts' rows from it via `drop_foreign_rows`; fan-out code uses a fresh session
 per account, `background.account_session`).
 """
+
 from sqlalchemy import event
 from sqlalchemy.orm import Session, with_loader_criteria
 from sqlalchemy.sql import visitors
 from sqlalchemy.sql.selectable import TableClause
 
 from backend.accounts.context import (
-    AccountContextMissing, current_account, is_unscoped, owner_id_for_session,
-    resolve_account, strict_mode,
+    AccountContextMissing,
+    current_account,
+    is_unscoped,
+    owner_id_for_session,
+    resolve_account,
+    strict_mode,
 )
 
 _installed = False
@@ -61,7 +66,8 @@ def owned_tables_in(statement, marker=None) -> set:
 def _missing_context(what: str):
     return AccountContextMissing(
         f"No account context for a statement on {what}: wrap the code in "
-        "use_account(...) or unscoped() (MT_STRICT=1)")
+        "use_account(...) or unscoped() (MT_STRICT=1)"
+    )
 
 
 def _stamp_insert(state, marker):
@@ -76,11 +82,11 @@ def _stamp_insert(state, marker):
         if is_unscoped():
             account = owner_id_for_session(state.session)
         else:
-            account = resolve_account(state.session)   # raises in strict mode
+            account = resolve_account(state.session)  # raises in strict mode
     if account is None:
         if strict_mode():
             raise _missing_context(name)
-        return   # no accounts table yet (pre-migration): nothing to stamp with
+        return  # no accounts table yet (pre-migration): nothing to stamp with
     params = state.parameters
     if isinstance(params, list) and params:
         for p in params:
@@ -95,11 +101,12 @@ def _stamp_insert(state, marker):
     if multi:
         raise ValueError(
             f"multi-row values() INSERT into {name}: pass account_id on every row "
-            "or insert through the ORM")
+            "or insert through the ORM"
+        )
     values = getattr(stmt, "_values", None) or {}
     if any(getattr(k, "key", k) == "account_id" for k in values):
         return
-    if getattr(stmt, "select", None) is not None:   # INSERT … FROM SELECT
+    if getattr(stmt, "select", None) is not None:  # INSERT … FROM SELECT
         if strict_mode():
             raise ValueError(f"INSERT … FROM SELECT into {name} must carry account_id")
         return
@@ -132,7 +139,9 @@ def install_scoping(marker) -> None:
         except Exception:
             mappers = []
         if any(issubclass(m.class_, marker) for m in mappers):
-            account = resolve_account(state.session)  # raises in strict mode without a context
+            account = resolve_account(
+                state.session
+            )  # raises in strict mode without a context
         else:
             # An unowned entity that may join an owned one (JobLocation → Job), a SELECT
             # whose entities sit in a subquery (Query.count(), exists(), union) or a Core
@@ -151,18 +160,27 @@ def install_scoping(marker) -> None:
         if account is None:
             return
         state.statement = state.statement.options(
-            with_loader_criteria(marker, lambda cls: cls.account_id == account, include_aliases=True)
+            with_loader_criteria(
+                marker, lambda cls: cls.account_id == account, include_aliases=True
+            )
         )
 
     @event.listens_for(Session, "before_flush")
     def _stamp_new_rows(session, flush_context, instances):
-        new = [o for o in session.new
-               if isinstance(o, marker) and getattr(o, "account_id", None) is None]
+        new = [
+            o
+            for o in session.new
+            if isinstance(o, marker) and getattr(o, "account_id", None) is None
+        ]
         if not new:
             return
         account = current_account.get()
         if account is None:
-            account = owner_id_for_session(session) if is_unscoped() else resolve_account(session)
+            account = (
+                owner_id_for_session(session)
+                if is_unscoped()
+                else resolve_account(session)
+            )
         if account is None:
             # R1-03: never stamp NULL while accounts exist (the row would be invisible
             # and later backfilled to the owner, whoever created it). System code
@@ -186,12 +204,13 @@ def drop_foreign_rows(session) -> int:
     if session is None or _marker is None or is_unscoped():
         return 0
     from sqlalchemy import inspect as sa_inspect
+
     account = current_account.get()
     if account is None:
         try:
             account = owner_id_for_session(session)
         except Exception:
-            account = None   # unknown: keep nothing account-owned
+            account = None  # unknown: keep nothing account-owned
     dropped = 0
     for obj in list(session.identity_map.values()):
         if not isinstance(obj, _marker):
@@ -205,9 +224,13 @@ def drop_foreign_rows(session) -> int:
 
 def _accounts_exist(session) -> bool:
     from sqlalchemy import func, select
+
     from backend.models.db import Account
+
     t = Account.__table__
     try:
-        return bool(session.connection().execute(select(func.count()).select_from(t)).scalar())
+        return bool(
+            session.connection().execute(select(func.count()).select_from(t)).scalar()
+        )
     except Exception:
         return False

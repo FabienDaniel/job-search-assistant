@@ -1,22 +1,28 @@
 """Tests for sources/linkedin_personal.py — LinkedIn /jobs/collections/ scraper."""
+
 import pytest
 
 
 def test_sources_linkedin_personal_exposes_entry_points():
     from backend.scraper.sources import linkedin_personal
+
     assert hasattr(linkedin_personal, "run")
     assert hasattr(linkedin_personal, "preview")
 
 
 def test_run_is_async():
     import asyncio
+
     from backend.scraper.sources import linkedin_personal
+
     assert asyncio.iscoroutinefunction(linkedin_personal.run)
 
 
 def test_preview_is_async():
     import asyncio
+
     from backend.scraper.sources import linkedin_personal
+
     assert asyncio.iscoroutinefunction(linkedin_personal.preview)
 
 
@@ -46,12 +52,15 @@ class _FakePage:
         raise AssertionError(f"page.fill({selector!r}) — the login page has no such id")
 
     async def click(self, selector):
-        raise AssertionError(f"page.click({selector!r}) — the login page has no submit button")
+        raise AssertionError(
+            f"page.click({selector!r}) — the login page has no submit button"
+        )
 
 
 @pytest.mark.asyncio
 async def test_fill_login_form_uses_autocomplete_selectors(monkeypatch):
     import asyncio as _asyncio
+
     from backend.scraper.sources import linkedin_personal as lp
 
     async def _no_sleep(_seconds):
@@ -86,7 +95,9 @@ class _SessionPage:
         self.url = url
 
     def locator(self, selector):
-        raise AssertionError(f"locator({selector!r}) — the feed DOM is not a login signal")
+        raise AssertionError(
+            f"locator({selector!r}) — the feed DOM is not a login signal"
+        )
 
 
 class _FakeContext:
@@ -106,11 +117,17 @@ class _FakeContext:
         (_SessionPage(status=0), False),
         (_SessionPage(raises=True), False),
         (_SessionPage(url="https://www.linkedin.com/login", status=200), False),
-        (_SessionPage(url="https://www.linkedin.com/checkpoint/ch/login", status=200), False),
+        (
+            _SessionPage(
+                url="https://www.linkedin.com/checkpoint/ch/login", status=200
+            ),
+            False,
+        ),
     ],
 )
 async def test_is_logged_in_trusts_voyager_not_the_dom(page, expected):
     from backend.scraper.sources import linkedin_personal as lp
+
     assert await lp._is_logged_in(page) is expected
 
 
@@ -127,17 +144,28 @@ async def test_is_logged_in_trusts_voyager_not_the_dom(page, expected):
         ("https://www.linkedin.com/feed/", 401, False, False),
         # A signed-out URL wins even with the cookie still set.
         ("https://www.linkedin.com/login", 401, True, False),
-        ("https://www.linkedin.com/uas/login?session_redirect=%2Ffeed%2F", 0, True, False),
+        (
+            "https://www.linkedin.com/uas/login?session_redirect=%2Ffeed%2F",
+            0,
+            True,
+            False,
+        ),
         ("https://www.linkedin.com/authwall?trk=x", 0, True, False),
         # /me 200 is definitive regardless of surface or cookie.
         ("https://www.linkedin.com/feed/", 200, False, True),
     ],
 )
-async def test_is_logged_in_falls_back_to_the_auth_cookie_on_a_signed_in_surface(url, status, has_cookie, expected):
+async def test_is_logged_in_falls_back_to_the_auth_cookie_on_a_signed_in_surface(
+    url, status, has_cookie, expected
+):
     from backend.scraper.sources import linkedin_personal as lp
+
     page = _SessionPage(url=url, status=status)
-    ctx = _FakeContext([{"name": "li_at", "value": "x"}] if has_cookie
-                       else [{"name": "JSESSIONID", "value": "y"}])
+    ctx = _FakeContext(
+        [{"name": "li_at", "value": "x"}]
+        if has_cookie
+        else [{"name": "JSESSIONID", "value": "y"}]
+    )
     assert await lp._is_logged_in(page, ctx) is expected
 
 
@@ -150,14 +178,16 @@ async def test_ensure_logged_in_skips_credential_login_on_a_live_feed(monkeypatc
 
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(lp.asyncio, "sleep", _no_sleep)
 
-    page = _SessionPage(status=401)      # goto() lands on /feed/, /me still refuses
+    page = _SessionPage(status=401)  # goto() lands on /feed/, /me still refuses
     ctx = _FakeContext([{"name": "li_at", "value": "x"}])
     called = {}
 
     async def fake_login(*_a, **_k):
         called["login"] = True
+
     monkeypatch.setattr(lp, "_login", fake_login)
 
     await lp._ensure_logged_in(page, ctx, "user@example.com", "secret")
@@ -172,23 +202,31 @@ async def test_login_treats_a_fill_timeout_on_a_signed_in_page_as_success(monkey
 
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(lp.asyncio, "sleep", _no_sleep)
 
     page = _SessionPage(url="https://www.linkedin.com/login", status=401)
     ctx = _FakeContext([{"name": "li_at", "value": "x"}])
 
-    states = iter([False, True])          # guard sees the login page; after the failed fill, /feed
+    states = iter(
+        [False, True]
+    )  # guard sees the login page; after the failed fill, /feed
+
     async def fake_is_logged_in(_page, _context=None):
         return next(states)
+
     monkeypatch.setattr(lp, "_is_logged_in", fake_is_logged_in)
 
     async def fake_fill(*_a, **_k):
         raise RuntimeError("Locator.fill: Timeout 30000ms exceeded")
+
     monkeypatch.setattr(lp, "_fill_login_form", fake_fill)
 
     saved = []
+
     async def fake_save(_c):
         saved.append(True)
+
     monkeypatch.setattr(lp, "_save_cookies", fake_save)
 
     await lp._login(page, ctx, "user@example.com", "secret")
@@ -201,6 +239,7 @@ async def test_login_reraises_a_fill_failure_when_not_signed_in(monkeypatch):
 
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(lp.asyncio, "sleep", _no_sleep)
 
     page = _SessionPage(url="https://www.linkedin.com/login", status=401)
@@ -208,10 +247,12 @@ async def test_login_reraises_a_fill_failure_when_not_signed_in(monkeypatch):
 
     async def fake_is_logged_in(_page, _context=None):
         return False
+
     monkeypatch.setattr(lp, "_is_logged_in", fake_is_logged_in)
 
     async def fake_fill(*_a, **_k):
         raise RuntimeError("Locator.fill: Timeout 30000ms exceeded")
+
     monkeypatch.setattr(lp, "_fill_login_form", fake_fill)
 
     with pytest.raises(RuntimeError, match="Timeout"):
@@ -224,12 +265,14 @@ async def test_login_skips_the_form_when_login_redirects_to_the_feed(monkeypatch
 
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(lp.asyncio, "sleep", _no_sleep)
 
     page = _SessionPage(url="https://www.linkedin.com/login", status=401)
 
     async def _goto(_url, **_kw):
-        page.url = "https://www.linkedin.com/feed/"   # LinkedIn redirects a live session
+        page.url = "https://www.linkedin.com/feed/"  # LinkedIn redirects a live session
+
     page.goto = _goto
 
     ctx = _FakeContext([{"name": "li_at", "value": "x"}])
@@ -255,11 +298,13 @@ def _login_until_wait(monkeypatch, lp, page_url, wait_raises=True):
     ctx = _FakeContext([{"name": "li_at", "value": "x"}])
 
     async def _goto(_url, **_kw):
-        page.url = page_url          # where the browser actually ends up after goto
+        page.url = page_url  # where the browser actually ends up after goto
+
     page.goto = _goto
 
     async def not_logged_in(*_a, **_k):
         return False
+
     monkeypatch.setattr(lp, "_is_logged_in", not_logged_in)
 
     async def fake_fill(*_a, **_k):
@@ -274,6 +319,7 @@ def _login_until_wait(monkeypatch, lp, page_url, wait_raises=True):
 
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(lp.asyncio, "sleep", _no_sleep)
     return page, ctx
 
@@ -281,11 +327,15 @@ def _login_until_wait(monkeypatch, lp, page_url, wait_raises=True):
 @pytest.mark.asyncio
 async def test_login_fills_the_form_and_saves_cookies(monkeypatch):
     from backend.scraper.sources import linkedin_personal as lp
-    page, ctx = _login_until_wait(monkeypatch, lp, "https://www.linkedin.com/login", wait_raises=False)
+
+    page, ctx = _login_until_wait(
+        monkeypatch, lp, "https://www.linkedin.com/login", wait_raises=False
+    )
     saved = []
 
     async def fake_save(_c):
         saved.append(True)
+
     monkeypatch.setattr(lp, "_save_cookies", fake_save)
 
     await lp._login(page, ctx, "user@example.com", "secret")
@@ -295,7 +345,10 @@ async def test_login_fills_the_form_and_saves_cookies(monkeypatch):
 @pytest.mark.asyncio
 async def test_login_reports_a_security_challenge(monkeypatch):
     from backend.scraper.sources import linkedin_personal as lp
-    page, ctx = _login_until_wait(monkeypatch, lp, "https://www.linkedin.com/checkpoint/challenge")
+
+    page, ctx = _login_until_wait(
+        monkeypatch, lp, "https://www.linkedin.com/checkpoint/challenge"
+    )
     with pytest.raises(RuntimeError, match="security challenge"):
         await lp._login(page, ctx, "user@example.com", "secret")
 
@@ -303,6 +356,7 @@ async def test_login_reports_a_security_challenge(monkeypatch):
 @pytest.mark.asyncio
 async def test_login_reports_still_on_the_login_page(monkeypatch):
     from backend.scraper.sources import linkedin_personal as lp
+
     page, ctx = _login_until_wait(monkeypatch, lp, "https://www.linkedin.com/login")
     with pytest.raises(RuntimeError, match="Check credentials"):
         await lp._login(page, ctx, "user@example.com", "secret")
@@ -311,7 +365,10 @@ async def test_login_reports_still_on_the_login_page(monkeypatch):
 @pytest.mark.asyncio
 async def test_login_reports_an_unexpected_landing(monkeypatch):
     from backend.scraper.sources import linkedin_personal as lp
-    page, ctx = _login_until_wait(monkeypatch, lp, "https://www.linkedin.com/somewhere-else")
+
+    page, ctx = _login_until_wait(
+        monkeypatch, lp, "https://www.linkedin.com/somewhere-else"
+    )
     with pytest.raises(RuntimeError, match="unexpected page"):
         await lp._login(page, ctx, "user@example.com", "secret")
 
@@ -322,10 +379,12 @@ async def test_ensure_logged_in_without_credentials_asks_for_them(monkeypatch):
 
     async def not_logged_in(*_a, **_k):
         return False
+
     monkeypatch.setattr(lp, "_is_logged_in", not_logged_in)
 
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(lp.asyncio, "sleep", _no_sleep)
 
     page = _SessionPage(url="https://www.linkedin.com/login", status=401)
@@ -339,14 +398,16 @@ async def test_ensure_logged_in_returns_on_a_live_session(monkeypatch):
 
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(lp.asyncio, "sleep", _no_sleep)
     called = []
 
     async def fake_login(*_a, **_k):
         called.append(True)
+
     monkeypatch.setattr(lp, "_login", fake_login)
 
-    page = _SessionPage(status=200)          # /me answers 200 → live session
+    page = _SessionPage(status=200)  # /me answers 200 → live session
     await lp._ensure_logged_in(page, _FakeContext([]), "user@example.com", "secret")
     assert called == []
 
@@ -404,6 +465,7 @@ async def test_fill_login_form_keeps_the_full_wait_by_default(monkeypatch):
 
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(lp.asyncio, "sleep", _no_sleep)
     page = _TimeoutPage()
     await lp._fill_login_form(page, "user@example.com", "secret")
@@ -416,16 +478,20 @@ async def test_login_fills_with_the_short_wait(monkeypatch):
 
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(lp.asyncio, "sleep", _no_sleep)
 
     async def not_logged_in(*_a, **_k):
         return False
+
     monkeypatch.setattr(lp, "_is_logged_in", not_logged_in)
 
     seen = {}
+
     async def fake_fill(_page, _email, _password, timeout=30000):
         seen["timeout"] = timeout
         raise RuntimeError("stop here")
+
     monkeypatch.setattr(lp, "_fill_login_form", fake_fill)
 
     page = _SessionPage(url="https://www.linkedin.com/login", status=401)
@@ -435,16 +501,20 @@ async def test_login_fills_with_the_short_wait(monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("landing", [
-    "https://www.linkedin.com/authwall?trk=x",
-    "https://www.linkedin.com/login?session_redirect=%2Fjobs%2Fcollections%2Frecommended",
-])
+@pytest.mark.parametrize(
+    "landing",
+    [
+        "https://www.linkedin.com/authwall?trk=x",
+        "https://www.linkedin.com/login?session_redirect=%2Fjobs%2Fcollections%2Frecommended",
+    ],
+)
 async def test_scrape_collection_reports_an_expired_session(monkeypatch, landing):
     """A collection that lands on the login wall is a dead session, not 0 jobs."""
     from backend.scraper.sources import linkedin_personal as lp
 
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(lp.asyncio, "sleep", _no_sleep)
 
     class _WallPage:
@@ -455,11 +525,15 @@ async def test_scrape_collection_reports_an_expired_session(monkeypatch, landing
 
     async def no_cards(*_a, **_k):
         raise AssertionError("cards scraped on the login wall")
+
     monkeypatch.setattr(lp, "_scrape_page_with_clicks", no_cards)
 
     with pytest.raises(lp.LinkedInSessionExpiredError, match="session expired"):
-        await lp._scrape_collection(_WallPage(), "https://www.linkedin.com/jobs/collections/recommended/",
-                                    "recommended")
+        await lp._scrape_collection(
+            _WallPage(),
+            "https://www.linkedin.com/jobs/collections/recommended/",
+            "recommended",
+        )
 
 
 @pytest.mark.asyncio
@@ -482,22 +556,44 @@ async def test_preview_excludes_active_companies_like_the_run(test_db, monkeypat
         return None
 
     async def fake_collection(page, url, name):
-        return [{"job_id": "1", "title": "Product Manager", "company": "Acme",
-                 "url": "https://www.linkedin.com/jobs/view/1", "collection": name},
-                {"job_id": "2", "title": "Product Manager", "company": "Globex",
-                 "url": "https://www.linkedin.com/jobs/view/2", "collection": name}]
+        return [
+            {
+                "job_id": "1",
+                "title": "Product Manager",
+                "company": "Acme",
+                "url": "https://www.linkedin.com/jobs/view/1",
+                "collection": name,
+            },
+            {
+                "job_id": "2",
+                "title": "Product Manager",
+                "company": "Globex",
+                "url": "https://www.linkedin.com/jobs/view/2",
+                "collection": name,
+            },
+        ]
+
     monkeypatch.setattr(lp, "_check_set_up", lambda email, password: None)
     monkeypatch.setattr(lp, "_get_linkedin_browser", fake_browser)
     monkeypatch.setattr(lp, "_ensure_logged_in", noop)
     monkeypatch.setattr(lp, "_scrape_collection", fake_collection)
     monkeypatch.setattr(lp, "_enrich_apply_urls", noop)
-    test_db.add(Company(name="Acme", active=True, scrape_urls=["https://acme.example/jobs"]))
+    test_db.add(
+        Company(name="Acme", active=True, scrape_urls=["https://acme.example/jobs"])
+    )
     test_db.commit()
-    search = Search(name="li", search_mode="linkedin_personal", sources=["recommended"],
-                    exclude_active_companies=True)
+    search = Search(
+        name="li",
+        search_mode="linkedin_personal",
+        sources=["recommended"],
+        exclude_active_companies=True,
+    )
 
     out = await lp.preview(search, test_db)
 
     rows = {j["company"]: j for j in out["jobs"]}
     assert rows["Globex"]["kept"] is True
-    assert rows["Acme"]["kept"] is False and rows["Acme"]["reason"] == "Company excluded: acme"
+    assert (
+        rows["Acme"]["kept"] is False
+        and rows["Acme"]["reason"] == "Company excluded: acme"
+    )

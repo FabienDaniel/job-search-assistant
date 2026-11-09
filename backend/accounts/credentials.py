@@ -20,6 +20,7 @@ so they get per-account homes by the same rule:
 Removing an account deletes its two dirs (`admin.account_dirs`); export leaves them out.
 `backend/scripts/cli_login.py` prints the login command for one account.
 """
+
 import os
 import uuid
 from typing import Optional
@@ -49,8 +50,12 @@ def _expand(path: str) -> str:
 
 def account_roots() -> list:
     """Every per-account root; removal deletes `<root>/<account id>` in each."""
-    return [_expand(CODEX_ACCOUNTS_ROOT), _expand(AGY_ACCOUNTS_ROOT), _expand(CLAUDE_ACCOUNTS_ROOT),
-            LI_ACCOUNTS_ROOT]
+    return [
+        _expand(CODEX_ACCOUNTS_ROOT),
+        _expand(AGY_ACCOUNTS_ROOT),
+        _expand(CLAUDE_ACCOUNTS_ROOT),
+        LI_ACCOUNTS_ROOT,
+    ]
 
 
 def codex_home(account_id) -> str:
@@ -103,9 +108,11 @@ def claude_code_token(db) -> str:
         own = (row.value if row is not None else "") or ""
         if not own.strip():
             from backend.analyzer.llm_client import NonRetryableLLMError
+
             raise NonRetryableLLMError(
                 "Claude Code is not logged in for this account: paste your Claude Code token "
-                "(from `claude setup-token`) in Settings › Models")
+                "(from `claude setup-token`) in Settings › Models"
+            )
         return own.strip()
     return (acct_settings.get_setting(db, CLAUDE_TOKEN_KEY) or "").strip()
 
@@ -159,6 +166,7 @@ def session_member(db=None) -> Optional[uuid.UUID]:
     if db is not None:
         return _linkedin_member(db)
     from backend.models.db import SessionLocal
+
     own = SessionLocal()
     try:
         return _linkedin_member(own)
@@ -169,12 +177,15 @@ def session_member(db=None) -> Optional[uuid.UUID]:
 def linkedin_shared_from_owner(db=None) -> bool:
     """True for a member whose LinkedIn section is 'inherit': its LinkedIn runs use the
     owner's session; refreshing that session is the owner's job (R5-01)."""
+
     def _check(d):
         member = acct_settings.member_account(d)
         return member is not None and _linkedin_member(d) is None
+
     if db is not None:
         return _check(db)
     from backend.models.db import SessionLocal
+
     own = SessionLocal()
     try:
         return _check(own)
@@ -201,6 +212,7 @@ def linkedin_personal_cookies(db=None) -> str:
         if not os.path.exists(LI_PERSONAL_OWNER) and os.path.exists(LI_PERSONAL_LEGACY):
             try:
                 import shutil
+
                 os.makedirs(os.path.dirname(LI_PERSONAL_OWNER), exist_ok=True)
                 shutil.move(LI_PERSONAL_LEGACY, LI_PERSONAL_OWNER)
             except OSError:

@@ -1,4 +1,5 @@
 """A scraped company or a run search must still be deletable: the handlers orphan ScrapeLog/Job rows (nulling the FK) rather than raising on delete."""
+
 import pytest
 from fastapi import HTTPException
 
@@ -13,8 +14,14 @@ OTHER_SE_ID = "a1aaaaaa-aaa1-4aa1-8aaa-aaaaaaaaaaaa"
 
 def test_company_with_scrape_history_is_deletable(test_db):
     test_db.add(Company(id=CO_ID, name="ZZ Vercel Co"))
-    test_db.add(ScrapeLog(company_id=CO_ID, source="playwright_url", jobs_found=13, new_jobs=13))
-    test_db.add(ScrapeLog(company_id=CO_ID, source="playwright_url", jobs_found=0, is_warning=True))
+    test_db.add(
+        ScrapeLog(company_id=CO_ID, source="playwright_url", jobs_found=13, new_jobs=13)
+    )
+    test_db.add(
+        ScrapeLog(
+            company_id=CO_ID, source="playwright_url", jobs_found=0, is_warning=True
+        )
+    )
     test_db.commit()
 
     assert delete_company(CO_ID, db=test_db) == {"deleted": True}
@@ -31,10 +38,24 @@ def test_search_with_runs_and_stored_jobs_is_deletable(test_db):
     test_db.add(Search(id=OTHER_SE_ID, name="Keep me"))
     test_db.add(ScrapeLog(search_id=SE_ID, source="jobspy", jobs_found=4))
     test_db.add(ScrapeLog(search_id=OTHER_SE_ID, source="jobspy", jobs_found=9))
-    test_db.add(Job(external_id="ext-a08-1", title="TPM", company="Acme",
-                    url="https://x.test/1", search_id=SE_ID))
-    test_db.add(Job(external_id="ext-a08-2", title="PM", company="Acme",
-                    url="https://x.test/2", search_id=OTHER_SE_ID))
+    test_db.add(
+        Job(
+            external_id="ext-a08-1",
+            title="TPM",
+            company="Acme",
+            url="https://x.test/1",
+            search_id=SE_ID,
+        )
+    )
+    test_db.add(
+        Job(
+            external_id="ext-a08-2",
+            title="PM",
+            company="Acme",
+            url="https://x.test/2",
+            search_id=OTHER_SE_ID,
+        )
+    )
     test_db.commit()
 
     assert delete_search(SE_ID, db=test_db) == {"deleted": True}

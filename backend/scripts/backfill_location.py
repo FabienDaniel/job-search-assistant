@@ -14,6 +14,7 @@ re-parse of rows that already have columns can move them.
     python -m backend.scripts.backfill_location --reparse            # dry run
     python -m backend.scripts.backfill_location --reparse --commit   # write
 """
+
 import argparse
 import collections
 import logging
@@ -48,12 +49,16 @@ def _reparse_job(job, commit: bool):
         # flush the deletes now: in one flush SQLAlchemy inserts before it deletes,
         # and an unchanged place would collide with its own old row (uq_job_location)
         from sqlalchemy.orm import object_session
+
         session = object_session(job)
         if session is not None:
             session.flush()
         for index, (country, region, city) in enumerate(places):
-            job.locations.append(JobLocation(country=country, region=region,
-                                             city=city, is_primary=index == 0))
+            job.locations.append(
+                JobLocation(
+                    country=country, region=region, city=city, is_primary=index == 0
+                )
+            )
     return True, before, after
 
 
@@ -64,20 +69,26 @@ def run(commit: bool = False, reparse: bool = False) -> dict:
     changes = []
     # A stable shape for the report, so a caller never has to guess whether a
     # missing key means zero or means the pass never ran.
-    tally.update({"scanned": 0, "changed": 0} if reparse
-                 else {"scanned": 0, "resolved": 0})
+    tally.update(
+        {"scanned": 0, "changed": 0} if reparse else {"scanned": 0, "resolved": 0}
+    )
     try:
-        query = (db.query(Job.id)
-                 .filter(Job.location.isnot(None), Job.location != "")
-                 .order_by(Job.discovered_at))
+        query = (
+            db.query(Job.id)
+            .filter(Job.location.isnot(None), Job.location != "")
+            .order_by(Job.discovered_at)
+        )
         if not reparse:
-            query = query.filter(Job.loc_country.is_(None), Job.loc_region.is_(None),
-                                 Job.loc_city.is_(None))
+            query = query.filter(
+                Job.loc_country.is_(None),
+                Job.loc_region.is_(None),
+                Job.loc_city.is_(None),
+            )
         # ids first, rows per batch: a commit inside a server-side cursor loop
         # invalidates the cursor on Postgres ("named cursor isn't valid anymore")
         ids = [row[0] for row in query.all()]
         for start in range(0, len(ids), BATCH):
-            chunk = ids[start:start + BATCH]
+            chunk = ids[start : start + BATCH]
             for job in db.query(Job).filter(Job.id.in_(chunk)).all():
                 tally["scanned"] += 1
                 if reparse:
@@ -116,32 +127,48 @@ def run(commit: bool = False, reparse: bool = False) -> dict:
                 db.expunge_all()
     finally:
         db.close()
-    return {"tally": dict(tally), "unresolved": unresolved.most_common(15),
-            "changes": changes}
+    return {
+        "tally": dict(tally),
+        "unresolved": unresolved.most_common(15),
+        "changes": changes,
+    }
 
 
 def run_all_accounts(commit: bool = False, reparse: bool = False) -> dict:
     """`run()` once per account (QA F4 / R1-10: with no context a script would see only
     the owner's jobs), reports merged."""
     from backend.accounts.background import acting_as, all_account_ids
+
     tally, unresolved, changes = collections.Counter(), collections.Counter(), []
     for account in all_account_ids():
         with acting_as(account):
             r = run(commit=commit, reparse=reparse)
         tally.update(r["tally"])
         unresolved.update(dict(r["unresolved"]))
-        changes.extend(r["changes"][:max(0, 20 - len(changes))])
-    return {"tally": dict(tally), "unresolved": unresolved.most_common(15), "changes": changes}
+        changes.extend(r["changes"][: max(0, 20 - len(changes))])
+    return {
+        "tally": dict(tally),
+        "unresolved": unresolved.most_common(15),
+        "changes": changes,
+    }
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--commit", action="store_true",
-                        help="write the results; without it nothing is saved")
-    parser.add_argument("--reparse", action="store_true",
-                        help=("re-read every row that has a location and rewrite "
-                              "the ones the parser now reads differently, rows "
-                              "with parsed columns included"))
+    parser.add_argument(
+        "--commit",
+        action="store_true",
+        help="write the results; without it nothing is saved",
+    )
+    parser.add_argument(
+        "--reparse",
+        action="store_true",
+        help=(
+            "re-read every row that has a location and rewrite "
+            "the ones the parser now reads differently, rows "
+            "with parsed columns included"
+        ),
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -152,8 +179,11 @@ def main(argv=None):
     logger.info("%s", "COMMIT" if args.commit else "DRY RUN - nothing written")
     if args.reparse:
         logger.info("scanned    %d", tally.get("scanned", 0))
-        logger.info("changed    %d (%.1f%%)", tally.get("changed", 0),
-                    100.0 * tally.get("changed", 0) / scanned)
+        logger.info(
+            "changed    %d (%.1f%%)",
+            tally.get("changed", 0),
+            100.0 * tally.get("changed", 0) / scanned,
+        )
         for text, before, after in report["changes"]:
             logger.info("    %-40r %s -> %s", text, before, after)
         logger.info("still unresolved %d distinct strings", len(report["unresolved"]))
@@ -162,8 +192,11 @@ def main(argv=None):
         return 0
 
     logger.info("scanned    %d", tally.get("scanned", 0))
-    logger.info("resolved   %d (%.1f%%)", tally.get("resolved", 0),
-                100.0 * tally.get("resolved", 0) / scanned)
+    logger.info(
+        "resolved   %d (%.1f%%)",
+        tally.get("resolved", 0),
+        100.0 * tally.get("resolved", 0) / scanned,
+    )
     logger.info("  country  %d", tally.get("country", 0))
     logger.info("  city     %d", tally.get("city", 0))
     logger.info("ambiguous  %d  -> left empty on purpose", tally.get("ambiguous", 0))

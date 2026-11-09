@@ -1,26 +1,32 @@
 """Tests for ats/lever.py — detection + API mock."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 
 def test_is_lever_detects_jobs_lever_co():
     from backend.scraper.ats.lever import is_lever
+
     assert is_lever("https://jobs.lever.co/acme")
 
 
 def test_is_lever_detects_with_path():
     from backend.scraper.ats.lever import is_lever
+
     assert is_lever("https://jobs.lever.co/acme/team/engineering")
 
 
 def test_is_lever_rejects_non_lever():
     from backend.scraper.ats.lever import is_lever
+
     assert not is_lever("https://boards.greenhouse.io/acme")
     assert not is_lever("https://nvidia.wd5.myworkdayjobs.com/Site")
 
 
 def test_is_lever_rejects_path_injection():
     from backend.scraper.ats.lever import is_lever
+
     assert not is_lever("https://attacker.com/?url=lever.co")
 
 
@@ -44,6 +50,7 @@ async def test_scrape_lever_parses_api(monkeypatch):
         },
     ]
     import json as _json
+
     mock_resp = MagicMock()
     mock_resp.json = MagicMock(return_value=api_response_body)
     mock_resp.text = _json.dumps(api_response_body)
@@ -58,6 +65,7 @@ async def test_scrape_lever_parses_api(monkeypatch):
     monkeypatch.setattr("httpx.AsyncClient", lambda **kw: mock_client)
 
     from backend.scraper.ats.lever import scrape
+
     result = await scrape("https://jobs.lever.co/acme")
     jobs = result[0] if isinstance(result, tuple) else result
     assert isinstance(jobs, list)
@@ -80,6 +88,7 @@ async def test_scrape_lever_handles_http_error(monkeypatch):
     monkeypatch.setattr("httpx.AsyncClient", lambda **kw: mock_client)
 
     from backend.scraper.ats.lever import scrape
+
     result = await scrape("https://jobs.lever.co/acme")
     jobs = result[0] if isinstance(result, tuple) else result
     assert jobs == []

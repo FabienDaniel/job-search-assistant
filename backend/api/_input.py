@@ -7,12 +7,15 @@ sends a number, list or dict, which surfaces as an unexplained 500 (R4-T1-20).
 These helpers turn every such shape into the 400 the handler already answers for
 a blank value.
 """
+
 import uuid as _uuid
 
 from fastapi import HTTPException
 
 
-def str_field(body: dict, key: str, *, required: bool = False, label: str = None) -> str:
+def str_field(
+    body: dict, key: str, *, required: bool = False, label: str = None
+) -> str:
     """Return `body[key]` as a stripped string.
 
     Missing/None/blank -> "" (or 400 when `required`). A non-string value is a
@@ -45,5 +48,4 @@ def uuid_filter(value, label: str):
     try:
         return _uuid.UUID(str(value))
     except (ValueError, AttributeError, TypeError):
-        raise HTTPException(status_code=422,
-                            detail=f"{label} must be a UUID") from None
+        raise HTTPException(status_code=422, detail=f"{label} must be a UUID") from None

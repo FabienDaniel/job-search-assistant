@@ -20,6 +20,7 @@
 The redirect URI is `<browser origin>/api/gmail/callback`; the owner adds it once as an
 authorised redirect URI of the OAuth client in the Google Cloud console.
 """
+
 import logging
 import uuid
 from urllib.parse import urlencode
@@ -69,16 +70,30 @@ def gmail_connect(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=503, detail="gmail_not_configured")
     redirect_uri = gmail_auth.redirect_uri(request)
     state, nonce = gmail_auth.new_state(db, _caller_id(db), redirect_uri)
-    body = {"url": gmail_auth.consent_url(client_id, redirect_uri, state), "redirect_uri": redirect_uri}
+    body = {
+        "url": gmail_auth.consent_url(client_id, redirect_uri, state),
+        "redirect_uri": redirect_uri,
+    }
     response = JSONResponse(body)
     # QA F8 / R5-06: only this browser can finish the flow (see gmail_auth.BROWSER_COOKIE)
-    gmail_auth.set_browser_cookie(response, nonce, secure=redirect_uri.startswith("https://"))
+    gmail_auth.set_browser_cookie(
+        response, nonce, secure=redirect_uri.startswith("https://")
+    )
     return response
 
 
-@router.get("/callback", summary="Google OAuth redirect target (public)", include_in_schema=False)
-async def gmail_callback(request: Request, code: str = None, state: str = None, error: str = None,
-                         db: Session = Depends(get_db)):
+@router.get(
+    "/callback",
+    summary="Google OAuth redirect target (public)",
+    include_in_schema=False,
+)
+async def gmail_callback(
+    request: Request,
+    code: str = None,
+    state: str = None,
+    error: str = None,
+    db: Session = Depends(get_db),
+):
     response = await _callback(request, code, state, error, db)
     gmail_auth.clear_browser_cookie(response)
     return response
@@ -87,8 +102,12 @@ async def gmail_callback(request: Request, code: str = None, state: str = None, 
 async def _callback(request: Request, code, state, error, db) -> RedirectResponse:
     try:
         payload = gmail_auth.read_state(db, state)
-        gmail_auth.check_browser(db, payload, request.cookies.get(gmail_auth.BROWSER_COOKIE),
-                                 request.cookies.get(acct_auth.COOKIE_NAME))
+        gmail_auth.check_browser(
+            db,
+            payload,
+            request.cookies.get(gmail_auth.BROWSER_COOKIE),
+            request.cookies.get(acct_auth.COOKIE_NAME),
+        )
     except gmail_auth.StateError as e:
         logger.warning("Gmail connect refused: %s", e.reason)
         return _back(False, e.reason)
@@ -102,25 +121,32 @@ async def _callback(request: Request, code, state, error, db) -> RedirectRespons
     except ValueError:
         return _back(False, "invalid_state")
     with unscoped():
-        acc = db.query(Account.id, Account.role).filter(Account.id == account_id).first()
+        acc = (
+            db.query(Account.id, Account.role).filter(Account.id == account_id).first()
+        )
     if acc is None:
         return _back(False, "account_gone")
 
     client_id, client_secret = gmail_auth.client_config()
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(TOKEN_URL, data={
-                "code": code,
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "redirect_uri": payload["r"],
-                "grant_type": "authorization_code",
-            })
+            resp = await client.post(
+                TOKEN_URL,
+                data={
+                    "code": code,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uri": payload["r"],
+                    "grant_type": "authorization_code",
+                },
+            )
     except Exception as e:
         logger.error("Gmail code exchange failed: %s", e)
         return _back(False, "exchange_failed")
     if resp.status_code != 200:
-        logger.error("Gmail code exchange failed (%s): %s", resp.status_code, resp.text[:300])
+        logger.error(
+            "Gmail code exchange failed (%s): %s", resp.status_code, resp.text[:300]
+        )
         return _back(False, "exchange_failed")
     refresh = (resp.json() or {}).get("refresh_token") or ""
     if not refresh:
@@ -136,7 +162,11 @@ async def _callback(request: Request, code, state, error, db) -> RedirectRespons
 @router.post("/disconnect", summary="Forget the current account's Gmail token")
 def gmail_disconnect(db: Session = Depends(get_db)):
     target = member_account(db)
-    row = install_row(db, gmail_auth.TOKEN_KEY) if target is None else _account_row(db, target, gmail_auth.TOKEN_KEY)
+    row = (
+        install_row(db, gmail_auth.TOKEN_KEY)
+        if target is None
+        else _account_row(db, target, gmail_auth.TOKEN_KEY)
+    )
     if row is not None and row.value:
         row.value = ""
     gmail_auth.clear_status(db, target, commit=False)

@@ -1,6 +1,8 @@
 """Regression: _linkedin_import_progress records per-job analysis errors."""
+
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
 
 
 @pytest.mark.asyncio
@@ -11,8 +13,9 @@ async def test_progress_records_analysis_error(monkeypatch):
     ext._linkedin_import_progress.clear()
 
     # Session present (persisted cookies) so enrich proceeds past the session gate
-    monkeypatch.setattr(ext, "_load_session_cookies",
-                        lambda: [{"name": "li_at", "value": "x"}])
+    monkeypatch.setattr(
+        ext, "_load_session_cookies", lambda: [{"name": "li_at", "value": "x"}]
+    )
 
     # Fake logged-in browser (linkedin_personal._get_linkedin_browser is imported
     # lazily inside enrich, so patch it at its source module).
@@ -21,21 +24,29 @@ async def test_progress_records_analysis_error(monkeypatch):
     fake_page.evaluate = AsyncMock(return_value=200)
     fake_context = MagicMock()
     fake_context.add_cookies = AsyncMock()
-    fake_browser = MagicMock(); fake_browser.close = AsyncMock()
-    fake_pw = MagicMock(); fake_pw.stop = AsyncMock()
+    fake_browser = MagicMock()
+    fake_browser.close = AsyncMock()
+    fake_pw = MagicMock()
+    fake_pw.stop = AsyncMock()
 
     async def fake_get_browser():
         return fake_pw, fake_browser, fake_context, fake_page
 
     monkeypatch.setattr(
         "backend.scraper.sources.linkedin_personal._get_linkedin_browser",
-        fake_get_browser, raising=False)
+        fake_get_browser,
+        raising=False,
+    )
 
     # Voyager fetch returns a valid job (used for both the session probe + the loop)
     async def fake_voyager(page, lid):
-        return {"title": "Senior Product Manager", "company": "Acme",
-                "location": "San Francisco", "description": "We sponsor visas.",
-                "apply_url": ""}
+        return {
+            "title": "Senior Product Manager",
+            "company": "Acme",
+            "location": "San Francisco",
+            "description": "We sponsor visas.",
+            "apply_url": "",
+        }
 
     monkeypatch.setattr(ext, "_voyager_fetch", fake_voyager)
 

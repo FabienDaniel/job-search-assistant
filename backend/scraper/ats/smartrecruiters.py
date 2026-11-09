@@ -1,13 +1,14 @@
 """SmartRecruiters ATS handler — GET api.smartrecruiters.com/v1/companies/{slug}/postings, paginated via limit/offset (max 100).
 Only single-value country/city/q filters are forwarded from the input URL; multi-value forms return 0 from the API, so multiple countries need separate scrape_urls."""
+
 import json
 import logging
 from urllib.parse import parse_qs, urlparse
 
 import httpx
 
-from backend.scraper._shared.filters import _validate_job
 from backend.scraper._shared.errors import raise_if_board_gone
+from backend.scraper._shared.filters import _validate_job
 from backend.scraper._shared.urls import host_matches
 
 logger = logging.getLogger("jobnavigator.scraper.ats.smartrecruiters")
@@ -53,8 +54,10 @@ def _location_fields(loc) -> dict:
     if not isinstance(loc, dict):
         return {}
     place = loc.get("fullLocation") or ", ".join(
-        part for part in (loc.get("city"), loc.get("region"), loc.get("country"))
-        if part)
+        part
+        for part in (loc.get("city"), loc.get("region"), loc.get("country"))
+        if part
+    )
     arrangement = None
     if loc.get("hybrid"):
         arrangement = "hybrid"
@@ -68,8 +71,14 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
     company_slug = _extract_company_slug(url)
     if not company_slug:
         if debug:
-            return [], [{"title": "(none)", "url": url, "selector": "smartrecruiters_api",
-                         "reason": "No company slug in URL"}]
+            return [], [
+                {
+                    "title": "(none)",
+                    "url": url,
+                    "selector": "smartrecruiters_api",
+                    "reason": "No company slug in URL",
+                }
+            ]
         return []
 
     api_base = f"https://api.smartrecruiters.com/v1/companies/{company_slug}/postings"
@@ -85,7 +94,9 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
             filter_suffix += f"&{key}={vals[0]}"
             forwarded_filters[key] = vals[0]
 
-    logger.info(f"SmartRecruiters API: {api_base} filters={forwarded_filters or 'none'}")
+    logger.info(
+        f"SmartRecruiters API: {api_base} filters={forwarded_filters or 'none'}"
+    )
 
     jobs: list[dict] = []
     rejected: list[dict] = []
@@ -101,23 +112,37 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
                     f"(offset={offset})"
                 )
                 if not debug and offset == 0:
-                    raise_if_board_gone(resp.status_code, "SmartRecruiters", company_slug)
+                    raise_if_board_gone(
+                        resp.status_code, "SmartRecruiters", company_slug
+                    )
                 # Always surface the failure in debug mode — even mid-pagination, so
                 # callers can tell a partial-success result was actually truncated.
                 if debug:
-                    rejected.append({"title": "(none)", "url": page_url,
-                                     "selector": "smartrecruiters_api",
-                                     "reason": f"HTTP {resp.status_code} at offset={offset}"})
+                    rejected.append(
+                        {
+                            "title": "(none)",
+                            "url": page_url,
+                            "selector": "smartrecruiters_api",
+                            "reason": f"HTTP {resp.status_code} at offset={offset}",
+                        }
+                    )
                 break
 
             try:
                 data = json.loads(resp.text)
             except (ValueError, json.JSONDecodeError) as e:
-                logger.warning(f"SmartRecruiters API: invalid JSON for {company_slug}: {e}")
+                logger.warning(
+                    f"SmartRecruiters API: invalid JSON for {company_slug}: {e}"
+                )
                 if debug:
-                    rejected.append({"title": "(none)", "url": page_url,
-                                     "selector": "smartrecruiters_api",
-                                     "reason": f"Invalid JSON at offset={offset}: {e}"})
+                    rejected.append(
+                        {
+                            "title": "(none)",
+                            "url": page_url,
+                            "selector": "smartrecruiters_api",
+                            "reason": f"Invalid JSON at offset={offset}: {e}",
+                        }
+                    )
                 break
 
             content = data.get("content") or []
@@ -129,21 +154,36 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
                 job_id = posting.get("id") or ""
                 if not job_id:
                     if debug:
-                        rejected.append({"title": title, "url": "",
-                                         "selector": "smartrecruiters_api",
-                                         "reason": "Missing posting id"})
+                        rejected.append(
+                            {
+                                "title": title,
+                                "url": "",
+                                "selector": "smartrecruiters_api",
+                                "reason": "Missing posting id",
+                            }
+                        )
                     continue
                 # Bare-ID URL redirects to canonical "{id}-{slugified-name}" form;
                 # used directly so we don't have to slugify and risk drift.
                 job_url = f"https://jobs.smartrecruiters.com/{company_slug}/{job_id}"
                 reason = _validate_job(title, job_url)
                 if reason is None:
-                    jobs.append({"title": title, "url": job_url,
-                                 **_location_fields(posting.get("location"))})
+                    jobs.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            **_location_fields(posting.get("location")),
+                        }
+                    )
                 elif debug:
-                    rejected.append({"title": title, "url": job_url,
-                                     "selector": "smartrecruiters_api",
-                                     "reason": reason})
+                    rejected.append(
+                        {
+                            "title": title,
+                            "url": job_url,
+                            "selector": "smartrecruiters_api",
+                            "reason": reason,
+                        }
+                    )
 
             total = data.get("totalFound")
             offset += _PAGE_LIMIT

@@ -37,6 +37,7 @@ inline script) and checks a double-submit token: the same random value in the `b
 and the `X-BCP` header. Hollylist hides members-only offers (no company, no text, no apply
 link); they are dropped.
 """
+
 import asyncio
 import html
 import json
@@ -53,27 +54,43 @@ from backend.analyzer.work_arrangement import HYBRID, ONSITE, REMOTE
 from backend.models.db import Search
 from backend.scraper._shared import job_boards
 from backend.scraper._shared.html_text import html_to_text
-from backend.scraper._shared.job_boards import (Board, BoardError, annual_usd, city_of, country_name,
-                                                employer_apply, iso_from_ts, make_row, term_of)
+from backend.scraper._shared.job_boards import (
+    Board,
+    BoardError,
+    annual_usd,
+    city_of,
+    country_name,
+    employer_apply,
+    iso_from_ts,
+    make_row,
+    term_of,
+)
 from backend.scraper._shared.urls import host_matches
 
 _ARRANGEMENT = {"REMOTE": REMOTE, "HYBRID": HYBRID, "ONSITE": ONSITE}
 
 
-async def _gql(client: httpx.AsyncClient, url: str, query: str, variables: dict, headers=None) -> dict:
-    resp = await client.post(url, json={"query": query, "variables": variables}, headers=headers)
+async def _gql(
+    client: httpx.AsyncClient, url: str, query: str, variables: dict, headers=None
+) -> dict:
+    resp = await client.post(
+        url, json={"query": query, "variables": variables}, headers=headers
+    )
     if resp.status_code >= 400:
         raise BoardError(f"HTTP {resp.status_code} from {url}")
     body = resp.json()
     if body.get("errors"):
-        raise BoardError("GraphQL: " + "; ".join(str(e.get("message"))[:160] for e in body["errors"][:2]))
+        raise BoardError(
+            "GraphQL: "
+            + "; ".join(str(e.get("message"))[:160] for e in body["errors"][:2])
+        )
     return body.get("data") or {}
 
 
 # ── Behance ─────────────────────────────────────────────────────────────────
 
 _BEHANCE = "https://www.behance.net"
-_BEHANCE_PAGE = 50               # the API returns at most 50 nodes per page
+_BEHANCE_PAGE = 50  # the API returns at most 50 nodes per page
 _BEHANCE_LIST = """query L($query: query, $first: Int, $page: Int, $filter: CombinedJobListingFilter) {
   combinedJobListings(query: $query, first: $first, page: $page, filter: $filter) {
     nodes { id oid jobType title companyName url remoteStatus isRemote location locations { displayName } }
@@ -101,8 +118,12 @@ async def _behance_headers(client: httpx.AsyncClient) -> dict:
         raise BoardError(f"HTTP {resp.status_code}: Behance refused the job list page")
     token = str(uuid.uuid4())
     client.cookies.set("bcp", token, domain=".behance.net")
-    return {"X-BCP": token, "X-Requested-With": "XMLHttpRequest",
-            "Origin": _BEHANCE, "Referer": f"{_BEHANCE}/joblist"}
+    return {
+        "X-BCP": token,
+        "X-Requested-With": "XMLHttpRequest",
+        "Origin": _BEHANCE,
+        "Referer": f"{_BEHANCE}/joblist",
+    }
 
 
 async def _behance_list(client: httpx.AsyncClient, search: Search, limit: int) -> list:
@@ -112,17 +133,40 @@ async def _behance_list(client: httpx.AsyncClient, search: Search, limit: int) -
         variables["filter"] = {"remoteStatus": "REMOTE"}
     rows, page = [], 1
     while len(rows) < limit:
-        data = await _gql(client, f"{_BEHANCE}/v3/graphql", _BEHANCE_LIST, dict(variables, page=page), headers)
+        data = await _gql(
+            client,
+            f"{_BEHANCE}/v3/graphql",
+            _BEHANCE_LIST,
+            dict(variables, page=page),
+            headers,
+        )
         conn = data.get("combinedJobListings") or {}
         for n in conn.get("nodes") or []:
-            places = [l.get("displayName") for l in n.get("locations") or [] if l.get("displayName")]
-            status = str(n.get("remoteStatus") or ("REMOTE" if n.get("isRemote") else "")).upper()
-            rows.append(make_row(
-                title=n.get("title"), company=n.get("companyName") or "", url=n.get("url") or "",
-                location="; ".join(places) or n.get("location") or ("Remote" if status == "REMOTE" else ""),
-                arrangement=_ARRANGEMENT.get(status),
-                ref={"headers": headers, "oid": n.get("oid"), "id": n.get("id"),
-                     "brief": n.get("jobType") == "FREELANCE"}))
+            places = [
+                l.get("displayName")
+                for l in n.get("locations") or []
+                if l.get("displayName")
+            ]
+            status = str(
+                n.get("remoteStatus") or ("REMOTE" if n.get("isRemote") else "")
+            ).upper()
+            rows.append(
+                make_row(
+                    title=n.get("title"),
+                    company=n.get("companyName") or "",
+                    url=n.get("url") or "",
+                    location="; ".join(places)
+                    or n.get("location")
+                    or ("Remote" if status == "REMOTE" else ""),
+                    arrangement=_ARRANGEMENT.get(status),
+                    ref={
+                        "headers": headers,
+                        "oid": n.get("oid"),
+                        "id": n.get("id"),
+                        "brief": n.get("jobType") == "FREELANCE",
+                    },
+                )
+            )
         if not (conn.get("pageInfo") or {}).get("hasNextPage"):
             break
         page += 1
@@ -136,15 +180,27 @@ def _behance_text(*parts) -> str:
 
 async def _behance_detail(client: httpx.AsyncClient, row: dict) -> None:
     ref = row["ref"]
-    data = await _gql(client, f"{_BEHANCE}/v3/graphql", _BEHANCE_DETAIL,
-                      {"oid": None if ref["brief"] else ref["oid"], "briefId": ref["id"] if ref["brief"] else 0,
-                       "isBrief": ref["brief"]}, ref["headers"])
+    data = await _gql(
+        client,
+        f"{_BEHANCE}/v3/graphql",
+        _BEHANCE_DETAIL,
+        {
+            "oid": None if ref["brief"] else ref["oid"],
+            "briefId": ref["id"] if ref["brief"] else 0,
+            "isBrief": ref["brief"],
+        },
+        ref["headers"],
+    )
     if ref["brief"]:
         b = data.get("freelanceBriefPublicInfo") or {}
-        row["description"] = _behance_text(b.get("description"), b.get("deliverables"),
-                                            b.get("candidateInfo"), b.get("additionalDetails"))
+        row["description"] = _behance_text(
+            b.get("description"),
+            b.get("deliverables"),
+            b.get("candidateInfo"),
+            b.get("additionalDetails"),
+        )
         row["company"] = row["company"] or (b.get("company") or "")
-        row["easy_apply"] = True     # a brief is answered on Behance
+        row["easy_apply"] = True  # a brief is answered on Behance
         return
     j = data.get("job") or {}
     row["description"] = html_to_text(j.get("description") or "")
@@ -153,15 +209,19 @@ async def _behance_detail(client: httpx.AsyncClient, row: dict) -> None:
     link = j.get("applicationUrl")
     row["apply_url"] = employer_apply(link)
     row["easy_apply"] = bool(link) and host_matches(link, "behance.net")
-    row["salary_min"], row["salary_max"] = annual_usd(j.get("salaryMin"), j.get("salaryMax"),
-                                                       j.get("salaryTimeframe"), j.get("salaryCurrency"))
+    row["salary_min"], row["salary_max"] = annual_usd(
+        j.get("salaryMin"),
+        j.get("salaryMax"),
+        j.get("salaryTimeframe"),
+        j.get("salaryCurrency"),
+    )
 
 
 # ── Hollylist ───────────────────────────────────────────────────────────────
 
 _HOLLYLIST = "https://www.hollylist.com"
 _HOLLYLIST_PAGE = 100
-_HOLLYLIST_MARKETS = (None, "europe")     # None is the US listing (hollylist.com/jobs)
+_HOLLYLIST_MARKETS = (None, "europe")  # None is the US listing (hollylist.com/jobs)
 _HOLLYLIST_LIST = """query($skip: Int, $limit: Int, $term: String, $loc: String, $market: String, $remote: Boolean) {
   getJobs(searchTerm: $term, location: $loc, radius: 20, isRemote: $remote, market: $market, skip: $skip, limit: $limit) {
     jobs { _id slugUrl title organization isPublic dateAdded location { name } }
@@ -172,36 +232,65 @@ _HOLLYLIST_DETAIL = """query($slug: String) {
 }"""
 
 
-async def _hollylist_market(client: httpx.AsyncClient, search: Search, market, limit: int) -> list:
-    variables = {"term": term_of(search) or None, "loc": city_of(search) or None, "market": market,
-                 "remote": True if search.is_remote else None, "limit": _HOLLYLIST_PAGE}
+async def _hollylist_market(
+    client: httpx.AsyncClient, search: Search, market, limit: int
+) -> list:
+    variables = {
+        "term": term_of(search) or None,
+        "loc": city_of(search) or None,
+        "market": market,
+        "remote": True if search.is_remote else None,
+        "limit": _HOLLYLIST_PAGE,
+    }
     rows, skip = [], 0
     while len(rows) < limit:
-        data = await _gql(client, f"{_HOLLYLIST}/graphql", _HOLLYLIST_LIST, dict(variables, skip=skip))
+        data = await _gql(
+            client, f"{_HOLLYLIST}/graphql", _HOLLYLIST_LIST, dict(variables, skip=skip)
+        )
         jobs = (data.get("getJobs") or {}).get("jobs") or []
         for j in jobs:
             if not j.get("isPublic") or not j.get("slugUrl"):
-                continue             # members-only: no company, no text, no apply link
-            rows.append(make_row(
-                title=j.get("title"), company=j.get("organization") or "",
-                url=f"{_HOLLYLIST}/job/{j['slugUrl']}",     # redirects to the market's own path
-                location=(j.get("location") or {}).get("name") or "", posted=j.get("dateAdded"),
-                ref={"slug": j["slugUrl"]}))
+                continue  # members-only: no company, no text, no apply link
+            rows.append(
+                make_row(
+                    title=j.get("title"),
+                    company=j.get("organization") or "",
+                    url=f"{_HOLLYLIST}/job/{j['slugUrl']}",  # redirects to the market's own path
+                    location=(j.get("location") or {}).get("name") or "",
+                    posted=j.get("dateAdded"),
+                    ref={"slug": j["slugUrl"]},
+                )
+            )
         if len(jobs) < _HOLLYLIST_PAGE:
             break
         skip += _HOLLYLIST_PAGE
     return rows[:limit]
 
 
-async def _hollylist_list(client: httpx.AsyncClient, search: Search, limit: int) -> list:
+async def _hollylist_list(
+    client: httpx.AsyncClient, search: Search, limit: int
+) -> list:
     """Both markets, newest first. A Location belongs to one market; the other returns nothing."""
-    found = await asyncio.gather(*(_hollylist_market(client, search, m, limit) for m in _HOLLYLIST_MARKETS))
-    rows = sorted((r for market in found for r in market), key=lambda r: r["posted"] or "", reverse=True)
+    found = await asyncio.gather(
+        *(_hollylist_market(client, search, m, limit) for m in _HOLLYLIST_MARKETS)
+    )
+    rows = sorted(
+        (r for market in found for r in market),
+        key=lambda r: r["posted"] or "",
+        reverse=True,
+    )
     return rows[:limit]
 
 
 async def _hollylist_detail(client: httpx.AsyncClient, row: dict) -> None:
-    j = (await _gql(client, f"{_HOLLYLIST}/graphql", _HOLLYLIST_DETAIL, {"slug": row["ref"]["slug"]})).get("getJob") or {}
+    j = (
+        await _gql(
+            client,
+            f"{_HOLLYLIST}/graphql",
+            _HOLLYLIST_DETAIL,
+            {"slug": row["ref"]["slug"]},
+        )
+    ).get("getJob") or {}
     # Pay is a bare rate without a currency across two markets; the JD extractor reads the text.
     row["description"] = html_to_text(j.get("descMark") or "")
     if j.get("isRemote"):
@@ -232,18 +321,24 @@ def _wana_filter(search: Search) -> str:
 
 def _wana_row(doc: dict) -> dict:
     sal = doc.get("salary") or {}
-    sal_min, sal_max = annual_usd(sal.get("min"), sal.get("max"), sal.get("period"), sal.get("currency"))
+    sal_min, sal_max = annual_usd(
+        sal.get("min"), sal.get("max"), sal.get("period"), sal.get("currency")
+    )
     loc = doc.get("location") or {}
     link = doc.get("jobLink") or ""
     return make_row(
-        title=doc.get("title"), company=(doc.get("company") or {}).get("name") or "",
+        title=doc.get("title"),
+        company=(doc.get("company") or {}).get("name") or "",
         # The original posting when Wana Create copied it from another board, so it dedups with that board's row.
         url=link if link.startswith("http") else f"{_WANA_JOB}{doc.get('id')}",
         location=loc.get("name") or loc.get("city") or "",
         description=html_to_text(doc.get("description") or ""),
-        salary_min=sal_min, salary_max=sal_max,
+        salary_min=sal_min,
+        salary_max=sal_max,
         arrangement=_ARRANGEMENT.get(str(doc.get("workType") or "").upper()),
-        posted=doc.get("createdAt"), easy_apply=not link)
+        posted=doc.get("createdAt"),
+        easy_apply=not link,
+    )
 
 
 async def _wana_list(client: httpx.AsyncClient, search: Search, limit: int) -> list:
@@ -253,15 +348,23 @@ async def _wana_list(client: httpx.AsyncClient, search: Search, limit: int) -> l
     key, endpoint = cfg.get("api_key"), (cfg.get("endpoint") or "").rstrip("/")
     if not key or not endpoint.startswith("https://"):
         raise BoardError("Wana Create sent no search key")
-    params = {"q": term_of(search) or "*", "query_by": "title,keywords", "sort_by": "createdAt_ts:desc",
-              "per_page": _WANA_PAGE, "prefix": "false"}
+    params = {
+        "q": term_of(search) or "*",
+        "query_by": "title,keywords",
+        "sort_by": "createdAt_ts:desc",
+        "per_page": _WANA_PAGE,
+        "prefix": "false",
+    }
     filt = _wana_filter(search)
     if filt:
         params["filter_by"] = filt
     rows, page = [], 1
     while len(rows) < limit:
-        resp = await client.get(f"{endpoint}/collections/jobs/documents/search",
-                                params=dict(params, page=page), headers={"X-TYPESENSE-API-KEY": key})
+        resp = await client.get(
+            f"{endpoint}/collections/jobs/documents/search",
+            params=dict(params, page=page),
+            headers={"X-TYPESENSE-API-KEY": key},
+        )
         if resp.status_code >= 400:
             raise BoardError(f"HTTP {resp.status_code} from the Wana Create search")
         body = resp.json()
@@ -275,18 +378,25 @@ async def _wana_list(client: httpx.AsyncClient, search: Search, limit: int) -> l
 
 # ── JSON-LD job pages (Dribbble, Work With Indies) ──────────────────────────
 
+
 def _fix_escapes(text: str) -> str:
     """Double every backslash that does not start a valid JSON escape, reading pairs left to
     right so an escaped backslash (\\\\) stays one escape."""
-    return re.sub(r"\\(.)", lambda m: m.group(0) if m.group(1) in '"\\/bfnrtu' else "\\\\" + m.group(1),
-                  text, flags=re.S)
+    return re.sub(
+        r"\\(.)",
+        lambda m: m.group(0) if m.group(1) in '"\\/bfnrtu' else "\\\\" + m.group(1),
+        text,
+        flags=re.S,
+    )
 
 
 def _jobposting_ld(html_text: str) -> dict:
     """The first schema.org JobPosting in the page's JSON-LD blocks, or {}. Work With Indies
     writes invalid escapes such as `\\_blank`; a block that fails is parsed again with those
     backslashes doubled."""
-    for block in re.findall(r'<script[^>]*application/ld\+json[^>]*>(.*?)</script>', html_text, re.S):
+    for block in re.findall(
+        r"<script[^>]*application/ld\+json[^>]*>(.*?)</script>", html_text, re.S
+    ):
         try:
             data = json.loads(block, strict=False)
         except ValueError:
@@ -305,7 +415,9 @@ def _ld_place(ld: dict) -> str:
     out = []
     for p in places if isinstance(places, list) else [places]:
         addr = (p or {}).get("address") or {}
-        parts = [addr.get(k) for k in ("addressLocality", "addressRegion", "addressCountry")]
+        parts = [
+            addr.get(k) for k in ("addressLocality", "addressRegion", "addressCountry")
+        ]
         out.append(", ".join(dict.fromkeys(x for x in parts if x and x != "null")))
     return "; ".join(x for x in out if x)
 
@@ -317,12 +429,14 @@ def _apply_ld(row: dict, ld: dict) -> None:
         row["description"] = text
     if str(ld.get("jobLocationType") or "").upper() == "TELECOMMUTE":
         row["arrangement"] = REMOTE
-        where = (ld.get("applicantLocationRequirements") or {})
+        where = ld.get("applicantLocationRequirements") or {}
         where = where.get("name") if isinstance(where, dict) else ""
         row["location"] = f"Remote: {where}" if where else (row["location"] or "Remote")
     elif _ld_place(ld):
         row["location"] = _ld_place(ld)
-    row["company"] = row["company"] or ((ld.get("hiringOrganization") or {}).get("name") or "")
+    row["company"] = row["company"] or (
+        (ld.get("hiringOrganization") or {}).get("name") or ""
+    )
 
 
 async def _ld_detail(client: httpx.AsyncClient, row: dict) -> str:
@@ -344,7 +458,9 @@ def _rss_date(text) -> Optional[str]:
 # ── Dribbble ────────────────────────────────────────────────────────────────
 
 _DRIBBBLE_RSS = "https://dribbble.com/jobs.rss"
-_DRIBBBLE_TITLE = re.compile(r"^(?P<company>.*?) is hiring for a position of (?P<title>.*?)(?: in (?P<place>.*))?$")
+_DRIBBBLE_TITLE = re.compile(
+    r"^(?P<company>.*?) is hiring for a position of (?P<title>.*?)(?: in (?P<place>.*))?$"
+)
 _REMOTE_WORDS = re.compile(r"\b(remote|anywhere|worldwide)\b", re.I)
 
 
@@ -356,11 +472,22 @@ async def _dribbble_list(client: httpx.AsyncClient, search: Search, limit: int) 
     rows = []
     for it in ET.fromstring(resp.content).findall("./channel/item"):
         m = _DRIBBBLE_TITLE.match(" ".join((it.findtext("title") or "").split()))
-        title, place = (m.group("title"), m.group("place") or "") if m else (it.findtext("title"), "")
-        rows.append(make_row(
-            title=title, company=it.findtext("{http://purl.org/dc/elements/1.1/}creator") or (m.group("company") if m else ""),
-            url=(it.findtext("link") or "").split("?")[0], location=place,
-            arrangement=REMOTE if _REMOTE_WORDS.search(place) else None, posted=_rss_date(it.findtext("pubDate"))))
+        title, place = (
+            (m.group("title"), m.group("place") or "")
+            if m
+            else (it.findtext("title"), "")
+        )
+        rows.append(
+            make_row(
+                title=title,
+                company=it.findtext("{http://purl.org/dc/elements/1.1/}creator")
+                or (m.group("company") if m else ""),
+                url=(it.findtext("link") or "").split("?")[0],
+                location=place,
+                arrangement=REMOTE if _REMOTE_WORDS.search(place) else None,
+                posted=_rss_date(it.findtext("pubDate")),
+            )
+        )
     return rows[:limit]
 
 
@@ -378,20 +505,42 @@ _ARTSTATION_PAGE = 100
 
 
 def _artstation_row(j: dict) -> dict:
-    places = [((l or {}).get("locality") or {}).get("formatted_name") for l in j.get("recruitment_localities") or []]
+    places = [
+        ((l or {}).get("locality") or {}).get("formatted_name")
+        for l in j.get("recruitment_localities") or []
+    ]
     places = [p for p in places if p]
-    text = "\n\n".join(t for t in (html_to_text(j.get("description") or ""), html_to_text(j.get("how_to_apply") or "")) if t)
+    text = "\n\n".join(
+        t
+        for t in (
+            html_to_text(j.get("description") or ""),
+            html_to_text(j.get("how_to_apply") or ""),
+        )
+        if t
+    )
     remote = bool(j.get("work_remotely"))
     return make_row(
-        title=j.get("title"), company=j.get("company_name") or "",
-        url=f"https://www.artstation.com/jobs/{j.get('hash_id')}" if j.get("hash_id") else "",
-        location=("Remote: " if remote else "") + "; ".join(places) if places else ("Remote" if remote else ""),
-        description=text, arrangement=REMOTE if remote else None,
-        apply_url=employer_apply(j.get("apply_link")),      # else how_to_apply gives an e-mail address
-        posted=(j.get("listing_placement") or {}).get("posted_at") or j.get("created_at"))
+        title=j.get("title"),
+        company=j.get("company_name") or "",
+        url=f"https://www.artstation.com/jobs/{j.get('hash_id')}"
+        if j.get("hash_id")
+        else "",
+        location=("Remote: " if remote else "") + "; ".join(places)
+        if places
+        else ("Remote" if remote else ""),
+        description=text,
+        arrangement=REMOTE if remote else None,
+        apply_url=employer_apply(
+            j.get("apply_link")
+        ),  # else how_to_apply gives an e-mail address
+        posted=(j.get("listing_placement") or {}).get("posted_at")
+        or j.get("created_at"),
+    )
 
 
-async def _artstation_list(client: httpx.AsyncClient, search: Search, limit: int) -> list:
+async def _artstation_list(
+    client: httpx.AsyncClient, search: Search, limit: int
+) -> list:
     """The whole board is about 100 jobs, two pages; `query` and `work_remotely` narrow it.
     Location is checked here against the job's localities."""
     params = {"per_page": _ARTSTATION_PAGE, "query": term_of(search)}
@@ -412,7 +561,9 @@ async def _artstation_list(client: httpx.AsyncClient, search: Search, limit: int
 # ── Work With Indies ────────────────────────────────────────────────────────
 
 _WWI_RSS = "https://www.workwithindies.com/careers/rss.xml"
-_WWI_TITLE = re.compile(r"^(?P<company>.*?) is hiring an? (?P<title>.*?)(?: to work (?P<place>.*))?$")
+_WWI_TITLE = re.compile(
+    r"^(?P<company>.*?) is hiring an? (?P<title>.*?)(?: to work (?P<place>.*))?$"
+)
 
 
 async def _wwi_list(client: httpx.AsyncClient, search: Search, limit: int) -> list:
@@ -424,13 +575,20 @@ async def _wwi_list(client: httpx.AsyncClient, search: Search, limit: int) -> li
     for it in ET.fromstring(resp.content).findall("./channel/item"):
         m = _WWI_TITLE.match(" ".join((it.findtext("title") or "").split()))
         place = (m.group("place") or "") if m else ""
-        rows.append(make_row(
-            title=m.group("title") if m else it.findtext("title"), company=m.group("company") if m else "",
-            url=it.findtext("link") or "", location=place,
-            description=html_to_text(it.findtext("description") or ""),
-            # "to work from CET ± 3 hours": a time-zone band is a remote job
-            arrangement=REMOTE if _REMOTE_WORDS.search(place) or place.lower().startswith("from ") else None,
-            posted=_rss_date(it.findtext("pubDate"))))
+        rows.append(
+            make_row(
+                title=m.group("title") if m else it.findtext("title"),
+                company=m.group("company") if m else "",
+                url=it.findtext("link") or "",
+                location=place,
+                description=html_to_text(it.findtext("description") or ""),
+                # "to work from CET ± 3 hours": a time-zone band is a remote job
+                arrangement=REMOTE
+                if _REMOTE_WORDS.search(place) or place.lower().startswith("from ")
+                else None,
+                posted=_rss_date(it.findtext("pubDate")),
+            )
+        )
     return rows[:limit]
 
 
@@ -445,7 +603,9 @@ async def _wwi_detail(client: httpx.AsyncClient, row: dict) -> None:
 # ── boards ──────────────────────────────────────────────────────────────────
 
 _OPEN_EVERYWHERE = re.compile(r"\b(anywhere|worldwide)\b", re.I)
-_BEHANCE_COUNTRY_NAMES = {"United States": ("united states", "usa")}   # Behance writes "CA, USA"
+_BEHANCE_COUNTRY_NAMES = {
+    "United States": ("united states", "usa")
+}  # Behance writes "CA, USA"
 
 
 def _behance_not_open_to(r: dict, country: str) -> Optional[str]:
@@ -454,7 +614,12 @@ def _behance_not_open_to(r: dict, country: str) -> Optional[str]:
     the country in full: "CA" alone is California in "CA, USA"."""
     loc = (r.get("location") or "").lower()
     names = _BEHANCE_COUNTRY_NAMES.get(country, (country.lower(),))
-    if not country or loc in ("", "remote") or _OPEN_EVERYWHERE.search(loc) or any(n in loc for n in names):
+    if (
+        not country
+        or loc in ("", "remote")
+        or _OPEN_EVERYWHERE.search(loc)
+        or any(n in loc for n in names)
+    ):
         return None
     return f"Not open to {country}"
 
@@ -469,7 +634,9 @@ BOARDS = {
     "wanacreate": Board("Wana Create", _wana_list),
     "dribbble": Board("Dribbble", _dribbble_list, _dribbble_detail, local_city=True),
     "artstation": Board("ArtStation", _artstation_list, local_city=True),
-    "workwithindies": Board("Work With Indies", _wwi_list, _wwi_detail, local_city=True),
+    "workwithindies": Board(
+        "Work With Indies", _wwi_list, _wwi_detail, local_city=True
+    ),
 }
 
 

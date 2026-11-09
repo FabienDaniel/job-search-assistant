@@ -1,4 +1,5 @@
 """Cover-letter CRUD, PDF export, and background AI generation; mirrors routes_resumes.py (shared browser singleton, font-embedding render, tracer-link rewriting on export)."""
+
 import json
 import logging
 import uuid as _uuid
@@ -7,16 +8,32 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from backend.accounts.owned import get_owned_or_404, get_persona, owned_id_or_404
-from backend.models.db import DEFAULT_COVER_LETTER_TEMPLATE, get_db, CoverLetter, Resume, Job, Persona, TracerLink, TracerClickEvent, SessionLocal
 from backend.accounts.settings import get_setting
 from backend.api._input import str_field, uuid_filter
-from backend.job_monitor import launch_background, JobAlreadyRunningError
-from backend.api.routes_resumes import _content_disposition, _header_name, _render_pdf, _rewrite_urls_with_tracers, _resolve_tailoring_jd  # shared with resumes
+from backend.api.routes_resumes import (
+    _content_disposition,
+    _header_name,
+    _render_pdf,
+    _resolve_tailoring_jd,
+    _rewrite_urls_with_tracers,
+)  # shared with resumes
+from backend.job_monitor import JobAlreadyRunningError, launch_background
+from backend.models.db import (
+    DEFAULT_COVER_LETTER_TEMPLATE,
+    CoverLetter,
+    Job,
+    Persona,
+    Resume,
+    SessionLocal,
+    TracerClickEvent,
+    TracerLink,
+    get_db,
+)
 from backend.scraper._shared.link_kinds import job_link
 
 logger = logging.getLogger("jobnavigator.cover_letters")
@@ -27,6 +44,7 @@ TEMPLATES_DIR = Path(__file__).parent.parent / "cover_letter_templates"
 
 
 # ── Templates ─────────────────────────────────────────────────────────────────
+
 
 def _discover_templates() -> list[dict]:
     from backend.api.routes_resumes import template_paths
@@ -61,7 +79,11 @@ def _default_template_id(db=None, resume_template=None) -> str:
     from backend.api.routes_resumes import chosen_template, template_paths
 
     names = list(template_paths(TEMPLATES_DIR))
-    chosen = chosen_template(db, "cover_letter_template", "cover_letter_last_template") if db is not None else None
+    chosen = (
+        chosen_template(db, "cover_letter_template", "cover_letter_last_template")
+        if db is not None
+        else None
+    )
     for name in (chosen, resume_template, DEFAULT_COVER_LETTER_TEMPLATE):
         if name and name in names:
             return name
@@ -71,32 +93,48 @@ def _default_template_id(db=None, resume_template=None) -> str:
 def _validate_template(name) -> str:
     """422 unless `name` is a real folder directly under cover_letter_templates/ (R4-T5-01)."""
     from backend.api.routes_resumes import validate_template_name
+
     return validate_template_name(name, TEMPLATES_DIR)
 
 
 def _render_html(json_data: dict, template_name: str, page_format: str) -> str:
     """Render a cover letter to HTML via its Jinja2 template (fonts base64-embedded)."""
     import re as _re
+
     from jinja2 import Environment, FileSystemLoader
     from markupsafe import Markup
 
     from backend.api.routes_resumes import (
-        _TEMPLATE_NAME_RE, _load_template_fonts, _render_safe_links, resolve_template_dir, template_paths,
+        _TEMPLATE_NAME_RE,
+        _load_template_fonts,
+        _render_safe_links,
+        resolve_template_dir,
+        template_paths,
     )
 
     # A stored name that is not a letter template on this install (a résumé-only one such
     # as `modern`, a personal one) renders with the default instead of failing with a 422.
-    if (isinstance(template_name, str) and template_name not in template_paths(TEMPLATES_DIR)
-            and _TEMPLATE_NAME_RE.match(template_name)):
+    if (
+        isinstance(template_name, str)
+        and template_name not in template_paths(TEMPLATES_DIR)
+        and _TEMPLATE_NAME_RE.match(template_name)
+    ):
         template_name = _default_template_id()
     # Same on-disk allowlist the résumé renderer uses — the folder comes from the
     # directory listing, the request name is only a key (R4-T5-01).
     template_dir = resolve_template_dir(template_name, TEMPLATES_DIR)
 
     env = Environment(loader=FileSystemLoader(str(template_dir)))
-    env.filters['bold'] = lambda text: Markup(
-        _re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>',
-                _re.sub(r'[<>&]', lambda m: {'<': '&lt;', '>': '&gt;', '&': '&amp;'}[m.group()], text or ''))
+    env.filters["bold"] = lambda text: Markup(
+        _re.sub(
+            r"\*\*(.+?)\*\*",
+            r"<b>\1</b>",
+            _re.sub(
+                r"[<>&]",
+                lambda m: {"<": "&lt;", ">": "&gt;", "&": "&amp;"}[m.group()],
+                text or "",
+            ),
+        )
     )
     template = env.get_template("template.html.j2")
 
@@ -109,13 +147,21 @@ def _render_html(json_data: dict, template_name: str, page_format: str) -> str:
         if not isinstance(content.get(part), dict):
             content[part] = dict(_EMPTY_LETTER[part])
         content[part] = {**_EMPTY_LETTER[part], **content[part]}
-    return template.render(**_render_safe_links(content), page_format=page_format, fonts=fonts)
+    return template.render(
+        **_render_safe_links(content), page_format=page_format, fonts=fonts
+    )
 
 
 # The sections a new letter has (frontend CoverLetterEditor.jsx EMPTY): what a template may read.
-_EMPTY_LETTER = {"header": {"name": "", "contact_items": []},
-                 "recipient": {"company": "", "manager": "", "address": ""},
-                 "date": "", "greeting": "", "body_paragraphs": [], "closing": "", "signature": ""}
+_EMPTY_LETTER = {
+    "header": {"name": "", "contact_items": []},
+    "recipient": {"company": "", "manager": "", "address": ""},
+    "date": "",
+    "greeting": "",
+    "body_paragraphs": [],
+    "closing": "",
+    "signature": "",
+}
 
 
 @router.get("/templates")
@@ -125,7 +171,10 @@ def list_templates():
 
 # ── Serialization ─────────────────────────────────────────────────────────────
 
-def _to_dict(cl: CoverLetter, include_json_data: bool = False, ctx: dict | None = None) -> dict:
+
+def _to_dict(
+    cl: CoverLetter, include_json_data: bool = False, ctx: dict | None = None
+) -> dict:
     """ctx carries the batch-loaded job/application/resume context so the list can render a row without an N+1 walk (see list_cover_letters)."""
     ctx = ctx or {}
     d = {
@@ -142,7 +191,8 @@ def _to_dict(cl: CoverLetter, include_json_data: bool = False, ctx: dict | None 
         "updated_at": cl.updated_at.isoformat() if cl.updated_at else None,
         # display context — the row shows "{source} · {voice} · {length}" and a
         # stage chip, and the editor menu hides items whose target is missing
-        "source_name": ctx.get("source_name") or ("Persona" if cl.from_persona else None),
+        "source_name": ctx.get("source_name")
+        or ("Persona" if cl.from_persona else None),
         "company": ctx.get("company"),
         "title": ctx.get("title"),
         "job_url": ctx.get("job_url"),
@@ -157,19 +207,24 @@ def _to_dict(cl: CoverLetter, include_json_data: bool = False, ctx: dict | None 
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
+
 def _build_ctx(rows: list[CoverLetter], db: Session) -> dict:
     """Batch-load the job, its application stage and the source resume name for a set of letters — three queries total rather than three per row."""
     from backend.models.db import Application, Job, Resume
+
     job_ids = {cl.job_id for cl in rows if cl.job_id}
     res_ids = {cl.resume_id for cl in rows if cl.resume_id}
     jobs, stages, names = {}, {}, {}
     if job_ids:
         for j in db.query(Job).filter(Job.id.in_(job_ids)).all():
             jobs[j.id] = j
-        for a in (db.query(Application)
-                    .filter(Application.job_id.in_(job_ids))
-                    .order_by(Application.updated_at.desc()).all()):
-            stages.setdefault(a.job_id, a.status)      # newest wins
+        for a in (
+            db.query(Application)
+            .filter(Application.job_id.in_(job_ids))
+            .order_by(Application.updated_at.desc())
+            .all()
+        ):
+            stages.setdefault(a.job_id, a.status)  # newest wins
     if res_ids:
         for r in db.query(Resume).filter(Resume.id.in_(res_ids)).all():
             names[r.id] = r.name
@@ -182,7 +237,8 @@ def _build_ctx(rows: list[CoverLetter], db: Session) -> dict:
             "job_url": job_link(j) if j else None,
             "job_status": j.status if j else None,
             "stage": stages.get(cl.job_id),
-            "source_name": names.get(cl.resume_id) or ("Persona" if cl.from_persona else None),
+            "source_name": names.get(cl.resume_id)
+            or ("Persona" if cl.from_persona else None),
         }
     return out
 
@@ -235,11 +291,20 @@ def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db)):
     cl = db.query(CoverLetter).filter(CoverLetter.id == cl_id).first()
     if not cl:
         raise HTTPException(404, "Cover letter not found")
-    allowed = {"name", "template", "page_format", "json_data", "job_id", "resume_id",
-               "voice", "length"}
+    allowed = {
+        "name",
+        "template",
+        "page_format",
+        "json_data",
+        "job_id",
+        "resume_id",
+        "voice",
+        "length",
+    }
     if "template" in body:
         _validate_template(body["template"])
         from backend.api.routes_resumes import remember_template
+
         remember_template(db, "cover_letter_last_template", body["template"])
     # Re-pairing a letter: the new job / résumé must be the account's own (MT-5).
     body = dict(body)
@@ -259,25 +324,36 @@ def update_cover_letter(cl_id: str, body: dict, db: Session = Depends(get_db)):
 def get_tracer_stats(cl_id: str, db: Session = Depends(get_db)):
     """Click stats per tracer link for a cover letter (mirrors the resume endpoint)."""
     from sqlalchemy import func
+
     links = db.query(TracerLink).filter(TracerLink.cover_letter_id == cl_id).all()
     result = []
     for link in links:
-        total = db.query(func.count(TracerClickEvent.id)).filter(
-            TracerClickEvent.tracer_link_id == link.id,
-            TracerClickEvent.is_likely_bot == False,
-        ).scalar()
-        last = db.query(func.max(TracerClickEvent.clicked_at)).filter(
-            TracerClickEvent.tracer_link_id == link.id,
-            TracerClickEvent.is_likely_bot == False,
-        ).scalar()
-        result.append({
-            "token": link.token,
-            "source_label": link.source_label,
-            "destination_url": link.destination_url,
-            "clicks": total or 0,
-            "last_clicked": last.isoformat() if last else None,
-            "is_active": link.is_active,
-        })
+        total = (
+            db.query(func.count(TracerClickEvent.id))
+            .filter(
+                TracerClickEvent.tracer_link_id == link.id,
+                TracerClickEvent.is_likely_bot == False,
+            )
+            .scalar()
+        )
+        last = (
+            db.query(func.max(TracerClickEvent.clicked_at))
+            .filter(
+                TracerClickEvent.tracer_link_id == link.id,
+                TracerClickEvent.is_likely_bot == False,
+            )
+            .scalar()
+        )
+        result.append(
+            {
+                "token": link.token,
+                "source_label": link.source_label,
+                "destination_url": link.destination_url,
+                "clicks": total or 0,
+                "last_clicked": last.isoformat() if last else None,
+                "is_active": link.is_active,
+            }
+        )
     return result
 
 
@@ -290,12 +366,18 @@ def delete_cover_letter(cl_id: str, db: Session = Depends(get_db)):
     # the ORM doesn't try to NULL the FK on this nullable column).
     # A link shared with the résumé this letter was written from stays — release
     # only our side of it, so the résumé keeps reporting it and its click history survives.
-    for link in db.query(TracerLink).filter(
-        TracerLink.cover_letter_id == cl.id, TracerLink.resume_id.isnot(None),
-    ).all():
+    for link in (
+        db.query(TracerLink)
+        .filter(
+            TracerLink.cover_letter_id == cl.id,
+            TracerLink.resume_id.isnot(None),
+        )
+        .all()
+    ):
         link.cover_letter_id = None
     db.query(TracerLink).filter(
-        TracerLink.cover_letter_id == cl.id, TracerLink.resume_id.is_(None),
+        TracerLink.cover_letter_id == cl.id,
+        TracerLink.resume_id.is_(None),
     ).delete(synchronize_session=False)
     db.delete(cl)
     db.commit()
@@ -304,14 +386,16 @@ def delete_cover_letter(cl_id: str, db: Session = Depends(get_db)):
 
 # ── PDF export ────────────────────────────────────────────────────────────────
 
+
 @router.get("/{cl_id}/pdf")
 async def export_pdf(cl_id: str, db: Session = Depends(get_db)):
     cl = db.query(CoverLetter).filter(CoverLetter.id == cl_id).first()
     if not cl:
         raise HTTPException(404, "Cover letter not found")
 
-    pdf_data = _rewrite_urls_with_tracers(cl.json_data or {}, None, db,
-                                          cover_letter_id=str(cl.id), job_id=cl.job_id)
+    pdf_data = _rewrite_urls_with_tracers(
+        cl.json_data or {}, None, db, cover_letter_id=str(cl.id), job_id=cl.job_id
+    )
     html = _render_html(pdf_data, cl.template, cl.page_format)
     fmt = cl.page_format or "letter"
     paper_format = "A4" if fmt.lower() == "a4" else "Letter"
@@ -319,7 +403,9 @@ async def export_pdf(cl_id: str, db: Session = Depends(get_db)):
     try:
         # JavaScript off, no network but Google Fonts: the letter's text is HTML here.
         pdf_bytes = await _render_pdf(
-            html, format=paper_format, print_background=True,
+            html,
+            format=paper_format,
+            print_background=True,
             margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
         )
     except Exception as e:
@@ -328,6 +414,7 @@ async def export_pdf(cl_id: str, db: Session = Depends(get_db)):
 
     # Filename: {Name}_{Type}_CoverLetter_{number}.pdf
     header_name = (_header_name(cl.json_data) or "CoverLetter").replace(" ", "")
+
     def _safe(text: str) -> str:
         """Letters (any script), digits, `-` and `_`; no spaces or punctuation that muddles a download filename."""
         out = "".join(c for c in (text or "") if c.isalnum() or c in " -_").strip()
@@ -354,6 +441,7 @@ async def export_pdf(cl_id: str, db: Session = Depends(get_db)):
 
 # ── AI generation ─────────────────────────────────────────────────────────────
 
+
 @router.post("/generate", status_code=202)
 async def generate_cover_letter(body: dict, db: Session = Depends(get_db)):
     """Generate a cover letter for a (resume, job) pair in the background; returns 202 + run_id, and with cover_letter_id rewrites that existing letter in place instead of creating a new one."""
@@ -374,7 +462,9 @@ async def generate_cover_letter(body: dict, db: Session = Depends(get_db)):
     if resume_id == "persona":
         persona = get_persona(db, create=False)
         if not persona or not (persona.resume_content or {}):
-            raise HTTPException(400, "Persona has no resume_content — fill it in /persona first")
+            raise HTTPException(
+                400, "Persona has no resume_content — fill it in /persona first"
+            )
     else:
         resume = get_owned_or_404(db, Resume, resume_id)
         if not (resume.json_data or {}):
@@ -384,11 +474,19 @@ async def generate_cover_letter(body: dict, db: Session = Depends(get_db)):
     # Fast-fail: the job needs some JD source; _generate_inner resolves the actual
     # text (description -> live fetch -> cached page) later, so this skips the slow fetch.
     # A hand-logged job (Log application) arrives with a URL and no description.
-    if not ((job.description or "").strip() or (job_link(job) or "").strip() or (job.cached_page_text or "").strip()):
-        raise HTTPException(400, "Job has no description, URL, or cached page to write from")
+    if not (
+        (job.description or "").strip()
+        or (job_link(job) or "").strip()
+        or (job.cached_page_text or "").strip()
+    ):
+        raise HTTPException(
+            400, "Job has no description, URL, or cached page to write from"
+        )
 
     if not (get_setting(db, "cover_letter_prompt") or "").strip():
-        raise HTTPException(500, "cover_letter_prompt setting is empty — configure it in Settings")
+        raise HTTPException(
+            500, "cover_letter_prompt setting is empty — configure it in Settings"
+        )
 
     # Regenerating scopes to the letter, so rewriting one draft never blocks
     # generating a different letter for the same pair.
@@ -412,29 +510,57 @@ async def generate_cover_letter(body: dict, db: Session = Depends(get_db)):
         )
         return {"run_id": run_id, "status": "running"}
     except JobAlreadyRunningError as e:
-        return JSONResponse(status_code=409, content={"detail": f"{e.job_type} is already running for this pair"})
+        return JSONResponse(
+            status_code=409,
+            content={"detail": f"{e.job_type} is already running for this pair"},
+        )
 
 
-async def _generate_impl(resume_id: str, job_id: str, voice: str | None, length: str,
-                         template: str | None, page_format: str | None,
-                         cover_letter_id: str | None = None):
+async def _generate_impl(
+    resume_id: str,
+    job_id: str,
+    voice: str | None,
+    length: str,
+    template: str | None,
+    page_format: str | None,
+    cover_letter_id: str | None = None,
+):
     """Background worker: generate the letter and persist a CoverLetter row; semaphore-guarded (shared with tailoring) so concurrent generations don't blow the LLM rate limit."""
     from backend.analyzer.cover_letter_generator import (
-        resolve_voice_instruction, generate_cover_letter_body,
+        generate_cover_letter_body,
+        resolve_voice_instruction,
     )
     from backend.analyzer.llm_logger import track_llm_call
     from backend.api.routes_resumes import _get_tailoring_semaphore
 
     async with _get_tailoring_semaphore():
         # Returned string becomes JobRun.result_summary (Stats -> Run history).
-        return await _generate_inner(resume_id, job_id, voice, length, template, page_format,
-                                     resolve_voice_instruction, generate_cover_letter_body, track_llm_call,
-                                     cover_letter_id=cover_letter_id)
+        return await _generate_inner(
+            resume_id,
+            job_id,
+            voice,
+            length,
+            template,
+            page_format,
+            resolve_voice_instruction,
+            generate_cover_letter_body,
+            track_llm_call,
+            cover_letter_id=cover_letter_id,
+        )
 
 
-async def _generate_inner(resume_id, job_id, voice, length, template, page_format,
-                          resolve_voice_instruction, generate_cover_letter_body, track_llm_call,
-                          cover_letter_id=None):
+async def _generate_inner(
+    resume_id,
+    job_id,
+    voice,
+    length,
+    template,
+    page_format,
+    resolve_voice_instruction,
+    generate_cover_letter_body,
+    track_llm_call,
+    cover_letter_id=None,
+):
     """Read -> LLM -> write, each with its own short session, so no pooled
     connection is held while the generation call is awaited."""
     from types import SimpleNamespace
@@ -451,11 +577,15 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
         job_title = job.title
         # Detached snapshot: phase 1b resolves the JD after this session closes,
         # so no pooled connection is held across a live page fetch.
-        job_ref = SimpleNamespace(id=job.id, description=job.description,
-                                  url=job_link(job), cached_page_text=job.cached_page_text)
+        job_ref = SimpleNamespace(
+            id=job.id,
+            description=job.description,
+            url=job_link(job),
+            cached_page_text=job.cached_page_text,
+        )
 
         # Resolve the evidence source: Persona.resume_content or a Resume row.
-        persona_as_base = (resume_id == "persona")
+        persona_as_base = resume_id == "persona"
         if persona_as_base:
             if not persona or not (persona.resume_content or {}):
                 raise RuntimeError("persona has no resume_content at execution time")
@@ -482,6 +612,7 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
         # Log the pair call_cover_letter_llm will actually dispatch with -- the same
         # resolver, not a second fallback chain.
         from backend.analyzer.llm_client import resolve_llm_config
+
         _cfg = resolve_llm_config("cover_letter", db=db)
         _provider, _model = _cfg["provider"], _cfg["model"]
     finally:
@@ -493,10 +624,16 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
         raise RuntimeError(f"cover letter: job {job_id} has no usable description")
 
     # -- Phase 2: the LLM call, with no connection held ----------------------
-    async with track_llm_call("cover_letter", _provider, _model, job_id=job_id) as _tracker:
+    async with track_llm_call(
+        "cover_letter", _provider, _model, job_id=job_id
+    ) as _tracker:
         body = await generate_cover_letter_body(
-            resume_data, preferences, job_description,
-            voice_instruction, length, prompt_template,
+            resume_data,
+            preferences,
+            job_description,
+            voice_instruction,
+            length,
+            prompt_template,
         )
         _tracker.record(body.pop("_llm", None))
         body.pop("_usage", None)  # superseded by _llm; keep the dict clean
@@ -505,7 +642,10 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
     header = resume_data.get("header", {})
     today = date.today().strftime("%B %d, %Y")
     json_data = {
-        "header": {"name": header.get("name", ""), "contact_items": header.get("contact_items", [])},
+        "header": {
+            "name": header.get("name", ""),
+            "contact_items": header.get("contact_items", []),
+        },
         "recipient": {"company": job_company or "", "manager": "", "address": ""},
         "date": today,
         "greeting": body["greeting"],
@@ -514,7 +654,9 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
         "signature": body["signature"] or header.get("name", ""),
     }
 
-    job_label = f"{job_company} \u2014 {job_title}" if job_company else (job_title or "Job")
+    job_label = (
+        f"{job_company} \u2014 {job_title}" if job_company else (job_title or "Job")
+    )
 
     # -- Phase 3: persist the letter -----------------------------------------
     db = SessionLocal()
@@ -553,7 +695,9 @@ async def _generate_inner(resume_id, job_id, voice, length, template, page_forma
             action = "generated"
         db.commit()
         db.refresh(cl)
-        logger.info(f"Cover letter {cl.id} {action} for job {job_id} (voice={voice_id})")
+        logger.info(
+            f"Cover letter {cl.id} {action} for job {job_id} (voice={voice_id})"
+        )
         return f"{action.capitalize()} letter for {job_label} ({voice_id or 'default'} voice)"
     finally:
         db.close()

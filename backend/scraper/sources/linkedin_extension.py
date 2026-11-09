@@ -1,23 +1,27 @@
 """LinkedIn Extension source — Voyager enrichment for job IDs captured passively by the Chrome extension, received via POST /api/jobs/linkedin-import.
 Runs Voyager from inside a logged-in Playwright browser (not linkedin-api) since password login now hits CHALLENGE and standalone HTTP clients get session-poisoned by LinkedIn's rotating cookies; the session is refreshed by backend/scraper/_shared/linkedin_session.py."""
+
 import asyncio
 import json
 import logging
 import os
 from collections.abc import MutableMapping
 
-from backend.models.db import (
-    SessionLocal, Job,
-    build_company_lookup, get_existing_external_ids,
-)
-from backend.scraper._shared.dedup import make_external_id, make_content_hash
-from backend.scraper._shared.postings import is_short_link, resolve_short_link
+from backend.analyzer.h1b_checker import check_job_h1b, determine_h1b_verdict
+from backend.analyzer.location import apply_location_to_job
 from backend.analyzer.salary_extractor import apply_salary_to_job
 from backend.analyzer.work_arrangement import apply_arrangement_to_job
-from backend.analyzer.location import apply_location_to_job
-from backend.analyzer.h1b_checker import check_job_h1b, determine_h1b_verdict
+from backend.models.db import (
+    Job,
+    SessionLocal,
+    build_company_lookup,
+    get_existing_external_ids,
+)
+from backend.scraper._shared.dedup import make_content_hash, make_external_id
+from backend.scraper._shared.postings import is_short_link, resolve_short_link
 
 logger = logging.getLogger("jobnavigator.jobs")
+
 
 class _PerAccountProgress(MutableMapping):
     """In-memory LinkedIn import progress, one dict per account (QA F5, R5-02).
@@ -32,6 +36,7 @@ class _PerAccountProgress(MutableMapping):
     @staticmethod
     def _key():
         from backend.accounts.context import current_account
+
         acc = current_account.get()
         return str(acc) if acc is not None else ""
 
@@ -68,15 +73,20 @@ class _PerAccountProgress(MutableMapping):
 # Shared with routes_jobs for the progress-polling endpoint.
 _linkedin_import_progress = _PerAccountProgress()
 
+
 # Persisted (mounted) Playwright session cookies — written by
 # backend/scraper/_shared/linkedin_session.py. Survives container restarts.
 def _session_path() -> str:
     """The jar the LinkedIn import reads: the mock account's session when a mock account is set
     (Settings › LinkedIn), else the main account's. MT-16: the current account's jars (the
     owner's mock jar is /root/.linkedin_api/li_cookies.json, a member's lives under accounts/<id>/)."""
-    from backend.accounts.credentials import linkedin_extension_cookies, linkedin_personal_cookies
+    from backend.accounts.credentials import (
+        linkedin_extension_cookies,
+        linkedin_personal_cookies,
+    )
     from backend.accounts.settings import get_setting
     from backend.models.db import SessionLocal
+
     db = SessionLocal()
     try:
         mock = (get_setting(db, "linkedin_mock_email") or "").strip()
@@ -87,14 +97,20 @@ def _session_path() -> str:
     main, old = linkedin_personal_cookies(), linkedin_extension_cookies()
     # Before the sessions split, an install without a mock account kept its personal session in
     # the extension jar: it carries over as the main session once.
-    if not os.path.exists(main) and os.path.exists(old) and not os.path.exists(old + ".account"):
+    if (
+        not os.path.exists(main)
+        and os.path.exists(old)
+        and not os.path.exists(old + ".account")
+    ):
         try:
             import shutil
+
             os.makedirs(os.path.dirname(main) or ".", exist_ok=True)
             shutil.copyfile(old, main)
         except OSError:
             return old
     return main
+
 
 # The exact Voyager endpoint + decoration the linkedin-api library used; returns plain JSON
 # with top-level title/companyDetails/description/formattedLocation/applyMethod.
@@ -175,27 +191,36 @@ async def enrich(linkedin_ids: list[str], db=None):
     """Background: fetch LinkedIn job data via in-browser Voyager, create jobs."""
     from backend.models.db import Search
 
-    logger.info(f"LinkedIn import: fetching {len(linkedin_ids)} jobs via Voyager (browser session)")
+    logger.info(
+        f"LinkedIn import: fetching {len(linkedin_ids)} jobs via Voyager (browser session)"
+    )
 
     db = SessionLocal()
     try:
         # Pre-check: skip LinkedIn IDs already in the DB (avoid unnecessary fetches)
         existing_li_ids = {
-            r[0] for r in db.query(Job.linkedin_job_id).filter(Job.linkedin_job_id != None).all()
+            r[0]
+            for r in db.query(Job.linkedin_job_id)
+            .filter(Job.linkedin_job_id != None)
+            .all()
         }
         pre_dedup = [lid for lid in linkedin_ids if lid not in existing_li_ids]
         pre_skipped = len(linkedin_ids) - len(pre_dedup)
         if pre_skipped:
-            logger.info(f"LinkedIn import: {pre_skipped}/{len(linkedin_ids)} already in DB, skipping fetch")
+            logger.info(
+                f"LinkedIn import: {pre_skipped}/{len(linkedin_ids)} already in DB, skipping fetch"
+            )
 
-        _linkedin_import_progress.update({
-            "total": len(linkedin_ids),
-            "pre_skipped": pre_skipped,
-            "processed": 0,
-            "imported": 0,
-            "skipped": pre_skipped,
-            "status": "running",
-        })
+        _linkedin_import_progress.update(
+            {
+                "total": len(linkedin_ids),
+                "pre_skipped": pre_skipped,
+                "processed": 0,
+                "imported": 0,
+                "skipped": pre_skipped,
+                "status": "running",
+            }
+        )
 
         if not pre_dedup:
             _linkedin_import_progress["status"] = "done"
@@ -203,30 +228,47 @@ async def enrich(linkedin_ids: list[str], db=None):
             return
 
         # Load the LinkedIn Extension search for filters + linking
-        ext_search = db.query(Search).filter(Search.search_mode == "linkedin_extension").first()
+        ext_search = (
+            db.query(Search).filter(Search.search_mode == "linkedin_extension").first()
+        )
 
         # Require a persisted logged-in session (established out-of-band via
         # backend/scraper/_shared/linkedin_session.py). Without it we can't reach Voyager.
         session_cookies = _load_session_cookies()
         if not session_cookies:
-            logger.error("LinkedIn import: no session cookies at %s — run "
-                         "Settings › LinkedIn › Sign in (or `python -m backend.refresh_linkedin_session --session main|mock`) first", _session_path())
+            logger.error(
+                "LinkedIn import: no session cookies at %s — run "
+                "Settings › LinkedIn › Sign in (or `python -m backend.refresh_linkedin_session --session main|mock`) first",
+                _session_path(),
+            )
             _linkedin_import_progress["status"] = "error"
-            _linkedin_import_progress["error_details"] = [{"stage": "session",
-                "error": "no LinkedIn session — refresh it in Settings › LinkedIn"}]
+            _linkedin_import_progress["error_details"] = [
+                {
+                    "stage": "session",
+                    "error": "no LinkedIn session — refresh it in Settings › LinkedIn",
+                }
+            ]
             return
 
         existing_ext_ids = get_existing_external_ids(db)
         company_lookup = build_company_lookup(db)
         # Hoisted per import so these aren't re-read per job in the loop
-        from backend.scraper._shared.filters import (build_search_exclude_sets, company_included,
-                                                     search_title_filters, title_filter_hit)
         from backend.analyzer.h1b_checker import load_exclusion_phrases
-        include_kw, exclude_kw = search_title_filters(ext_search, db) if ext_search else ([], [])
+        from backend.scraper._shared.filters import (
+            build_search_exclude_sets,
+            company_included,
+            search_title_filters,
+            title_filter_hit,
+        )
+
+        include_kw, exclude_kw = (
+            search_title_filters(ext_search, db) if ext_search else ([], [])
+        )
         # The search set holds the search's own list plus, when "Skip my active companies" is on,
         # every active company and its aliases.
         global_company_ex, search_company_ex = (
-            build_search_exclude_sets(db, ext_search) if ext_search else (set(), set()))
+            build_search_exclude_sets(db, ext_search) if ext_search else (set(), set())
+        )
         _phrases = load_exclusion_phrases(db)
         imported = 0
         skipped = pre_skipped
@@ -234,12 +276,16 @@ async def enrich(linkedin_ids: list[str], db=None):
         # One logged-in browser for the whole batch (reuses linkedin_personal's stealth browser);
         # navigate to a LinkedIn origin first so in-page fetch() carries the session + fresh cookies.
         from backend.scraper.sources.linkedin_personal import _get_linkedin_browser
+
         pw = browser = None
         try:
             pw, browser, context, page = await _get_linkedin_browser()
             await context.add_cookies(session_cookies)
-            await page.goto("https://www.linkedin.com/jobs/",
-                            wait_until="domcontentloaded", timeout=30000)
+            await page.goto(
+                "https://www.linkedin.com/jobs/",
+                wait_until="domcontentloaded",
+                timeout=30000,
+            )
             await asyncio.sleep(2)
             # Verify the session is live before burning through the batch.
             probe = await _voyager_fetch(page, pre_dedup[0])
@@ -251,13 +297,21 @@ async def enrich(linkedin_ids: list[str], db=None):
                     "  const csrf=(document.cookie.match(/JSESSIONID=\"?([^;\"]+)/)||[])[1]||'';"
                     "  return (await fetch('https://www.linkedin.com/voyager/api/me',"
                     "    {credentials:'include', headers:{'csrf-token':csrf}})).status;"
-                    "}")
+                    "}"
+                )
                 if me_status != 200:
-                    logger.error("LinkedIn import: session invalid (me=%s) — run "
-                                 "Settings › LinkedIn › Sign in (or `python -m backend.refresh_linkedin_session --session main|mock`)", me_status)
+                    logger.error(
+                        "LinkedIn import: session invalid (me=%s) — run "
+                        "Settings › LinkedIn › Sign in (or `python -m backend.refresh_linkedin_session --session main|mock`)",
+                        me_status,
+                    )
                     _linkedin_import_progress["status"] = "error"
-                    _linkedin_import_progress["error_details"] = [{"stage": "session",
-                        "error": f"session invalid (me={me_status}) — refresh it in Settings › LinkedIn"}]
+                    _linkedin_import_progress["error_details"] = [
+                        {
+                            "stage": "session",
+                            "error": f"session invalid (me={me_status}) — refresh it in Settings › LinkedIn",
+                        }
+                    ]
                     return
 
             for lid in pre_dedup:
@@ -273,7 +327,9 @@ async def enrich(linkedin_ids: list[str], db=None):
                     company = (job_data.get("company") or "").strip()
 
                     if not title or not company:
-                        logger.warning(f"LinkedIn {lid}: missing title/company, skipping")
+                        logger.warning(
+                            f"LinkedIn {lid}: missing title/company, skipping"
+                        )
                         skipped += 1
                         continue
 
@@ -281,28 +337,42 @@ async def enrich(linkedin_ids: list[str], db=None):
                     if ext_search:
                         rule, _ = title_filter_hit(title, include_kw, exclude_kw)
                         if rule == "include":
-                            logger.info(f"LinkedIn {lid}: title '{title}' doesn't match include filter, skipping")
+                            logger.info(
+                                f"LinkedIn {lid}: title '{title}' doesn't match include filter, skipping"
+                            )
                             skipped += 1
                             continue
                         if rule == "exclude":
-                            logger.info(f"LinkedIn {lid}: title '{title}' matches exclude filter, skipping")
+                            logger.info(
+                                f"LinkedIn {lid}: title '{title}' matches exclude filter, skipping"
+                            )
                             skipped += 1
                             continue
                         company_excl = ext_search.company_exclude or []
-                        if company_excl and company.lower().strip() in {c.lower().strip() for c in company_excl}:
-                            logger.info(f"LinkedIn {lid}: company '{company}' excluded, skipping")
+                        if company_excl and company.lower().strip() in {
+                            c.lower().strip() for c in company_excl
+                        }:
+                            logger.info(
+                                f"LinkedIn {lid}: company '{company}' excluded, skipping"
+                            )
                             skipped += 1
                             continue
                         if company.lower() in global_company_ex:
-                            logger.info(f"LinkedIn {lid}: company '{company}' on the global exclude list, skipping")
+                            logger.info(
+                                f"LinkedIn {lid}: company '{company}' on the global exclude list, skipping"
+                            )
                             skipped += 1
                             continue
                         if company.lower() in search_company_ex:
-                            logger.info(f"LinkedIn {lid}: company '{company}' is an active company, skipping")
+                            logger.info(
+                                f"LinkedIn {lid}: company '{company}' is an active company, skipping"
+                            )
                             skipped += 1
                             continue
                         if not company_included(company, ext_search.company_filter)[0]:
-                            logger.info(f"LinkedIn {lid}: company '{company}' not on the include list, skipping")
+                            logger.info(
+                                f"LinkedIn {lid}: company '{company}' not on the include list, skipping"
+                            )
                             skipped += 1
                             continue
 
@@ -316,7 +386,11 @@ async def enrich(linkedin_ids: list[str], db=None):
 
                     ext_id = make_external_id(company, title, job_url)
                     c_hash = make_content_hash(company, title)
-                    alt_ext_id = make_external_id(company, title, linkedin_url) if apply_url else None
+                    alt_ext_id = (
+                        make_external_id(company, title, linkedin_url)
+                        if apply_url
+                        else None
+                    )
 
                     if ext_id in existing_ext_ids:
                         skipped += 1
@@ -325,7 +399,11 @@ async def enrich(linkedin_ids: list[str], db=None):
                         skipped += 1
                         continue
 
-                    landed = await resolve_short_link(job_url) if is_short_link(job_url) else job_url
+                    landed = (
+                        await resolve_short_link(job_url)
+                        if is_short_link(job_url)
+                        else job_url
+                    )
                     job = Job(
                         external_id=ext_id,
                         content_hash=c_hash,
@@ -344,29 +422,38 @@ async def enrich(linkedin_ids: list[str], db=None):
                     # H-1B + language check first, then salary (reuses the cache
                     # median that check_job_h1b stashes on the job).
                     try:
-                        await check_job_h1b(job, db, company_lookup=company_lookup, phrases=_phrases)
+                        await check_job_h1b(
+                            job, db, company_lookup=company_lookup, phrases=_phrases
+                        )
                         job.h1b_verdict = determine_h1b_verdict(
                             job.h1b_company_lca_count, job.h1b_jd_flag
                         )
                         apply_salary_to_job(job, getattr(job, "_h1b_median", None))
                         apply_arrangement_to_job(
-                            job, structured=_voyager_arrangement(job_data))
+                            job, structured=_voyager_arrangement(job_data)
+                        )
                         apply_location_to_job(job)
                     except Exception as e:
                         logger.warning(f"LinkedIn {lid}: analysis error: {e}")
                         _linkedin_import_progress["errors"] = (
                             _linkedin_import_progress.get("errors", 0) + 1
                         )
-                        _linkedin_import_progress.setdefault("error_details", []).append({
-                            "lid": lid,
-                            "stage": "analysis",
-                            "error": str(e)[:200],
-                        })
+                        _linkedin_import_progress.setdefault(
+                            "error_details", []
+                        ).append(
+                            {
+                                "lid": lid,
+                                "stage": "analysis",
+                                "error": str(e)[:200],
+                            }
+                        )
 
                     # Skip flagged jobs (same as other scrapers)
                     if job.h1b_jd_flag:
                         _phrase = getattr(job, "_h1b_matched_phrase", None) or "?"
-                        logger.info(f"LinkedIn {lid} ({job.title!r}): skipping (body exclusion) — matched phrase: {_phrase!r}")
+                        logger.info(
+                            f"LinkedIn {lid} ({job.title!r}): skipping (body exclusion) — matched phrase: {_phrase!r}"
+                        )
                         skipped += 1
                         continue
 
@@ -374,7 +461,9 @@ async def enrich(linkedin_ids: list[str], db=None):
                     db.commit()
                     imported += 1
                     existing_ext_ids.add(ext_id)
-                    logger.info(f"LinkedIn {lid}: imported '{title}' at '{company}' -> {job_url[:80]}")
+                    logger.info(
+                        f"LinkedIn {lid}: imported '{title}' at '{company}' -> {job_url[:80]}"
+                    )
 
                 except Exception as e:
                     logger.warning(f"LinkedIn {lid}: failed: {e}")
@@ -383,26 +472,37 @@ async def enrich(linkedin_ids: list[str], db=None):
                     _linkedin_import_progress["errors"] = (
                         _linkedin_import_progress.get("errors", 0) + 1
                     )
-                    _linkedin_import_progress.setdefault("error_details", []).append({
-                        "lid": lid,
-                        "stage": "fetch",
-                        "error": str(e)[:200],
-                    })
+                    _linkedin_import_progress.setdefault("error_details", []).append(
+                        {
+                            "lid": lid,
+                            "stage": "fetch",
+                            "error": str(e)[:200],
+                        }
+                    )
 
-                _linkedin_import_progress.update({
-                    "processed": _linkedin_import_progress["processed"] + 1,
-                    "imported": imported,
-                    "skipped": skipped,
-                })
+                _linkedin_import_progress.update(
+                    {
+                        "processed": _linkedin_import_progress["processed"] + 1,
+                        "imported": imported,
+                        "skipped": skipped,
+                    }
+                )
 
                 await asyncio.sleep(1)  # Rate limit
 
             _linkedin_import_progress["status"] = "done"
-            logger.info(f"LinkedIn import: done — imported {imported}, skipped {skipped}/{len(linkedin_ids)}")
+            logger.info(
+                f"LinkedIn import: done — imported {imported}, skipped {skipped}/{len(linkedin_ids)}"
+            )
 
-            if imported > 0 and ext_search and ext_search.auto_scoring_depth in ("light", "full"):
+            if (
+                imported > 0
+                and ext_search
+                and ext_search.auto_scoring_depth in ("light", "full")
+            ):
                 try:
                     from backend.analyzer.cv_scorer import analyze_unscored_jobs
+
                     await analyze_unscored_jobs(status="new")
                     logger.info("LinkedIn import: auto-scoring triggered")
                 except Exception as e:
@@ -410,11 +510,13 @@ async def enrich(linkedin_ids: list[str], db=None):
                     _linkedin_import_progress["errors"] = (
                         _linkedin_import_progress.get("errors", 0) + 1
                     )
-                    _linkedin_import_progress.setdefault("error_details", []).append({
-                        "lid": None,
-                        "stage": "auto_scoring",
-                        "error": str(e)[:200],
-                    })
+                    _linkedin_import_progress.setdefault("error_details", []).append(
+                        {
+                            "lid": None,
+                            "stage": "auto_scoring",
+                            "error": str(e)[:200],
+                        }
+                    )
         finally:
             try:
                 if browser:

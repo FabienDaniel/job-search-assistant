@@ -1,6 +1,7 @@
 """Cross-run fetch reuse: a run whose target was fetched by another run in the last
 REUSE_SECONDS (or is being fetched right now) gets that fetch instead of downloading again,
 when the earlier fetch covers what it asks for."""
+
 import asyncio
 import threading
 import time
@@ -30,17 +31,28 @@ def test_same_key_within_the_window_reuses_the_fetch():
 def test_a_smaller_request_is_covered_a_larger_one_is_not():
     a = T.shared_fetch_for(("keyword", "pm"), {"results_wanted": 100, "hours_old": 72})
     a.get_sync(lambda: ["job"])
-    assert T.shared_fetch_for(("keyword", "pm"), {"results_wanted": 50, "hours_old": 24}) is a
-    bigger = T.shared_fetch_for(("keyword", "pm"), {"results_wanted": 200, "hours_old": 24})
+    assert (
+        T.shared_fetch_for(("keyword", "pm"), {"results_wanted": 50, "hours_old": 24})
+        is a
+    )
+    bigger = T.shared_fetch_for(
+        ("keyword", "pm"), {"results_wanted": 200, "hours_old": 24}
+    )
     assert bigger is not a
-    older = T.shared_fetch_for(("keyword", "pm"), {"results_wanted": 50, "hours_old": 168})
+    older = T.shared_fetch_for(
+        ("keyword", "pm"), {"results_wanted": 50, "hours_old": 168}
+    )
     assert older is not a
 
 
 def test_a_different_key_is_a_different_fetch():
-    a = T.shared_fetch_for(("company", (("https://boards.greenhouse.io/acme", "greenhouse"),), 5, ""))
+    a = T.shared_fetch_for(
+        ("company", (("https://boards.greenhouse.io/acme", "greenhouse"),), 5, "")
+    )
     a.get_sync(lambda: ["job"])
-    b = T.shared_fetch_for(("company", (("https://boards.greenhouse.io/other", "greenhouse"),), 5, ""))
+    b = T.shared_fetch_for(
+        ("company", (("https://boards.greenhouse.io/other", "greenhouse"),), 5, "")
+    )
     assert b is not a
 
 
@@ -48,8 +60,11 @@ def test_an_expired_fetch_is_not_reused(monkeypatch):
     a = T.shared_fetch_for(("trulyremote",))
     a.get_sync(lambda: ["job"])
     from types import SimpleNamespace
+
     later = time.monotonic() + T.REUSE_SECONDS + 1
-    monkeypatch.setattr(T, "time", SimpleNamespace(time=time.time, monotonic=lambda: later))
+    monkeypatch.setattr(
+        T, "time", SimpleNamespace(time=time.time, monotonic=lambda: later)
+    )
     assert T.shared_fetch_for(("trulyremote",)) is not a
 
 
@@ -112,7 +127,9 @@ def test_sync_fetches_in_two_threads_run_once():
         time.sleep(0.1)
         return ["job"]
 
-    threads = [threading.Thread(target=lambda: out.append(a.get_sync(fetch))) for _ in range(2)]
+    threads = [
+        threading.Thread(target=lambda: out.append(a.get_sync(fetch))) for _ in range(2)
+    ]
     for t in threads:
         t.start()
     for t in threads:

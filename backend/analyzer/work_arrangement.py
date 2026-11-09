@@ -17,6 +17,7 @@ does) marks about four jobs wrongly for each one it marks correctly.
 
 The cascade never guesses. An unresolved job keeps `None`.
 """
+
 import html as _html
 import logging
 import re
@@ -29,24 +30,38 @@ ONSITE = "onsite"
 
 # Values seen in the structured fields of the sources we read.
 _STRUCTURED = {
-    "remote": REMOTE, "fully remote": REMOTE, "fullyremote": REMOTE,
-    "remote_ok": REMOTE, "work from home": REMOTE, "wfh": REMOTE,
+    "remote": REMOTE,
+    "fully remote": REMOTE,
+    "fullyremote": REMOTE,
+    "remote_ok": REMOTE,
+    "work from home": REMOTE,
+    "wfh": REMOTE,
     "hybrid": HYBRID,
-    "onsite": ONSITE, "on-site": ONSITE, "on site": ONSITE,
-    "in office": ONSITE, "in-office": ONSITE, "office": ONSITE,
-    "unspecified": None, "": None,
+    "onsite": ONSITE,
+    "on-site": ONSITE,
+    "on site": ONSITE,
+    "in office": ONSITE,
+    "in-office": ONSITE,
+    "office": ONSITE,
+    "unspecified": None,
+    "": None,
 }
 
 # A token on its own, not a word inside a sentence.
 # Word forms scanned inside a string, for "Remote or Hybrid" where one regex
 # pass over separators would report only the first.
 ARRANGEMENT_WORDS = {
-    "remote": REMOTE, "hybrid": HYBRID, "on-site": ONSITE, "onsite": ONSITE,
+    "remote": REMOTE,
+    "hybrid": HYBRID,
+    "on-site": ONSITE,
+    "onsite": ONSITE,
 }
 
 _TOKEN = re.compile(
     r"(?:^|[\s,;·|(\[\-–—])(remote|hybrid|on-?site|work from home|wfh)"
-    r"(?:[\s,;·|)\]\-–—]|$)", re.I)
+    r"(?:[\s,;·|)\]\-–—]|$)",
+    re.I,
+)
 
 _JD_REMOTE = [
     r"100%\s+remote",
@@ -104,7 +119,9 @@ _NOISE = re.compile(
     r"telemetry|device|devices|config|configuration|url|origin|"
     r"site|sites|assistance|build|builds|special\s+project|patient|patients)"
     r"|(?:git|ssh|rdp|vpn|tailscale|terraform|tofu)\s+remote"
-    r"|remote[- ]first\s+(?:culture|team|teams|company)", re.I)
+    r"|remote[- ]first\s+(?:culture|team|teams|company)",
+    re.I,
+)
 
 # "hybrid" as a technical term, not a work arrangement.
 _HYBRID_NOISE = re.compile(
@@ -112,24 +129,32 @@ _HYBRID_NOISE = re.compile(
     r"network|networks|storage|search|encryption|app|apps|application|"
     r"applications|mesh|environment|environments|setup\s+of\s+servers|"
     r"table|tables|index|indexes|query|queries|vector|vectors)"
-    r"|(?:cloud|on[- ]?prem(?:ise)?s?|multi[- ]cloud)\s+(?:and\s+)?hybrid", re.I)
+    r"|(?:cloud|on[- ]?prem(?:ise)?s?|multi[- ]cloud)\s+(?:and\s+)?hybrid",
+    re.I,
+)
 
 # "onsite" naming the work, not the workplace: "Onsite Construction Manager".
 _ONSITE_NOISE = re.compile(
     r"on[- ]?site\s+(?:construction|installation|equipment|repair|repairs|"
-    r"service\s+delivery|inspection|inspections|drilling)", re.I)
+    r"service\s+delivery|inspection|inspections|drilling)",
+    re.I,
+)
 
 # The sentence says the job is not remote.
 _NEGATED = re.compile(
     r"(?:not|no|isn't|is\s+not|does\s+not\s+(?:offer|support)|won't\s+be|"
     r"cannot\s+be|can't\s+be|nor)\s+(?:\w+\s+){0,3}remote"
     r"|remote\s+(?:work\s+)?is\s+not"
-    r"|this\s+is\s+not\s+a\s+remote", re.I)
+    r"|this\s+is\s+not\s+a\s+remote",
+    re.I,
+)
 
 # "we may consider remote candidates" is not a remote posting.
 _CONDITIONAL = re.compile(
     r"(?:may|might|could|open\s+to|willing\s+to|would)\s+"
-    r"(?:be\s+)?(?:willing\s+to\s+)?(?:consider|entertain)\s+(?:\w+\s+){0,4}remote", re.I)
+    r"(?:be\s+)?(?:willing\s+to\s+)?(?:consider|entertain)\s+(?:\w+\s+){0,4}remote",
+    re.I,
+)
 
 # Hybrid runs before remote: a hybrid posting almost always also praises "remote
 # work flexibility", and the remote patterns would win on that sentence.
@@ -157,7 +182,7 @@ def _strip_tags(text: str) -> str:
         close = text.find(">", start + 1)
         if close == -1:
             break
-        if close == start + 1:                  # "<>": [^>]+ needs one character
+        if close == start + 1:  # "<>": [^>]+ needs one character
             start = text.find("<", close)
             continue
         out.append(text[pos:start])
@@ -214,9 +239,11 @@ def from_description(description: str) -> tuple[str | None, str | None]:
             start = max(0, match.start() - _CONTEXT)
             end = min(len(text), match.end() + _CONTEXT)
             context = text[start:end]
-            if value == REMOTE and (_NOISE.search(context)
-                                    or _NEGATED.search(context)
-                                    or _CONDITIONAL.search(context)):
+            if value == REMOTE and (
+                _NOISE.search(context)
+                or _NEGATED.search(context)
+                or _CONDITIONAL.search(context)
+            ):
                 continue
             if value == HYBRID and _HYBRID_NOISE.search(context):
                 continue
@@ -262,19 +289,24 @@ def _denoise(values: set, text: str) -> set:
     return out
 
 
-def extract_arrangement(location: str = None, title: str = None,
-                        description: str = None, structured=None) -> dict:
+def extract_arrangement(
+    location: str = None, title: str = None, description: str = None, structured=None
+) -> dict:
     """Run the cascade. The first tier that resolves wins.
 
     `arrangements` is a set: one posting may be offered several ways, and it has
     to answer each of those filters. `arrangement` names the primary one for a
     caller that wants a single label.
     """
+
     def _result(values, source, snippet):
         ordered = [v for v in (REMOTE, HYBRID, ONSITE) if v in values]
-        return {"arrangements": set(values),
-                "arrangement": ordered[0] if ordered else None,
-                "arrangement_source": source, "snippet": snippet}
+        return {
+            "arrangements": set(values),
+            "arrangement": ordered[0] if ordered else None,
+            "arrangement_source": source,
+            "snippet": snippet,
+        }
 
     values = from_structured_set(structured)
     if values:
@@ -292,8 +324,12 @@ def extract_arrangement(location: str = None, title: str = None,
     if value:
         return _result({value}, "description", snippet)
 
-    return {"arrangements": set(), "arrangement": None,
-            "arrangement_source": None, "snippet": None}
+    return {
+        "arrangements": set(),
+        "arrangement": None,
+        "arrangement_source": None,
+        "snippet": None,
+    }
 
 
 def from_structured_set(value) -> set:
@@ -319,7 +355,11 @@ def apply_arrangement_to_job(job, structured=None) -> None:
 
     `job.remote` is written from `arr_remote` for the API's existing parameter.
     """
-    if job.arr_remote is not None or job.arr_hybrid is not None             or job.arr_onsite is not None:
+    if (
+        job.arr_remote is not None
+        or job.arr_hybrid is not None
+        or job.arr_onsite is not None
+    ):
         return
 
     result = extract_arrangement(

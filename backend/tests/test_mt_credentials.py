@@ -6,6 +6,7 @@ the owner's when it is 'inherit' (the default). The three CLIs get per-account l
 Claude Code a token setting, Codex a CODEX_HOME, Antigravity a HOME (its state dir).
 No subprocess runs: `_run_cli` / `create_subprocess_exec` are fakes that record the env.
 """
+
 import json
 import os
 
@@ -30,7 +31,11 @@ def accounts(test_db):
 
 
 def _own(db, account_id, key, value):
-    row = db.query(Setting).filter(Setting.key == key, Setting.account_id == account_id).first()
+    row = (
+        db.query(Setting)
+        .filter(Setting.key == key, Setting.account_id == account_id)
+        .first()
+    )
     if row is None:
         db.add(Setting(key=key, value=value, account_id=account_id))
     else:
@@ -49,12 +54,22 @@ def two_configs(test_db, accounts):
     member-model / sk-member (+ an OpenAI fallback, so the same key), stored as B's rows but only
     read once B owns 'models'. Keys are per provider (3.1)."""
     a, b = accounts
-    for k, v in {"llm_provider": "claude_api", "llm_model": "owner-model", "anthropic_api_key": "sk-owner",
-                 "llm_fallback_provider": "openrouter", "llm_fallback_model": "owner-fb",
-                 "openrouter_api_key": "or-owner"}.items():
+    for k, v in {
+        "llm_provider": "claude_api",
+        "llm_model": "owner-model",
+        "anthropic_api_key": "sk-owner",
+        "llm_fallback_provider": "openrouter",
+        "llm_fallback_model": "owner-fb",
+        "openrouter_api_key": "or-owner",
+    }.items():
         set_setting(test_db, k, v)
-    for k, v in {"llm_provider": "openai", "llm_model": "member-model", "openai_api_key": "sk-member",
-                 "llm_fallback_provider": "openai", "llm_fallback_model": "member-fb"}.items():
+    for k, v in {
+        "llm_provider": "openai",
+        "llm_model": "member-model",
+        "openai_api_key": "sk-member",
+        "llm_fallback_provider": "openai",
+        "llm_fallback_model": "member-fb",
+    }.items():
         _own(test_db, b, k, v)
     return a, b
 
@@ -66,7 +81,16 @@ MEMBER = ("openai", "member-model", "sk-member")
 def _capture_dispatch(monkeypatch, fail_primary=False):
     calls = []
 
-    async def fake_dispatch(provider, model, api_key, prompt, system, max_tokens, cached_prefix=None, effort=""):
+    async def fake_dispatch(
+        provider,
+        model,
+        api_key,
+        prompt,
+        system,
+        max_tokens,
+        cached_prefix=None,
+        effort="",
+    ):
         calls.append((provider, model, api_key))
         if fail_primary and len(calls) == 1:
             raise L.NonRetryableLLMError("primary down")
@@ -79,8 +103,12 @@ def _capture_dispatch(monkeypatch, fail_primary=False):
 async def _every_entry_point():
     """The six dispatching entry points, in order: scoring (call_llm), tailoring, letters,
     autofill, email, and the résumé PDF / generic path (call_llm with no override)."""
-    await L.call_llm("p", "s", 10, **{k: v for k, v in zip(
-        ("provider", "model", "api_key"), _scoring_pair())})
+    await L.call_llm(
+        "p",
+        "s",
+        10,
+        **{k: v for k, v in zip(("provider", "model", "api_key"), _scoring_pair())},
+    )
     await L.call_cv_tailor_llm("p", "s")
     await L.call_cover_letter_llm("p", "s")
     await L.call_autofill_llm("p", "s")
@@ -94,6 +122,7 @@ def _scoring_pair():
 
 
 # ── API keys: every entry point ──────────────────────────────────────────────
+
 
 def test_resolve_llm_config_every_feature_inherit_then_own(test_db, two_configs):
     a, b = two_configs
@@ -113,7 +142,9 @@ def test_resolve_llm_config_every_feature_inherit_then_own(test_db, two_configs)
 
 
 @pytest.mark.asyncio
-async def test_every_entry_point_dispatches_with_the_member_own_key(test_db, two_configs, monkeypatch):
+async def test_every_entry_point_dispatches_with_the_member_own_key(
+    test_db, two_configs, monkeypatch
+):
     a, b = two_configs
     _models_own(test_db, b)
     calls = _capture_dispatch(monkeypatch)
@@ -123,7 +154,9 @@ async def test_every_entry_point_dispatches_with_the_member_own_key(test_db, two
 
 
 @pytest.mark.asyncio
-async def test_every_entry_point_dispatches_with_the_owner_key_on_inherit(test_db, two_configs, monkeypatch):
+async def test_every_entry_point_dispatches_with_the_owner_key_on_inherit(
+    test_db, two_configs, monkeypatch
+):
     a, b = two_configs
     calls = _capture_dispatch(monkeypatch)
     with use_account(b):
@@ -132,7 +165,9 @@ async def test_every_entry_point_dispatches_with_the_owner_key_on_inherit(test_d
 
 
 @pytest.mark.asyncio
-async def test_owner_entry_points_unchanged_by_a_member_own_config(test_db, two_configs, monkeypatch):
+async def test_owner_entry_points_unchanged_by_a_member_own_config(
+    test_db, two_configs, monkeypatch
+):
     a, b = two_configs
     _models_own(test_db, b)
     calls = _capture_dispatch(monkeypatch)
@@ -142,11 +177,16 @@ async def test_owner_entry_points_unchanged_by_a_member_own_config(test_db, two_
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("own,expected", [
-    (True, ("openai", "member-fb", "sk-member")),
-    (False, ("openrouter", "owner-fb", "or-owner")),
-])
-async def test_fallback_follows_the_member_policy(test_db, two_configs, monkeypatch, own, expected):
+@pytest.mark.parametrize(
+    "own,expected",
+    [
+        (True, ("openai", "member-fb", "sk-member")),
+        (False, ("openrouter", "owner-fb", "or-owner")),
+    ],
+)
+async def test_fallback_follows_the_member_policy(
+    test_db, two_configs, monkeypatch, own, expected
+):
     a, b = two_configs
     if own:
         _models_own(test_db, b)
@@ -159,17 +199,25 @@ async def test_fallback_follows_the_member_policy(test_db, two_configs, monkeypa
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("own", [True, False])
-async def test_streaming_autofill_uses_the_member_policy(test_db, two_configs, monkeypatch, own):
+async def test_streaming_autofill_uses_the_member_policy(
+    test_db, two_configs, monkeypatch, own
+):
     a, b = two_configs
     set_setting(test_db, "llm_provider", "claude_api")
-    _own(test_db, b, "autofill_llm_provider", "claude_api")   # stream natively in both cases
-    _own(test_db, b, "autofill_llm_model", "member-claude")   # its own model: not the OpenAI Primary's (L-05)
+    _own(
+        test_db, b, "autofill_llm_provider", "claude_api"
+    )  # stream natively in both cases
+    _own(
+        test_db, b, "autofill_llm_model", "member-claude"
+    )  # its own model: not the OpenAI Primary's (L-05)
     _own(test_db, b, "anthropic_api_key", "sk-member-autofill")
     if own:
         _models_own(test_db, b)
     seen = []
 
-    async def fake_stream(prompt, system, model, api_key, max_tokens, cached_prefix, effort=""):
+    async def fake_stream(
+        prompt, system, model, api_key, max_tokens, cached_prefix, effort=""
+    ):
         seen.append((model, api_key))
         yield "hi"
 
@@ -177,31 +225,44 @@ async def test_streaming_autofill_uses_the_member_policy(test_db, two_configs, m
     with use_account(b):
         out = [c async for c in L.call_autofill_llm_stream("p", "s")]
     assert out == ["hi"]
-    assert seen == [("member-claude", "sk-member-autofill") if own else ("owner-model", "sk-owner")]
+    assert seen == [
+        ("member-claude", "sk-member-autofill") if own else ("owner-model", "sk-owner")
+    ]
 
 
-def test_streaming_route_over_http_runs_as_the_member(client, test_db, two_configs, monkeypatch):
+def test_streaming_route_over_http_runs_as_the_member(
+    client, test_db, two_configs, monkeypatch
+):
     """The SSE body runs after the middleware returned: the account context must still be B's."""
     a, b = two_configs
     _models_own(test_db, b)
     _own(test_db, b, "llm_provider", "claude_api")
-    _own(test_db, b, "anthropic_api_key", "sk-member-ant")   # its key for the provider it now uses
-    set_setting(test_db, "autofill_prompt", "Answer {question} for {company} as {persona}")
+    _own(
+        test_db, b, "anthropic_api_key", "sk-member-ant"
+    )  # its key for the provider it now uses
+    set_setting(
+        test_db, "autofill_prompt", "Answer {question} for {company} as {persona}"
+    )
     seen = []
 
-    async def fake_stream(prompt, system, model, api_key, max_tokens, cached_prefix, effort=""):
+    async def fake_stream(
+        prompt, system, model, api_key, max_tokens, cached_prefix, effort=""
+    ):
         seen.append((model, api_key))
         yield "drafted"
 
     monkeypatch.setattr(L, "_stream_claude", fake_stream)
     client.headers["X-Test-Act-As"] = str(b)
-    r = client.post("/api/autofill/answer/stream", json={"question": "Why us?", "company": "Acme"})
+    r = client.post(
+        "/api/autofill/answer/stream", json={"question": "Why us?", "company": "Acme"}
+    )
     assert r.status_code == 200, r.text
     assert "drafted" in r.text
     assert seen == [("member-model", "sk-member-ant")]
 
 
 # ── Claude Code: token per account ───────────────────────────────────────────
+
 
 def _capture_run_cli(monkeypatch, handler=None):
     calls = []
@@ -210,14 +271,22 @@ def _capture_run_cli(monkeypatch, handler=None):
         calls.append({"cmd": list(cmd), "env": dict(env or {}), "cwd": cwd})
         if handler:
             return handler(cmd)
-        return 0, json.dumps({"result": "ok", "is_error": False, "subtype": "success"}).encode(), b""
+        return (
+            0,
+            json.dumps(
+                {"result": "ok", "is_error": False, "subtype": "success"}
+            ).encode(),
+            b"",
+        )
 
     monkeypatch.setattr(L, "_run_cli", fake_run_cli)
     return calls
 
 
 @pytest.mark.asyncio
-async def test_claude_code_owner_without_a_setting_keeps_the_env_token(test_db, accounts, monkeypatch):
+async def test_claude_code_owner_without_a_setting_keeps_the_env_token(
+    test_db, accounts, monkeypatch
+):
     a, b = accounts
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "env-owner-token")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-must-not-pass")
@@ -240,10 +309,14 @@ async def test_claude_code_owner_setting_beats_the_env(test_db, accounts, monkey
 
 
 @pytest.mark.asyncio
-async def test_claude_code_member_inherit_uses_the_owner_token(test_db, accounts, monkeypatch):
+async def test_claude_code_member_inherit_uses_the_owner_token(
+    test_db, accounts, monkeypatch
+):
     a, b = accounts
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "env-owner-token")
-    _own(test_db, b, "claude_code_oauth_token", "member-token")   # ignored while inheriting
+    _own(
+        test_db, b, "claude_code_oauth_token", "member-token"
+    )  # ignored while inheriting
     calls = _capture_run_cli(monkeypatch)
     with use_account(b):
         await L._call_claude_code("p", "s", "", 100)
@@ -255,7 +328,9 @@ async def test_claude_code_member_inherit_uses_the_owner_token(test_db, accounts
 
 
 @pytest.mark.asyncio
-async def test_claude_code_member_own_uses_its_token(test_db, accounts, cli_roots, monkeypatch):
+async def test_claude_code_member_own_uses_its_token(
+    test_db, accounts, cli_roots, monkeypatch
+):
     a, b = accounts
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "env-owner-token")
     set_setting(test_db, "claude_code_oauth_token", "install-token")
@@ -273,31 +348,44 @@ async def test_claude_code_member_own_uses_its_token(test_db, accounts, cli_root
 def test_claude_code_token_is_a_redacted_models_secret(client, test_db, accounts):
     from backend.accounts.settings import section_of
     from backend.seed import DEFAULT_SETTINGS
+
     assert section_of("claude_code_oauth_token") == "models"
     assert "claude_code_oauth_token" in DEFAULT_SETTINGS
     set_setting(test_db, "claude_code_oauth_token", "sk-ant-oat-secret")
     body = client.get("/api/settings").json()
     assert body["claude_code_oauth_token"] == "•" * 6
     # the mask PATCHed back never overwrites the stored token
-    assert client.patch("/api/settings", json={"claude_code_oauth_token": "•" * 6}).status_code == 200
+    assert (
+        client.patch(
+            "/api/settings", json={"claude_code_oauth_token": "•" * 6}
+        ).status_code
+        == 200
+    )
     test_db.expire_all()
-    row = test_db.query(Setting).filter(Setting.key == "claude_code_oauth_token",
-                                        Setting.account_id.is_(None)).one()
+    row = (
+        test_db.query(Setting)
+        .filter(Setting.key == "claude_code_oauth_token", Setting.account_id.is_(None))
+        .one()
+    )
     assert row.value == "sk-ant-oat-secret"
 
 
 def test_new_account_settings_copy_never_carries_the_token(test_db, accounts):
     from backend.accounts.admin import _is_personal
+
     assert _is_personal("claude_code_oauth_token")
 
 
 # ── Codex: CODEX_HOME per account ────────────────────────────────────────────
 
+
 @pytest.fixture
 def cli_roots(tmp_path, monkeypatch):
     monkeypatch.setattr(C, "CODEX_ACCOUNTS_ROOT", str(tmp_path / "codex" / "accounts"))
     monkeypatch.setattr(C, "AGY_ACCOUNTS_ROOT", str(tmp_path / "gemini" / "accounts"))
-    monkeypatch.setattr(C, "CLAUDE_ACCOUNTS_ROOT", str(tmp_path / "claude" / "accounts"))
+    monkeypatch.setattr(
+        C, "CLAUDE_ACCOUNTS_ROOT", str(tmp_path / "claude" / "accounts")
+    )
     monkeypatch.setattr(C, "LI_ACCOUNTS_ROOT", str(tmp_path / "li" / "accounts"))
     return tmp_path
 
@@ -306,13 +394,18 @@ def _codex_handler(login_rc=0):
     def handler(cmd):
         if cmd[:3] == ["codex", "login", "status"]:
             return login_rc, b"", b""
-        events = [{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}]
+        events = [
+            {"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}
+        ]
         return 0, ("\n".join(json.dumps(e) for e in events) + "\n").encode(), b""
+
     return handler
 
 
 @pytest.mark.asyncio
-async def test_codex_member_own_gets_its_own_home_for_status_and_exec(test_db, accounts, cli_roots, monkeypatch):
+async def test_codex_member_own_gets_its_own_home_for_status_and_exec(
+    test_db, accounts, cli_roots, monkeypatch
+):
     a, b = accounts
     _models_own(test_db, b)
     monkeypatch.delenv("CODEX_HOME", raising=False)
@@ -328,7 +421,9 @@ async def test_codex_member_own_gets_its_own_home_for_status_and_exec(test_db, a
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("who", ["owner", "inherit"])
-async def test_codex_owner_and_inherit_keep_the_default_home(test_db, accounts, cli_roots, monkeypatch, who):
+async def test_codex_owner_and_inherit_keep_the_default_home(
+    test_db, accounts, cli_roots, monkeypatch, who
+):
     a, b = accounts
     monkeypatch.delenv("CODEX_HOME", raising=False)
     calls = _capture_run_cli(monkeypatch, _codex_handler())
@@ -339,7 +434,9 @@ async def test_codex_owner_and_inherit_keep_the_default_home(test_db, accounts, 
 
 
 @pytest.mark.asyncio
-async def test_codex_member_not_logged_in_names_its_own_login_command(test_db, accounts, cli_roots, monkeypatch):
+async def test_codex_member_not_logged_in_names_its_own_login_command(
+    test_db, accounts, cli_roots, monkeypatch
+):
     a, b = accounts
     _models_own(test_db, b)
     calls = _capture_run_cli(monkeypatch, _codex_handler(login_rc=1))
@@ -353,19 +450,34 @@ async def test_codex_member_not_logged_in_names_its_own_login_command(test_db, a
 
 # ── Antigravity: HOME (state dir) per account ────────────────────────────────
 
+
 def _agy_setup(tmp_path, monkeypatch):
     source = tmp_path / "shipped.json"
-    source.write_text(json.dumps({"permissions": {"deny": ["command(*)", "read_file(/)"]}}))
+    source.write_text(
+        json.dumps({"permissions": {"deny": ["command(*)", "read_file(/)"]}})
+    )
     monkeypatch.setattr(L, "_AGY_SETTINGS_SOURCE", str(source))
     default_state = tmp_path / "default-home" / ".gemini" / "antigravity-cli"
     monkeypatch.setattr(L, "_AGY_STATE", str(default_state))
     asserted = []
-    monkeypatch.setattr(L, "_agy_assert_denied", lambda path, rules: asserted.append(rules))
+    monkeypatch.setattr(
+        L, "_agy_assert_denied", lambda path, rules: asserted.append(rules)
+    )
 
     def handler(cmd):
-        out = [{"event": "init", "conversation_id": "c-9"},
-               {"event": "result", "result": {"conversation_id": "c-9", "status": "SUCCESS", "response": "ok"}}]
+        out = [
+            {"event": "init", "conversation_id": "c-9"},
+            {
+                "event": "result",
+                "result": {
+                    "conversation_id": "c-9",
+                    "status": "SUCCESS",
+                    "response": "ok",
+                },
+            },
+        ]
         return 0, ("\n".join(json.dumps(e) for e in out) + "\n").encode(), b""
+
     return default_state, asserted, handler
 
 
@@ -376,19 +488,25 @@ def _transcript(state):
 
 
 @pytest.mark.asyncio
-async def test_agy_member_own_runs_with_its_own_home_and_state_dir(test_db, accounts, cli_roots, monkeypatch):
+async def test_agy_member_own_runs_with_its_own_home_and_state_dir(
+    test_db, accounts, cli_roots, monkeypatch
+):
     a, b = accounts
     _models_own(test_db, b)
     default_state, asserted, handler = _agy_setup(cli_roots, monkeypatch)
     calls = _capture_run_cli(monkeypatch, handler)
-    member_state = cli_roots / "gemini" / "accounts" / str(b) / ".gemini" / "antigravity-cli"
+    member_state = (
+        cli_roots / "gemini" / "accounts" / str(b) / ".gemini" / "antigravity-cli"
+    )
     stale = _transcript(member_state)
     with use_account(b):
         res = await L._call_antigravity_cli("p", "s", "", 10)
     assert res["text"] == "ok"
     assert calls[0]["env"]["HOME"] == str(cli_roots / "gemini" / "accounts" / str(b))
     # deny list installed in the member's state dir, checked against agy's log
-    assert json.loads((member_state / "settings.json").read_text())["permissions"]["deny"] == ["command(*)", "read_file(/)"]
+    assert json.loads((member_state / "settings.json").read_text())["permissions"][
+        "deny"
+    ] == ["command(*)", "read_file(/)"]
     assert asserted == [["command(*)", "read_file(/)"]]
     assert not (default_state / "settings.json").exists()
     # the transcript is cleared from the member's dir
@@ -399,7 +517,9 @@ async def test_agy_member_own_runs_with_its_own_home_and_state_dir(test_db, acco
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("who", ["owner", "inherit"])
-async def test_agy_owner_and_inherit_keep_home_and_the_default_state(test_db, accounts, cli_roots, monkeypatch, who):
+async def test_agy_owner_and_inherit_keep_home_and_the_default_state(
+    test_db, accounts, cli_roots, monkeypatch, who
+):
     a, b = accounts
     default_state, asserted, handler = _agy_setup(cli_roots, monkeypatch)
     monkeypatch.setenv("HOME", "/root-ish")
@@ -414,34 +534,52 @@ async def test_agy_owner_and_inherit_keep_home_and_the_default_state(test_db, ac
 
 
 @pytest.mark.asyncio
-async def test_agy_member_not_logged_in_names_its_own_home(test_db, accounts, cli_roots, monkeypatch):
+async def test_agy_member_not_logged_in_names_its_own_home(
+    test_db, accounts, cli_roots, monkeypatch
+):
     a, b = accounts
     _models_own(test_db, b)
     _default, _asserted, _h = _agy_setup(cli_roots, monkeypatch)
 
     def handler(cmd):
-        out = [{"event": "result", "result": {"status": "ERROR", "error": "You are not logged into Antigravity."}}]
+        out = [
+            {
+                "event": "result",
+                "result": {
+                    "status": "ERROR",
+                    "error": "You are not logged into Antigravity.",
+                },
+            }
+        ]
         return 1, ("\n".join(json.dumps(e) for e in out) + "\n").encode(), b""
+
     _capture_run_cli(monkeypatch, handler)
     with use_account(b):
         with pytest.raises(L.NonRetryableLLMError) as e:
             await L._call_antigravity_cli("p", "s", "", 10)
-    assert f"-e HOME={cli_roots / 'gemini' / 'accounts' / str(b)} backend agy" in str(e.value)
+    assert f"-e HOME={cli_roots / 'gemini' / 'accounts' / str(b)} backend agy" in str(
+        e.value
+    )
 
 
 # ── Removal deletes the CLI homes ────────────────────────────────────────────
 
+
 def test_account_dirs_lists_the_cli_homes_and_the_session_dir(cli_roots, accounts):
     from backend.accounts.admin import account_dirs
+
     a, b = accounts
-    assert account_dirs(b) == [str(cli_roots / "codex" / "accounts" / str(b)),
-                               str(cli_roots / "gemini" / "accounts" / str(b)),
-                               str(cli_roots / "claude" / "accounts" / str(b)),
-                               str(cli_roots / "li" / "accounts" / str(b))]
+    assert account_dirs(b) == [
+        str(cli_roots / "codex" / "accounts" / str(b)),
+        str(cli_roots / "gemini" / "accounts" / str(b)),
+        str(cli_roots / "claude" / "accounts" / str(b)),
+        str(cli_roots / "li" / "accounts" / str(b)),
+    ]
 
 
 def test_removing_an_account_deletes_its_cli_homes_only(test_db, accounts, cli_roots):
     from backend.accounts.admin import delete_account_rows
+
     a, b = accounts
     other = Account(name="Third", role="member")
     test_db.add(other)
@@ -460,7 +598,9 @@ def test_removing_an_account_deletes_its_cli_homes_only(test_db, accounts, cli_r
 
 def test_export_leaves_cli_homes_out(test_db, accounts, cli_roots):
     import zipfile
+
     from backend.accounts.admin import build_export
+
     a, b = accounts
     home = cli_roots / "codex" / "accounts" / str(b)
     home.mkdir(parents=True)
@@ -474,31 +614,47 @@ def test_export_leaves_cli_homes_out(test_db, accounts, cli_roots):
 
 # ── backend/scripts/cli_login.py ─────────────────────────────────────────────
 
-def test_cli_login_prints_the_per_account_commands(test_db, accounts, cli_roots, capsys):
+
+def test_cli_login_prints_the_per_account_commands(
+    test_db, accounts, cli_roots, capsys
+):
     from backend.scripts import cli_login
+
     a, b = accounts
     _models_own(test_db, b)
     assert cli_login.main(["codex", "partner"]) == 0
     home = cli_roots / "codex" / "accounts" / str(b)
     out = capsys.readouterr().out.splitlines()
-    assert out[0] == f"docker compose exec -it -e CODEX_HOME={home} backend codex login --device-auth"
+    assert (
+        out[0]
+        == f"docker compose exec -it -e CODEX_HOME={home} backend codex login --device-auth"
+    )
     assert home.is_dir()
     assert cli_login.main(["agy", str(b)]) == 0
     out = capsys.readouterr().out.splitlines()
-    assert out[0] == f"docker compose exec -it -e HOME={cli_roots / 'gemini' / 'accounts' / str(b)} backend agy"
+    assert (
+        out[0]
+        == f"docker compose exec -it -e HOME={cli_roots / 'gemini' / 'accounts' / str(b)} backend agy"
+    )
     assert cli_login.main(["claude", "Partner"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("docker compose exec -it backend claude setup-token")
     assert "Claude Code token" in out
 
 
-def test_cli_login_owner_uses_the_default_homes_and_warns_inherit(test_db, accounts, cli_roots, capsys):
+def test_cli_login_owner_uses_the_default_homes_and_warns_inherit(
+    test_db, accounts, cli_roots, capsys
+):
     from backend.scripts import cli_login
+
     a, b = accounts
     owner_name = test_db.query(Account).filter(Account.id == a).one().name
     assert cli_login.main(["codex_cli", owner_name]) == 0
-    assert capsys.readouterr().out.splitlines()[0] == "docker compose exec -it backend codex login --device-auth"
-    assert cli_login.main(["codex", "Partner"]) == 0      # models inherit by default
+    assert (
+        capsys.readouterr().out.splitlines()[0]
+        == "docker compose exec -it backend codex login --device-auth"
+    )
+    assert cli_login.main(["codex", "Partner"]) == 0  # models inherit by default
     assert "inherits the owner's" in capsys.readouterr().out
     assert cli_login.main(["codex", "Nobody"]) == 1
     assert cli_login.main(["gemini", "Partner"]) == 2
@@ -506,8 +662,12 @@ def test_cli_login_owner_uses_the_default_homes_and_warns_inherit(test_db, accou
 
 # ── /api/llm/models: the catalog cache is per key ────────────────────────────
 
-def test_model_catalog_cache_is_keyed_by_the_api_key(client, test_db, accounts, monkeypatch):
+
+def test_model_catalog_cache_is_keyed_by_the_api_key(
+    client, test_db, accounts, monkeypatch
+):
     import backend.api.routes_llm as rl
+
     a, b = accounts
     rl._cache.clear()
     set_setting(test_db, "llm_provider", "openai")
@@ -522,9 +682,13 @@ def test_model_catalog_cache_is_keyed_by_the_api_key(client, test_db, accounts, 
         return [{"id": f"gpt-{key}"}]
 
     monkeypatch.setattr(rl, "_fetch_openai", fake_fetch)
-    assert client.get("/api/llm/models?provider=openai").json()["models"] == [{"id": "gpt-sk-owner"}]
+    assert client.get("/api/llm/models?provider=openai").json()["models"] == [
+        {"id": "gpt-sk-owner"}
+    ]
     client.headers["X-Test-Act-As"] = str(b)
-    assert client.get("/api/llm/models?provider=openai").json()["models"] == [{"id": "gpt-sk-member"}]
+    assert client.get("/api/llm/models?provider=openai").json()["models"] == [
+        {"id": "gpt-sk-member"}
+    ]
     assert client.get("/api/llm/models?provider=openai").json()["cached"] is True
     assert fetched == ["sk-owner", "sk-member"]
     rl._cache.clear()

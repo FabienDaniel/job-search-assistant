@@ -1,15 +1,18 @@
 """Tests for /api/searches guards on the built-in extension searches ("Extension"/"Extension LI" have no scraper; the v2 UI hides Run/Test/Delete for them, and PATCH stays allowed)."""
+
 import pytest
 
 
 def _seed_first_run(db):
     from backend.models.db import Setting
+
     db.add(Setting(key="dashboard_api_key", value=""))
     db.commit()
 
 
 def _mk_search(db, mode):
     from backend.models.db import Search
+
     s = Search(name=f"Extension {mode}", search_mode=mode, active=True)
     db.add(s)
     db.commit()
@@ -33,6 +36,7 @@ def test_delete_rejects_extension_search(api_client, test_db, mode):
     assert resp.status_code == 409, f"Unexpected {resp.status_code}: {resp.text}"
 
     from backend.models.db import Search
+
     assert test_db.query(Search).filter(Search.id == sid).first() is not None
 
 
@@ -41,7 +45,9 @@ def test_patch_still_allowed_on_extension_search(api_client, test_db, mode):
     """The editor saves filters via PATCH — it must stay open."""
     _seed_first_run(test_db)
     sid = _mk_search(test_db, mode)
-    resp = api_client.patch(f"/api/searches/{sid}", json={"title_exclude_keywords": ["intern"]})
+    resp = api_client.patch(
+        f"/api/searches/{sid}", json={"title_exclude_keywords": ["intern"]}
+    )
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
     assert resp.json()["title_exclude_keywords"] == ["intern"]
 
@@ -58,14 +64,20 @@ def test_run_rejects_a_keyword_source_with_no_query(api_client, test_db, mode):
 
 
 @pytest.mark.parametrize("mode", ["freehire", "caribbeanjobs"])
-def test_run_allows_a_keyword_source_with_a_term(api_client, test_db, monkeypatch, mode):
+def test_run_allows_a_keyword_source_with_a_term(
+    api_client, test_db, monkeypatch, mode
+):
     _seed_first_run(test_db)
     from backend.models.db import Search
-    s = Search(name=f"Query {mode}", search_mode=mode, search_term="engineer", active=True)
+
+    s = Search(
+        name=f"Query {mode}", search_mode=mode, search_term="engineer", active=True
+    )
     test_db.add(s)
     test_db.commit()
 
     import backend.job_monitor as mon
+
     monkeypatch.setattr(mon, "launch_background", lambda *a, **kw: "run-1")
 
     resp = api_client.post(f"/api/searches/{s.id}/run")
@@ -78,6 +90,7 @@ def test_run_still_allowed_on_keyword_search(api_client, test_db, monkeypatch):
     sid = _mk_search(test_db, "keyword")
 
     import backend.job_monitor as mon
+
     monkeypatch.setattr(mon, "launch_background", lambda *a, **kw: "run-1")
 
     resp = api_client.post(f"/api/searches/{sid}/run")
@@ -87,20 +100,30 @@ def test_run_still_allowed_on_keyword_search(api_client, test_db, monkeypatch):
 # ── the test preview must apply title_exclude_global, same as the run does ──
 # (scraper/sources/jobspy.py:285) and same as the Companies preview (routes_companies.py:603).
 
+
 def _seed_global_exclude(db, keywords):
     import json
+
     from backend.models.db import Setting
+
     db.add(Setting(key="title_exclude_global", value=json.dumps(keywords)))
     db.commit()
 
 
 def _mk_keyword_search(db, **kw):
     from backend.models.db import Search
+
     # title_exclude_keywords defaults to ["intern", "junior", "associate"]; blank it so these
     # tests measure only the global list, unless a test deliberately exercises the per-search layer.
     kw.setdefault("title_exclude_keywords", [])
-    s = Search(name="Global exclude probe", search_mode="keyword", active=True,
-               sources=["indeed"], search_term="program manager", **kw)
+    s = Search(
+        name="Global exclude probe",
+        search_mode="keyword",
+        active=True,
+        sources=["indeed"],
+        search_term="program manager",
+        **kw,
+    )
     db.add(s)
     db.commit()
     return str(s.id)
@@ -110,11 +133,22 @@ def _stub_jobspy(monkeypatch, titles):
     """Make jobspy.scrape_jobs return one row per title (patching the module attribute works since the handler imports it inside the function)."""
     import jobspy
     import pandas as pd
-    df = pd.DataFrame([{
-        "title": t, "company": f"Co {i}", "job_url": f"https://example.com/{i}",
-        "site": "indeed", "location": "United States", "description": "",
-        "min_amount": None, "max_amount": None,
-    } for i, t in enumerate(titles)])
+
+    df = pd.DataFrame(
+        [
+            {
+                "title": t,
+                "company": f"Co {i}",
+                "job_url": f"https://example.com/{i}",
+                "site": "indeed",
+                "location": "United States",
+                "description": "",
+                "min_amount": None,
+                "max_amount": None,
+            }
+            for i, t in enumerate(titles)
+        ]
+    )
     monkeypatch.setattr(jobspy, "scrape_jobs", lambda **kwargs: df)
 
 
@@ -122,11 +156,14 @@ def test_preview_applies_global_title_exclude(api_client, test_db, monkeypatch):
     _seed_first_run(test_db)
     _seed_global_exclude(test_db, ["intern", "marketing"])
     sid = _mk_keyword_search(test_db)
-    _stub_jobspy(monkeypatch, [
-        "Technical Program Manager",
-        "Intern, Design Engineering",
-        "Staff Technical Product Marketing Manager",
-    ])
+    _stub_jobspy(
+        monkeypatch,
+        [
+            "Technical Program Manager",
+            "Intern, Design Engineering",
+            "Staff Technical Product Marketing Manager",
+        ],
+    )
 
     resp = api_client.post(f"/api/searches/{sid}/test")
     assert resp.status_code == 200, f"Unexpected {resp.status_code}: {resp.text}"
@@ -154,7 +191,9 @@ def test_preview_applies_global_title_exclude(api_client, test_db, monkeypatch):
     assert dropped2["global_excluded_by"] == ["marketing"]
 
 
-def test_preview_global_exclude_is_word_bounded_and_optional(api_client, test_db, monkeypatch):
+def test_preview_global_exclude_is_word_bounded_and_optional(
+    api_client, test_db, monkeypatch
+):
     """No global list configured -> no drops; and the match is word-bounded."""
     _seed_first_run(test_db)
     _seed_global_exclude(test_db, ["intern"])
@@ -167,7 +206,9 @@ def test_preview_global_exclude_is_word_bounded_and_optional(api_client, test_db
     assert d["jobs"][0]["kept"] is True
 
 
-def test_preview_per_search_exclude_still_wins_its_own_label(api_client, test_db, monkeypatch):
+def test_preview_per_search_exclude_still_wins_its_own_label(
+    api_client, test_db, monkeypatch
+):
     """A per-search exclude keeps its own reason — it is not relabelled [Global]."""
     _seed_first_run(test_db)
     _seed_global_exclude(test_db, ["marketing"])

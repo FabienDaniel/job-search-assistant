@@ -12,6 +12,7 @@ A row says how its job is applied to, which sets the job's link kind (link_kinds
 - `easy_apply`: the posting is applied to on the board itself;
 - neither: only the board's page is known, and the job stays a Board link.
 """
+
 import asyncio
 import json
 import logging
@@ -26,23 +27,37 @@ from sqlalchemy.exc import IntegrityError
 
 from backend.accounts.settings import get_setting
 from backend.analyzer.work_arrangement import HYBRID, ONSITE, REMOTE
-from backend.countries import normalize_country, split_country_suffix, supported_countries
-from backend.models.db import SessionLocal, Job, Search, get_existing_external_ids
+from backend.countries import (
+    normalize_country,
+    split_country_suffix,
+    supported_countries,
+)
+from backend.models.db import Job, Search, SessionLocal, get_existing_external_ids
 from backend.scraper._shared.analysis import analyze_inline, prefetch_h1b
-from backend.scraper._shared.dedup import make_external_id, make_content_hash, mark_ignored
-from backend.scraper._shared.filters import (build_search_exclude_sets, company_included,
-                                             search_title_filters, title_kept)
+from backend.scraper._shared.dedup import (
+    make_content_hash,
+    make_external_id,
+    mark_ignored,
+)
+from backend.scraper._shared.filters import (
+    build_search_exclude_sets,
+    company_included,
+    search_title_filters,
+    title_kept,
+)
 from backend.scraper._shared.link_kinds import EASY_APPLY, _on_board
 from backend.scraper._shared.posting_links import counts_as_new
 from backend.scraper._shared.postings import resolve_short_links
 
 logger = logging.getLogger("jobnavigator.job_boards")
 
-UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-      "Chrome/130.0 Safari/537.36")
-MAX_RESULTS = 500                # results_wanted per board, the UI's bound
-PREVIEW_LIMIT = 20               # listing rows per board on Test
-PREVIEW_DETAIL_LIMIT = 20        # detail queries per Test, all boards together
+UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/130.0 Safari/537.36"
+)
+MAX_RESULTS = 500  # results_wanted per board, the UI's bound
+PREVIEW_LIMIT = 20  # listing rows per board on Test
+PREVIEW_DETAIL_LIMIT = 20  # detail queries per Test, all boards together
 _DETAIL_CONCURRENCY = 3
 
 
@@ -74,7 +89,7 @@ def clamp_results(value) -> int:
 
 
 def city_of(search: Search) -> str:
-    """"Los Angeles, CA, United States" -> "Los Angeles"."""
+    """ "Los Angeles, CA, United States" -> "Los Angeles"."""
     return split_country_suffix(search.location or "")[0].split(",")[0].strip()
 
 
@@ -83,8 +98,10 @@ def term_of(search: Search) -> str:
 
 
 def country_name(search: Search) -> str:
-    """"canada" -> "Canada": the search's Country as the English name; "" when unknown."""
-    return dict(supported_countries()).get(normalize_country(getattr(search, "country", None)) or "", "")
+    """ "canada" -> "Canada": the search's Country as the English name; "" when unknown."""
+    return dict(supported_countries()).get(
+        normalize_country(getattr(search, "country", None)) or "", ""
+    )
 
 
 def iso_from_ts(ts) -> Optional[str]:
@@ -97,8 +114,12 @@ def annual_usd(lo, hi, period, currency) -> tuple:
     """(min, max) of a yearly USD salary, else (None, None). Another currency stays in the
     text, as on caribbeanjobs. A posting can label an hourly rate yearly ("15-20"), so a
     yearly figure below 1,000 is not taken."""
-    if (str(currency or "").upper() != "USD" or str(period or "").upper() not in ("ANNUAL", "YEARLY")
-            or not isinstance(lo, (int, float)) or lo < 1000):
+    if (
+        str(currency or "").upper() != "USD"
+        or str(period or "").upper() not in ("ANNUAL", "YEARLY")
+        or not isinstance(lo, (int, float))
+        or lo < 1000
+    ):
         return None, None
     return int(lo), int(hi if isinstance(hi, (int, float)) and hi >= lo else lo)
 
@@ -110,9 +131,20 @@ def employer_apply(link) -> Optional[str]:
 
 
 def make_row(**kw) -> dict:
-    base = {"title": "", "company": "", "url": "", "location": "", "description": "",
-            "salary_min": None, "salary_max": None, "arrangement": None, "posted": None, "ref": None,
-            "apply_url": None, "easy_apply": False}
+    base = {
+        "title": "",
+        "company": "",
+        "url": "",
+        "location": "",
+        "description": "",
+        "salary_min": None,
+        "salary_max": None,
+        "arrangement": None,
+        "posted": None,
+        "ref": None,
+        "apply_url": None,
+        "easy_apply": False,
+    }
     base.update(kw)
     base["title"] = " ".join((base["title"] or "").split())
     return base
@@ -132,8 +164,12 @@ def too_old(r: dict, hours_old) -> Optional[str]:
 
 
 def http_client(mounts=None) -> httpx.AsyncClient:
-    return httpx.AsyncClient(timeout=httpx.Timeout(30), follow_redirects=True, mounts=mounts,
-                             headers={"User-Agent": UA, "Accept-Language": "en-US,en;q=0.9"})
+    return httpx.AsyncClient(
+        timeout=httpx.Timeout(30),
+        follow_redirects=True,
+        mounts=mounts,
+        headers={"User-Agent": UA, "Accept-Language": "en-US,en;q=0.9"},
+    )
 
 
 def _defer_over_budget(fresh: list, breakdown: dict, boards: dict) -> list:
@@ -143,7 +179,9 @@ def _defer_over_budget(fresh: list, breakdown: dict, boards: dict) -> list:
     for r in fresh:
         cap = boards[r["source"]].max_details
         if cap is not None and used.get(r["source"], 0) >= cap:
-            breakdown[r["source"]]["deferred"] = breakdown[r["source"]].get("deferred", 0) + 1
+            breakdown[r["source"]]["deferred"] = (
+                breakdown[r["source"]].get("deferred", 0) + 1
+            )
             continue
         used[r["source"]] = used.get(r["source"], 0) + 1
         out.append(r)
@@ -158,7 +196,9 @@ def _defer_failed_details(fresh: list, breakdown: dict) -> list:
     out = []
     for r in fresh:
         if r.get("detail_error") and not (r.get("description") or "").strip():
-            breakdown[r["source"]]["deferred"] = breakdown[r["source"]].get("deferred", 0) + 1
+            breakdown[r["source"]]["deferred"] = (
+                breakdown[r["source"]].get("deferred", 0) + 1
+            )
             continue
         out.append(r)
     return out
@@ -168,19 +208,25 @@ def _error_text(e: BaseException) -> str:
     return str(e) if isinstance(e, BoardError) else f"{type(e).__name__}: {e}"[:200]
 
 
-async def _collect(client: httpx.AsyncClient, search: Search, boards: dict, limit: int) -> tuple[list, dict]:
+async def _collect(
+    client: httpx.AsyncClient, search: Search, boards: dict, limit: int
+) -> tuple[list, dict]:
     """Every board concurrently: (unique rows, breakdown). A failed board writes `error` into
     its breakdown row and the others still count."""
     if not boards:
         raise BoardError("no board selected")
     keys = list(boards)
-    outcomes = await asyncio.gather(*(boards[k].listing(client, search, limit) for k in keys),
-                                    return_exceptions=True)
+    outcomes = await asyncio.gather(
+        *(boards[k].listing(client, search, limit) for k in keys),
+        return_exceptions=True,
+    )
     breakdown, rows, seen = {}, [], set()
     for key, outcome in zip(keys, outcomes):
         if isinstance(outcome, BaseException):
             breakdown[key] = {"seen": 0, "new": 0, "error": _error_text(outcome)}
-            logger.warning(f"{key} for '{search.name}' failed: {breakdown[key]['error']}")
+            logger.warning(
+                f"{key} for '{search.name}' failed: {breakdown[key]['error']}"
+            )
             continue
         breakdown[key] = {"seen": 0, "new": 0, "returned": len(outcome)}
         for r in outcome:
@@ -205,11 +251,22 @@ async def _fill_details(client: httpx.AsyncClient, rows: list, boards: dict) -> 
                 await detail(client, r)
             except Exception as e:
                 r["detail_error"] = _error_text(e)
-                logger.warning(f"{r['source']} detail failed for {r['url']}: {r['detail_error']}")
+                logger.warning(
+                    f"{r['source']} detail failed for {r['url']}: {r['detail_error']}"
+                )
+
     await asyncio.gather(*(one(r) for r in rows))
 
 
-def _rejection(r: dict, search: Search, boards: dict, include_kw, exclude_kw, global_ex: set, search_ex: set) -> Optional[str]:
+def _rejection(
+    r: dict,
+    search: Search,
+    boards: dict,
+    include_kw,
+    exclude_kw,
+    global_ex: set,
+    search_ex: set,
+) -> Optional[str]:
     ok, reason = title_kept(r["title"], include_kw, exclude_kw)
     if not ok:
         return reason
@@ -230,15 +287,23 @@ def _rejection(r: dict, search: Search, boards: dict, include_kw, exclude_kw, gl
     if reason:
         return reason
     city = city_of(search)
-    if (board and board.local_city and city and r.get("arrangement") != REMOTE
-            and city.lower() not in (r.get("location") or "").lower()):
+    if (
+        board
+        and board.local_city
+        and city
+        and r.get("arrangement") != REMOTE
+        and city.lower() not in (r.get("location") or "").lower()
+    ):
         return f"Not in {city}"
     return too_old(r, search.hours_old)
 
 
 def _all_failed(breakdown: dict, boards: dict) -> Optional[str]:
     if breakdown and all(v.get("error") for v in breakdown.values()):
-        return " · ".join(f"{boards[k].label if k in boards else k}: {v['error']}" for k, v in breakdown.items())
+        return " · ".join(
+            f"{boards[k].label if k in boards else k}: {v['error']}"
+            for k, v in breakdown.items()
+        )
     return None
 
 
@@ -257,13 +322,19 @@ async def run(search: Search, boards: dict, mounts=None) -> dict:
             existing_ids = get_existing_external_ids(db)
 
             def rejected(r):
-                return _rejection(r, search, boards, include_kw, exclude_kw, global_ex, search_ex)
+                return _rejection(
+                    r, search, boards, include_kw, exclude_kw, global_ex, search_ex
+                )
 
             async with http_client(mounts) as client:
-                rows, breakdown = await _collect(client, search, boards, clamp_results(search.results_wanted))
+                rows, breakdown = await _collect(
+                    client, search, boards, clamp_results(search.results_wanted)
+                )
 
                 def bump(r, field):
-                    breakdown[r["source"]][field] = breakdown[r["source"]].get(field, 0) + 1
+                    breakdown[r["source"]][field] = (
+                        breakdown[r["source"]].get(field, 0) + 1
+                    )
 
                 fresh = []
                 for r in rows:
@@ -272,7 +343,10 @@ async def run(search: Search, boards: dict, mounts=None) -> dict:
                         continue
                     kept += 1
                     bump(r, "seen")
-                    if make_external_id(r["company"], r["title"], r["url"]) not in existing_ids:
+                    if (
+                        make_external_id(r["company"], r["title"], r["url"])
+                        not in existing_ids
+                    ):
                         fresh.append(r)
                 fresh = _defer_over_budget(fresh, breakdown, boards)
                 await _fill_details(client, fresh, boards)
@@ -284,20 +358,34 @@ async def run(search: Search, boards: dict, mounts=None) -> dict:
                 breakdown[r["source"]]["seen"] -= 1
                 bump(r, "filtered")
             late_ids = {id(r) for r in late}
-            await prefetch_h1b([r.get("company") for r in fresh if id(r) not in late_ids])
-            landed = await resolve_short_links([r.get("apply_url") for r in fresh if id(r) not in late_ids])
+            await prefetch_h1b(
+                [r.get("company") for r in fresh if id(r) not in late_ids]
+            )
+            landed = await resolve_short_links(
+                [r.get("apply_url") for r in fresh if id(r) not in late_ids]
+            )
 
             for r in fresh:
                 ext_id = make_external_id(r["company"], r["title"], r["url"])
                 if ext_id in existing_ids:
                     continue
-                job = Job(external_id=ext_id, content_hash=make_content_hash(r["company"], r["title"]),
-                          company=r["company"], title=r["title"], url=r["url"],
-                          apply_url=landed.get(r.get("apply_url"), r.get("apply_url")), source=r["source"],
-                          search_id=search.id, location=r.get("location") or None,
-                          description=r.get("description") or None, status="new", seen=False, saved=False)
+                job = Job(
+                    external_id=ext_id,
+                    content_hash=make_content_hash(r["company"], r["title"]),
+                    company=r["company"],
+                    title=r["title"],
+                    url=r["url"],
+                    apply_url=landed.get(r.get("apply_url"), r.get("apply_url")),
+                    source=r["source"],
+                    search_id=search.id,
+                    location=r.get("location") or None,
+                    description=r.get("description") or None,
+                    status="new",
+                    seen=False,
+                    saved=False,
+                )
                 if r.get("easy_apply"):
-                    job.link_kind = EASY_APPLY   # kept on insert: link_kinds.classify
+                    job.link_kind = EASY_APPLY  # kept on insert: link_kinds.classify
                 if id(r) in late_ids:
                     # Dropped after its job page was read (Behance dates arrive there): kept as
                     # "ignored", so the next run's dedup skips it before reading the page again.
@@ -311,10 +399,14 @@ async def run(search: Search, boards: dict, mounts=None) -> dict:
                 try:
                     await analyze_inline(job, db=db, arrangement=r.get("arrangement"))
                 except Exception as e:
-                    logger.warning(f"{mode} inline analysis failed for {r['title']}: {e}")
+                    logger.warning(
+                        f"{mode} inline analysis failed for {r['title']}: {e}"
+                    )
                 if job.h1b_jd_flag:
                     # Kept as "ignored" (as company scrapes do), so its page is read once.
-                    logger.info(f"Ignored (body exclusion): {r['title']} @ {r.get('company') or '?'}")
+                    logger.info(
+                        f"Ignored (body exclusion): {r['title']} @ {r.get('company') or '?'}"
+                    )
                     mark_ignored(job)
                 if not _store(db, job, ext_id, existing_ids, r):
                     continue
@@ -333,18 +425,38 @@ async def run(search: Search, boards: dict, mounts=None) -> dict:
 
         duration = time.time() - start
         from backend.activity import log_activity
-        log_activity("scrape", f"{mode} '{search.name}': {new_jobs} new / {kept} kept in {duration:.1f}s"
-                     + (f" ({ignored_jobs} filtered out after the job page)" if ignored_jobs else ""))
-        return {"jobs_found": kept, "new_jobs": new_jobs, "ignored_jobs": ignored_jobs,
-                "error": _all_failed(breakdown, boards), "duration": duration, "source_breakdown": breakdown}
+
+        log_activity(
+            "scrape",
+            f"{mode} '{search.name}': {new_jobs} new / {kept} kept in {duration:.1f}s"
+            + (
+                f" ({ignored_jobs} filtered out after the job page)"
+                if ignored_jobs
+                else ""
+            ),
+        )
+        return {
+            "jobs_found": kept,
+            "new_jobs": new_jobs,
+            "ignored_jobs": ignored_jobs,
+            "error": _all_failed(breakdown, boards),
+            "duration": duration,
+            "source_breakdown": breakdown,
+        }
     except Exception as e:
         duration = time.time() - start
         msg = _error_text(e)
         logger.error(f"{mode} scrape failed for '{search.name}': {msg}")
         from backend.activity import log_activity
+
         log_activity("scrape", f"{mode} '{search.name}' failed: {msg}")
-        return {"jobs_found": 0, "new_jobs": 0, "error": msg, "duration": duration,
-                "source_breakdown": breakdown}
+        return {
+            "jobs_found": 0,
+            "new_jobs": 0,
+            "error": msg,
+            "duration": duration,
+            "source_breakdown": breakdown,
+        }
 
 
 def _store(db, job: Job, ext_id: str, existing_ids: set, r: dict) -> bool:
@@ -354,10 +466,14 @@ def _store(db, job: Job, ext_id: str, existing_ids: set, r: dict) -> bool:
             db.add(job)
             db.flush()
     except IntegrityError:
-        logger.debug(f"Duplicate external_id for '{r['title']}' @ {r.get('company')}, skipping")
+        logger.debug(
+            f"Duplicate external_id for '{r['title']}' @ {r.get('company')}, skipping"
+        )
         return False
     except Exception as e:
-        logger.warning(f"Insert failed for '{r['title']}' @ {r.get('company')} ({r['url']}): {e}")
+        logger.warning(
+            f"Insert failed for '{r['title']}' @ {r.get('company')} ({r['url']}): {e}"
+        )
         return False
     existing_ids.add(ext_id)
     return True
@@ -374,25 +490,35 @@ def _body_phrases(db) -> list:
 async def preview(search: Search, db, boards: dict, mounts=None) -> dict:
     """Dry run: PREVIEW_LIMIT listing rows per board, details for the first kept rows, nothing saved."""
     start = time.time()
-    config = {"mode": search.search_mode, "search_term": search.search_term or "", "location": search.location or "",
-              "sources": list(boards), "results_wanted": PREVIEW_LIMIT}
+    config = {
+        "mode": search.search_mode,
+        "search_term": search.search_term or "",
+        "location": search.location or "",
+        "sources": list(boards),
+        "results_wanted": PREVIEW_LIMIT,
+    }
     try:
         include_kw, exclude_kw = search_title_filters(search, db)
         global_ex, search_ex = build_search_exclude_sets(db, search)
 
         def rejected(r):
-            return _rejection(r, search, boards, include_kw, exclude_kw, global_ex, search_ex)
+            return _rejection(
+                r, search, boards, include_kw, exclude_kw, global_ex, search_ex
+            )
 
         async with http_client(mounts) as client:
             rows, breakdown = await _collect(client, search, boards, PREVIEW_LIMIT)
             reasons = [rejected(r) for r in rows]
             survivors = [r for r, why in zip(rows, reasons) if why is None]
-            sampled = _defer_over_budget(survivors, breakdown, boards)[:PREVIEW_DETAIL_LIMIT]
+            sampled = _defer_over_budget(survivors, breakdown, boards)[
+                :PREVIEW_DETAIL_LIMIT
+            ]
             await _fill_details(client, sampled, boards)
         sampled_ids = {id(r) for r in sampled}
         phrases = _body_phrases(db)
 
         from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+
         results = []
         for r, reason in zip(rows, reasons):
             if reason is None and id(r) in sampled_ids:
@@ -407,18 +533,33 @@ async def preview(search: Search, db, boards: dict, mounts=None) -> dict:
                 if r.get("salary_max") and r["salary_max"] != r["salary_min"]:
                     salary += f" – {r['salary_max']:,}"
             desc = r.get("description") or ""
-            results.append({
-                "title": r["title"], "company": r.get("company", ""), "url": r["url"],
-                "source": r["source"], "location": r.get("location", ""), "salary": salary,
-                "has_description": len(desc) > 50, "desc_length": len(desc),
-                "kept": reason is None, "reason": reason, "posted": r.get("posted"),
-            })
+            results.append(
+                {
+                    "title": r["title"],
+                    "company": r.get("company", ""),
+                    "url": r["url"],
+                    "source": r["source"],
+                    "location": r.get("location", ""),
+                    "salary": salary,
+                    "has_description": len(desc) > 50,
+                    "desc_length": len(desc),
+                    "kept": reason is None,
+                    "reason": reason,
+                    "posted": r.get("posted"),
+                }
+            )
         preview_note = None
         if len(survivors) > len(sampled):
-            caps = "".join(f", and {b.label} {b.max_details} per run" for b in boards.values() if b.max_details)
-            preview_note = (f"Details sampled: the job pages of {len(sampled)} of {len(survivors)} jobs "
-                            f"that passed the filters were read (at most {PREVIEW_DETAIL_LIMIT}{caps}). "
-                            f"The rest show the listing's text; a run reads each new job's page.")
+            caps = "".join(
+                f", and {b.label} {b.max_details} per run"
+                for b in boards.values()
+                if b.max_details
+            )
+            preview_note = (
+                f"Details sampled: the job pages of {len(sampled)} of {len(survivors)} jobs "
+                f"that passed the filters were read (at most {PREVIEW_DETAIL_LIMIT}{caps}). "
+                f"The rest show the listing's text; a run reads each new job's page."
+            )
         return {
             "search_name": search.name,
             "duration": round(time.time() - start, 1),
@@ -427,9 +568,17 @@ async def preview(search: Search, db, boards: dict, mounts=None) -> dict:
             "preview_note": preview_note,
             "raw_count": len(rows),
             "after_filter": sum(1 for x in results if x["kept"]),
-            "source_breakdown": {k: v.get("returned", 0) for k, v in breakdown.items() if not v.get("error")},
-            "source_errors": {k: v["error"] for k, v in breakdown.items() if v.get("error")},
-            "company_breakdown": dict(Counter(r["company"] for r in rows if r.get("company")).most_common(20)),
+            "source_breakdown": {
+                k: v.get("returned", 0)
+                for k, v in breakdown.items()
+                if not v.get("error")
+            },
+            "source_errors": {
+                k: v["error"] for k, v in breakdown.items() if v.get("error")
+            },
+            "company_breakdown": dict(
+                Counter(r["company"] for r in rows if r.get("company")).most_common(20)
+            ),
             "include_keywords": include_kw,
             "exclude_keywords": exclude_kw,
             "company_filter": search.company_filter or [],
@@ -438,5 +587,9 @@ async def preview(search: Search, db, boards: dict, mounts=None) -> dict:
             "config": config,
         }
     except Exception as e:
-        return {"search_name": search.name, "error": _error_text(e),
-                "duration": round(time.time() - start, 1), "config": config}
+        return {
+            "search_name": search.name,
+            "error": _error_text(e),
+            "duration": round(time.time() - start, 1),
+            "config": config,
+        }

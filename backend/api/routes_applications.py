@@ -1,14 +1,17 @@
 """Application management endpoints."""
+
 import logging
 from typing import Annotated, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from backend.models.db import get_db, Application, Job, Company, utcnow, SessionLocal
-from backend.accounts.settings import get_setting, default_resume_ids
-from backend.scraper._shared.bot_wall import is_bot_wall
+from sqlalchemy.orm import Session
+
+from backend.accounts.settings import default_resume_ids, get_setting
+from backend.models.db import Application, Company, Job, SessionLocal, get_db, utcnow
 from backend.scraper._shared import page_cache
+from backend.scraper._shared.bot_wall import is_bot_wall
 from backend.scraper._shared.link_kinds import job_link
 
 logger = logging.getLogger("jobnavigator.applications")
@@ -19,6 +22,7 @@ _BLOCKED_STATUSES = {401, 403, 429}
 
 class _ReadBlocked(Exception):
     """The posting site refused the read; the page parse is skipped."""
+
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -31,6 +35,7 @@ def _parse_dt(value):
     if not value:
         return None
     from datetime import datetime, timezone
+
     try:
         dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
         return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
@@ -44,14 +49,14 @@ class ApplicationCreate(BaseModel):
     url: str
     cv_version_used: Optional[str] = None
     notes: Optional[str] = None
-    status: Optional[str] = None          # applied|interview|offer (Log-application modal)
-    applied_at: Optional[str] = None      # ISO date/datetime for back-dated entries
-    location: Optional[str] = None        # optional; the feed's territorial filter reads it
+    status: Optional[str] = None  # applied|interview|offer (Log-application modal)
+    applied_at: Optional[str] = None  # ISO date/datetime for back-dated entries
+    location: Optional[str] = None  # optional; the feed's territorial filter reads it
 
 
 class InterviewCreate(BaseModel):
     what: str
-    when_at: Optional[str] = None      # ISO datetime from the calendar picker
+    when_at: Optional[str] = None  # ISO datetime from the calendar picker
     where_text: Optional[str] = None
     status: Optional[str] = "scheduled"
     prep: Optional[str] = None
@@ -65,7 +70,9 @@ async def _fetch_and_store_description(job_id: str, url: str) -> None:
     """Write the ATS-quality JD onto a job that has none. `_resolve_tailoring_jd`
     owns the fetch, the SSRF gate and the write, so this adds no second cascade."""
     from types import SimpleNamespace
+
     from backend.api.routes_resumes import _resolve_tailoring_jd
+
     try:
         await _resolve_tailoring_jd(
             SimpleNamespace(id=job_id, description="", url=url, cached_page_text="")
@@ -78,6 +85,7 @@ async def _fetch_and_store_description(job_id: str, url: str) -> None:
     # arrives here rather than at insert time.
     from backend.analyzer.work_arrangement import apply_arrangement_to_job
     from backend.models.db import Job, SessionLocal
+
     db = SessionLocal()
     try:
         job = db.query(Job).filter(Job.id == job_id).first()
@@ -99,6 +107,7 @@ def create_application(
     """Create application (used by Chrome extension). Also creates job record if needed."""
     # Generate external_id for dedup (use same normalization as scrapers)
     from backend.scraper._shared.dedup import make_external_id
+
     external_id = make_external_id(data.company, data.title, data.url)
 
     job = db.query(Job).filter(Job.external_id == external_id).first()
@@ -108,7 +117,7 @@ def create_application(
             company=data.company,
             title=data.title,
             url=data.url,
-            source="manual",   # APPS-15: hand-logged via the Log modal / extension, not a scrape
+            source="manual",  # APPS-15: hand-logged via the Log modal / extension, not a scrape
             status="applied",
             location=data.location or None,
             seen=True,
@@ -119,6 +128,7 @@ def create_application(
         # rest once the JD lands.
         from backend.analyzer.location import apply_location_to_job
         from backend.analyzer.work_arrangement import apply_arrangement_to_job
+
         apply_arrangement_to_job(job)
         apply_location_to_job(job)
         db.add(job)
@@ -128,10 +138,12 @@ def create_application(
 
     # One application per job — a duplicate log is refused with 409.
     from backend.models.db import record_transition
+
     new_status = data.status if data.status in VALID_STATUSES else "applied"
     applied_at = None
     if data.applied_at:
         from datetime import datetime
+
         try:
             applied_at = datetime.fromisoformat(data.applied_at.replace("Z", "+00:00"))
         except ValueError:
@@ -144,7 +156,10 @@ def create_application(
         db.rollback()
         raise HTTPException(
             status_code=409,
-            detail={"message": "An application already exists for this job", "application_id": str(app.id)},
+            detail={
+                "message": "An application already exists for this job",
+                "application_id": str(app.id),
+            },
         )
     app = Application(
         job_id=job.id,
@@ -152,10 +167,14 @@ def create_application(
         cv_version_used=data.cv_version_used,
         notes=data.notes,
         # seed the funnel edge so this application shows an initial edge in the Sankey chart
-        status_transitions=[{
-            "from": None, "to": new_status,
-            "at": utcnow().isoformat(), "source": "ui",
-        }],
+        status_transitions=[
+            {
+                "from": None,
+                "to": new_status,
+                "at": utcnow().isoformat(),
+                "source": "ui",
+            }
+        ],
     )
     if applied_at:
         app.applied_at = applied_at
@@ -166,10 +185,14 @@ def create_application(
     if data.company and data.company.strip():
         company_name = data.company.strip()
         from backend.models.db import find_company_by_name
+
         existing_co = find_company_by_name(db, company_name)
         if not existing_co:
             new_co = Company(
-                name=company_name, tier=None, active=False, playwright_enabled=False,
+                name=company_name,
+                tier=None,
+                active=False,
+                playwright_enabled=False,
                 selected_resume_ids=default_resume_ids(db),
             )
             db.add(new_co)
@@ -177,6 +200,7 @@ def create_application(
             db.commit()
             logger.info(f"Auto-created company '{company_name}' from application")
             from backend.analyzer.h1b_checker import fetch_h1b_for_company_id
+
             background_tasks.add_task(fetch_h1b_for_company_id, str(new_co.id))
 
     if data.url and not job.has_cached_page:
@@ -205,6 +229,7 @@ def list_applications(
     db: Session = Depends(get_db),
 ):
     from sqlalchemy.orm import selectinload
+
     q = db.query(Application).options(selectinload(Application.interviews))
     if status:
         q = q.filter(Application.status == status)
@@ -212,25 +237,43 @@ def list_applications(
     total = q.count()
     apps = q.order_by(desc(Application.updated_at)).offset(offset).limit(limit).all()
 
-    from backend.models.db import build_company_lookup, Resume, CoverLetter
+    from backend.models.db import CoverLetter, Resume, build_company_lookup
+
     lookup = build_company_lookup(db)
     job_ids = [a.job_id for a in apps]
     with_letter = set()
     if job_ids:
-        with_letter = {str(r[0]) for r in db.query(CoverLetter.job_id)
-                       .filter(CoverLetter.job_id.in_(job_ids)).distinct().all()}
+        with_letter = {
+            str(r[0])
+            for r in db.query(CoverLetter.job_id)
+            .filter(CoverLetter.job_id.in_(job_ids))
+            .distinct()
+            .all()
+        }
     tailored = {}
     if job_ids:
-        for r in (db.query(Resume)
-                  .filter(Resume.job_id.in_(job_ids), Resume.is_base == False)  # noqa: E712
-                  .order_by(Resume.updated_at.asc()).all()):
-            tailored[str(r.job_id)] = r      # asc → last write wins = most recent
+        for r in (
+            db.query(Resume)
+            .filter(Resume.job_id.in_(job_ids), Resume.is_base == False)  # noqa: E712
+            .order_by(Resume.updated_at.asc())
+            .all()
+        ):
+            tailored[str(r.job_id)] = r  # asc → last write wins = most recent
     from backend.analyzer.score_keys import resume_names
+
     names = resume_names(db)
     return {
         "total": total,
-        "applications": [_app_to_dict(a, lookup, tailored.get(str(a.job_id)),
-                                      str(a.job_id) in with_letter, names=names) for a in apps],
+        "applications": [
+            _app_to_dict(
+                a,
+                lookup,
+                tailored.get(str(a.job_id)),
+                str(a.job_id) in with_letter,
+                names=names,
+            )
+            for a in apps
+        ],
     }
 
 
@@ -240,15 +283,26 @@ def update_application(app_id: str, updates: dict, db: Session = Depends(get_db)
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    allowed = {"status", "notes", "next_action", "next_action_date", "cv_version_used", "applied_at"}
+    allowed = {
+        "status",
+        "notes",
+        "next_action",
+        "next_action_date",
+        "cv_version_used",
+        "applied_at",
+    }
     if "status" in updates and updates["status"] not in VALID_STATUSES:
-        raise HTTPException(status_code=400,
-                            detail=f"status must be one of {sorted(VALID_STATUSES)}")
+        raise HTTPException(
+            status_code=400, detail=f"status must be one of {sorted(VALID_STATUSES)}"
+        )
     changed = False
-    undo = bool(updates.pop("undo", False))   # the toast's Undo: reverse the last move, do not log a new one
+    undo = bool(
+        updates.pop("undo", False)
+    )  # the toast's Undo: reverse the last move, do not log a new one
     if "status" in updates:
         if updates["status"] != app.status:
             from backend.models.db import record_transition, revert_transition
+
             if undo:
                 revert_transition(app, updates["status"])
             else:
@@ -265,6 +319,7 @@ def update_application(app_id: str, updates: dict, db: Session = Depends(get_db)
         app.updated_at = utcnow()
     db.commit()
     from backend.models.db import build_company_lookup
+
     lookup = build_company_lookup(db)
     return _app_to_dict(app, lookup)
 
@@ -301,6 +356,7 @@ def _bulk_ids(body: dict) -> list:
 def _parse_app_id(raw):
     """A single bulk id as a UUID, or None when it is not one."""
     import uuid as _uuid
+
     try:
         return _uuid.UUID(str(raw))
     except (ValueError, AttributeError, TypeError):
@@ -321,10 +377,11 @@ def bulk_update_applications(body: dict, db: Session = Depends(get_db)):
 
     ids = _bulk_ids(body)
     status = str_field(body, "status", required=True)
-    undo = bool((body or {}).get("undo", False))   # the bulk toast's Undo, see PATCH
+    undo = bool((body or {}).get("undo", False))  # the bulk toast's Undo, see PATCH
     if status not in VALID_STATUSES:
-        raise HTTPException(status_code=400,
-                            detail=f"status must be one of {sorted(VALID_STATUSES)}")
+        raise HTTPException(
+            status_code=400, detail=f"status must be one of {sorted(VALID_STATUSES)}"
+        )
 
     updated = 0
     skipped = 0
@@ -387,25 +444,67 @@ def bulk_delete_applications(body: dict, db: Session = Depends(get_db)):
 # Squashed (lowercase, alphanumeric-only) names of job boards/aggregators that
 # must never be returned as an employer.
 _ATS_BRAND_KEYS = {
-    "greenhouse", "lever", "ashby", "ashbyhq", "workday", "myworkdayjobs",
-    "smartrecruiters", "rippling", "phenom", "talentbrew", "icims", "taleo",
-    "eightfold", "jobvite", "workable", "breezy", "breezyhr", "bamboohr",
-    "teamtailor", "recruitee", "linkedin", "indeed", "ziprecruiter",
-    "glassdoor", "monster", "dice", "wellfound", "angellist", "builtin",
-    "levelsfyi", "jobright", "jobspy",
+    "greenhouse",
+    "lever",
+    "ashby",
+    "ashbyhq",
+    "workday",
+    "myworkdayjobs",
+    "smartrecruiters",
+    "rippling",
+    "phenom",
+    "talentbrew",
+    "icims",
+    "taleo",
+    "eightfold",
+    "jobvite",
+    "workable",
+    "breezy",
+    "breezyhr",
+    "bamboohr",
+    "teamtailor",
+    "recruitee",
+    "linkedin",
+    "indeed",
+    "ziprecruiter",
+    "glassdoor",
+    "monster",
+    "dice",
+    "wellfound",
+    "angellist",
+    "builtin",
+    "levelsfyi",
+    "jobright",
+    "jobspy",
 }
 
 # Path segments that are board chrome rather than a company slug.
 _SLUG_NOISE = {
-    "jobs", "job", "careers", "career", "embed", "api", "search", "postings",
-    "posting", "job_board", "job_app", "users", "self", "login", "signin",
-    "sessions", "en-us", "en",
+    "jobs",
+    "job",
+    "careers",
+    "career",
+    "embed",
+    "api",
+    "search",
+    "postings",
+    "posting",
+    "job_board",
+    "job_app",
+    "users",
+    "self",
+    "login",
+    "signin",
+    "sessions",
+    "en-us",
+    "en",
 }
 
 
 def _title_slug(slug: str) -> str:
     """'clear-street' -> 'Clear Street'; only the first letter of each word is forced, so already-cased slugs ('BoschGroup') survive intact."""
     import re
+
     words = [w for w in re.split(r"[-_+.\s]+", (slug or "").strip()) if w]
     return " ".join(w[0].upper() + w[1:] for w in words)
 
@@ -413,10 +512,15 @@ def _title_slug(slug: str) -> str:
 def _is_ats_brand(name) -> bool:
     """True if a detected 'company' is really the job board's own brand or pure board chrome (e.g. 'Careers'), used to suppress the og:site_name/hostname fallback."""
     import re
+
     raw = (name or "").strip()
     if not raw:
         return False
-    n = re.sub(r"\b(jobs?|boards?|careers?|site|com|io|inc|ltd|llc|software)\b", " ", raw.lower())
+    n = re.sub(
+        r"\b(jobs?|boards?|careers?|site|com|io|inc|ltd|llc|software)\b",
+        " ",
+        raw.lower(),
+    )
     n = re.sub(r"[^a-z0-9]+", "", n)
     if not n:
         return True  # "Jobs", "Careers", "Job Board" — chrome, not an employer
@@ -426,11 +530,15 @@ def _is_ats_brand(name) -> bool:
 def _company_from_url(url: str):
     """Derive the employer from a known ATS board URL (path slug or tenant subdomain); returns None for anything unrecognised so the caller falls back to page metadata, reusing the scraper's is_* host predicates to stay in sync with the ATS matrix."""
     from urllib.parse import parse_qs, urlparse
+
     from backend.scraper.ats.ashby import is_ashby
     from backend.scraper.ats.greenhouse import is_greenhouse
     from backend.scraper.ats.lever import is_lever
-    from backend.scraper.ats.rippling import is_rippling, _parse_rippling_url
-    from backend.scraper.ats.smartrecruiters import is_smartrecruiters, _extract_company_slug
+    from backend.scraper.ats.rippling import _parse_rippling_url, is_rippling
+    from backend.scraper.ats.smartrecruiters import (
+        _extract_company_slug,
+        is_smartrecruiters,
+    )
     from backend.scraper.ats.workday import is_workday
 
     if not url:
@@ -454,16 +562,16 @@ def _company_from_url(url: str):
             # boards.greenhouse.io/<slug>/jobs/<id>, job-boards.greenhouse.io/<slug>/...,
             # and the embed form boards.greenhouse.io/embed/job_board?for=<slug>.
             slug = (parse_qs(parsed.query).get("for") or [None])[0] or _first_slug()
-        elif is_lever(url):            # jobs.lever.co/<slug>/<id>
+        elif is_lever(url):  # jobs.lever.co/<slug>/<id>
             slug = _first_slug()
-        elif is_ashby(url):            # jobs.ashbyhq.com/<slug>/<id>
+        elif is_ashby(url):  # jobs.ashbyhq.com/<slug>/<id>
             slug = _first_slug()
         elif is_smartrecruiters(url):  # jobs|careers|api.smartrecruiters.com/<slug>/...
             slug = _extract_company_slug(url)
-        elif is_workday(url):          # <company>.wd5.myworkdayjobs.com/<site>/...
+        elif is_workday(url):  # <company>.wd5.myworkdayjobs.com/<site>/...
             sub = host.split(".")[0]
             slug = sub if sub not in ("www", "jobs", "careers") else None
-        elif is_rippling(url):         # ats.rippling.com/<slug>/jobs
+        elif is_rippling(url):  # ats.rippling.com/<slug>/jobs
             slug, _ = _parse_rippling_url(url)
     except Exception:  # a malformed board URL must never break the reader
         return None
@@ -476,6 +584,7 @@ def _company_from_url(url: str):
 def _decode_entities(value):
     """Strip HTML entities from an extracted field; JSON-LD lives in raw script text so json.loads never unescapes it (e.g. LinkedIn's "&amp;" titles), and unescaping repeats to also catch double-encoded "&amp;amp;" cases."""
     import html
+
     if not value:
         return value
     text = str(value)
@@ -494,10 +603,14 @@ def _known_posting(url: str):
     ones the scrapers already read through their own APIs.
     """
     from backend.scraper._shared.dedup import make_external_id
+
     db = SessionLocal()
     try:
-        row = (db.query(Job.title, Job.company)
-               .filter(Job.external_id == make_external_id("", "", url)).first())
+        row = (
+            db.query(Job.title, Job.company)
+            .filter(Job.external_id == make_external_id("", "", url))
+            .first()
+        )
     except Exception as e:  # a shortcut only: the page read below still answers
         logger.warning("extract: stored-job lookup failed for %s: %s", url, e)
         return None
@@ -514,8 +627,14 @@ async def extract_posting(payload: ExtractRequest):
     import json
     import re
     from urllib.parse import urlparse
+
     from bs4 import BeautifulSoup
-    from backend.scraper._shared.url_safety import safe_get, assert_public_http_url, UnsafeURLError
+
+    from backend.scraper._shared.url_safety import (
+        UnsafeURLError,
+        assert_public_http_url,
+        safe_get,
+    )
 
     url = (payload.url or "").strip()
     try:
@@ -525,18 +644,29 @@ async def extract_posting(payload: ExtractRequest):
 
     known = _known_posting(url)
     if known:
-        return {"title": known[0].strip(), "company": known[1].strip(), "blocked": False}
+        return {
+            "title": known[0].strip(),
+            "company": known[1].strip(),
+            "blocked": False,
+        }
 
     title = company = None
     blocked = False
     try:
-        resp = await safe_get(url, timeout=15, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+        resp = await safe_get(
+            url,
+            timeout=15,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            },
+        )
         # Checked before the status: a challenge can arrive as a 200, and its
         # <title> ("Just a moment...") would otherwise become the job title.
         blocked = resp.status_code in _BLOCKED_STATUSES or is_bot_wall(resp.text)
         if blocked:
-            logger.warning("extract: %s refused the read (HTTP %s)", url, resp.status_code)
+            logger.warning(
+                "extract: %s refused the read (HTTP %s)", url, resp.status_code
+            )
             raise _ReadBlocked()
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text[:1_000_000], "html.parser")
@@ -547,7 +677,7 @@ async def extract_posting(payload: ExtractRequest):
                 data = json.loads(tag.string or "{}")
             except Exception:
                 continue
-            for node in (data if isinstance(data, list) else [data]):
+            for node in data if isinstance(data, list) else [data]:
                 if not isinstance(node, dict):
                     continue
                 if node.get("@type") == "JobPosting":
@@ -585,24 +715,37 @@ async def extract_posting(payload: ExtractRequest):
 
     if not company:
         host = (urlparse(url).hostname or "").replace("www.", "")
-        parts = [p for p in host.split(".") if p not in ("com", "io", "co", "org", "net", "ai", "jobs", "careers")]
+        parts = [
+            p
+            for p in host.split(".")
+            if p not in ("com", "io", "co", "org", "net", "ai", "jobs", "careers")
+        ]
         candidate = parts[-1].title() if parts else None
         # Leave it empty rather than fill the Company field with a board name.
         company = candidate if candidate and not _is_ats_brand(candidate) else None
 
-    return {"title": (_decode_entities(title) or "").strip() or None,
-            "company": (_decode_entities(company) or "").strip() or None,
-            "blocked": blocked}
+    return {
+        "title": (_decode_entities(title) or "").strip() or None,
+        "company": (_decode_entities(company) or "").strip() or None,
+        "blocked": blocked,
+    }
 
 
 @router.post("/{app_id}/interviews", status_code=201)
 def add_interview(app_id: str, data: InterviewCreate, db: Session = Depends(get_db)):
     from backend.models.db import Interview
+
     app = db.query(Application).filter(Application.id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
-    iv = Interview(application_id=app.id, what=data.what, where_text=data.where_text,
-                   when_at=_parse_dt(data.when_at), status=data.status or "scheduled", prep=data.prep)
+    iv = Interview(
+        application_id=app.id,
+        what=data.what,
+        where_text=data.where_text,
+        when_at=_parse_dt(data.when_at),
+        status=data.status or "scheduled",
+        prep=data.prep,
+    )
     db.add(iv)
     app.updated_at = utcnow()
     db.commit()
@@ -612,6 +755,7 @@ def add_interview(app_id: str, data: InterviewCreate, db: Session = Depends(get_
 @router.patch("/interviews/{interview_id}")
 def update_interview(interview_id: str, updates: dict, db: Session = Depends(get_db)):
     from backend.models.db import Interview
+
     iv = db.query(Interview).filter(Interview.id == interview_id).first()
     if not iv:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -627,6 +771,7 @@ def update_interview(interview_id: str, updates: dict, db: Session = Depends(get
 @router.delete("/interviews/{interview_id}")
 def delete_interview(interview_id: str, db: Session = Depends(get_db)):
     from backend.models.db import Interview
+
     iv = db.query(Interview).filter(Interview.id == interview_id).first()
     if not iv:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -639,6 +784,7 @@ def delete_interview(interview_id: str, db: Session = Depends(get_db)):
 def prep_bundle(app_id: str, db: Session = Depends(get_db)):
     """Assemble the interview prep handover (role, résumé, posting, and the editable `prep_ask` closing question) as plain context for an external model; no LLM call happens here."""
     from backend.models.db import Resume
+
     app = db.query(Application).filter(Application.id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -647,12 +793,17 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db)):
     def money(lo, hi):
         def k(v):
             return "$" + str(round(v / 1000)) + "K"
+
         if lo and hi and lo != hi:
             return k(lo) + "–" + k(hi)
         return k(lo or hi) if (lo or hi) else None
 
     # Which optional sections to include (Settings -> Interview prep).
-    inc = {x.strip() for x in (get_setting(db, "prep_include") or "resume,posting,notes").split(",") if x.strip()}
+    inc = {
+        x.strip()
+        for x in (get_setting(db, "prep_include") or "resume,posting,notes").split(",")
+        if x.strip()
+    }
 
     L = []
     add = L.append
@@ -677,9 +828,22 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db)):
     if app.interviews:
         add("- Interviews booked:")
         for iv in app.interviews:
-            when = iv.when_at.strftime("%a %d %b %Y, %H:%M") if iv.when_at else "unscheduled"
+            when = (
+                iv.when_at.strftime("%a %d %b %Y, %H:%M")
+                if iv.when_at
+                else "unscheduled"
+            )
             where = (" · " + iv.where_text) if iv.where_text else ""
-            row = "  - " + iv.what + " — " + when + where + " (" + (iv.status or "scheduled") + ")"
+            row = (
+                "  - "
+                + iv.what
+                + " — "
+                + when
+                + where
+                + " ("
+                + (iv.status or "scheduled")
+                + ")"
+            )
             if iv.prep:
                 row += "\n    prep note: " + iv.prep
             add(row)
@@ -689,31 +853,46 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db)):
     # ── 2. my résumé, flattened to plain text ────────────────────────────────
     tailored = None
     if app.job_id:
-        tailored = (db.query(Resume)
-                    .filter(Resume.job_id == app.job_id, Resume.is_base == False)  # noqa: E712
-                    .order_by(Resume.updated_at.desc()).first())
+        tailored = (
+            db.query(Resume)
+            .filter(Resume.job_id == app.job_id, Resume.is_base == False)  # noqa: E712
+            .order_by(Resume.updated_at.desc())
+            .first()
+        )
     from backend.analyzer.score_keys import display_best, is_resume_key
+
     best_key = job.best_cv if job else None
-    cv_name = (tailored.name if tailored else None) or app.cv_version_used or display_best(job, db=db)
+    cv_name = (
+        (tailored.name if tailored else None)
+        or app.cv_version_used
+        or display_best(job, db=db)
+    )
     src = tailored
     if not src and not app.cv_version_used and is_resume_key(best_key):
-        src = db.query(Resume).filter(Resume.id == best_key).first()    # scores are keyed by résumé id
+        src = (
+            db.query(Resume).filter(Resume.id == best_key).first()
+        )  # scores are keyed by résumé id
     if not src and cv_name:
         src = db.query(Resume).filter(Resume.name == cv_name).first()
     resume_text = ""
     if src and src.json_data:
         try:
             from backend.analyzer.cv_scorer import _flatten_resume
+
             resume_text = _flatten_resume(src.json_data)
         except Exception as e:
             logger.info("prep: could not flatten résumé %s: %s", cv_name, e)
     if "resume" in inc:
         add("")
         add("## My résumé" + (" — " + cv_name if cv_name else ""))
-    # _flatten_resume emits its own "## Summary"/"## Experience" headings — demote
-    # them so they read as parts of the résumé, not siblings of "The posting".
+        # _flatten_resume emits its own "## Summary"/"## Experience" headings — demote
+        # them so they read as parts of the résumé, not siblings of "The posting".
         body = resume_text.strip() or "[résumé content unavailable]"
-        add("\n".join(("#" + ln) if ln.startswith("##") else ln for ln in body.splitlines()))
+        add(
+            "\n".join(
+                ("#" + ln) if ln.startswith("##") else ln for ln in body.splitlines()
+            )
+        )
 
     # ── 3. the posting, plain text ───────────────────────────────────────────
     if "posting" in inc:
@@ -732,13 +911,20 @@ def prep_bundle(app_id: str, db: Session = Depends(get_db)):
 
 def _session_of(obj):
     from sqlalchemy.orm import object_session
+
     return object_session(obj)
 
 
-def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=False,
-                 names: dict | None = None) -> dict:
+def _app_to_dict(
+    a: Application,
+    lookup=None,
+    tailored=None,
+    has_cover_letter=False,
+    names: dict | None = None,
+) -> dict:
     """Serialize an Application; pass lookup={lowercase: Company} (from build_company_lookup) to populate company_canonical for alias-aware grouping, else it falls back to the raw company name. `names` ({résumé id: name}, score_keys.resume_names) is loaded once by a list caller."""
     from backend.analyzer.score_keys import display_best
+
     job = a.job
     raw = job.company if job else None
     canonical_co = (lookup or {}).get((raw or "").lower())
@@ -750,8 +936,12 @@ def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=Fa
         "cv_version_used": a.cv_version_used,
         "notes": a.notes,
         "next_action": a.next_action,
-        "next_action_date": a.next_action_date.isoformat() if a.next_action_date else None,
-        "last_email_received": a.last_email_received.isoformat() if a.last_email_received else None,
+        "next_action_date": a.next_action_date.isoformat()
+        if a.next_action_date
+        else None,
+        "last_email_received": a.last_email_received.isoformat()
+        if a.last_email_received
+        else None,
         "last_email_snippet": a.last_email_snippet,
         "status_transitions": a.status_transitions or [],
         "updated_at": a.updated_at.isoformat() if a.updated_at else None,
@@ -767,7 +957,9 @@ def _app_to_dict(a: Application, lookup=None, tailored=None, has_cover_letter=Fa
         "salary_max": job.salary_max if job else None,
         "source": job.source if job else None,
         "has_cached_page": bool(job.cached_page_html) if job else False,
-        "discovered_at": job.discovered_at.isoformat() if (job and job.discovered_at) else None,
+        "discovered_at": job.discovered_at.isoformat()
+        if (job and job.discovered_at)
+        else None,
         "tailored_resume_id": str(tailored.id) if tailored else None,
         "tailored_resume_name": tailored.name if tailored else None,
         "has_cover_letter": has_cover_letter,

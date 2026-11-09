@@ -1,4 +1,5 @@
 """telemetry/umami.py: what goes to Umami, and that nothing goes when it must not."""
+
 import httpx
 import pytest
 from sqlalchemy.orm import sessionmaker
@@ -15,14 +16,18 @@ def sent(monkeypatch, test_db):
 
     def handler(request):
         import json
+
         assert request.url.path == "/api/batch"
         batch = json.loads(request.content)
         REQUESTS.append(len(batch))
         calls.extend((request.headers.get("user-agent"), b) for b in batch)
-        return httpx.Response(200, json={"size": len(batch), "processed": len(batch), "errors": 0})
+        return httpx.Response(
+            200, json={"size": len(batch), "processed": len(batch), "errors": 0}
+        )
 
     async def no_timer():
         return None
+
     REQUESTS.clear()
     monkeypatch.setattr(U, "_transport", httpx.MockTransport(handler))
     monkeypatch.setattr(U, "UMAMI_WEBSITE_ID", "site-123")
@@ -35,7 +40,7 @@ def sent(monkeypatch, test_db):
     return calls
 
 
-REQUESTS = []   # events per request, in order
+REQUESTS = []  # events per request, in order
 
 
 @pytest.mark.asyncio
@@ -48,9 +53,17 @@ async def test_events_go_in_batches_of_50(sent):
 async def test_payload_shape(sent):
     assert await U.send([("scraper_health", {"kind": "workday", "runs": 2})]) == 1
     agent, body = sent[0]
-    assert body == {"type": "event", "payload": {"website": "site-123", "hostname": "jobnavigator.local", "url": "/server",
-                                                 "name": "scraper_health", "data": {"kind": "workday", "runs": 2},
-                                                 "language": "en"}}
+    assert body == {
+        "type": "event",
+        "payload": {
+            "website": "site-123",
+            "hostname": "jobnavigator.local",
+            "url": "/server",
+            "name": "scraper_health",
+            "data": {"kind": "workday", "runs": 2},
+            "language": "en",
+        },
+    }
     assert agent.startswith("Mozilla/5.0") and "JobNavigator/" in agent
 
 
@@ -82,33 +95,51 @@ async def test_app_started_on_each_start(sent, test_db):
 
 
 @pytest.mark.asyncio
-async def test_a_broken_database_does_not_escape_the_start_send(sent, test_db, monkeypatch):
+async def test_a_broken_database_does_not_escape_the_start_send(
+    sent, test_db, monkeypatch
+):
     def broken():
         raise RuntimeError("db down")
+
     monkeypatch.setattr(U, "_session", broken)
     assert await U.send_start() == 0
 
 
 # ── browser events, relayed ──────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_relay_forwards_only_at_full(sent, test_db, client):
     set_setting(test_db, "telemetry_level", "essentials")
-    assert client.post("/api/telemetry/event", json={"name": "job_saved", "data": {}, "url": "/feed"}).json() == {"sent": False}
+    assert client.post(
+        "/api/telemetry/event", json={"name": "job_saved", "data": {}, "url": "/feed"}
+    ).json() == {"sent": False}
     set_setting(test_db, "telemetry_level", "full")
-    assert client.post("/api/telemetry/event", json={"name": "job_opened", "data": {"link_kind": "direct"},
-                                                     "url": "/feed"}).json() == {"sent": True}
-    assert sent == []                      # queued, sent with the others
+    assert client.post(
+        "/api/telemetry/event",
+        json={"name": "job_opened", "data": {"link_kind": "direct"}, "url": "/feed"},
+    ).json() == {"sent": True}
+    assert sent == []  # queued, sent with the others
     assert await U.flush_relayed() == 1
     payload = sent[-1][1]["payload"]
-    assert payload["hostname"] == "jobnavigator.local" and payload["url"] == "/feed" and payload["name"] == "job_opened"
-    assert payload["data"]["link_kind"] == "direct" and len(payload["data"]["install_id"]) == 36
+    assert (
+        payload["hostname"] == "jobnavigator.local"
+        and payload["url"] == "/feed"
+        and payload["name"] == "job_opened"
+    )
+    assert (
+        payload["data"]["link_kind"] == "direct"
+        and len(payload["data"]["install_id"]) == 36
+    )
 
 
 @pytest.mark.asyncio
 async def test_relay_page_view_is_an_umami_page_view(sent, test_db, client):
     set_setting(test_db, "telemetry_level", "full")
-    client.post("/api/telemetry/event", json={"name": "page_view", "data": {}, "url": "/resumes/:id"})
+    client.post(
+        "/api/telemetry/event",
+        json={"name": "page_view", "data": {}, "url": "/resumes/:id"},
+    )
     await U.flush_relayed()
     payload = sent[-1][1]["payload"]
     assert payload["url"] == "/resumes/:id" and "name" not in payload
@@ -116,8 +147,17 @@ async def test_relay_page_view_is_an_umami_page_view(sent, test_db, client):
 
 def test_relay_drops_text_paths_and_odd_values():
     name, data, url = U.clean_browser_event(
-        "job_opened", {"link_kind": "direct", "title": "Senior PM at Zyxcorp", "n": 3, "ok": True,
-                       "BadKey": "x", "nested": {"a": 1}}, "/resumes/Zyxcorp Resume?x=1")
+        "job_opened",
+        {
+            "link_kind": "direct",
+            "title": "Senior PM at Zyxcorp",
+            "n": 3,
+            "ok": True,
+            "BadKey": "x",
+            "nested": {"a": 1},
+        },
+        "/resumes/Zyxcorp Resume?x=1",
+    )
     assert data == {"link_kind": "direct", "n": 3, "ok": True} and url == "/"
     assert U.clean_browser_event("Job Opened!", {}, "/feed") is None
     assert U.clean_browser_event("job_opened", "not a dict", "/feed")[1] == {}
@@ -130,12 +170,13 @@ async def test_relay_is_rate_limited(sent, test_db, monkeypatch):
     monkeypatch.setattr(U, "_relayed", [])
     results = [await U.relay("job_saved", {}, "/feed") for _ in range(5)]
     assert results == [True, True, True, False, False]
-    assert await U.flush_relayed() == 3 and REQUESTS == [3]   # one request for the lot
+    assert await U.flush_relayed() == 3 and REQUESTS == [3]  # one request for the lot
 
 
 @pytest.mark.asyncio
 async def test_daily_send_stamps_last_sent(sent, test_db):
     from backend.accounts.settings import get_install_setting
+
     set_setting(test_db, "telemetry_level", "essentials")
     assert await U.send_daily() >= 1
     test_db.expire_all()
@@ -145,13 +186,25 @@ async def test_daily_send_stamps_last_sent(sent, test_db):
 @pytest.mark.asyncio
 async def test_essentials_sends_no_failing_hosts(sent, test_db):
     set_setting(test_db, "telemetry_level", "essentials")
-    c = Company(name="Acme", scrape_urls=["https://job-boards.greenhouse.io/acme"], active=True)
+    c = Company(
+        name="Acme", scrape_urls=["https://job-boards.greenhouse.io/acme"], active=True
+    )
     test_db.add(c)
     test_db.commit()
-    test_db.add(ScrapeLog(company_id=c.id, source="playwright_Acme", error="BoardNotFoundError (HTTP 404)"))
+    test_db.add(
+        ScrapeLog(
+            company_id=c.id,
+            source="playwright_Acme",
+            error="BoardNotFoundError (HTTP 404)",
+        )
+    )
     test_db.commit()
     await U.send_daily()
-    health = [b["payload"]["data"] for _a, b in sent if b["payload"]["name"] == "scraper_health"]
+    health = [
+        b["payload"]["data"]
+        for _a, b in sent
+        if b["payload"]["name"] == "scraper_health"
+    ]
     assert health and all("failing_hosts" not in d for d in health)
 
 
@@ -159,6 +212,7 @@ async def test_essentials_sends_no_failing_hosts(sent, test_db):
 async def test_umami_down_is_logged_not_raised(monkeypatch, test_db, caplog):
     def down(request):
         raise httpx.ConnectError("no route")
+
     monkeypatch.setattr(U, "_transport", httpx.MockTransport(down))
     monkeypatch.setattr(U, "UMAMI_WEBSITE_ID", "site-123")
     assert await U.send([("app_started", {})]) == 0

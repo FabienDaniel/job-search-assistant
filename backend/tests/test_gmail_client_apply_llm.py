@@ -1,4 +1,5 @@
 """Tests gmail_client._apply_llm_result_to_app: forward-only transitions via a rank dict (rejected=99, so rejection always bypasses the rule); record_transition is patched at backend.models.db since it's imported locally."""
+
 from unittest.mock import MagicMock
 
 
@@ -28,7 +29,9 @@ def test_forward_transition_applied_to_interview(monkeypatch):
 
     app = _make_app("applied")
     db = MagicMock()
-    gmail_client._apply_llm_result_to_app(db, app, _make_result("interview"), "body", "subj")
+    gmail_client._apply_llm_result_to_app(
+        db, app, _make_result("interview"), "body", "subj"
+    )
 
     assert ("interview", "email") in transitions
     # Side effects: timestamps set + commit called
@@ -49,7 +52,9 @@ def test_backward_transition_blocked_by_forward_only(monkeypatch):
 
     app = _make_app("interview")
     db = MagicMock()
-    gmail_client._apply_llm_result_to_app(db, app, _make_result("applied"), "body", "subj")
+    gmail_client._apply_llm_result_to_app(
+        db, app, _make_result("applied"), "body", "subj"
+    )
 
     assert transitions == [], (
         f"Forward-only rule should block interview -> applied; got transitions: {transitions}"
@@ -72,7 +77,9 @@ def test_rejection_always_allowed_from_any_state(monkeypatch):
     # Rejection from "interview" — rank 99 > rank 3, so transition fires
     app = _make_app("interview")
     db = MagicMock()
-    gmail_client._apply_llm_result_to_app(db, app, _make_result("rejected"), "body", "subj")
+    gmail_client._apply_llm_result_to_app(
+        db, app, _make_result("rejected"), "body", "subj"
+    )
 
     assert ("rejected", "email") in transitions
 
@@ -90,6 +97,8 @@ def test_no_change_is_noop(monkeypatch):
 
     app = _make_app("applied")
     db = MagicMock()
-    gmail_client._apply_llm_result_to_app(db, app, _make_result("no_change", confidence=50), "body", "subj")
+    gmail_client._apply_llm_result_to_app(
+        db, app, _make_result("no_change", confidence=50), "body", "subj"
+    )
 
     assert transitions == []

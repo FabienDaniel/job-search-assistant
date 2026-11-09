@@ -5,32 +5,51 @@ country, worldwide ones included. The API terms ask to send applicants through `
 so that is the stored URL. It is a Himalayas page (136 of 136 sampled on 2026-10-31), so the job is
 a Board link; a link that leaves Himalayas needs no `apply_url` to be Direct, as `url` holds it.
 """
+
 import httpx
 
 from backend.analyzer.work_arrangement import REMOTE
 from backend.models.db import Search
 from backend.scraper._shared import job_boards
 from backend.scraper._shared.html_text import html_to_text
-from backend.scraper._shared.job_boards import (Board, BoardError, annual_usd, country_name, iso_from_ts,
-                                                make_row, term_of, too_old)
+from backend.scraper._shared.job_boards import (
+    Board,
+    BoardError,
+    annual_usd,
+    country_name,
+    iso_from_ts,
+    make_row,
+    term_of,
+    too_old,
+)
 
 _SEARCH = "https://himalayas.app/jobs/api/search"
-_PAGE = 20            # fixed by the API
+_PAGE = 20  # fixed by the API
 _MAX_PAGES = 25
 
 
 def _row(j: dict) -> dict:
     places = [p for p in j.get("locationRestrictions") or [] if p]
-    period = "ANNUAL" if str(j.get("salaryPeriod") or "").lower() == "annual" else j.get("salaryPeriod")
-    sal_min, sal_max = annual_usd(j.get("minSalary"), j.get("maxSalary"), period, j.get("currency"))
+    period = (
+        "ANNUAL"
+        if str(j.get("salaryPeriod") or "").lower() == "annual"
+        else j.get("salaryPeriod")
+    )
+    sal_min, sal_max = annual_usd(
+        j.get("minSalary"), j.get("maxSalary"), period, j.get("currency")
+    )
     return make_row(
-        title=j.get("title"), company=j.get("companyName") or "",
+        title=j.get("title"),
+        company=j.get("companyName") or "",
         # The API terms ask to send applicants through applicationLink.
         url=j.get("applicationLink") or j.get("guid") or "",
         location="Remote: " + ", ".join(places) if places else "Remote (worldwide)",
         description=html_to_text(j.get("description") or ""),
-        salary_min=sal_min, salary_max=sal_max, arrangement=REMOTE,
-        posted=iso_from_ts(j.get("pubDate")))
+        salary_min=sal_min,
+        salary_max=sal_max,
+        arrangement=REMOTE,
+        posted=iso_from_ts(j.get("pubDate")),
+    )
 
 
 async def _list(client: httpx.AsyncClient, search: Search, limit: int) -> list:

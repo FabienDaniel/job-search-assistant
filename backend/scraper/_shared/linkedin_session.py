@@ -7,6 +7,7 @@ scrapers and saves the cookies for them:
 - `main`: the user's own account (linkedin_email / _password), saved to the LinkedIn Personal jar.
 
 Each jar gets a `<jar>.account` record of whose session it holds; the lookup reads it."""
+
 import asyncio
 import json
 import os
@@ -35,7 +36,11 @@ def state(which: str = MOCK) -> dict:
 
 def jar(which: str = MOCK) -> str:
     """The current account's cookie jar of one session."""
-    return _cred.linkedin_extension_cookies() if which == MOCK else _cred.linkedin_personal_cookies()
+    return (
+        _cred.linkedin_extension_cookies()
+        if which == MOCK
+        else _cred.linkedin_personal_cookies()
+    )
 
 
 def pin_file(which: str = MOCK) -> str:
@@ -60,7 +65,9 @@ def signed_in_as(which: str):
     try:
         with open(_record_path(which)) as f:
             data = json.load(f)
-        return data if isinstance(data, dict) and data.get("account") in SESSIONS else None
+        return (
+            data if isinstance(data, dict) and data.get("account") in SESSIONS else None
+        )
     except (OSError, ValueError):
         return None
 
@@ -73,16 +80,26 @@ def _phase(phase: str, detail: str = "", which: str = MOCK) -> None:
 
 def _creds(which: str = MOCK):
     """(email, password, missing-message) of the account one session signs in with."""
-    from backend.models.db import SessionLocal
     from backend.accounts.settings import get_setting
+    from backend.models.db import SessionLocal
+
     db = SessionLocal()
     try:
+
         def g(k):
             return (get_setting(db, k) or "").strip()
+
         if which == MOCK:
-            return (g("linkedin_mock_email"), g("linkedin_mock_password"),
-                    "Mock account email/password are not set.")
-        return (g("linkedin_email"), g("linkedin_password"), "Main account email/password are not set.")
+            return (
+                g("linkedin_mock_email"),
+                g("linkedin_mock_password"),
+                "Mock account email/password are not set.",
+            )
+        return (
+            g("linkedin_email"),
+            g("linkedin_password"),
+            "Main account email/password are not set.",
+        )
     finally:
         db.close()
 
@@ -93,13 +110,17 @@ async def _login_and_save(email, password, which: str = MOCK) -> int:
     the main session as the mock's. The main sign-in may reuse them."""
     fresh = which == MOCK
     from backend.scraper.sources import linkedin_personal as lp
+
     pw = browser = None
     try:
         pw, browser, context, page = await lp._get_linkedin_browser()
         if fresh:
             await context.clear_cookies()
-        await page.goto("https://www.linkedin.com/login",
-                        wait_until="domcontentloaded", timeout=30000)
+        await page.goto(
+            "https://www.linkedin.com/login",
+            wait_until="domcontentloaded",
+            timeout=30000,
+        )
         await asyncio.sleep(2)
 
         if "/feed" not in page.url and "/jobs" not in page.url:
@@ -107,7 +128,8 @@ async def _login_and_save(email, password, which: str = MOCK) -> int:
             try:
                 await page.wait_for_url(
                     lambda u: "/feed" in u or "/jobs" in u or "/checkpoint" in u,
-                    timeout=30000)
+                    timeout=30000,
+                )
             except Exception:
                 pass
             if "/checkpoint" in page.url or "/challenge" in page.url:
@@ -153,8 +175,11 @@ async def _solve_pin(page, which: str = MOCK) -> bool:
     PIN_FILE = pin_file(which)
     if os.path.exists(PIN_FILE):
         os.remove(PIN_FILE)
-    print(f"CHECKPOINT: LinkedIn emailed a PIN to the account. Drop the 6 "
-          f"digits into {PIN_FILE} (waiting up to 300s)...", flush=True)
+    print(
+        f"CHECKPOINT: LinkedIn emailed a PIN to the account. Drop the 6 "
+        f"digits into {PIN_FILE} (waiting up to 300s)...",
+        flush=True,
+    )
     _phase("awaiting_pin", "LinkedIn emailed a PIN to the account's inbox.", which)
     pin = None
     for _ in range(100):
@@ -196,8 +221,11 @@ async def run_refresh(which: str = MOCK) -> int:
     except Exception as e:  # noqa: BLE001 - surfaced to the UI verbatim
         _phase("failed", str(e)[:200], which)
         return 1
-    _phase("ok" if code == 0 else "failed",
-           "Signed in." if code == 0 else "Login did not complete — see backend logs.", which)
+    _phase(
+        "ok" if code == 0 else "failed",
+        "Signed in." if code == 0 else "Login did not complete — see backend logs.",
+        which,
+    )
     return code
 
 
@@ -213,9 +241,10 @@ def _run(which: str = MOCK) -> int:
 def resolve_account(ref: str):
     """(account id, name, note) for `--account <name|id>`, or None when no single account
     matches. The note explains which session a member on 'inherit' refreshes."""
+    from backend.accounts.context import use_account
     from backend.models.db import SessionLocal
     from backend.scripts.cli_login import find_account
-    from backend.accounts.context import use_account
+
     db = SessionLocal()
     try:
         acc = find_account(db, ref)
@@ -225,8 +254,10 @@ def resolve_account(ref: str):
         if acc.role != "owner":
             with use_account(acc.id):
                 if _cred.linkedin_shared_from_owner(db):
-                    note = (f"{acc.name}'s LinkedIn section inherits the owner's, so this refreshes "
-                            "the owner's session.")
+                    note = (
+                        f"{acc.name}'s LinkedIn section inherits the owner's, so this refreshes "
+                        "the owner's session."
+                    )
         return acc.id, acc.name, note
     finally:
         db.close()
@@ -237,10 +268,19 @@ def main(argv=None) -> int:
     without --account the owner's session, as before; with it, that account's session
     (its own jar when its LinkedIn section is 'own', else the owner's)."""
     import argparse
-    parser = argparse.ArgumentParser(description="Refresh a logged-in LinkedIn browser session.")
-    parser.add_argument("--account", help="account name (case-insensitive) or id; default: the owner")
-    parser.add_argument("--session", choices=SESSIONS, default=MOCK,
-                        help="mock (the extension import and the lookup, default) or main (LinkedIn Personal)")
+
+    parser = argparse.ArgumentParser(
+        description="Refresh a logged-in LinkedIn browser session."
+    )
+    parser.add_argument(
+        "--account", help="account name (case-insensitive) or id; default: the owner"
+    )
+    parser.add_argument(
+        "--session",
+        choices=SESSIONS,
+        default=MOCK,
+        help="mock (the extension import and the lookup, default) or main (LinkedIn Personal)",
+    )
     args = parser.parse_args(argv)
     if not args.account:
         return _run(args.session)
@@ -250,6 +290,7 @@ def main(argv=None) -> int:
         return 1
     account_id, name, note = found
     from backend.accounts.context import use_account
+
     print(f"Refreshing the LinkedIn session of {name}.", flush=True)
     if note:
         print(note, flush=True)

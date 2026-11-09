@@ -13,26 +13,51 @@ Outside-click uses a point inside <main> (the page-title strip), not the (3,3)
 viewport corner round 3 used: that corner lands on the nav rail, which sits above
 a drawer's own scrim and swallows the click (smoke-final DS-S-01).
 """
+
 import re
 
-from _suite import case
 import _common as C
 import h
+from _suite import case
 
 SPECS = [
-    dict(label='Feed · keyboard shortcuts', route='/feed',
-         trigger='[title="Keyboard shortcuts"]',
-         panel='[role="group"][aria-label="Keyboard shortcuts"]'),
-    dict(label='Feed · Source filter menu', route='/feed',
-         trigger='[aria-haspopup="menu"]:has-text("Source")', panel='[role="menu"]'),
-    dict(label='Companies · Add company modal', route='/companies',
-         trigger='text="+ Add company"', panel='[role="dialog"]', expect='Add company'),
-    dict(label='Searches · row ⋯ menu', route='/searches',
-         trigger='[title="More actions"]', panel='[role="menu"]'),
-    dict(label='Résumés · New résumé modal', route='/resumes',
-         trigger='text="+ New résumé"', panel='[role="dialog"]'),
-    dict(label='Settings · Model catalog modal', route='/settings',
-         trigger='[aria-label="Model catalog — manage"]', panel='[role="dialog"]'),
+    dict(
+        label="Feed · keyboard shortcuts",
+        route="/feed",
+        trigger='[title="Keyboard shortcuts"]',
+        panel='[role="group"][aria-label="Keyboard shortcuts"]',
+    ),
+    dict(
+        label="Feed · Source filter menu",
+        route="/feed",
+        trigger='[aria-haspopup="menu"]:has-text("Source")',
+        panel='[role="menu"]',
+    ),
+    dict(
+        label="Companies · Add company modal",
+        route="/companies",
+        trigger='text="+ Add company"',
+        panel='[role="dialog"]',
+        expect="Add company",
+    ),
+    dict(
+        label="Searches · row ⋯ menu",
+        route="/searches",
+        trigger='[title="More actions"]',
+        panel='[role="menu"]',
+    ),
+    dict(
+        label="Résumés · New résumé modal",
+        route="/resumes",
+        trigger='text="+ New résumé"',
+        panel='[role="dialog"]',
+    ),
+    dict(
+        label="Settings · Model catalog modal",
+        route="/settings",
+        trigger='[aria-label="Model catalog — manage"]',
+        panel='[role="dialog"]',
+    ),
 ]
 
 
@@ -42,7 +67,7 @@ def _visible(pg, sel):
 
 
 def _open(pg, spec):
-    t = pg.locator(spec['trigger']).first
+    t = pg.locator(spec["trigger"]).first
     if t.count() == 0:
         return False
     t.scroll_into_view_if_needed()
@@ -51,50 +76,67 @@ def _open(pg, spec):
     return True
 
 
-@case('modals')
+@case("modals")
 def _modals(c):
     with h.browser() as b:
         pg = C.mpage(b)
-        pg.route(re.compile(r'/api/llm/models'),
-                 lambda r: r.fulfill(status=200, content_type='application/json', body='[]'))
+        pg.route(
+            re.compile(r"/api/llm/models"),
+            lambda r: r.fulfill(status=200, content_type="application/json", body="[]"),
+        )
         try:
             for spec in SPECS:
-                lab = spec['label']
-                C.go(pg, spec['route'])
+                lab = spec["label"]
+                C.go(pg, spec["route"])
                 base = C.overlay_count(pg)
 
                 if not _open(pg, spec):
-                    c.check(f'{lab} · trigger present', False, f"no match for {spec['trigger']}")
+                    c.check(
+                        f"{lab} · trigger present",
+                        False,
+                        f"no match for {spec['trigger']}",
+                    )
                     continue
-                opened = _visible(pg, spec['panel']) and C.overlay_count(pg) > base
-                c.check(f'{lab} · opens', opened,
-                        f"panel={_visible(pg, spec['panel'])} overlays {base}→{C.overlay_count(pg)}")
-                if spec.get('expect'):
-                    c.check(f'{lab} · shows {spec["expect"]!r}', C.body_has(pg, spec['expect']))
+                opened = _visible(pg, spec["panel"]) and C.overlay_count(pg) > base
+                c.check(
+                    f"{lab} · opens",
+                    opened,
+                    f"panel={_visible(pg, spec['panel'])} overlays {base}→{C.overlay_count(pg)}",
+                )
+                if spec.get("expect"):
+                    c.check(
+                        f"{lab} · shows {spec['expect']!r}",
+                        C.body_has(pg, spec["expect"]),
+                    )
                 if not opened:
-                    pg.keyboard.press('Escape')
+                    pg.keyboard.press("Escape")
                     continue
 
-                pg.keyboard.press('Escape')
+                pg.keyboard.press("Escape")
                 pg.wait_for_timeout(420)
-                c.check(f'{lab} · Escape closes it', not _visible(pg, spec['panel']))
+                c.check(f"{lab} · Escape closes it", not _visible(pg, spec["panel"]))
 
                 # reopen for the outside-click half
-                if not _open(pg, spec) or not _visible(pg, spec['panel']):
-                    c.check(f'{lab} · reopens for the scrim check', False)
+                if not _open(pg, spec) or not _visible(pg, spec["panel"]):
+                    c.check(f"{lab} · reopens for the scrim check", False)
                     continue
                 x, y = C.outside_point(pg)
                 pg.mouse.click(x, y)
                 pg.wait_for_timeout(450)
-                c.check(f'{lab} · outside/scrim click closes it', not _visible(pg, spec['panel']),
-                        f'clicked ({x},{y})')
+                c.check(
+                    f"{lab} · outside/scrim click closes it",
+                    not _visible(pg, spec["panel"]),
+                    f"clicked ({x},{y})",
+                )
 
                 # leave nothing open behind us
-                pg.keyboard.press('Escape')
+                pg.keyboard.press("Escape")
                 pg.wait_for_timeout(150)
 
             errs, perrs = C.console_errors(pg)
-            c.check('no pageerrors across all six overlays', not perrs, '; '.join(perrs[:2]))
+            c.check(
+                "no pageerrors across all six overlays", not perrs, "; ".join(perrs[:2])
+            )
         finally:
-            pg.unroute_all(behavior='ignoreErrors')
+            pg.unroute_all(behavior="ignoreErrors")
             pg.context.close()

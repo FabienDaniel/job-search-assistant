@@ -1,9 +1,12 @@
 """_fetch_job_description's page fallback: a LinkedIn page yields only its description block, and a bot wall yields nothing."""
+
 import pytest
 
 from backend.scraper.ats import _descriptions
 
-_JD = "Responsibilities: run the release train. Requirements: Kubernetes, Terraform. " * 3
+_JD = (
+    "Responsibilities: run the release train. Requirements: Kubernetes, Terraform. " * 3
+)
 
 _LINKEDIN_PAGE = f"""<html><head><title>Staff Platform Engineer at Rivian | LinkedIn Jobs</title></head><body>
 <div>Join or sign in to find your next job. Email or phone. Password. Forgot password? Sign in.</div>
@@ -37,14 +40,18 @@ def _serve(monkeypatch):
     def _install(html):
         async def _get(url, **kw):
             return _Resp(html)
+
         monkeypatch.setattr(us, "safe_get", _get)
+
     return _install
 
 
 @pytest.mark.asyncio
 async def test_linkedin_page_yields_only_the_description_block(_serve):
     _serve(_LINKEDIN_PAGE)
-    text = await _descriptions._fetch_job_description("https://www.linkedin.com/jobs/view/4418891742")
+    text = await _descriptions._fetch_job_description(
+        "https://www.linkedin.com/jobs/view/4418891742"
+    )
     assert text.startswith("Responsibilities: run the release train.")
     for chrome in ("Sign in", "Password", "Similar jobs", "LinkedIn Jobs"):
         assert chrome not in text
@@ -54,18 +61,33 @@ async def test_linkedin_page_yields_only_the_description_block(_serve):
 async def test_linkedin_page_without_the_block_yields_nothing(_serve):
     """A changed LinkedIn layout must not fall back to the sign-in chrome."""
     _serve(_LINKEDIN_PAGE.replace("show-more-less-html__markup", "renamed"))
-    assert await _descriptions._fetch_job_description("https://www.linkedin.com/jobs/view/1") is None
+    assert (
+        await _descriptions._fetch_job_description(
+            "https://www.linkedin.com/jobs/view/1"
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio
 async def test_other_sites_still_read_the_whole_page(_serve):
     _serve(f"<html><body><h1>Platform Engineer</h1><p>{_JD}</p></body></html>")
-    text = await _descriptions._fetch_job_description("https://careers.example.com/jobs/1")
+    text = await _descriptions._fetch_job_description(
+        "https://careers.example.com/jobs/1"
+    )
     assert "Platform Engineer" in text and "Requirements" in text
 
 
 @pytest.mark.asyncio
 async def test_a_bot_wall_yields_nothing(_serve):
-    _serve("<html><head><title>Just a moment...</title></head><body>"
-           + "Verifying you are human. This may take a few seconds. " * 5 + "</body></html>")
-    assert await _descriptions._fetch_job_description("https://ca.indeed.com/viewjob?jk=abc") is None
+    _serve(
+        "<html><head><title>Just a moment...</title></head><body>"
+        + "Verifying you are human. This may take a few seconds. " * 5
+        + "</body></html>"
+    )
+    assert (
+        await _descriptions._fetch_job_description(
+            "https://ca.indeed.com/viewjob?jk=abc"
+        )
+        is None
+    )

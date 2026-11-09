@@ -1,15 +1,21 @@
 """Tests for ats/oracle_hcm.py — detection + API mock + custom host mapping."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 
 def test_is_oracle_hcm_detects_oraclecloud():
     from backend.scraper.ats.oracle_hcm import is_oracle_hcm
-    assert is_oracle_hcm("https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/12345/")
+
+    assert is_oracle_hcm(
+        "https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/12345/"
+    )
 
 
 def test_is_oracle_hcm_detects_sites_path_with_mapped_host():
     from backend.scraper.ats.oracle_hcm import is_oracle_hcm
+
     # Oracle custom domains (e.g. careers.oracle.com) — detected when URL has /sites/.../jobs
     # The original logic requires both "/sites/" AND "/jobs" in the URL for host-mapped domains.
     assert is_oracle_hcm("https://careers.oracle.com/sites/CX_1/jobs/")
@@ -17,24 +23,30 @@ def test_is_oracle_hcm_detects_sites_path_with_mapped_host():
 
 def test_is_oracle_hcm_rejects_non_oracle():
     from backend.scraper.ats.oracle_hcm import is_oracle_hcm
+
     assert not is_oracle_hcm("https://boards.greenhouse.io/acme")
     assert not is_oracle_hcm("https://nvidia.wd5.myworkdayjobs.com/Site")
 
 
 def test_is_oracle_hcm_rejects_path_injection():
     from backend.scraper.ats.oracle_hcm import is_oracle_hcm
+
     assert not is_oracle_hcm("https://attacker.com/?url=oraclecloud.com")
 
 
 def test_oracle_hcm_host_returns_backend():
     from backend.scraper.ats.oracle_hcm import _oracle_hcm_host
+
     # Direct oraclecloud.com URL — host is the URL's own host
-    host = _oracle_hcm_host("https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/123")
+    host = _oracle_hcm_host(
+        "https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/123"
+    )
     assert host == "eeho.fa.us2.oraclecloud.com"
 
 
 def test_oracle_hcm_host_maps_custom_domain():
-    from backend.scraper.ats.oracle_hcm import _oracle_hcm_host, _ORACLE_HCM_HOSTS
+    from backend.scraper.ats.oracle_hcm import _ORACLE_HCM_HOSTS, _oracle_hcm_host
+
     # careers.oracle.com should map to a real backend
     host = _oracle_hcm_host("https://careers.oracle.com/jobs/")
     if "careers.oracle.com" in _ORACLE_HCM_HOSTS:
@@ -43,6 +55,7 @@ def test_oracle_hcm_host_maps_custom_domain():
 
 def test_oracle_hcm_host_returns_none_for_non_oracle():
     from backend.scraper.ats.oracle_hcm import _oracle_hcm_host
+
     assert _oracle_hcm_host("https://boards.greenhouse.io/acme") is None
 
 
@@ -62,6 +75,9 @@ async def test_scrape_oracle_hcm_handles_http_error(monkeypatch):
     monkeypatch.setattr("httpx.AsyncClient", lambda **kw: mock_client)
 
     from backend.scraper.ats.oracle_hcm import scrape
-    result = await scrape("https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/")
+
+    result = await scrape(
+        "https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/"
+    )
     jobs = result[0] if isinstance(result, tuple) else result
     assert jobs == []

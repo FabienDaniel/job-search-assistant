@@ -1,4 +1,5 @@
 """Levels.fyi source — Playwright DOM scraping, since levels.fyi encrypts its API responses; paginates + expands "View all open roles" per company to collect matching jobs."""
+
 import asyncio
 import json
 import logging
@@ -8,33 +9,36 @@ from datetime import datetime, timezone
 
 from sqlalchemy.exc import IntegrityError
 
-from backend.models.db import SessionLocal, Job, Search, get_existing_external_ids
 from backend.accounts.settings import get_setting
-from backend.scraper._shared.dedup import make_external_id, make_content_hash
+from backend.models.db import Job, Search, SessionLocal, get_existing_external_ids
+from backend.scraper._shared import levels_jobs
+from backend.scraper._shared.browser import _close_page, _get_browser, _new_page
+from backend.scraper._shared.dedup import make_content_hash, make_external_id
+from backend.scraper._shared.filters import _apply_company_filters
+from backend.scraper._shared.link_kinds import EASY_APPLY
 from backend.scraper._shared.posting_links import counts_as_new
 from backend.scraper._shared.postings import resolve_short_links
-from backend.scraper._shared.browser import _get_browser, _new_page, _close_page
-from backend.scraper._shared.filters import _apply_company_filters
-from backend.scraper._shared import levels_jobs
-from backend.scraper._shared.link_kinds import EASY_APPLY
 
 logger = logging.getLogger("jobnavigator.playwright")
 
 
 # ── Levels.fyi scraper ────────────────────────────────────────────────────────
 
+
 def _is_levelsfyi(url: str) -> bool:
     """Check if URL is a levels.fyi job search page."""
     return "levels.fyi" in url.lower() and "/jobs" in url.lower()
 
 
-def _parse_levelsfyi_salary(location_text: str) -> tuple[str, str | None, int | None, int | None]:
+def _parse_levelsfyi_salary(
+    location_text: str,
+) -> tuple[str, str | None, int | None, int | None]:
     """Parse levels.fyi location+salary string like 'San Francisco, CA · Remote · $200K - $300K' into (location, work_arrangement, salary_min, salary_max)."""
     if not location_text:
         return ("", None, None, None)
 
     # The separator can be a unicode middle dot or a regular dot
-    parts = [p.strip() for p in re.split(r'\s*[·\u00b7]\s*', location_text)]
+    parts = [p.strip() for p in re.split(r"\s*[·\u00b7]\s*", location_text)]
     location = parts[0] if parts else ""
     work_arrangement = None
     salary_min = salary_max = None
@@ -46,9 +50,10 @@ def _parse_levelsfyi_salary(location_text: str) -> tuple[str, str | None, int | 
         elif "$" in part:
             # "$45/hr" is not a yearly figure (the rule below would read $45 as $45K).
             from backend.analyzer.salary_extractor import is_non_annual
+
             if is_non_annual(part):
                 continue
-            amounts = re.findall(r'\$(\d+(?:\.\d+)?)\s*[Kk]?', part)
+            amounts = re.findall(r"\$(\d+(?:\.\d+)?)\s*[Kk]?", part)
             for i, amt in enumerate(amounts):
                 val = int(float(amt))
                 if val < 10000:
@@ -71,14 +76,16 @@ def _levelsfyi_job_id(href: str) -> str | None:
     return levels_jobs.job_id(href)
 
 
-async def _levelsfyi_extract_jobs_from_card(card, page, seen_ids: set, debug: bool = False):
+async def _levelsfyi_extract_jobs_from_card(
+    card, page, seen_ids: set, debug: bool = False
+):
     """Extract all job links from a single company card. Returns (jobs, rejected)."""
     jobs = []
     rejected_list = []
 
     company_name = ""
     try:
-        h2 = await card.query_selector('h2')
+        h2 = await card.query_selector("h2")
         if h2:
             company_name = (await h2.inner_text()).strip()
     except Exception:
@@ -119,7 +126,9 @@ async def _levelsfyi_extract_jobs_from_card(card, page, seen_ids: set, debug: bo
             loc_el = await link.query_selector('[class*="__companyJobLocation"]')
             if loc_el:
                 loc_text = (await loc_el.inner_text()).strip()
-                location, work_arrangement, salary_min, salary_max = _parse_levelsfyi_salary(loc_text)
+                location, work_arrangement, salary_min, salary_max = (
+                    _parse_levelsfyi_salary(loc_text)
+                )
         except Exception:
             pass
 
@@ -135,19 +144,28 @@ async def _levelsfyi_extract_jobs_from_card(card, page, seen_ids: set, debug: bo
 
         if not title:
             if debug:
-                rejected_list.append({"title": "(empty)", "url": job_url, "company": company_name, "reason": "No title"})
+                rejected_list.append(
+                    {
+                        "title": "(empty)",
+                        "url": job_url,
+                        "company": company_name,
+                        "reason": "No title",
+                    }
+                )
             continue
 
-        jobs.append({
-            "title": title,
-            "url": job_url,
-            "company": company_name,
-            "location": location,
-            "work_arrangement": work_arrangement,
-            "salary_min": salary_min,
-            "salary_max": salary_max,
-            "date_posted": date_posted,
-        })
+        jobs.append(
+            {
+                "title": title,
+                "url": job_url,
+                "company": company_name,
+                "location": location,
+                "work_arrangement": work_arrangement,
+                "salary_min": salary_min,
+                "salary_max": salary_max,
+                "date_posted": date_posted,
+            }
+        )
 
     return jobs, rejected_list
 
@@ -156,8 +174,13 @@ async def _levelsfyi_extract_detail(page, job_url: str) -> dict:
     """Visit a levels.fyi job detail page and extract application URL, salary and description from
     its __NEXT_DATA__ JSON (levels_jobs.job_fields). `found` is True when the page had the job's
     data, so a missing application URL means the job is applied to on levels.fyi itself."""
-    result = {"application_url": None, "salary_min": None, "salary_max": None, "description": None,
-              "found": False}
+    result = {
+        "application_url": None,
+        "salary_min": None,
+        "salary_max": None,
+        "description": None,
+        "found": False,
+    }
 
     try:
         await page.goto(job_url, wait_until="domcontentloaded", timeout=20000)
@@ -174,7 +197,9 @@ async def _levelsfyi_extract_detail(page, job_url: str) -> dict:
             if job_data:
                 result.update(levels_jobs.job_fields(job_data), found=True)
         except Exception as e:
-            logger.debug(f"levels.fyi detail __NEXT_DATA__ extraction failed for {job_url}: {e}")
+            logger.debug(
+                f"levels.fyi detail __NEXT_DATA__ extraction failed for {job_url}: {e}"
+            )
 
     except Exception as e:
         logger.debug(f"levels.fyi detail page failed for {job_url}: {e}")
@@ -182,7 +207,9 @@ async def _levelsfyi_extract_detail(page, job_url: str) -> dict:
     return result
 
 
-async def _scrape_levelsfyi(url: str, browser=None, debug: bool = False, max_pages: int = 50) -> list[dict] | tuple:
+async def _scrape_levelsfyi(
+    url: str, browser=None, debug: bool = False, max_pages: int = 50
+) -> list[dict] | tuple:
     """Scrape levels.fyi job listings via Playwright DOM extraction (paginate, then enrich detail pages); returns a list of job dicts, or (jobs, rejected) when debug=True."""
     own_browser = browser is None
     pw = None
@@ -201,7 +228,9 @@ async def _scrape_levelsfyi(url: str, browser=None, debug: bool = False, max_pag
         try:
             await page.wait_for_selector('a[href*="jobId="]', timeout=20000)
         except Exception:
-            logger.warning("levels.fyi: job card selector timed out, trying fallback wait")
+            logger.warning(
+                "levels.fyi: job card selector timed out, trying fallback wait"
+            )
             await asyncio.sleep(8)
         await asyncio.sleep(3)
 
@@ -226,7 +255,9 @@ async def _scrape_levelsfyi(url: str, browser=None, debug: bool = False, max_pag
             page_num += 1
 
             # Primary card selector, with fallback using :has() pseudo-class
-            cards = await page.query_selector_all('[class*="company-jobs-preview-card"][class*="__container"]')
+            cards = await page.query_selector_all(
+                '[class*="company-jobs-preview-card"][class*="__container"]'
+            )
             if not cards:
                 cards = await page.query_selector_all('div:has(> a[href*="jobId="])')
             if not cards:
@@ -234,17 +265,23 @@ async def _scrape_levelsfyi(url: str, browser=None, debug: bool = False, max_pag
 
             page_count = 0
             for card in cards:
-                card_jobs, card_rejected = await _levelsfyi_extract_jobs_from_card(card, page, seen_ids, debug)
+                card_jobs, card_rejected = await _levelsfyi_extract_jobs_from_card(
+                    card, page, seen_ids, debug
+                )
                 jobs.extend(card_jobs)
                 rejected.extend(card_rejected)
                 page_count += len(card_jobs)
 
-            logger.info(f"levels.fyi: page {page_num} — {page_count} new jobs ({len(jobs)} total)")
+            logger.info(
+                f"levels.fyi: page {page_num} — {page_count} new jobs ({len(jobs)} total)"
+            )
 
             # Click next pagination button
             has_next = False
             try:
-                pag_buttons = await page.query_selector_all('[class*="paginationButton"] button.MuiButton-root')
+                pag_buttons = await page.query_selector_all(
+                    '[class*="paginationButton"] button.MuiButton-root'
+                )
                 if not pag_buttons:
                     logger.info("levels.fyi: no pagination buttons, single page")
                     break
@@ -257,7 +294,9 @@ async def _scrape_levelsfyi(url: str, browser=None, debug: bool = False, max_pag
                         old_links = await page.query_selector_all('a[href*="jobId="]')
                         old_first_href = ""
                         if old_links:
-                            old_first_href = await old_links[0].get_attribute("href") or ""
+                            old_first_href = (
+                                await old_links[0].get_attribute("href") or ""
+                            )
 
                         # Use JS click to bypass any overlay interception
                         await btn.evaluate("el => el.click()")
@@ -269,18 +308,27 @@ async def _scrape_levelsfyi(url: str, browser=None, debug: bool = False, max_pag
                         for _wait in range(15):
                             await asyncio.sleep(1)
                             try:
-                                new_links = await page.query_selector_all('a[href*="jobId="]')
+                                new_links = await page.query_selector_all(
+                                    'a[href*="jobId="]'
+                                )
                                 new_first = ""
                                 if new_links:
-                                    new_first = await new_links[0].get_attribute("href") or ""
+                                    new_first = (
+                                        await new_links[0].get_attribute("href") or ""
+                                    )
                                 if new_first and new_first != old_first_href:
                                     break  # Content changed
                                 # Also check if MUI button got outlined class (current page)
-                                cur_btns = await page.query_selector_all('[class*="paginationButton"] button.MuiButton-root')
+                                cur_btns = await page.query_selector_all(
+                                    '[class*="paginationButton"] button.MuiButton-root'
+                                )
                                 for cb in cur_btns:
                                     cb_text = (await cb.inner_text()).strip()
                                     cb_class = await cb.get_attribute("class") or ""
-                                    if cb_text == str(next_page) and "outlined" in cb_class.lower():
+                                    if (
+                                        cb_text == str(next_page)
+                                        and "outlined" in cb_class.lower()
+                                    ):
                                         break
                                 else:
                                     continue
@@ -288,13 +336,17 @@ async def _scrape_levelsfyi(url: str, browser=None, debug: bool = False, max_pag
                             except Exception:
                                 continue
                         else:
-                            logger.warning(f"levels.fyi: page {next_page} content didn't change after 15s")
+                            logger.warning(
+                                f"levels.fyi: page {next_page} content didn't change after 15s"
+                            )
 
                         await asyncio.sleep(1)  # Extra settle time
                         break
 
                 if not has_next:
-                    logger.info(f"levels.fyi: no button for page {next_page}, done paginating")
+                    logger.info(
+                        f"levels.fyi: no button for page {next_page}, done paginating"
+                    )
                     break
 
             except Exception as e:
@@ -309,7 +361,9 @@ async def _scrape_levelsfyi(url: str, browser=None, debug: bool = False, max_pag
         if jobs:
             NUM_TABS = 5
             start_p3 = time.time()
-            logger.info(f"levels.fyi: Pass 3 — enriching {len(jobs)} jobs with {NUM_TABS} tabs")
+            logger.info(
+                f"levels.fyi: Pass 3 — enriching {len(jobs)} jobs with {NUM_TABS} tabs"
+            )
             enriched = 0
             detail_pages = []
 
@@ -330,26 +384,37 @@ async def _scrape_levelsfyi(url: str, browser=None, debug: bool = False, max_pag
                             if detail.get("application_url"):
                                 j["application_url"] = detail["application_url"]
                             elif detail.get("found"):
-                                j["levels_apply"] = True   # no employer link: applied to on levels.fyi
+                                j["levels_apply"] = (
+                                    True  # no employer link: applied to on levels.fyi
+                                )
                             if detail.get("description"):
                                 j["description"] = detail["description"]
-                            if detail.get("salary_min") and (not j.get("salary_min") or detail["salary_min"] != j["salary_min"]):
+                            if detail.get("salary_min") and (
+                                not j.get("salary_min")
+                                or detail["salary_min"] != j["salary_min"]
+                            ):
                                 j["salary_min"] = detail["salary_min"]
                                 j["salary_max"] = detail.get("salary_max")
                             enriched += 1
                         except Exception as e:
-                            logger.debug(f"levels.fyi: detail failed for {j.get('title', '?')}: {e}")
+                            logger.debug(
+                                f"levels.fyi: detail failed for {j.get('title', '?')}: {e}"
+                            )
 
                 slices = [[] for _ in range(NUM_TABS)]
                 for i, j in enumerate(jobs):
                     slices[i % NUM_TABS].append(j)
 
-                await asyncio.gather(*[
-                    _worker(idx, detail_pages[idx], slices[idx])
-                    for idx in range(NUM_TABS)
-                ])
+                await asyncio.gather(
+                    *[
+                        _worker(idx, detail_pages[idx], slices[idx])
+                        for idx in range(NUM_TABS)
+                    ]
+                )
 
-                logger.info(f"levels.fyi: Pass 3 done — enriched {enriched}/{len(jobs)} jobs in {time.time() - start_p3:.1f}s")
+                logger.info(
+                    f"levels.fyi: Pass 3 done — enriched {enriched}/{len(jobs)} jobs in {time.time() - start_p3:.1f}s"
+                )
             finally:
                 for dp in detail_pages:
                     await _close_page(dp)
@@ -357,7 +422,9 @@ async def _scrape_levelsfyi(url: str, browser=None, debug: bool = False, max_pag
     except Exception as e:
         logger.error(f"levels.fyi scraper error: {e}")
         if debug:
-            rejected.append({"title": "(error)", "url": url, "company": "", "reason": str(e)})
+            rejected.append(
+                {"title": "(error)", "url": url, "company": "", "reason": str(e)}
+            )
     finally:
         if page:
             await _close_page(page)
@@ -367,7 +434,9 @@ async def _scrape_levelsfyi(url: str, browser=None, debug: bool = False, max_pag
             if pw:
                 await pw.stop()
 
-    logger.info(f"levels.fyi: {len(jobs)} jobs extracted, {len(rejected)} rejected across {page_num} pages")
+    logger.info(
+        f"levels.fyi: {len(jobs)} jobs extracted, {len(rejected)} rejected across {page_num} pages"
+    )
     if debug:
         return jobs, rejected
     return jobs
@@ -388,7 +457,9 @@ async def run(search: Search, shared=None) -> dict:
         nonlocal pw, browser
         pw, browser = await _get_browser()
         search_max_pages = search.max_pages or 50
-        raw = await _scrape_levelsfyi(search.direct_url, browser=browser, max_pages=search_max_pages)
+        raw = await _scrape_levelsfyi(
+            search.direct_url, browser=browser, max_pages=search_max_pages
+        )
 
         # Retry up to 3 times if 0 results (levels.fyi rate-limiting / slow render)
         retry_delays = [10, 20, 30]
@@ -397,7 +468,9 @@ async def run(search: Search, shared=None) -> dict:
                 break
             logger.info(f"levels.fyi: 0 results, retry {attempt}/3 in {delay}s")
             await asyncio.sleep(delay)
-            raw = await _scrape_levelsfyi(search.direct_url, browser=browser, max_pages=search_max_pages)
+            raw = await _scrape_levelsfyi(
+                search.direct_url, browser=browser, max_pages=search_max_pages
+            )
         return raw
 
     try:
@@ -405,39 +478,54 @@ async def run(search: Search, shared=None) -> dict:
 
         # Apply search-level + global title filters
         from backend.scraper._shared.filters import search_title_filters, title_kept
+
         _gte_db2 = SessionLocal()
         try:
             include_kw, exclude_kw = search_title_filters(search, _gte_db2)
         finally:
             _gte_db2.close()
-        kept_jobs = [j for j in raw_jobs if title_kept(j["title"], include_kw, exclude_kw)[0]]
+        kept_jobs = [
+            j for j in raw_jobs if title_kept(j["title"], include_kw, exclude_kw)[0]
+        ]
 
         # Company exclude (global=full match, per-search=full match,
         # plus active companies when search.exclude_active_companies is on)
         db_excl = SessionLocal()
         try:
-            from backend.scraper.sources.jobspy import get_setting_value
             from backend.scraper._shared.filters import build_search_exclude_sets
-            global_exclude_set, search_exclude_set = build_search_exclude_sets(db_excl, search)
+            from backend.scraper.sources.jobspy import get_setting_value
+
+            global_exclude_set, search_exclude_set = build_search_exclude_sets(
+                db_excl, search
+            )
             if global_exclude_set or search_exclude_set:
                 before = len(kept_jobs)
+
                 def _company_excluded(company_name):
                     cl = (company_name or "").lower()
                     if cl in global_exclude_set:
                         return True
                     return cl in search_exclude_set
-                kept_jobs = [j for j in kept_jobs if not _company_excluded(j.get("company"))]
+
+                kept_jobs = [
+                    j for j in kept_jobs if not _company_excluded(j.get("company"))
+                ]
                 if len(kept_jobs) < before:
-                    logger.info(f"levels.fyi: company exclude removed {before - len(kept_jobs)} jobs")
+                    logger.info(
+                        f"levels.fyi: company exclude removed {before - len(kept_jobs)} jobs"
+                    )
 
             # Body exclusion description check — drop jobs with exclusion phrases (H-1B + language)
-            body_phrases_raw = get_setting_value(db_excl, "body_exclusion_phrases", "[]")
+            body_phrases_raw = get_setting_value(
+                db_excl, "body_exclusion_phrases", "[]"
+            )
             try:
                 body_phrases = json.loads(body_phrases_raw)
             except json.JSONDecodeError:
                 body_phrases = []
             if body_phrases:
                 from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+
                 before = len(kept_jobs)
                 filtered = []
                 for j in kept_jobs:
@@ -445,12 +533,16 @@ async def run(search: Search, shared=None) -> dict:
                     if desc:
                         result = scan_jd_for_h1b_flags(desc, body_phrases)
                         if result["jd_flag"]:
-                            logger.info(f"levels.fyi: body exclusion drop: {j['title']} @ {j.get('company', '?')} — matched phrase: {result.get('matched_phrase')!r}")
+                            logger.info(
+                                f"levels.fyi: body exclusion drop: {j['title']} @ {j.get('company', '?')} — matched phrase: {result.get('matched_phrase')!r}"
+                            )
                             continue
                     filtered.append(j)
                 kept_jobs = filtered
                 if len(kept_jobs) < before:
-                    logger.info(f"levels.fyi: body exclusion check removed {before - len(kept_jobs)} jobs")
+                    logger.info(
+                        f"levels.fyi: body exclusion check removed {before - len(kept_jobs)} jobs"
+                    )
         finally:
             db_excl.close()
 
@@ -458,28 +550,53 @@ async def run(search: Search, shared=None) -> dict:
         db_temp = SessionLocal()
         try:
             from collections import defaultdict
+
             by_company = defaultdict(list)
             for j in kept_jobs:
                 by_company[j.get("company", "")].append(j)
 
             from backend.models.db import get_global_title_exclude
+
             _gte_list = get_global_title_exclude(db_temp)
             filtered_jobs = []
             for company_name, company_jobs in by_company.items():
                 if not company_name:
                     # Still apply global title exclude even for unknown companies
                     if _gte_list:
-                        kept, _ = _apply_company_filters(company_jobs, type('', (), {'title_include_expr': None, 'title_exclude_keywords': []})(), _gte_list)
+                        kept, _ = _apply_company_filters(
+                            company_jobs,
+                            type(
+                                "",
+                                (),
+                                {
+                                    "title_include_expr": None,
+                                    "title_exclude_keywords": [],
+                                },
+                            )(),
+                            _gte_list,
+                        )
                         filtered_jobs.extend(kept)
                     else:
                         filtered_jobs.extend(company_jobs)
                     continue
                 from backend.models.db import find_company_by_name
+
                 company_obj = find_company_by_name(db_temp, company_name)
-                if company_obj and (company_obj.title_exclude_keywords or (company_obj.title_include_expr and company_obj.title_include_expr.strip()) or _gte_list):
-                    kept, rej = _apply_company_filters(company_jobs, company_obj, _gte_list)
+                if company_obj and (
+                    company_obj.title_exclude_keywords
+                    or (
+                        company_obj.title_include_expr
+                        and company_obj.title_include_expr.strip()
+                    )
+                    or _gte_list
+                ):
+                    kept, rej = _apply_company_filters(
+                        company_jobs, company_obj, _gte_list
+                    )
                     if rej:
-                        logger.info(f"levels.fyi: company filter '{company_name}' removed {len(rej)} jobs: {[r['title'] for r in rej[:5]]}")
+                        logger.info(
+                            f"levels.fyi: company filter '{company_name}' removed {len(rej)} jobs: {[r['title'] for r in rej[:5]]}"
+                        )
                     filtered_jobs.extend(kept)
                 else:
                     filtered_jobs.extend(company_jobs)
@@ -496,11 +613,20 @@ async def run(search: Search, shared=None) -> dict:
             existing_ids = get_existing_external_ids(db)
             # The loop below writes rows; H-1B lookups for the new jobs happen before it (S2-01).
             from backend.scraper._shared.analysis import prefetch_h1b
-            await prefetch_h1b([
-                j["company"] for j in kept_jobs
-                if make_external_id(j["company"], j["title"], j.get("application_url") or j["url"]) not in existing_ids
-            ])
-            landed = await resolve_short_links([j.get("application_url") or j["url"] for j in kept_jobs])
+
+            await prefetch_h1b(
+                [
+                    j["company"]
+                    for j in kept_jobs
+                    if make_external_id(
+                        j["company"], j["title"], j.get("application_url") or j["url"]
+                    )
+                    not in existing_ids
+                ]
+            )
+            landed = await resolve_short_links(
+                [j.get("application_url") or j["url"] for j in kept_jobs]
+            )
             for j in kept_jobs:
                 # Use application_url as primary URL if available, fallback to levels.fyi URL
                 apply_url = j.get("application_url") or ""
@@ -535,7 +661,7 @@ async def run(search: Search, shared=None) -> dict:
                     saved=False,
                 )
                 if j.get("levels_apply") and not apply_url:
-                    job.link_kind = EASY_APPLY   # kept on insert: link_kinds.classify
+                    job.link_kind = EASY_APPLY  # kept on insert: link_kinds.classify
 
                 if j.get("salary_min"):
                     job.salary_min = j["salary_min"]
@@ -547,11 +673,15 @@ async def run(search: Search, shared=None) -> dict:
                 # H-1B check + salary extraction
                 try:
                     from backend.analyzer.h1b_checker import check_job_h1b
-                    from backend.analyzer.salary_extractor import apply_salary_to_job
-                    from backend.analyzer.work_arrangement import apply_arrangement_to_job
                     from backend.analyzer.location import apply_location_to_job
+                    from backend.analyzer.salary_extractor import apply_salary_to_job
+                    from backend.analyzer.work_arrangement import (
+                        apply_arrangement_to_job,
+                    )
+
                     await check_job_h1b(job, db)
                     from backend.models.db import find_company_by_name
+
                     company_obj = find_company_by_name(db, j["company"])
                     apply_salary_to_job(job, getattr(job, "_h1b_median", None))
                     # The card carries "· Remote" / "· Hybrid" next to the salary.
@@ -562,7 +692,9 @@ async def run(search: Search, shared=None) -> dict:
 
                 if job.h1b_jd_flag:
                     _phrase = getattr(job, "_h1b_matched_phrase", None) or "?"
-                    logger.info(f"Skipping job (body exclusion): {j['title']} @ {job.company or j.get('company') or '?'} — matched phrase: {_phrase!r}")
+                    logger.info(
+                        f"Skipping job (body exclusion): {j['title']} @ {job.company or j.get('company') or '?'} — matched phrase: {_phrase!r}"
+                    )
                     continue
 
                 try:
@@ -572,10 +704,14 @@ async def run(search: Search, shared=None) -> dict:
                     new_jobs += counts_as_new(job)
                     existing_ids.add(ext_id)
                 except IntegrityError:
-                    logger.debug(f"Duplicate external_id for '{j['title']}' at {j.get('company')}, skipping")
+                    logger.debug(
+                        f"Duplicate external_id for '{j['title']}' at {j.get('company')}, skipping"
+                    )
                     continue
                 except Exception as e:
-                    logger.warning(f"Insert failed for '{j['title']}' at {j.get('company')} ({job_url}): {e}")
+                    logger.warning(
+                        f"Insert failed for '{j['title']}' at {j.get('company')} ({job_url}): {e}"
+                    )
                     continue
 
             # Update last_run_at
@@ -590,15 +726,25 @@ async def run(search: Search, shared=None) -> dict:
         duration = time.time() - start_time
 
         from backend.activity import log_activity
-        log_activity("scrape", f"levels.fyi '{search.name}': {new_jobs} new / {jobs_found} found in {duration:.1f}s")
 
-        return {"jobs_found": jobs_found, "new_jobs": new_jobs, "error": None, "duration": duration}
+        log_activity(
+            "scrape",
+            f"levels.fyi '{search.name}': {new_jobs} new / {jobs_found} found in {duration:.1f}s",
+        )
+
+        return {
+            "jobs_found": jobs_found,
+            "new_jobs": new_jobs,
+            "error": None,
+            "duration": duration,
+        }
 
     except Exception as e:
         duration = time.time() - start_time
         logger.error(f"levels.fyi scrape failed for '{search.name}': {e}")
 
         from backend.activity import log_activity
+
         log_activity("scrape", f"levels.fyi '{search.name}' failed: {e}")
 
         return {"jobs_found": 0, "new_jobs": 0, "error": str(e), "duration": duration}
@@ -621,7 +767,9 @@ async def preview(search: Search, db) -> dict:
     try:
         pw, browser = await _get_browser()
         search_max_pages = search.max_pages or 50
-        raw_jobs = await _scrape_levelsfyi(search.direct_url, browser=browser, max_pages=search_max_pages)
+        raw_jobs = await _scrape_levelsfyi(
+            search.direct_url, browser=browser, max_pages=search_max_pages
+        )
 
         # Retry up to 3 times if 0 results (levels.fyi rate-limiting / slow render)
         retry_delays = [10, 20, 30]
@@ -630,7 +778,9 @@ async def preview(search: Search, db) -> dict:
                 break
             logger.info(f"levels.fyi test: 0 results, retry {attempt}/3 in {delay}s")
             await asyncio.sleep(delay)
-            raw_jobs = await _scrape_levelsfyi(search.direct_url, browser=browser, max_pages=search_max_pages)
+            raw_jobs = await _scrape_levelsfyi(
+                search.direct_url, browser=browser, max_pages=search_max_pages
+            )
     except Exception as e:
         return {
             "search_name": search.name,
@@ -665,11 +815,17 @@ async def preview(search: Search, db) -> dict:
         }
 
     raw_count = len(raw_jobs)
-    from backend.scraper._shared.filters import build_search_exclude_sets, search_title_filters, title_kept
+    from backend.scraper._shared.filters import (
+        build_search_exclude_sets,
+        search_title_filters,
+        title_kept,
+    )
+
     include_kw, exclude_kw = search_title_filters(search, db)
     company_filter = search.company_filter or []
 
     import json
+
     global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
     search_exclude = list(search_exclude_set)
     all_exclude = list(global_exclude_set | search_exclude_set)
@@ -686,11 +842,16 @@ async def preview(search: Search, db) -> dict:
     company_names = {j.get("company", "") for j in raw_jobs if j.get("company")}
     for cn in company_names:
         from backend.models.db import find_company_by_name
+
         co = find_company_by_name(db, cn)
-        if co and (co.title_exclude_keywords or (co.title_include_expr and co.title_include_expr.strip())):
+        if co and (
+            co.title_exclude_keywords
+            or (co.title_include_expr and co.title_include_expr.strip())
+        ):
             company_filters[cn.lower()] = co
 
     from collections import Counter
+
     company_counts = Counter(j["company"] for j in raw_jobs if j.get("company"))
     company_breakdown = dict(company_counts.most_common(20))
 
@@ -718,6 +879,7 @@ async def preview(search: Search, db) -> dict:
             desc = j.get("description") or ""
             if desc:
                 from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+
                 body_result = scan_jd_for_h1b_flags(desc, body_phrases)
                 if body_result["jd_flag"]:
                     kept = False
@@ -731,7 +893,13 @@ async def preview(search: Search, db) -> dict:
                 if not co_kept:
                     kept = False
                     if co_obj.title_exclude_keywords:
-                        matched_kw = [kw for kw in co_obj.title_exclude_keywords if re.search(r'\b' + re.escape(kw.lower()) + r'\b', title_lower)]
+                        matched_kw = [
+                            kw
+                            for kw in co_obj.title_exclude_keywords
+                            if re.search(
+                                r"\b" + re.escape(kw.lower()) + r"\b", title_lower
+                            )
+                        ]
                         if matched_kw:
                             reason = f"Company '{co_obj.name}' excludes: {', '.join(matched_kw)}"
                     if not reason and co_obj.title_include_expr:
@@ -749,25 +917,29 @@ async def preview(search: Search, db) -> dict:
         desc = j.get("description") or ""
         has_desc = bool(desc and len(desc) > 50)
 
-        results.append({
-            "title": title,
-            "company": j.get("company", ""),
-            "url": display_url,
-            "levelsfyi_url": j.get("url", ""),
-            "source": "levels_fyi",
-            "location": j.get("location", ""),
-            "salary": salary,
-            "has_description": has_desc,
-            "desc_length": len(desc) if has_desc else 0,
-            "kept": kept,
-            "reason": reason,
-            "date_posted": j.get("date_posted", ""),
-        })
+        results.append(
+            {
+                "title": title,
+                "company": j.get("company", ""),
+                "url": display_url,
+                "levelsfyi_url": j.get("url", ""),
+                "source": "levels_fyi",
+                "location": j.get("location", ""),
+                "salary": salary,
+                "has_description": has_desc,
+                "desc_length": len(desc) if has_desc else 0,
+                "kept": kept,
+                "reason": reason,
+                "date_posted": j.get("date_posted", ""),
+            }
+        )
 
     after_filter = sum(1 for r in results if r["kept"])
 
     with_apply_url = sum(1 for j in raw_jobs if j.get("application_url"))
-    with_desc = sum(1 for j in raw_jobs if j.get("description") and len(j["description"]) > 50)
+    with_desc = sum(
+        1 for j in raw_jobs if j.get("description") and len(j["description"]) > 50
+    )
     with_salary = sum(1 for j in raw_jobs if j.get("salary_min"))
 
     return {

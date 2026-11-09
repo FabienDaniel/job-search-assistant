@@ -1,11 +1,13 @@
 """Tests for migrate_llm_settings — model-list refresh + openai_compat removal."""
+
 import json
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.models.db import Setting
-from backend.seed import migrate_llm_settings, DEFAULT_SETTINGS
+from backend.seed import DEFAULT_SETTINGS, migrate_llm_settings
 
 
 @pytest.fixture
@@ -34,14 +36,21 @@ def test_stale_list_gains_defaults_and_drops_dead_provider(db):
 
     migrate_llm_settings(db)
 
-    result = json.loads(db.query(Setting).filter(Setting.key == "llm_models_list").first().value)
+    result = json.loads(
+        db.query(Setting).filter(Setting.key == "llm_models_list").first().value
+    )
     # dead provider dropped
     assert not any(m["provider"] == "openai_compat" for m in result)
     # every default present (superset)
     for d in _default_list():
-        assert any(m["provider"] == d["provider"] and m["model"] == d["model"] for m in result)
+        assert any(
+            m["provider"] == d["provider"] and m["model"] == d["model"] for m in result
+        )
     # pre-existing valid entry kept
-    assert any(m["provider"] == "claude_api" and m["model"] == "claude-sonnet-4-6" for m in result)
+    assert any(
+        m["provider"] == "claude_api" and m["model"] == "claude-sonnet-4-6"
+        for m in result
+    )
     # new defaults added
     assert any(m["model"] == "claude-sonnet-5" for m in result)
     assert any(m["model"] == "claude-opus-4-8" for m in result)
@@ -54,31 +63,51 @@ def test_deleted_default_not_readded_after_seeding(db):
     db.commit()
     migrate_llm_settings(db)  # first run records the seen-set
 
-    lst = json.loads(db.query(Setting).filter(Setting.key == "llm_models_list").first().value)
+    lst = json.loads(
+        db.query(Setting).filter(Setting.key == "llm_models_list").first().value
+    )
     victim = lst[0]
     row = db.query(Setting).filter(Setting.key == "llm_models_list").first()
     row.value = json.dumps([m for m in lst if m != victim])
     db.commit()
 
     migrate_llm_settings(db)  # second run must not resurrect the deleted default
-    result = json.loads(db.query(Setting).filter(Setting.key == "llm_models_list").first().value)
+    result = json.loads(
+        db.query(Setting).filter(Setting.key == "llm_models_list").first().value
+    )
     assert victim not in result
 
 
 def test_custom_entries_preserved(db):
     """User-added custom models survive the refresh; custom openai_compat entries don't."""
     stale = _default_list() + [
-        {"provider": "ollama", "model": "my-local:13b", "label": "my-local:13b (custom)", "custom": True},
-        {"provider": "openai_compat", "model": "x/y", "label": "x/y (custom)", "custom": True},
+        {
+            "provider": "ollama",
+            "model": "my-local:13b",
+            "label": "my-local:13b (custom)",
+            "custom": True,
+        },
+        {
+            "provider": "openai_compat",
+            "model": "x/y",
+            "label": "x/y (custom)",
+            "custom": True,
+        },
     ]
     db.add(Setting(key="llm_models_list", value=json.dumps(stale)))
     db.commit()
 
     migrate_llm_settings(db)
 
-    result = json.loads(db.query(Setting).filter(Setting.key == "llm_models_list").first().value)
-    assert {"provider": "ollama", "model": "my-local:13b", "label": "my-local:13b (custom)",
-            "custom": True} in result
+    result = json.loads(
+        db.query(Setting).filter(Setting.key == "llm_models_list").first().value
+    )
+    assert {
+        "provider": "ollama",
+        "model": "my-local:13b",
+        "label": "my-local:13b (custom)",
+        "custom": True,
+    } in result
     assert not any(m["provider"] == "openai_compat" for m in result)
 
 
@@ -89,8 +118,14 @@ def test_openai_compat_provider_repointed(db):
 
     migrate_llm_settings(db)
 
-    assert db.query(Setting).filter(Setting.key == "llm_provider").first().value == "openai"
-    assert db.query(Setting).filter(Setting.key == "email_llm_provider").first().value == "claude_code"
+    assert (
+        db.query(Setting).filter(Setting.key == "llm_provider").first().value
+        == "openai"
+    )
+    assert (
+        db.query(Setting).filter(Setting.key == "email_llm_provider").first().value
+        == "claude_code"
+    )
 
 
 def test_dated_haiku_model_renamed_to_alias(db):
@@ -101,10 +136,19 @@ def test_dated_haiku_model_renamed_to_alias(db):
 
     migrate_llm_settings(db)
 
-    assert db.query(Setting).filter(Setting.key == "llm_fallback_model").first().value == "claude-haiku-4-5"
-    assert db.query(Setting).filter(Setting.key == "email_llm_model").first().value == "claude-haiku-4-5"
+    assert (
+        db.query(Setting).filter(Setting.key == "llm_fallback_model").first().value
+        == "claude-haiku-4-5"
+    )
+    assert (
+        db.query(Setting).filter(Setting.key == "email_llm_model").first().value
+        == "claude-haiku-4-5"
+    )
     # Non-haiku models untouched
-    assert db.query(Setting).filter(Setting.key == "llm_model").first().value == "claude-sonnet-4-6"
+    assert (
+        db.query(Setting).filter(Setting.key == "llm_model").first().value
+        == "claude-sonnet-4-6"
+    )
 
 
 def test_idempotent(db):
@@ -121,20 +165,30 @@ def test_go_minimax_and_qwen_reach_an_existing_list_without_overwriting_it(db):
     """#25 follow-up: MiniMax and Qwen answer on Go's chat/completions, so they join the starter
     list. An install that already saw the earlier defaults gains them, and keeps its own
     removals and custom entries."""
-    new = {"opencode_go|minimax-m3", "opencode_go|qwen3.8-max", "opencode_go|qwen3.8-flash"}
-    key = lambda m: f'{m["provider"]}|{m["model"]}'
+    new = {
+        "opencode_go|minimax-m3",
+        "opencode_go|qwen3.8-max",
+        "opencode_go|qwen3.8-flash",
+    }
+    key = lambda m: f"{m['provider']}|{m['model']}"
     assert new <= {key(m) for m in _default_list()}
     earlier = [m for m in _default_list() if key(m) not in new]
     removed = {"provider": "opencode_go", "model": "hy3"}
     custom = {"provider": "opencode_go", "model": "my-own-go-model"}
     saved = [m for m in earlier if m != removed] + [custom]
     db.add(Setting(key="llm_models_list", value=json.dumps(saved)))
-    db.add(Setting(key="llm_seeded_models", value=json.dumps(sorted(key(m) for m in earlier))))
+    db.add(
+        Setting(
+            key="llm_seeded_models", value=json.dumps(sorted(key(m) for m in earlier))
+        )
+    )
     db.commit()
 
     migrate_llm_settings(db)
 
-    result = json.loads(db.query(Setting).filter(Setting.key == "llm_models_list").first().value)
-    assert result[:len(saved)] == saved                       # the saved list is kept as it was
-    assert {key(m) for m in result[len(saved):]} == new       # only the three are appended
-    assert removed not in result                              # a removed default stays removed
+    result = json.loads(
+        db.query(Setting).filter(Setting.key == "llm_models_list").first().value
+    )
+    assert result[: len(saved)] == saved  # the saved list is kept as it was
+    assert {key(m) for m in result[len(saved) :]} == new  # only the three are appended
+    assert removed not in result  # a removed default stays removed

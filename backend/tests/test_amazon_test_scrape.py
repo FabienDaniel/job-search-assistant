@@ -1,5 +1,6 @@
 """The company "Test scrape" must route an amazon.jobs URL to the Amazon handler,
 the same one the real scrape uses, not fall through to the generic reader."""
+
 import pytest
 
 from backend.models.db import Company
@@ -30,8 +31,12 @@ def _fake_amazon(monkeypatch):
 
     async def fake_scrape(url, debug=False, **kw):
         calls.append((url, debug))
-        return [{"title": "Senior Program Manager",
-                 "url": "https://www.amazon.jobs/en/jobs/1234567/senior-program-manager"}], []
+        return [
+            {
+                "title": "Senior Program Manager",
+                "url": "https://www.amazon.jobs/en/jobs/1234567/senior-program-manager",
+            }
+        ], []
 
     monkeypatch.setattr(browser_mod, "_get_browser", fake_get_browser)
     monkeypatch.setattr(browser_mod, "_new_page", no_page)
@@ -43,8 +48,13 @@ def _fake_amazon(monkeypatch):
 async def test_amazon_url_is_read_by_the_amazon_handler(test_db, _fake_amazon):
     from backend.api.routes_companies import test_scrape_company
 
-    c = Company(name="ZZ Amazon", active=True, scrape_urls=[URL],
-                title_include_expr="manager", title_exclude_keywords=[])
+    c = Company(
+        name="ZZ Amazon",
+        active=True,
+        scrape_urls=[URL],
+        title_include_expr="manager",
+        title_exclude_keywords=[],
+    )
     test_db.add(c)
     test_db.commit()
 
@@ -58,4 +68,5 @@ async def test_amazon_url_is_read_by_the_amazon_handler(test_db, _fake_amazon):
 
 def test_amazon_chip_label_matches_the_row_chip():
     from backend.scraper.ats.registry import scrape_type
+
     assert scrape_type(URL) == "Amazon API"

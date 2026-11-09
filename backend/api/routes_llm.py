@@ -1,18 +1,22 @@
 """LLM helper endpoints — live model catalogs for the Settings model picker; OpenRouter's is public, OpenAI/Anthropic require a resolved API key, and results are cached ~1h per provider."""
+
+import logging
 import os
 import re
 import time
-import logging
+
 import httpx
 from fastapi import APIRouter, HTTPException
-from backend.models.db import SessionLocal
+
 from backend.accounts.settings import get_setting
+from backend.models.db import SessionLocal
 
 logger = logging.getLogger("jobnavigator.llm")
 router = APIRouter(prefix="/llm", tags=["settings"])
 
 _CACHE_TTL = 3600  # 1 hour
 _cache = {}  # provider, or (provider, key) for a keyed catalog -> {"at": float, "models": list}
+
 
 def _resolve_key(db, provider: str) -> str:
     """The provider's API key (one per provider, so a key set while only Scoring used that
@@ -21,10 +25,12 @@ def _resolve_key(db, provider: str) -> str:
     key, which is the owner's (R3-02)."""
     from backend.accounts.settings import PROVIDER_KEY_SETTINGS
     from backend.analyzer.llm_client import provider_api_key
+
     key = provider_api_key(db, provider)
     if key or provider not in PROVIDER_KEY_SETTINGS:
         return key
     from backend.accounts.credentials import own_login_account
+
     if own_login_account(db) is not None:
         return ""
     return os.getenv(PROVIDER_KEY_SETTINGS[provider].upper(), "")
@@ -33,7 +39,9 @@ def _resolve_key(db, provider: str) -> str:
 def _builtin_models(provider: str) -> list:
     """The seeded default catalog entries for `provider`, shaped like a live catalog."""
     import json
+
     from backend.seed import DEFAULT_SETTINGS
+
     entries = json.loads(DEFAULT_SETTINGS["llm_models_list"][0])
     ids = sorted({e["model"] for e in entries if e.get("provider") == provider})
     return [{"id": m, "name": m} for m in ids]
@@ -47,20 +55,24 @@ async def _fetch_openrouter() -> list:
     out = []
     for m in data:
         pricing = m.get("pricing") or {}
-        out.append({
-            "id": m.get("id"),
-            "name": m.get("name") or m.get("id"),
-            "context_length": m.get("context_length"),
-            "prompt_price": pricing.get("prompt"),
-            "completion_price": pricing.get("completion"),
-        })
+        out.append(
+            {
+                "id": m.get("id"),
+                "name": m.get("name") or m.get("id"),
+                "context_length": m.get("context_length"),
+                "prompt_price": pricing.get("prompt"),
+                "completion_price": pricing.get("completion"),
+            }
+        )
     return out
 
 
 async def _fetch_openai(key: str) -> list:
     async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.get("https://api.openai.com/v1/models",
-                                headers={"Authorization": f"Bearer {key}"})
+        resp = await client.get(
+            "https://api.openai.com/v1/models",
+            headers={"Authorization": f"Bearer {key}"},
+        )
         resp.raise_for_status()
         data = resp.json().get("data", [])
     out = []
@@ -74,18 +86,22 @@ async def _fetch_openai(key: str) -> list:
 
 async def _fetch_anthropic(key: str) -> list:
     async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.get("https://api.anthropic.com/v1/models?limit=1000",
-                                headers={"x-api-key": key,
-                                         "anthropic-version": "2023-06-01"})
+        resp = await client.get(
+            "https://api.anthropic.com/v1/models?limit=1000",
+            headers={"x-api-key": key, "anthropic-version": "2023-06-01"},
+        )
         resp.raise_for_status()
         data = resp.json().get("data", [])
-    return [{"id": m.get("id"), "name": m.get("display_name") or m.get("id")} for m in data]
+    return [
+        {"id": m.get("id"), "name": m.get("display_name") or m.get("id")} for m in data
+    ]
 
 
 async def _fetch_opencode_go(key: str) -> list:
     """OpenCode Go models from its OpenAI-compatible endpoint; the catalog is public, so a
     missing key still lists what exists."""
     from backend.analyzer.llm_client import OPENCODE_GO_BASE_URL
+
     headers = {"Authorization": f"Bearer {key}"} if key else {}
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.get(f"{OPENCODE_GO_BASE_URL}/models", headers=headers)
@@ -98,6 +114,7 @@ async def _fetch_opencode_go(key: str) -> list:
 async def list_efforts():
     """Reasoning-effort values per provider for the Settings pickers; a provider not listed takes none."""
     from backend.analyzer.llm_client import REASONING_EFFORTS
+
     return {"efforts": {p: list(v) for p, v in REASONING_EFFORTS.items()}}
 
 
@@ -121,12 +138,20 @@ async def list_models(provider: str = "openrouter"):
             key = _resolve_key(db, key_provider)
             if not key and provider == "claude_code":
                 # Subscription users usually have no API key: serve the built-in Claude list rather than a 400.
-                return {"models": _builtin_models("claude_code"), "cached": False, "builtin": True}
+                return {
+                    "models": _builtin_models("claude_code"),
+                    "cached": False,
+                    "builtin": True,
+                }
             if not key:
                 label = "OpenAI" if provider == "openai" else "Anthropic"
-                raise HTTPException(400, f"No {label} API key configured — set one in Settings first.")
+                raise HTTPException(
+                    400, f"No {label} API key configured — set one in Settings first."
+                )
         else:
-            raise HTTPException(400, f"Live model search is not supported for provider '{provider}'.")
+            raise HTTPException(
+                400, f"Live model search is not supported for provider '{provider}'."
+            )
     finally:
         db.close()
 

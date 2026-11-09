@@ -1,4 +1,5 @@
 """Tests for llm_logger.log_llm_call."""
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -8,11 +9,13 @@ from sqlalchemy.orm import sessionmaker
 def test_db(monkeypatch):
     """In-memory SQLite, patched into llm_logger.SessionLocal."""
     from backend.models.db import Base, LlmCallLog
+
     engine = create_engine("sqlite:///:memory:")
     LlmCallLog.__table__.create(engine)
     Session = sessionmaker(bind=engine)
 
     import backend.analyzer.llm_logger as llm_logger
+
     monkeypatch.setattr(llm_logger, "SessionLocal", Session)
 
     session = Session()
@@ -83,14 +86,19 @@ def test_log_llm_call_failure_never_raises(test_db, monkeypatch):
         purpose="email",
         provider="claude_api",
         model="claude-haiku-4-5-20251001",
-        usage={"input_tokens": 100, "output_tokens": 20,
-               "cache_read_tokens": 0, "cache_write_tokens": 0},
+        usage={
+            "input_tokens": 100,
+            "output_tokens": 20,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+        },
     )
 
 
 def test_log_llm_call_with_job_id(test_db):
     """job_id is stored when provided."""
     import uuid
+
     from backend.analyzer.llm_logger import log_llm_call
     from backend.models.db import LlmCallLog
 
@@ -99,8 +107,12 @@ def test_log_llm_call_with_job_id(test_db):
         purpose="score_full",
         provider="claude_api",
         model="claude-sonnet-4-6",
-        usage={"input_tokens": 1000, "output_tokens": 100,
-               "cache_read_tokens": 0, "cache_write_tokens": 0},
+        usage={
+            "input_tokens": 1000,
+            "output_tokens": 100,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+        },
         job_id=job_id,
     )
     row = test_db.query(LlmCallLog).first()
@@ -116,8 +128,12 @@ def test_log_llm_call_failure_records_error(test_db):
         purpose="score_light",
         provider="claude_api",
         model="claude-sonnet-4-6",
-        usage={"input_tokens": 0, "output_tokens": 0,
-               "cache_read_tokens": 0, "cache_write_tokens": 0},
+        usage={
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+        },
         success=False,
         error="529 overloaded",
     )
@@ -135,8 +151,12 @@ def test_log_llm_call_claude_code_cost_is_zero(test_db):
         purpose="score_light",
         provider="claude_code",
         model="claude-sonnet-4-6",
-        usage={"input_tokens": 10000, "output_tokens": 5000,
-               "cache_read_tokens": 0, "cache_write_tokens": 0},
+        usage={
+            "input_tokens": 10000,
+            "output_tokens": 5000,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+        },
         duration_ms=500,
     )
     row = test_db.query(LlmCallLog).first()

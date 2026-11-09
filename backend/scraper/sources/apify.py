@@ -27,10 +27,11 @@ clamped to MAX_RESULTS; a preview, the Test button, uses PREVIEW_LIMIT), a spend
 `maxTotalChargeUsd` (charge_cap_usd) and a platform-side `timeout` equal to our own
 _MAX_WAIT, so the platform stops the run even when this process dies mid-poll.
 """
-import math
+
 import asyncio
 import json
 import logging
+import math
 import re
 import time
 from dataclasses import dataclass
@@ -41,20 +42,33 @@ from urllib.parse import urlencode
 import httpx
 from sqlalchemy.exc import IntegrityError
 
+from backend.accounts.settings import get_setting
+from backend.analyzer.salary_extractor import extract_salary
+from backend.analyzer.work_arrangement import (
+    HYBRID,
+    ONSITE,
+    REMOTE,
+    extract_arrangement,
+)
 from backend.countries import (
-    DEFAULT_COUNTRY, compose_location, indeed_host, normalize_country, split_country_suffix,
+    DEFAULT_COUNTRY,
+    compose_location,
+    indeed_host,
+    normalize_country,
+    split_country_suffix,
     supported_countries,
 )
-from backend.accounts.settings import get_setting
-from backend.models.db import SessionLocal, Job, Search, get_existing_external_ids
-from backend.analyzer.salary_extractor import extract_salary
-from backend.analyzer.work_arrangement import HYBRID, ONSITE, REMOTE, extract_arrangement
+from backend.models.db import Job, Search, SessionLocal, get_existing_external_ids
 from backend.scraper._shared.analysis import analyze_inline, prefetch_h1b
-from backend.scraper._shared.dedup import make_external_id, make_content_hash
-from backend.scraper._shared.posting_links import counts_as_new
-from backend.scraper._shared.filters import (build_search_exclude_sets, company_included,
-                                             search_title_filters, title_kept)
+from backend.scraper._shared.dedup import make_content_hash, make_external_id
+from backend.scraper._shared.filters import (
+    build_search_exclude_sets,
+    company_included,
+    search_title_filters,
+    title_kept,
+)
 from backend.scraper._shared.html_text import html_to_text
+from backend.scraper._shared.posting_links import counts_as_new
 
 logger = logging.getLogger("jobnavigator.apify")
 
@@ -64,8 +78,8 @@ PREVIEW_LIMIT = 20
 # results_wanted is clamped to this per board for every Apify search: on create, on
 # PATCH and at run time (the API accepts any integer; the UI's field stops here too).
 MAX_RESULTS = 200
-_WAIT_STEP = 60          # the API holds one status request open for 60 s at most
-_MAX_WAIT = 15 * 60      # a run still going after this is aborted, so it stops billing
+_WAIT_STEP = 60  # the API holds one status request open for 60 s at most
+_MAX_WAIT = 15 * 60  # a run still going after this is aborted, so it stops billing
 _TERMINAL = {"SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"}
 # Spend cap per run (maxTotalChargeUsd): results × the board's price × a margin for
 # start and compute charges, never below a few cents, never above the ceiling.
@@ -89,15 +103,18 @@ class ApifyError(Exception):
 
 # ── Search → actor input ────────────────────────────────────────────────────
 
+
 def _place(search: Search) -> str:
     """The city or region of a search, without a country segment."""
     return split_country_suffix(search.location or "")[0]
 
 
 def _country_label(search: Search) -> str:
-    """"usa" -> "United States", the full English name the career-site actor expects."""
+    """ "usa" -> "United States", the full English name the career-site actor expects."""
     labels = dict(supported_countries())
-    return labels.get(normalize_country(search.country) or "") or labels.get(DEFAULT_COUNTRY, "")
+    return labels.get(normalize_country(search.country) or "") or labels.get(
+        DEFAULT_COUNTRY, ""
+    )
 
 
 def _time_range(hours_old) -> str:
@@ -183,14 +200,14 @@ def _glassdoor_input(search: Search, limit: int) -> dict:
         "sortBy": "date_desc",
     }
     if search.hours_old:
-        body["daysOld"] = -(-int(search.hours_old) // 24)    # whole days, rounded up
+        body["daysOld"] = -(-int(search.hours_old) // 24)  # whole days, rounded up
     if search.is_remote:
         body["remoteWorkType"] = True
     return body
 
 
 def _first_place(search: Search) -> str:
-    """"Los Angeles, CA" -> "Los Angeles": the creative-board actors match a bare city name."""
+    """ "Los Angeles, CA" -> "Los Angeles": the creative-board actors match a bare city name."""
     return _place(search).split(",")[0].strip()
 
 
@@ -198,8 +215,11 @@ def _behance_input(search: Search, limit: int) -> dict:
     """The actor takes no posting age and no remote filter: its `isWorldwide` switch is not
     one (on 2026-10-24 a Remote run with it returned 15 on-site rows in Asia and Africa, and
     0 remote ones). `_not_remote` drops the on-site rows instead."""
-    body = {"search": (search.search_term or "").strip(), "maxItems": limit,
-            "jobTypes": ["CONTRACT", "FULLTIME"]}
+    body = {
+        "search": (search.search_term or "").strip(),
+        "maxItems": limit,
+        "jobTypes": ["CONTRACT", "FULLTIME"],
+    }
     city = _first_place(search)
     if city:
         body["city"] = city
@@ -208,8 +228,12 @@ def _behance_input(search: Search, limit: int) -> dict:
 
 def _hollylist_input(search: Search, limit: int) -> dict:
     """Members-only offers carry no company and no text, so the actor skips them."""
-    body = {"searchQueries": [(search.search_term or "").strip()], "maxResults": limit,
-            "extractFullDetails": True, "includePremiumOffers": False}
+    body = {
+        "searchQueries": [(search.search_term or "").strip()],
+        "maxResults": limit,
+        "extractFullDetails": True,
+        "includePremiumOffers": False,
+    }
     city = _first_place(search)
     if city:
         body["locations"] = [city]
@@ -228,7 +252,9 @@ def _career_site_body(search: Search, limit: int, ats: str) -> dict:
         "ats": [ats],
         "titleSearch": [(search.search_term or "").strip()],
         "timeRange": _time_range(search.hours_old),
-        "limit": min(max(limit, 10), 5000),   # the actor refuses a limit outside 10..5000
+        "limit": min(
+            max(limit, 10), 5000
+        ),  # the actor refuses a limit outside 10..5000
         "descriptionType": "text",
     }
     # The actor matches its own derived "City, Region, Country" strings, so a
@@ -278,7 +304,9 @@ def _parse_linkedin(raw: dict) -> dict:
         "title": raw.get("title") or "",
         "company": raw.get("companyName") or "",
         # The form every other LinkedIn source stores, so the same posting dedups across them.
-        "url": f"https://www.linkedin.com/jobs/view/{job_id}" if job_id.isdigit() else (raw.get("url") or ""),
+        "url": f"https://www.linkedin.com/jobs/view/{job_id}"
+        if job_id.isdigit()
+        else (raw.get("url") or ""),
         "location": raw.get("location") or "",
         "description": raw.get("description") or "",
         "salary_min": sal_min,
@@ -303,8 +331,13 @@ def _parse_glassdoor(raw: dict) -> dict:
         "salary_max": int(sal_max) if sal_max else None,
         "arrangement": None,
         # Glassdoor gives an age, not a date.
-        "posted": ((datetime.now(timezone.utc) - timedelta(days=raw["ageInDays"])).date().isoformat()
-                   if isinstance(raw.get("ageInDays"), int) else None),
+        "posted": (
+            (datetime.now(timezone.utc) - timedelta(days=raw["ageInDays"]))
+            .date()
+            .isoformat()
+            if isinstance(raw.get("ageInDays"), int)
+            else None
+        ),
     }
 
 
@@ -374,8 +407,12 @@ def _hollylist_salary(raw: dict) -> tuple:
     """(min, max) of the first salary row that the posting gives per year in USD, else (None, None).
     Another currency stays in the description text, as on caribbeanjobs."""
     for s in raw.get("salaries") or []:
-        if (isinstance(s, dict) and s.get("isOriginal") and str(s.get("period") or "").lower() == "year"
-                and str(s.get("currency") or "").upper() == "USD"):
+        if (
+            isinstance(s, dict)
+            and s.get("isOriginal")
+            and str(s.get("period") or "").lower() == "year"
+            and str(s.get("currency") or "").upper() == "USD"
+        ):
             lo, hi = s.get("min"), s.get("max")
             return (int(lo) if lo else None), (int(hi or lo) if (hi or lo) else None)
     return None, None
@@ -384,12 +421,16 @@ def _hollylist_salary(raw: dict) -> tuple:
 def _parse_hollylist(raw: dict) -> dict:
     loc = next((l for l in raw.get("locations") or [] if isinstance(l, dict)), {})
     sal_min, sal_max = _hollylist_salary(raw)
-    work = next((w.get("type") for w in raw.get("workType") or [] if isinstance(w, dict)), None)
+    work = next(
+        (w.get("type") for w in raw.get("workType") or [] if isinstance(w, dict)), None
+    )
     return {
         "title": (raw.get("title") or "").strip(),
         "company": (raw.get("company") or {}).get("name") or "",
         "url": raw.get("url") or "",
-        "location": ", ".join(p for p in (loc.get("city"), loc.get("region"), loc.get("countryCode")) if p),
+        "location": ", ".join(
+            p for p in (loc.get("city"), loc.get("region"), loc.get("countryCode")) if p
+        ),
         "description": (raw.get("description") or {}).get("text") or "",
         "salary_min": sal_min,
         "salary_max": sal_max,
@@ -400,9 +441,9 @@ def _parse_hollylist(raw: dict) -> dict:
 
 @dataclass(frozen=True)
 class Preset:
-    actor: str                                   # "owner/name" as the Apify Store shows it
-    label: str                                   # board name in the UI and in job source labels
-    hint: str                                    # one line under the board picker: scope and posting-age steps
+    actor: str  # "owner/name" as the Apify Store shows it
+    label: str  # board name in the UI and in job source labels
+    hint: str  # one line under the board picker: scope and posting-age steps
     build_input: Callable[[Search, int], dict]
     parse: Callable[[dict], dict]
     # USD per 1,000 results on the Free plan (the Store price when this was written);
@@ -413,38 +454,62 @@ class Preset:
 def _career_site(ats: str, label: str) -> Preset:
     """A cross-company search on one ATS: same actor and parser, only the `ats` filter differs."""
     return Preset(
-        "fantastic-jobs/career-site-job-listing-api", label,
+        "fantastic-jobs/career-site-job-listing-api",
+        label,
         f"Every company that hires through {label}. Hours old rounds up to 1 h, 24 h, 7 days or 6 months.",
-        _career_site_input(ats), _parse_career_site, 12.0)
+        _career_site_input(ats),
+        _parse_career_site,
+        12.0,
+    )
 
 
 PRESETS = {
     "apify_indeed": Preset(
-        "misceres/indeed-scraper", "Indeed",
+        "misceres/indeed-scraper",
+        "Indeed",
         "Indeed in the selected country. Hours old rounds up to 1, 3, 7 or 14 days; past 14 days, no age limit.",
-        _indeed_input, _parse_indeed, 6.0),
+        _indeed_input,
+        _parse_indeed,
+        6.0,
+    ),
     "apify_linkedin": Preset(
-        "valig/linkedin-jobs-scraper", "LinkedIn",
+        "valig/linkedin-jobs-scraper",
+        "LinkedIn",
         "LinkedIn public job search. Hours old is exact. LinkedIn ignores Remote without login, "
         "so Remote only drops the rows that the posting calls hybrid or on-site.",
-        _linkedin_input, _parse_linkedin, 0.40),
+        _linkedin_input,
+        _parse_linkedin,
+        0.40,
+    ),
     "apify_glassdoor": Preset(
-        "valig/glassdoor-jobs-scraper", "Glassdoor",
+        "valig/glassdoor-jobs-scraper",
+        "Glassdoor",
         "Glassdoor, newest first. Hours old rounds up to whole days; empty means the last 30 days.",
-        _glassdoor_input, _parse_glassdoor, 0.40),
+        _glassdoor_input,
+        _parse_glassdoor,
+        0.40,
+    ),
     # Fallbacks for the creative mode's own Behance and Hollylist clients (sources/creative.py).
     "apify_behance": Preset(
-        "piotrv1001/behance-jobs-scraper", "Behance",
+        "piotrv1001/behance-jobs-scraper",
+        "Behance",
         "Behance full-time and contract jobs; freelance briefs are not included. Hours old is not "
         "applied. Location matches the first city name. The actor has no remote filter, so Remote "
         "only drops the rows that Behance marks hybrid or on-site; Apify still bills them.",
-        _behance_input, _parse_behance, 1.0),
+        _behance_input,
+        _parse_behance,
+        1.0,
+    ),
     "apify_hollylist": Preset(
-        "datawatcher/hollylist-scraper", "Hollylist",
+        "datawatcher/hollylist-scraper",
+        "Hollylist",
         "Hollylist entertainment jobs, with full text. Members-only offers are skipped. Hours old "
         "is not applied. Location matches the first city name. Remote also returns on-site rows, "
         "so Remote drops the rows that the posting calls hybrid or on-site.",
-        _hollylist_input, _parse_hollylist, 1.90),
+        _hollylist_input,
+        _parse_hollylist,
+        1.90,
+    ),
     "apify_greenhouse": _career_site("greenhouse", "Greenhouse"),
     "apify_lever": _career_site("lever.co", "Lever"),
     "apify_ashby": _career_site("ashby", "Ashby"),
@@ -460,7 +525,9 @@ def configured_presets(search: Search) -> list:
 def charge_cap_usd(preset: Preset, limit: int) -> float:
     """The maxTotalChargeUsd a run of `preset` for `limit` results is started with."""
     raw = limit * preset.price_per_1k / 1000 * _CHARGE_MARGIN
-    cents = math.ceil(round(raw * 100, 6))     # whole cents, rounded up (float noise removed first)
+    cents = math.ceil(
+        round(raw * 100, 6)
+    )  # whole cents, rounded up (float noise removed first)
     return min(_MAX_CHARGE_USD, max(_MIN_CHARGE_USD, cents / 100))
 
 
@@ -468,8 +535,10 @@ def charge_cap_usd(preset: Preset, limit: int) -> float:
 
 # Apify's error.type when the account plan may not run Store actors (the $1 Creator plan).
 PLAN_BLOCKS_STORE = "public-actor-disabled"
-_PLAN_BLOCKS_STORE_TEXT = ("the Apify plan of this key cannot run Apify Store actors (the Creator plan blocks them); "
-                           "switch the account to the Free or a paid plan at https://console.apify.com/billing")
+_PLAN_BLOCKS_STORE_TEXT = (
+    "the Apify plan of this key cannot run Apify Store actors (the Creator plan blocks them); "
+    "switch the account to the Free or a paid plan at https://console.apify.com/billing"
+)
 
 
 def _api_error(resp: httpx.Response) -> ApifyError:
@@ -481,10 +550,12 @@ def _api_error(resp: httpx.Response) -> ApifyError:
     if err.get("type") == PLAN_BLOCKS_STORE:
         return ApifyError(f"HTTP {resp.status_code}: {_PLAN_BLOCKS_STORE_TEXT}")
     message = err.get("message") or ""
-    hint = {401: "the Apify API key is wrong or revoked",
-            402: "the Apify account has no credit left",
-            403: "the Apify API key cannot run this actor",
-            404: "the actor or run does not exist"}.get(resp.status_code, "")
+    hint = {
+        401: "the Apify API key is wrong or revoked",
+        402: "the Apify account has no credit left",
+        403: "the Apify API key cannot run this actor",
+        404: "the actor or run does not exist",
+    }.get(resp.status_code, "")
     if resp.status_code == 402 and message:
         # R30 S-17: a 402 is also a rented actor without a subscription, a monthly platform
         # limit or a charge cap below the actor's minimum; Apify's own message names which.
@@ -500,16 +571,30 @@ async def _call(client: httpx.AsyncClient, method: str, path: str, **kw) -> dict
     return resp.json()
 
 
-async def _run_actor(client: httpx.AsyncClient, actor: str, body: dict, limit: int,
-                     max_charge_usd: float = _MAX_CHARGE_USD) -> list:
+async def _run_actor(
+    client: httpx.AsyncClient,
+    actor: str,
+    body: dict,
+    limit: int,
+    max_charge_usd: float = _MAX_CHARGE_USD,
+) -> list:
     """Start the actor, wait for it, return its dataset items (at most `limit`)."""
     # maxItems caps what a pay-per-result actor may charge for, whatever its input says;
     # maxTotalChargeUsd caps the money whatever the actor bills for; timeout makes the
     # platform end the run at our own deadline even if this process dies mid-poll.
-    run = (await _call(client, "POST", f"/acts/{actor.replace('/', '~')}/runs",
-                       params={"maxItems": limit, "maxTotalChargeUsd": max_charge_usd,
-                               "timeout": _MAX_WAIT},
-                       json=body))["data"]
+    run = (
+        await _call(
+            client,
+            "POST",
+            f"/acts/{actor.replace('/', '~')}/runs",
+            params={
+                "maxItems": limit,
+                "maxTotalChargeUsd": max_charge_usd,
+                "timeout": _MAX_WAIT,
+            },
+            json=body,
+        )
+    )["data"]
     deadline = time.monotonic() + _MAX_WAIT
     while run.get("status") not in _TERMINAL:
         if time.monotonic() > deadline:
@@ -517,14 +602,26 @@ async def _run_actor(client: httpx.AsyncClient, actor: str, body: dict, limit: i
                 await _call(client, "POST", f"/actor-runs/{run['id']}/abort")
             except (ApifyError, httpx.HTTPError) as e:
                 logger.warning(f"Apify abort of run {run['id']} failed: {e}")
-            raise ApifyError(f"run {run['id']} took longer than {_MAX_WAIT // 60} min and was aborted")
-        run = (await _call(client, "GET", f"/actor-runs/{run['id']}",
-                           params={"waitForFinish": _WAIT_STEP}))["data"]
+            raise ApifyError(
+                f"run {run['id']} took longer than {_MAX_WAIT // 60} min and was aborted"
+            )
+        run = (
+            await _call(
+                client,
+                "GET",
+                f"/actor-runs/{run['id']}",
+                params={"waitForFinish": _WAIT_STEP},
+            )
+        )["data"]
     if run["status"] != "SUCCEEDED":
         detail = run.get("statusMessage") or ""
-        raise ApifyError(f"run {run['id']} {run['status']}" + (f": {detail[:200]}" if detail else ""))
-    resp = await client.get(f"{API_BASE}/datasets/{run['defaultDatasetId']}/items",
-                            params={"clean": "true", "format": "json", "limit": limit})
+        raise ApifyError(
+            f"run {run['id']} {run['status']}" + (f": {detail[:200]}" if detail else "")
+        )
+    resp = await client.get(
+        f"{API_BASE}/datasets/{run['defaultDatasetId']}/items",
+        params={"clean": "true", "format": "json", "limit": limit},
+    )
     if resp.status_code >= 400:
         raise _api_error(resp)
     items = resp.json()
@@ -546,7 +643,10 @@ def _client(token: str, read_timeout: float) -> httpx.AsyncClient:
     # The key goes in a header, never in the URL, so httpx errors and logs cannot show it.
     return httpx.AsyncClient(
         timeout=httpx.Timeout(30, read=read_timeout),
-        headers={"Authorization": f"Bearer {token}", "User-Agent": "JobNavigator/1.0 (+apify source)"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "JobNavigator/1.0 (+apify source)",
+        },
     )
 
 
@@ -567,7 +667,9 @@ async def account_name() -> str:
     actor = next(iter(PRESETS.values())).actor.replace("/", "~")
     async with _client(_token(), 30) as client:
         data = (await _call(client, "GET", "/users/me"))["data"]
-        resp = await client.post(f"{API_BASE}/acts/{actor}/runs", params=_PROBE_LIMITS, json=[])
+        resp = await client.post(
+            f"{API_BASE}/acts/{actor}/runs", params=_PROBE_LIMITS, json=[]
+        )
         if resp.status_code == 201:
             run_id = (resp.json().get("data") or {}).get("id")
             logger.warning(f"Apify plan probe started run {run_id}; aborting it")
@@ -593,9 +695,16 @@ async def _collect(search: Search, limit: int) -> tuple[list, dict]:
     # A status request is held open for _WAIT_STEP seconds, so the read timeout must exceed it.
     async with _client(_token(), _WAIT_STEP + 30) as client:
         outcomes = await asyncio.gather(
-            *(_run_actor(client, PRESETS[k].actor, PRESETS[k].build_input(search, limit), limit,
-                         charge_cap_usd(PRESETS[k], limit))
-              for k in keys),
+            *(
+                _run_actor(
+                    client,
+                    PRESETS[k].actor,
+                    PRESETS[k].build_input(search, limit),
+                    limit,
+                    charge_cap_usd(PRESETS[k], limit),
+                )
+                for k in keys
+            ),
             return_exceptions=True,
         )
 
@@ -603,7 +712,11 @@ async def _collect(search: Search, limit: int) -> tuple[list, dict]:
     for key, outcome in zip(keys, outcomes):
         if isinstance(outcome, BaseException):
             # httpx errors can echo the request; ApifyError text is ours and key-free.
-            msg = str(outcome) if isinstance(outcome, ApifyError) else type(outcome).__name__
+            msg = (
+                str(outcome)
+                if isinstance(outcome, ApifyError)
+                else type(outcome).__name__
+            )
             breakdown[key] = {"seen": 0, "new": 0, "error": msg}
             logger.warning(f"Apify {key} for '{search.name}' failed: {msg}")
             continue
@@ -627,15 +740,23 @@ def _not_remote(j: dict) -> str | None:
     """The reason to drop a row that the work-arrangement cascade reads as hybrid or on-site
     only. A row that the cascade cannot read stays: the cascade never guesses, and a
     remote posting often says "remote" in words that no pattern matches."""
-    found = extract_arrangement(j.get("location"), j.get("title"), j.get("description"),
-                                j.get("arrangement"))["arrangements"]
+    found = extract_arrangement(
+        j.get("location"), j.get("title"), j.get("description"), j.get("arrangement")
+    )["arrangements"]
     if not found or REMOTE in found:
         return None
     return "Not remote: " + ", ".join(v for v in (HYBRID, ONSITE) if v in found)
 
 
-def _rejection(j: dict, include_kw, exclude_kw, global_ex: set, search_ex: set,
-               company_filter=None, remote_only: bool = False) -> str | None:
+def _rejection(
+    j: dict,
+    include_kw,
+    exclude_kw,
+    global_ex: set,
+    search_ex: set,
+    company_filter=None,
+    remote_only: bool = False,
+) -> str | None:
     ok, reason = title_kept(j["title"], include_kw, exclude_kw)
     if not ok:
         return reason
@@ -666,11 +787,15 @@ def _all_failed(breakdown: dict) -> str | None:
     """The run-level error when no board answered, so the run is not recorded as a quiet day."""
     if breakdown and all(v.get("error") for v in breakdown.values()):
         # the board's label, not its key: "Indeed: HTTP 401 ..." reads as the run-history line
-        return " · ".join(f"{PRESETS[k].label if k in PRESETS else k}: {v['error']}" for k, v in breakdown.items())
+        return " · ".join(
+            f"{PRESETS[k].label if k in PRESETS else k}: {v['error']}"
+            for k, v in breakdown.items()
+        )
     return None
 
 
 # ── Entry points ────────────────────────────────────────────────────────────
+
 
 async def run(search: Search) -> dict:
     """Full scrape entry point. Fetch → filter → save to DB."""
@@ -689,16 +814,34 @@ async def run(search: Search) -> dict:
             remote_only = search.is_remote is True
 
             # The loop below writes rows; H-1B lookups for the new jobs happen before it (S2-01).
-            await prefetch_h1b([
-                j.get("company") for j in unique
-                if not _rejection(j, include_kw, exclude_kw, global_ex, search_ex,
-                                  search.company_filter, remote_only)
-                and make_external_id(j["company"], j["title"], j["url"]) not in existing_ids
-            ])
+            await prefetch_h1b(
+                [
+                    j.get("company")
+                    for j in unique
+                    if not _rejection(
+                        j,
+                        include_kw,
+                        exclude_kw,
+                        global_ex,
+                        search_ex,
+                        search.company_filter,
+                        remote_only,
+                    )
+                    and make_external_id(j["company"], j["title"], j["url"])
+                    not in existing_ids
+                ]
+            )
 
             for j in unique:
-                if _rejection(j, include_kw, exclude_kw, global_ex, search_ex,
-                              search.company_filter, remote_only):
+                if _rejection(
+                    j,
+                    include_kw,
+                    exclude_kw,
+                    global_ex,
+                    search_ex,
+                    search.company_filter,
+                    remote_only,
+                ):
                     # Counted so the Run-history line says "N filtered out" instead of a bare "0 seen".
                     row = breakdown[j["source"]]
                     row["filtered"] = row.get("filtered", 0) + 1
@@ -715,7 +858,7 @@ async def run(search: Search) -> dict:
                     company=j["company"],
                     title=j["title"],
                     url=j["url"],
-                    source=j["source"],             # the board key, already "apify_<board>"
+                    source=j["source"],  # the board key, already "apify_<board>"
                     search_id=search.id,
                     location=j.get("location") or None,
                     description=j.get("description") or None,
@@ -732,9 +875,13 @@ async def run(search: Search) -> dict:
                 try:
                     await analyze_inline(job, db=db, arrangement=j.get("arrangement"))
                 except Exception as e:
-                    logger.warning(f"apify inline analysis failed for {j['title']}: {e}")
+                    logger.warning(
+                        f"apify inline analysis failed for {j['title']}: {e}"
+                    )
                 if job.h1b_jd_flag:
-                    logger.info(f"Skipping (body exclusion): {j['title']} @ {j.get('company', '?')}")
+                    logger.info(
+                        f"Skipping (body exclusion): {j['title']} @ {j.get('company', '?')}"
+                    )
                     continue
 
                 try:
@@ -745,9 +892,13 @@ async def run(search: Search) -> dict:
                     existing_ids.add(ext_id)
                     breakdown[j["source"]]["new"] += 1
                 except IntegrityError:
-                    logger.debug(f"Duplicate external_id for '{j['title']}' @ {j.get('company')}, skipping")
+                    logger.debug(
+                        f"Duplicate external_id for '{j['title']}' @ {j.get('company')}, skipping"
+                    )
                 except Exception as e:
-                    logger.warning(f"Insert failed for '{j['title']}' @ {j.get('company')} ({j['url']}): {e}")
+                    logger.warning(
+                        f"Insert failed for '{j['title']}' @ {j.get('company')} ({j['url']}): {e}"
+                    )
 
             search_obj = db.query(Search).filter(Search.id == search.id).first()
             if search_obj:
@@ -758,18 +909,33 @@ async def run(search: Search) -> dict:
 
         duration = time.time() - start
         from backend.activity import log_activity
-        log_activity("scrape", f"apify '{search.name}': {new_jobs} new / {kept} kept in {duration:.1f}s")
-        return {"jobs_found": kept, "new_jobs": new_jobs, "error": _all_failed(breakdown),
-                "duration": duration, "source_breakdown": breakdown}
+
+        log_activity(
+            "scrape",
+            f"apify '{search.name}': {new_jobs} new / {kept} kept in {duration:.1f}s",
+        )
+        return {
+            "jobs_found": kept,
+            "new_jobs": new_jobs,
+            "error": _all_failed(breakdown),
+            "duration": duration,
+            "source_breakdown": breakdown,
+        }
 
     except Exception as e:
         duration = time.time() - start
         msg = str(e) if isinstance(e, ApifyError) else f"{type(e).__name__}: {e}"
         logger.error(f"apify scrape failed for '{search.name}': {msg}")
         from backend.activity import log_activity
+
         log_activity("scrape", f"apify '{search.name}' failed: {msg}")
-        return {"jobs_found": 0, "new_jobs": 0, "error": msg, "duration": duration,
-                "source_breakdown": breakdown}
+        return {
+            "jobs_found": 0,
+            "new_jobs": 0,
+            "error": msg,
+            "duration": duration,
+            "source_breakdown": breakdown,
+        }
 
 
 async def preview(search: Search, db) -> dict:
@@ -789,11 +955,20 @@ async def preview(search: Search, db) -> dict:
         remote_only = search.is_remote is True
 
         from collections import Counter
+
         from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+
         results = []
         for j in unique:
-            reason = _rejection(j, include_kw, exclude_kw, global_ex, search_ex,
-                                search.company_filter, remote_only)
+            reason = _rejection(
+                j,
+                include_kw,
+                exclude_kw,
+                global_ex,
+                search_ex,
+                search.company_filter,
+                remote_only,
+            )
             # run() drops these through analyze_inline; the preview names the phrase.
             if reason is None and phrases and j.get("description"):
                 hit = scan_jd_for_h1b_flags(j["description"], phrases)
@@ -805,19 +980,21 @@ async def preview(search: Search, db) -> dict:
                 if j.get("salary_max") and j["salary_max"] != j["salary_min"]:
                     salary += f" – {j['salary_max']:,}"
             desc = j.get("description") or ""
-            results.append({
-                "title": j["title"],
-                "company": j.get("company", ""),
-                "url": j["url"],
-                "source": j["source"],
-                "location": j.get("location", ""),
-                "salary": salary,
-                "has_description": len(desc) > 50,
-                "desc_length": len(desc),
-                "kept": reason is None,
-                "reason": reason,
-                "posted": j.get("posted"),
-            })
+            results.append(
+                {
+                    "title": j["title"],
+                    "company": j.get("company", ""),
+                    "url": j["url"],
+                    "source": j["source"],
+                    "location": j.get("location", ""),
+                    "salary": salary,
+                    "has_description": len(desc) > 50,
+                    "desc_length": len(desc),
+                    "kept": reason is None,
+                    "reason": reason,
+                    "posted": j.get("posted"),
+                }
+            )
 
         # Same shape as the keyword preview: counts per board, failures apart.
         return {
@@ -825,9 +1002,19 @@ async def preview(search: Search, db) -> dict:
             "duration": round(time.time() - start, 1),
             "raw_count": len(unique),
             "after_filter": sum(1 for r in results if r["kept"]),
-            "source_breakdown": {k: v.get("returned", 0) for k, v in breakdown.items() if not v.get("error")},
-            "source_errors": {k: v["error"] for k, v in breakdown.items() if v.get("error")},
-            "company_breakdown": dict(Counter(j["company"] for j in unique if j.get("company")).most_common(20)),
+            "source_breakdown": {
+                k: v.get("returned", 0)
+                for k, v in breakdown.items()
+                if not v.get("error")
+            },
+            "source_errors": {
+                k: v["error"] for k, v in breakdown.items() if v.get("error")
+            },
+            "company_breakdown": dict(
+                Counter(j["company"] for j in unique if j.get("company")).most_common(
+                    20
+                )
+            ),
             "include_keywords": include_kw,
             "exclude_keywords": exclude_kw,
             "company_filter": search.company_filter or [],
@@ -837,5 +1024,9 @@ async def preview(search: Search, db) -> dict:
         }
     except Exception as e:
         msg = str(e) if isinstance(e, ApifyError) else f"{type(e).__name__}: {e}"
-        return {"search_name": search.name, "error": msg,
-                "duration": round(time.time() - start, 1), "config": config}
+        return {
+            "search_name": search.name,
+            "error": msg,
+            "duration": round(time.time() - start, 1),
+            "config": config,
+        }

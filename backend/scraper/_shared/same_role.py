@@ -19,6 +19,7 @@ the data:
 
 Too little text (a listing without a description, a short blurb) proves nothing either.
 """
+
 import difflib
 import html
 import re
@@ -34,15 +35,69 @@ _TOKEN = re.compile(r"\$?[a-z0-9]+")
 # Pay and place words a per-city copy changes along with the place.
 _PLACE_WORDS = frozenset({"usa", "us", "usd", "annually", "annual", "hourly", "yearly"})
 # A per-city copy names its state in full ("Seattle, Washington") where the location says "SEATTLE".
-_STATES = re.compile(r"\b(?:" + "|".join(sorted((
-    "alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut", "delaware",
-    "district of columbia", "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa",
-    "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan", "minnesota",
-    "mississippi", "missouri", "montana", "nebraska", "nevada", "new hampshire", "new jersey",
-    "new mexico", "new york", "north carolina", "north dakota", "ohio", "oklahoma", "oregon",
-    "pennsylvania", "rhode island", "south carolina", "south dakota", "tennessee", "texas", "utah",
-    "vermont", "virginia", "washington", "west virginia", "wisconsin", "wyoming"), key=len, reverse=True))
-    + r")\b")
+_STATES = re.compile(
+    r"\b(?:"
+    + "|".join(
+        sorted(
+            (
+                "alabama",
+                "alaska",
+                "arizona",
+                "arkansas",
+                "california",
+                "colorado",
+                "connecticut",
+                "delaware",
+                "district of columbia",
+                "florida",
+                "georgia",
+                "hawaii",
+                "idaho",
+                "illinois",
+                "indiana",
+                "iowa",
+                "kansas",
+                "kentucky",
+                "louisiana",
+                "maine",
+                "maryland",
+                "massachusetts",
+                "michigan",
+                "minnesota",
+                "mississippi",
+                "missouri",
+                "montana",
+                "nebraska",
+                "nevada",
+                "new hampshire",
+                "new jersey",
+                "new mexico",
+                "new york",
+                "north carolina",
+                "north dakota",
+                "ohio",
+                "oklahoma",
+                "oregon",
+                "pennsylvania",
+                "rhode island",
+                "south carolina",
+                "south dakota",
+                "tennessee",
+                "texas",
+                "utah",
+                "vermont",
+                "virginia",
+                "washington",
+                "west virginia",
+                "wisconsin",
+                "wyoming",
+            ),
+            key=len,
+            reverse=True,
+        )
+    )
+    + r")\b"
+)
 # A code with a run of three digits or more, with its joined parts: a reference number
 # (R-482211-8), a requisition (JR363445-1), a date (2026-10-21), pay (151,000.00).
 _CODES = re.compile(r"[a-z0-9]*\d{3,}[a-z0-9]*(?:[-_/.][a-z0-9]+)*")
@@ -51,23 +106,76 @@ _CODES = re.compile(r"[a-z0-9]*\d{3,}[a-z0-9]*(?:[-_/.][a-z0-9]+)*")
 # ("based in our Boston office" / "Denver", location "United States"): the cities and metros
 # analyzer/location.py knows, with a state or province code right after one ("Seattle, WA").
 # Names that are also ordinary words or people's names stay words: a difference in them counts.
-_NOT_CITIES = frozenset({
-    "orange", "corona", "venice", "concord", "davis", "carson", "campbell", "hamilton", "milton",
-    "lancaster", "victoria", "regina", "valencia", "burlington", "surrey", "langley", "windsor",
-    "richmond", "stanford", "phoenix", "hawthorne", "glendale", "riverside", "kingston", "waterloo",
-    "belmont", "saratoga", "sonoma", "napa", "industry", "union city", "danville", "east coast",
-    "west coast", "tri-state", "tri state", "dmv"})
-_CODE_WORDS = frozenset({"in", "or", "me", "ok", "hi", "de", "la", "pa", "ma", "al", "co", "oh", "id", "on"})
+_NOT_CITIES = frozenset(
+    {
+        "orange",
+        "corona",
+        "venice",
+        "concord",
+        "davis",
+        "carson",
+        "campbell",
+        "hamilton",
+        "milton",
+        "lancaster",
+        "victoria",
+        "regina",
+        "valencia",
+        "burlington",
+        "surrey",
+        "langley",
+        "windsor",
+        "richmond",
+        "stanford",
+        "phoenix",
+        "hawthorne",
+        "glendale",
+        "riverside",
+        "kingston",
+        "waterloo",
+        "belmont",
+        "saratoga",
+        "sonoma",
+        "napa",
+        "industry",
+        "union city",
+        "danville",
+        "east coast",
+        "west coast",
+        "tri-state",
+        "tri state",
+        "dmv",
+    }
+)
+_CODE_WORDS = frozenset(
+    {"in", "or", "me", "ok", "hi", "de", "la", "pa", "ma", "al", "co", "oh", "id", "on"}
+)
 
 
 def _city_pattern():
-    from backend.analyzer.location import ALL_REGION_CODES, BARE_CITIES, CALIFORNIA_CITIES, CANADA_CITIES, METROS
-    names = (set(BARE_CITIES) | set(CALIFORNIA_CITIES) | set(CANADA_CITIES) | set(METROS)) - _NOT_CITIES
+    from backend.analyzer.location import (
+        ALL_REGION_CODES,
+        BARE_CITIES,
+        CALIFORNIA_CITIES,
+        CANADA_CITIES,
+        METROS,
+    )
+
+    names = (
+        set(BARE_CITIES) | set(CALIFORNIA_CITIES) | set(CANADA_CITIES) | set(METROS)
+    ) - _NOT_CITIES
     codes = sorted(c.lower() for c in ALL_REGION_CODES | {"DC"})
     # "in", "or", "me", "ok", "hi"... are words too: as a code they need the comma ("Boston, MA")
     plain = [c for c in codes if c not in _CODE_WORDS]
-    return re.compile(r"\b(" + "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True))
-                      + r")\b(?:\s+(?:metropolitan|metro))?(?:\s+area)?(?:\s*,\s*(?:" + "|".join(codes) + r")\b|\s+(?:" + "|".join(plain) + r")\b)?")
+    return re.compile(
+        r"\b("
+        + "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True))
+        + r")\b(?:\s+(?:metropolitan|metro))?(?:\s+area)?(?:\s*,\s*(?:"
+        + "|".join(codes)
+        + r")\b|\s+(?:"
+        + "|".join(plain)
+        + r")\b)?"
+    )
 
 
 _CITIES = _city_pattern()
@@ -75,7 +183,10 @@ _CITIES = _city_pattern()
 
 def text_places(text) -> set:
     """The known cities a posting's text names (lower-case)."""
-    return {m.group(1) for m in _CITIES.finditer(_TAG.sub(" ", html.unescape(str(text or ""))).lower())}
+    return {
+        m.group(1)
+        for m in _CITIES.finditer(_TAG.sub(" ", html.unescape(str(text or ""))).lower())
+    }
 
 
 def words(text) -> list:
@@ -87,10 +198,37 @@ def words(text) -> list:
 
 # Words a location field carries that are not a place ("Remotely in the UK", "Berlin Office"):
 # a difference in them still counts ("remote" against "hybrid" is another job).
-_NOT_PLACES = frozenset({
-    "a", "an", "and", "any", "area", "at", "for", "headquarters", "hq", "hybrid", "in", "location",
-    "locations", "more", "multiple", "of", "office", "offices", "on", "onsite", "or", "remote",
-    "remotely", "site", "the", "to", "within"})
+_NOT_PLACES = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "any",
+        "area",
+        "at",
+        "for",
+        "headquarters",
+        "hq",
+        "hybrid",
+        "in",
+        "location",
+        "locations",
+        "more",
+        "multiple",
+        "of",
+        "office",
+        "offices",
+        "on",
+        "onsite",
+        "or",
+        "remote",
+        "remotely",
+        "site",
+        "the",
+        "to",
+        "within",
+    }
+)
 
 
 def _place_words(*locations) -> set:
@@ -107,14 +245,33 @@ def role_words(text, *locations) -> list:
     drop = _place_words(*locations)
     text = _TAG.sub(" ", html.unescape(str(text or ""))).lower()
     text = _CODES.sub(" ", _STATES.sub(" ", _CITIES.sub(" ", text)))
-    return [w for w in words(text)
-            if not (w.startswith("$") or (w.isdigit() and (len(w) >= 3 or w == "00")) or w in drop)]
+    return [
+        w
+        for w in words(text)
+        if not (
+            w.startswith("$")
+            or (w.isdigit() and (len(w) >= 3 or w == "00"))
+            or w in drop
+        )
+    ]
 
 
 # Title spellings of one word, and levels written as digits ("Engineer 2" is "Engineer II").
-_TITLE_WORDS = {"sr": "senior", "snr": "senior", "jr": "junior", "mgr": "manager", "engr": "engineer",
-                "dir": "director", "assoc": "associate", "mgmt": "management",
-                "1": "i", "2": "ii", "3": "iii", "4": "iv", "5": "v"}
+_TITLE_WORDS = {
+    "sr": "senior",
+    "snr": "senior",
+    "jr": "junior",
+    "mgr": "manager",
+    "engr": "engineer",
+    "dir": "director",
+    "assoc": "associate",
+    "mgmt": "management",
+    "1": "i",
+    "2": "ii",
+    "3": "iii",
+    "4": "iv",
+    "5": "v",
+}
 # A requisition number with its letter prefix: "R-482211", "JR363445-1".
 _TITLE_CODE = re.compile(r"\b(?:[a-z]+[-_/])?" + _CODES.pattern)
 
@@ -123,13 +280,16 @@ def title_key(title) -> str:
     """A title as the same-role check compares it: case, punctuation, word order, common short
     forms ("Sr", "Mgr", "&") and requisition numbers do not count. Every word in brackets counts:
     Sierra's "(Spanish speaking)" and "(Brazilian Portuguese speaking)" are two roles."""
-    t = _TITLE_CODE.sub(" ", html.unescape(str(title or "")).lower().replace("&", " and "))
+    t = _TITLE_CODE.sub(
+        " ", html.unescape(str(title or "")).lower().replace("&", " and ")
+    )
     return " ".join(sorted(_TITLE_WORDS.get(w, w) for w in re.findall(r"[a-z0-9]+", t)))
 
 
 def role_hash(company, title) -> str:
     """The key jobs that may be one role share: the company and `title_key`."""
     import hashlib
+
     raw = f"{(company or '').strip().lower()}\n{title_key(title)}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
@@ -137,7 +297,11 @@ def role_hash(company, title) -> str:
 def other_words(a: list, b: list) -> int:
     """How many words differ between two word lists (the longer side of each changed run)."""
     sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
-    return sum(max(i2 - i1, j2 - j1) for op, i1, i2, j1, j2 in sm.get_opcodes() if op != "equal")
+    return sum(
+        max(i2 - i1, j2 - j1)
+        for op, i1, i2, j1, j2 in sm.get_opcodes()
+        if op != "equal"
+    )
 
 
 def same_text(text_a, text_b, location_a=None, location_b=None) -> bool:
@@ -153,7 +317,7 @@ def same_text(text_a, text_b, location_a=None, location_b=None) -> bool:
 def shingles(text) -> frozenset:
     """Five-word runs of the text, for a quick likeness between two texts."""
     w = role_words(text)
-    return frozenset(hash(" ".join(w[i:i + 5])) for i in range(len(w) - 4))
+    return frozenset(hash(" ".join(w[i : i + 5])) for i in range(len(w) - 4))
 
 
 def likeness(a: frozenset, b: frozenset) -> float:
@@ -168,7 +332,11 @@ def is_template(text, other_title_texts) -> bool:
     for other in other_title_texts:
         theirs = other if isinstance(other, frozenset) else shingles(other)
         # a text far shorter or longer cannot be 90% alike
-        if theirs and min(len(mine), len(theirs)) / max(len(mine), len(theirs)) >= TEMPLATE_LIKENESS \
-                and likeness(mine, theirs) >= TEMPLATE_LIKENESS:
+        if (
+            theirs
+            and min(len(mine), len(theirs)) / max(len(mine), len(theirs))
+            >= TEMPLATE_LIKENESS
+            and likeness(mine, theirs) >= TEMPLATE_LIKENESS
+        ):
             return True
     return False

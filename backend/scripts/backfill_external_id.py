@@ -29,6 +29,7 @@ rest are SKIPPED — their existing `external_id` is left untouched — and
 recorded in tests/round4/backfill-collisions.md. Nothing is ever merged
 or deleted.
 """
+
 import argparse
 import sys
 from collections import defaultdict
@@ -36,7 +37,7 @@ from pathlib import Path
 
 from sqlalchemy import or_, text
 
-from backend.models.db import SessionLocal, Job
+from backend.models.db import Job, SessionLocal
 from backend.scraper._shared.dedup import make_external_id
 
 BATCH_SIZE = 1000
@@ -58,9 +59,11 @@ def fetch_all_rows(db):
     rows = []
     last_id = None
     while True:
-        q = (db.query(Job.id, Job.company, Job.title, Job.url, Job.external_id)
-             .filter(or_(Job.source.is_(None), Job.source.notin_(SKIP_SOURCES)))
-             .order_by(Job.id))
+        q = (
+            db.query(Job.id, Job.company, Job.title, Job.url, Job.external_id)
+            .filter(or_(Job.source.is_(None), Job.source.notin_(SKIP_SOURCES)))
+            .order_by(Job.id)
+        )
         if last_id is not None:
             q = q.filter(Job.id > last_id)
         batch = q.limit(BATCH_SIZE).all()
@@ -94,8 +97,8 @@ def resolve_updates(computed):
     for rec in computed:
         groups[rec[5]].append(rec)
 
-    updates = []     # (id, new_id)
-    skipped = []     # (skipped_id, kept_id, skipped_url, skipped_stored_id)
+    updates = []  # (id, new_id)
+    skipped = []  # (skipped_id, kept_id, skipped_url, skipped_stored_id)
     unchanged = 0
 
     for new_id, recs in groups.items():
@@ -130,7 +133,7 @@ def apply_updates(db, updates):
     """UPDATE rows in batches of 1000, one transaction per batch."""
     stmt = text("UPDATE jobs SET external_id = :new_id WHERE id = :id")
     for i in range(0, len(updates), BATCH_SIZE):
-        batch = updates[i:i + BATCH_SIZE]
+        batch = updates[i : i + BATCH_SIZE]
         params = [{"id": id_, "new_id": new_id} for id_, new_id in batch]
         db.execute(stmt, params)
         db.commit()
@@ -145,14 +148,16 @@ def write_collisions_report(skipped, computed_by_id, dry_run):
         f"({'--dry-run' if dry_run else '--apply'}). See dup-report.md Section 2.",
         "",
         "Rows below kept their existing `external_id` because the recomputed id "
-        "was already claimed by another row (the \"kept id\" row). Nothing was "
+        'was already claimed by another row (the "kept id" row). Nothing was '
         "merged or deleted.",
         "",
     ]
     if not skipped:
         lines.append("No collisions found.")
     else:
-        lines.append("| skipped id | kept id | skipped row's url | skipped row's stored external_id |")
+        lines.append(
+            "| skipped id | kept id | skipped row's url | skipped row's stored external_id |"
+        )
         lines.append("|---|---|---|---|")
         for skipped_id, kept_id, url, stored_id in skipped:
             lines.append(f"| {skipped_id} | {kept_id} | {url} | {stored_id} |")
@@ -161,8 +166,14 @@ def write_collisions_report(skipped, computed_by_id, dry_run):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dry-run", action="store_true", help="Compute and print counts only. No writes.")
-    parser.add_argument("--apply", action="store_true", help="Write the recomputed external_id values.")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Compute and print counts only. No writes.",
+    )
+    parser.add_argument(
+        "--apply", action="store_true", help="Write the recomputed external_id values."
+    )
     args = parser.parse_args()
 
     if args.dry_run and args.apply:
@@ -174,6 +185,7 @@ def main():
     # QA F4 / R1-10: every account's jobs, one account at a time (external_id is unique
     # per account, so collisions are grouped per account too).
     from backend.accounts.background import acting_as, all_account_ids
+
     all_skipped, all_computed = [], {}
     for account in all_account_ids():
         db = SessionLocal()
@@ -194,8 +206,10 @@ def main():
 
                 if not dry_run:
                     apply_updates(db, updates)
-                    print(f"--apply: committed {len(updates)} updates in "
-                          f"{(len(updates) + BATCH_SIZE - 1) // BATCH_SIZE or 0} batch(es).")
+                    print(
+                        f"--apply: committed {len(updates)} updates in "
+                        f"{(len(updates) + BATCH_SIZE - 1) // BATCH_SIZE or 0} batch(es)."
+                    )
         finally:
             db.close()
 

@@ -5,6 +5,7 @@
 `send_digest` raise `COALESCE could not convert type jsonb to json`, so the
 digest reported nothing every day. Same failure class as `unscored_filter`.
 """
+
 import os
 import re
 

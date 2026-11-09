@@ -4,6 +4,7 @@
 as an rc=0 envelope with `is_error` set; its `result` can also be empty. Both
 used to leave the caller parsing an empty string.
 """
+
 import json as _json
 
 import pytest
@@ -30,8 +31,10 @@ async def _call():
 
 @pytest.mark.asyncio
 async def test_a_normal_envelope_yields_its_result(monkeypatch):
-    _cli_printing(monkeypatch, {"result": '{"summary": "x"}', "is_error": False,
-                                "subtype": "success"})
+    _cli_printing(
+        monkeypatch,
+        {"result": '{"summary": "x"}', "is_error": False, "subtype": "success"},
+    )
     assert (await _call())["text"] == '{"summary": "x"}'
 
 
@@ -43,11 +46,14 @@ async def test_plain_stdout_still_passes_through(monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("payload", [
-    {"result": "", "is_error": False, "subtype": "success"},
-    {"result": "   \n ", "is_error": False},
-    b"",
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"result": "", "is_error": False, "subtype": "success"},
+        {"result": "   \n ", "is_error": False},
+        b"",
+    ],
+)
 async def test_an_empty_reply_raises_instead_of_returning_nothing(monkeypatch, payload):
     _cli_printing(monkeypatch, payload)
     with pytest.raises(RuntimeError) as exc:
@@ -59,8 +65,14 @@ async def test_an_empty_reply_raises_instead_of_returning_nothing(monkeypatch, p
 
 @pytest.mark.asyncio
 async def test_an_error_envelope_carries_the_cli_text(monkeypatch):
-    _cli_printing(monkeypatch, {"result": "API Error: 500 Internal Server Error",
-                                "is_error": True, "subtype": "error_during_execution"})
+    _cli_printing(
+        monkeypatch,
+        {
+            "result": "API Error: 500 Internal Server Error",
+            "is_error": True,
+            "subtype": "error_during_execution",
+        },
+    )
     with pytest.raises(RuntimeError) as exc:
         await _call()
     assert "500 Internal Server Error" in str(exc.value)
@@ -68,8 +80,9 @@ async def test_an_error_envelope_carries_the_cli_text(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_an_error_envelope_without_text_still_names_its_subtype(monkeypatch):
-    _cli_printing(monkeypatch, {"result": "", "is_error": True,
-                                "subtype": "error_max_turns"})
+    _cli_printing(
+        monkeypatch, {"result": "", "is_error": True, "subtype": "error_max_turns"}
+    )
     with pytest.raises(RuntimeError) as exc:
         await _call()
     assert "error_max_turns" in str(exc.value)
@@ -77,8 +90,14 @@ async def test_an_error_envelope_without_text_still_names_its_subtype(monkeypatc
 
 @pytest.mark.asyncio
 async def test_a_spent_quota_is_not_retried(monkeypatch):
-    _cli_printing(monkeypatch, {"result": "Claude usage limit reached — resets at 5pm",
-                                "is_error": True, "subtype": "error"})
+    _cli_printing(
+        monkeypatch,
+        {
+            "result": "Claude usage limit reached — resets at 5pm",
+            "is_error": True,
+            "subtype": "error",
+        },
+    )
     with pytest.raises(NonRetryableLLMError) as exc:
         await _call()
     assert "usage limit" in str(exc.value)

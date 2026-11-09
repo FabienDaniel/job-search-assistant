@@ -8,6 +8,7 @@ so a DNS record that flips to 127.0.0.1 after validation (classic rebinding) can
 longer be reached, and the URL the HTTP client is given is built from resolver output
 rather than from the user's string.
 """
+
 import asyncio
 import ipaddress
 import logging
@@ -158,7 +159,11 @@ class ResolvedURL:
 
     @property
     def request_url(self) -> str:
-        return ("https://" if self.tls else "http://") + self.authority(self.ip) + self.path_and_query
+        return (
+            ("https://" if self.tls else "http://")
+            + self.authority(self.ip)
+            + self.path_and_query
+        )
 
     def __str__(self) -> str:  # logs should show the human URL, not the pinned one
         return self.logical_url
@@ -172,7 +177,9 @@ def _ascii_host(host: str) -> str:
         return host
 
 
-def _pin(scheme: str, ips: list, port, host: str, path: str, query: str, logical: str) -> ResolvedURL:
+def _pin(
+    scheme: str, ips: list, port, host: str, path: str, query: str, logical: str
+) -> ResolvedURL:
     """Assemble the pinned target from resolver output; the user URL contributes path + query only."""
     ascii_host = _ascii_host(host)
     port_part = f":{port}" if port else ""
@@ -291,7 +298,9 @@ async def safe_get(
                 continue
             _relabel(resp, logical)
             return resp
-        raise UnsafeURLError(f"Too many redirects (>{MAX_REDIRECTS}) starting at {url!r}")
+        raise UnsafeURLError(
+            f"Too many redirects (>{MAX_REDIRECTS}) starting at {url!r}"
+        )
 
 
 def _relabel(resp, logical: str) -> None:

@@ -1,4 +1,5 @@
 """Integration test: _cache_job_page refuses SSRF-style URLs (#4)."""
+
 import pytest
 
 
@@ -7,6 +8,7 @@ async def test_cache_job_page_rejects_aws_metadata_url(monkeypatch, test_db):
     """URL pointing at 169.254.169.254 must be refused before any fetch,
     and the reason must land in job.cache_error for the UI to surface."""
     from backend.models.db import Job
+
     job = Job(
         external_id="ssrf-1",
         content_hash="cssrf1",
@@ -18,20 +20,26 @@ async def test_cache_job_page_rejects_aws_metadata_url(monkeypatch, test_db):
     test_db.commit()
 
     from sqlalchemy.orm import sessionmaker
+
     TestSession = sessionmaker(bind=test_db.get_bind())
     monkeypatch.setattr(
-        "backend.scraper._shared.page_cache.SessionLocal", TestSession, raising=False,
+        "backend.scraper._shared.page_cache.SessionLocal",
+        TestSession,
+        raising=False,
     )
 
     # Ensure neither httpx nor Playwright is ever touched
-    import httpx as _httpx
     from unittest.mock import MagicMock
+
+    import httpx as _httpx
+
     forbidden = MagicMock(
         side_effect=AssertionError("httpx must not be called for unsafe URL"),
     )
     monkeypatch.setattr(_httpx, "AsyncClient", forbidden)
 
     from backend.scraper._shared.page_cache import _cache_job_page
+
     await _cache_job_page(str(job.id), job.url)
 
     test_db.expire_all()
@@ -45,6 +53,7 @@ async def test_cache_job_page_rejects_aws_metadata_url(monkeypatch, test_db):
 async def test_cache_job_page_rejects_private_ip(monkeypatch, test_db):
     """http://10.0.0.5/ must be rejected — protects internal LAN + Tailscale."""
     from backend.models.db import Job
+
     job = Job(
         external_id="ssrf-2",
         content_hash="cssrf2",
@@ -56,12 +65,16 @@ async def test_cache_job_page_rejects_private_ip(monkeypatch, test_db):
     test_db.commit()
 
     from sqlalchemy.orm import sessionmaker
+
     TestSession = sessionmaker(bind=test_db.get_bind())
     monkeypatch.setattr(
-        "backend.scraper._shared.page_cache.SessionLocal", TestSession, raising=False,
+        "backend.scraper._shared.page_cache.SessionLocal",
+        TestSession,
+        raising=False,
     )
 
     from backend.scraper._shared.page_cache import _cache_job_page
+
     await _cache_job_page(str(job.id), job.url)
 
     test_db.expire_all()

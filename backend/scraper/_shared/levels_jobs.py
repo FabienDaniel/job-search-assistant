@@ -5,6 +5,7 @@ script, so a plain page fetch never has the job text. The data has the descripti
 employer's apply link (`applicationUrl`). A job whose data names no apply link is applied to on
 levels.fyi itself, which counts like LinkedIn's Easy Apply (link kind `easy_apply`, shown as Direct).
 """
+
 import json
 import logging
 import re
@@ -33,7 +34,12 @@ def is_levels_job(url: str) -> bool:
 
 def job_fields(job_data: dict) -> dict:
     """{description, application_url, salary_min, salary_max} from a job object of the page data."""
-    out = {"description": None, "application_url": None, "salary_min": None, "salary_max": None}
+    out = {
+        "description": None,
+        "application_url": None,
+        "salary_min": None,
+        "salary_max": None,
+    }
     app_url = job_data.get("applicationUrl") or job_data.get("applyUrl") or ""
     if app_url:
         out["application_url"] = _clean_application_url(app_url) or None
@@ -41,10 +47,14 @@ def job_fields(job_data: dict) -> dict:
     if len(desc) > MIN_DESCRIPTION:
         out["description"] = desc[:30000]
     # Salary: base, else total (USD only)
-    currency = (job_data.get("baseSalaryCurrency") or job_data.get("currency") or "USD").upper()
+    currency = (
+        job_data.get("baseSalaryCurrency") or job_data.get("currency") or "USD"
+    ).upper()
     if currency == "USD":
-        for key, names in (("salary_min", ("minBaseSalary", "minTotalSalary")),
-                           ("salary_max", ("maxBaseSalary", "maxTotalSalary"))):
+        for key, names in (
+            ("salary_min", ("minBaseSalary", "minTotalSalary")),
+            ("salary_max", ("maxBaseSalary", "maxTotalSalary")),
+        ):
             val = next((job_data.get(n) for n in names if job_data.get(n)), None)
             if isinstance(val, (int, float)) and val > 0:
                 out[key] = int(val)
@@ -54,8 +64,13 @@ def job_fields(job_data: dict) -> dict:
 def job_object(next_data: dict) -> dict:
     """The job object from a job page's parsed `__NEXT_DATA__` ({} when the page has none)."""
     props = (next_data or {}).get("props", {}).get("pageProps", {})
-    return (props.get("initialJobDetails") or props.get("job") or props.get("jobData")
-            or props.get("initialJob") or {})
+    return (
+        props.get("initialJobDetails")
+        or props.get("job")
+        or props.get("jobData")
+        or props.get("initialJob")
+        or {}
+    )
 
 
 def parse_job_page(html: str) -> dict | None:
@@ -77,9 +92,13 @@ async def fetch_job(url: str) -> dict | None:
     if not jid or not host_matches(url, "levels.fyi"):
         return None
     from backend.scraper._shared.url_safety import safe_get
+
     try:
-        resp = await safe_get(f"https://www.levels.fyi/jobs?jobId={jid}", timeout=20,
-                              headers={"User-Agent": _UA})
+        resp = await safe_get(
+            f"https://www.levels.fyi/jobs?jobId={jid}",
+            timeout=20,
+            headers={"User-Agent": _UA},
+        )
     except Exception as e:  # noqa: BLE001 - None is "unknown"
         logger.info(f"levels.fyi job {jid}: {e}")
         return None

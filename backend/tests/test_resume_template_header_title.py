@@ -1,4 +1,5 @@
 """`header.title` prints in every résumé template, and only when set; an empty value renders nothing so no layout shifts."""
+
 import re
 from pathlib import Path
 
@@ -11,20 +12,31 @@ TITLE = "Senior Product Manager"
 
 
 def _template_names():
-    return sorted(p.name for p in TEMPLATES_DIR.iterdir()
-                  if (p / "template.html.j2").exists())
+    return sorted(
+        p.name for p in TEMPLATES_DIR.iterdir() if (p / "template.html.j2").exists()
+    )
 
 
 def _render(name, header):
     from jinja2 import Environment, FileSystemLoader
     from markupsafe import Markup
+
     env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR / name)))
     # the real renderer's only custom filter (routes_resumes._render_html)
-    env.filters["bold"] = lambda text: Markup(re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text or ""))
+    env.filters["bold"] = lambda text: Markup(
+        re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text or "")
+    )
     return env.get_template("template.html.j2").render(
-        header=header, summary="A summary.", experience=[], skills={},
-        education=[], projects=[], publications=[],
-        page_format="letter", fonts_base="", fonts={},
+        header=header,
+        summary="A summary.",
+        experience=[],
+        skills={},
+        education=[],
+        projects=[],
+        publications=[],
+        page_format="letter",
+        fonts_base="",
+        fonts={},
     )
 
 
@@ -37,11 +49,13 @@ def test_template_prints_the_header_title(name):
 @pytest.mark.parametrize("name", _template_names())
 def test_template_prints_nothing_when_the_title_is_empty(name):
     """Optional means absent — not an empty element that still takes space."""
-    with_title = _render(name, {"name": "Dana Okonkwo", "title": TITLE, "contact_items": []})
+    with_title = _render(
+        name, {"name": "Dana Okonkwo", "title": TITLE, "contact_items": []}
+    )
     without = _render(name, {"name": "Dana Okonkwo", "contact_items": []})
     blank = _render(name, {"name": "Dana Okonkwo", "title": "", "contact_items": []})
 
     assert TITLE not in without
-    assert without == blank                      # "" behaves exactly like absent
-    assert len(without) < len(with_title)        # the slot really is conditional
+    assert without == blank  # "" behaves exactly like absent
+    assert len(without) < len(with_title)  # the slot really is conditional
     assert "title-line" not in without or "title-line" in without.split("<body")[0]

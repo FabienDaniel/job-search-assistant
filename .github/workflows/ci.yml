@@ -23,12 +23,14 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install ruff
-        run: pip install ruff
-      - name: Run ruff (lenient — errors only, no style warnings)
+        run: pip install ruff==0.17.4
+      - name: Run ruff lint
         run: |
-          ruff check backend/ --select=E9,F63,F7,F82 --output-format=github
-        # E9 syntax errors, F63 pointless comparisons, F7 syntax, F82 undefined names
-        # We skip style rules since this is a personal project
+          ruff check . --select=E9,F63,F7,F82,I001 --output-format=github
+        # E9 syntax errors, F63 pointless comparisons, F7 syntax, F82 undefined names, I001 import order
+      - name: Check ruff formatting
+        run: |
+          ruff format --check .
 
   test-python:
     name: Run pytest (backend)

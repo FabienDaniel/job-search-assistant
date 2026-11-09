@@ -9,6 +9,7 @@ in clear.
 Skips when the baseline dump or `pg_restore` is not available (i.e. outside the
 backend container).
 """
+
 import os
 import pathlib
 import shutil
@@ -23,8 +24,13 @@ ENV = pathlib.Path("/app/.env")
 def _env_secrets():
     """Long values from the environment that must be treated as secrets."""
     out = {}
-    for key in ("ANTHROPIC_API_KEY", "INITIAL_API_KEY", "TELEGRAM_BOT_TOKEN",
-                "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"):
+    for key in (
+        "ANTHROPIC_API_KEY",
+        "INITIAL_API_KEY",
+        "TELEGRAM_BOT_TOKEN",
+        "GMAIL_CLIENT_SECRET",
+        "GMAIL_REFRESH_TOKEN",
+    ):
         value = os.getenv(key, "")
         if len(value) >= 8:
             out[key] = value
@@ -40,7 +46,8 @@ def settings_sql():
         pytest.skip("pg_restore not available")
     proc = subprocess.run(
         ["pg_restore", "--data-only", "--table=settings", "-f", "-", str(DUMP)],
-        capture_output=True, timeout=300,
+        capture_output=True,
+        timeout=300,
     )
     if proc.returncode != 0:
         pytest.skip(f"pg_restore failed: {proc.stderr[:200]!r}")
@@ -85,9 +92,10 @@ def test_which_env_secrets_reach_the_dump_is_recorded(settings_sql):
 def test_a_dump_never_reaches_the_api_surface(client):  # noqa: F811
     """No route serves a backup file; /api/db/backup only returns a run id."""
     from backend.main import app
+
     paths = {r.path for r in app.routes}
     assert not any("backup" in p and "{" in p for p in paths)
     assert "/api/db/backup" in paths
 
 
-from backend.tests.r4_support import client, _clear_running_state, _no_outbound  # noqa: E402,F401
+from backend.tests.r4_support import _clear_running_state, _no_outbound, client  # noqa: E402,F401

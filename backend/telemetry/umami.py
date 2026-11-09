@@ -1,5 +1,6 @@
 """Sending events to the maintainer's Umami (`/api/send`). Fire and forget: a send never raises,
 and nothing is sent when the owner has not chosen, JN_TELEMETRY=off, or no website id is set."""
+
 import asyncio
 import logging
 import re
@@ -13,24 +14,34 @@ from backend.telemetry import level as L
 logger = logging.getLogger("jobnavigator.telemetry")
 
 UMAMI_HOST = "https://a.viktoresadze.com"
-UMAMI_WEBSITE_ID = "2e5ee60a-d056-47cc-86d8-e9b3ab51fede"   # Umami › Settings › Websites › JobNavigator app; empty = nothing is sent
-HOSTNAME = "jobnavigator.local"   # never the install's own domain (Umami wants a dotted name)
+UMAMI_WEBSITE_ID = "2e5ee60a-d056-47cc-86d8-e9b3ab51fede"  # Umami › Settings › Websites › JobNavigator app; empty = nothing is sent
+HOSTNAME = (
+    "jobnavigator.local"  # never the install's own domain (Umami wants a dotted name)
+)
 TIMEOUT = 10.0
-_transport = None           # tests put an httpx.MockTransport here
+_transport = None  # tests put an httpx.MockTransport here
 
 
 def _user_agent() -> str:
     from backend.version import APP_VERSION
+
     # browser-like, so Umami's bot filter keeps server events (job-ops does the same)
-    return ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
-            f"Chrome/130.0 Safari/537.36 JobNavigator/{APP_VERSION}")
+    return (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+        f"Chrome/130.0 Safari/537.36 JobNavigator/{APP_VERSION}"
+    )
 
 
-PAGE_VIEW = "page_view"   # sent to Umami as a page view (no event name), not as an event
+PAGE_VIEW = "page_view"  # sent to Umami as a page view (no event name), not as an event
 
 
 def body(name: str, data: dict, url: str = "/server") -> dict:
-    payload = {"website": UMAMI_WEBSITE_ID, "hostname": HOSTNAME, "url": url, "language": "en"}
+    payload = {
+        "website": UMAMI_WEBSITE_ID,
+        "hostname": HOSTNAME,
+        "url": url,
+        "language": "en",
+    }
     if name != PAGE_VIEW:
         payload.update(name=name, data=data)
     return {"type": "event", "payload": payload}
@@ -52,12 +63,13 @@ async def _post_batches(bodies) -> int:
         return 0
     sent = 0
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT, transport=_transport,
-                                     headers={"User-Agent": _user_agent()}) as client:
+        async with httpx.AsyncClient(
+            timeout=TIMEOUT, transport=_transport, headers={"User-Agent": _user_agent()}
+        ) as client:
             for i in range(0, len(bodies), BATCH_SIZE):
                 if i and BATCH_PAUSE:
                     await asyncio.sleep(BATCH_PAUSE)
-                chunk = bodies[i:i + BATCH_SIZE]
+                chunk = bodies[i : i + BATCH_SIZE]
                 resp = await client.post(f"{UMAMI_HOST}/api/batch", json=chunk)
                 if resp.status_code < 300:
                     try:
@@ -66,13 +78,14 @@ async def _post_batches(bodies) -> int:
                         sent += len(chunk)
                 else:
                     logger.warning(f"Telemetry batch refused: HTTP {resp.status_code}")
-    except Exception as e:   # Umami down, no network: the app carries on
+    except Exception as e:  # Umami down, no network: the app carries on
         logger.warning(f"Telemetry not sent: {type(e).__name__}")
     return sent
 
 
 def _session():
     from backend.models.db import SessionLocal
+
     return SessionLocal()
 
 
@@ -80,6 +93,7 @@ async def send_start() -> int:
     """At startup: `app_started`. Never raises (it runs as a bare task in the app's lifespan)."""
     from backend.accounts.context import unscoped
     from backend.telemetry.events import heartbeat
+
     try:
         with unscoped():
             db = _session()
@@ -88,7 +102,7 @@ async def send_start() -> int:
                 if not L.sends_anything(level) or not UMAMI_WEBSITE_ID:
                     return 0
                 events = [("app_started", heartbeat(db, "app_started"))]
-                db.commit()   # no transaction waits on the network
+                db.commit()  # no transaction waits on the network
             finally:
                 db.close()
         return await send(events)
@@ -100,7 +114,6 @@ async def send_start() -> int:
 # ── browser events, relayed (the browser never talks to Umami) ──────────────
 # The browser posts to this install's /api/telemetry/event; checked again here and sent with
 # the server's agent, so Umami sees neither the user's browser and IP nor this install's address.
-
 
 
 _NAME = re.compile(r"^[a-z_]{1,40}$")
@@ -153,6 +166,7 @@ async def relay(name, data, url) -> bool:
     """Queue one browser event when the install is at `full` (sent with the others every 30 s).
     Never raises."""
     from backend.accounts.context import unscoped
+
     ev = clean_browser_event(name, data, url)
     if ev is None or not UMAMI_WEBSITE_ID:
         return False
@@ -185,6 +199,7 @@ async def send_daily() -> int:
     from backend.accounts.context import unscoped
     from backend.accounts.settings import put_setting
     from backend.telemetry.events import daily_events
+
     with unscoped():
         db = _session()
         try:

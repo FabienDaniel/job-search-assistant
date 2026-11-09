@@ -1,4 +1,5 @@
 """Company career-pages source — orchestrates ATS dispatch per URL; _dispatch_ats detects the ATS and calls the matching ats.<name>.scrape, falling through to ats.generic.scrape if nothing matches."""
+
 import asyncio
 import logging
 import time
@@ -7,11 +8,20 @@ from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 
 from backend.models.db import (
-    SessionLocal, Company, Job, ScrapeLog, get_existing_external_ids,
+    Company,
+    Job,
+    ScrapeLog,
+    SessionLocal,
+    get_existing_external_ids,
 )
-from backend.scraper._shared.browser import _get_browser, _new_page, _close_page
+from backend.scraper._shared.browser import _close_page, _get_browser, _new_page
+from backend.scraper._shared.dedup import (
+    _normalize_url,
+    make_content_hash,
+    make_external_id,
+    mark_ignored,
+)
 from backend.scraper._shared.filters import _apply_company_filters
-from backend.scraper._shared.dedup import make_external_id, make_content_hash, mark_ignored, _normalize_url
 from backend.scraper._shared.posting_links import counts_as_new
 from backend.scraper.ats import generic, registry
 from backend.scraper.ats._descriptions import _fetch_descriptions_parallel
@@ -21,14 +31,24 @@ logger = logging.getLogger("jobnavigator.scraper.sources.company_pages")
 
 # ── ATS dispatcher ───────────────────────────────────────────────────────────
 
-async def _dispatch_ats(url: str, debug: bool = False, shared_browser=None, max_pages: int | None = None):
+
+async def _dispatch_ats(
+    url: str, debug: bool = False, shared_browser=None, max_pages: int | None = None
+):
     """Call the handler `ats.registry` picks for this URL, or the generic reader. `max_pages`
     only caps Playwright-paginated readers (Meta, Google, generic). The API handlers read the whole board."""
     handler = registry.detect(url)
     if handler is not None:
-        return await handler.scrape(url, debug=debug, browser=shared_browser, max_pages=max_pages)
+        return await handler.scrape(
+            url, debug=debug, browser=shared_browser, max_pages=max_pages
+        )
     # None keeps generic's own default page cap.
-    return await generic.scrape(url, browser=shared_browser, debug=debug, **({'max_pages': max_pages} if max_pages else {}))
+    return await generic.scrape(
+        url,
+        browser=shared_browser,
+        debug=debug,
+        **({"max_pages": max_pages} if max_pages else {}),
+    )
 
 
 def _refresh_known_jobs(db, known: dict) -> int:
@@ -37,19 +57,39 @@ def _refresh_known_jobs(db, known: dict) -> int:
     alone, and `location` is filled only when the row has none. This is how a
     normal company pass back-fills postings scraped before the handlers emitted
     these fields, without re-fetching anything."""
-    from backend.analyzer.work_arrangement import apply_arrangement_to_job
     from backend.analyzer.location import apply_location_to_job
+    from backend.analyzer.work_arrangement import apply_arrangement_to_job
+
     ids = list(known)
-    rows = db.query(Job).filter(
-        Job.external_id.in_(ids),
-        ((Job.loc_country == None) & (Job.loc_region == None) & (Job.loc_city == None))
-        | ((Job.arr_remote == None) & (Job.arr_hybrid == None) & (Job.arr_onsite == None)),
-    ).all()
+    rows = (
+        db.query(Job)
+        .filter(
+            Job.external_id.in_(ids),
+            (
+                (Job.loc_country == None)
+                & (Job.loc_region == None)
+                & (Job.loc_city == None)
+            )
+            | (
+                (Job.arr_remote == None)
+                & (Job.arr_hybrid == None)
+                & (Job.arr_onsite == None)
+            ),
+        )
+        .all()
+    )
     touched = 0
     for job in rows:
         j = known.get(job.external_id) or {}
-        before = (job.location, job.loc_country, job.loc_region, job.loc_city,
-                  job.arr_remote, job.arr_hybrid, job.arr_onsite)
+        before = (
+            job.location,
+            job.loc_country,
+            job.loc_region,
+            job.loc_city,
+            job.arr_remote,
+            job.arr_hybrid,
+            job.arr_onsite,
+        )
         try:
             if not (job.location or "").strip() and j.get("location"):
                 job.location = j["location"]
@@ -58,8 +98,15 @@ def _refresh_known_jobs(db, known: dict) -> int:
         except Exception as e:
             logger.warning(f"Refresh failed for '{job.title}': {e}")
             continue
-        after = (job.location, job.loc_country, job.loc_region, job.loc_city,
-                 job.arr_remote, job.arr_hybrid, job.arr_onsite)
+        after = (
+            job.location,
+            job.loc_country,
+            job.loc_region,
+            job.loc_city,
+            job.arr_remote,
+            job.arr_hybrid,
+            job.arr_onsite,
+        )
         if after != before:
             touched += 1
     return touched
@@ -80,8 +127,9 @@ def _ats_labels_for(urls) -> str:
     return ", ".join(sorted(labels))
 
 
-def record_company_scrape_log(company_id, company_name: str, result: dict, db=None, run_id=None,
-                              scraped_at=None):
+def record_company_scrape_log(
+    company_id, company_name: str, result: dict, db=None, run_id=None, scraped_at=None
+):
     """Write the per-company ScrapeLog row for one career-page scrape; single source of truth for both the batch path and the manual single-company trigger so /api/scrape-log, is_warning and /health/entities see manual runs like scheduled ones. `db` lets a caller reuse an open session. The row belongs to the current account; `run_id` links the rows of every account one shared fetch fed (MT-8)."""
     own_db = db is None
     if own_db:
@@ -99,10 +147,7 @@ def record_company_scrape_log(company_id, company_name: str, result: dict, db=No
         # next tick measures the interval from start to start, not from the end of a
         # fetch that ran minutes into the previous tick.
         comp.last_scraped_at = scraped_at or datetime.now(timezone.utc)
-        is_warning = (
-            result.get("jobs_found", 0) == 0
-            and not result.get("error")
-        )
+        is_warning = result.get("jobs_found", 0) == 0 and not result.get("error")
         log = ScrapeLog(
             source=f"playwright_{company_name}",
             company_id=company_id,
@@ -122,12 +167,13 @@ def record_company_scrape_log(company_id, company_name: str, result: dict, db=No
 
 # ── Per-company scraper ──────────────────────────────────────────────────────
 
+
 async def _fetch_postings(company, target_urls: list, browser) -> tuple[list, list]:
     """The fetch half of a company scrape (MT-8): every URL through its ATS handler, deduped
     by posting URL. Returns (postings, url_errors); one URL failing never stops the rest.
     Reads only what the target key covers (URLs, max_pages, wait_for_selector), so the
     result can be shared by every company with the same key."""
-    max_pages = getattr(company, 'max_pages', 5) or 5
+    max_pages = getattr(company, "max_pages", 5) or 5
     unique_jobs = []
     seen_urls = set()
     url_errors = []
@@ -137,15 +183,22 @@ async def _fetch_postings(company, target_urls: list, browser) -> tuple[list, li
             # Handled explicitly here (not via _dispatch_ats's generic branch) because generic
             # needs company.wait_for_selector + max_pages, not _dispatch_ats's defaults.
             if registry.detect(target_url) is not None:
-                page_jobs = await _dispatch_ats(target_url, debug=False, shared_browser=browser, max_pages=max_pages)
+                page_jobs = await _dispatch_ats(
+                    target_url, debug=False, shared_browser=browser, max_pages=max_pages
+                )
             else:
                 page = await _new_page(browser)
                 await generic._setup_route_blocks(page)
-                await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
-                wait_sel = getattr(company, 'wait_for_selector', None)
+                await page.goto(
+                    target_url, wait_until="domcontentloaded", timeout=30000
+                )
+                wait_sel = getattr(company, "wait_for_selector", None)
                 await generic._wait_for_content(page, wait_sel)
                 page_jobs = await generic._extract_all_pages(
-                    page, target_url, max_pages, wait_for_selector=wait_sel,
+                    page,
+                    target_url,
+                    max_pages,
+                    wait_for_selector=wait_sel,
                 )
                 await _close_page(page)
             for j in page_jobs:
@@ -158,9 +211,12 @@ async def _fetch_postings(company, target_urls: list, browser) -> tuple[list, li
     return unique_jobs, url_errors
 
 
-async def scrape_single_career_page(company: Company, shared_browser=None,
-                                     known_external_ids: set = None,
-                                     shared_fetch=None) -> dict:
+async def scrape_single_career_page(
+    company: Company,
+    shared_browser=None,
+    known_external_ids: set = None,
+    shared_fetch=None,
+) -> dict:
     """Scrape a single company career page via company.scrape_urls, optionally reusing shared_browser; `known_external_ids`, when passed, is the batch's dedup set (of the current account) loaded once and mutated in place so later companies see earlier inserts.
 
     `shared_fetch` (a `backend.scraper.targets.SharedFetch`) makes several companies with
@@ -192,15 +248,20 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
             pw, browser = await _get_browser()
 
         if shared_fetch is None:
-            unique_jobs, url_errors = await _fetch_postings(company, target_urls, browser)
+            unique_jobs, url_errors = await _fetch_postings(
+                company, target_urls, browser
+            )
         else:
             unique_jobs, url_errors = await shared_fetch.get(
-                lambda: _fetch_postings(company, target_urls, browser))
+                lambda: _fetch_postings(company, target_urls, browser)
+            )
             if prefetched:
                 # This account's run includes the fetch it rode on, so durations compare.
                 start_time -= shared_fetch.duration
 
-        all_postings = list(unique_jobs)   # before the title filters: what the board lists
+        all_postings = list(
+            unique_jobs
+        )  # before the title filters: what the board lists
         if not unique_jobs:
             duration = time.time() - start_time
             return {
@@ -211,6 +272,7 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
             }
 
         from backend.models.db import get_global_title_exclude
+
         _gte_db = SessionLocal()
         try:
             _global_title_excl = get_global_title_exclude(_gte_db)
@@ -219,12 +281,17 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
         filtered_out = []
         has_filters = (
             (company.title_include_expr and company.title_include_expr.strip())
-            or (company.title_exclude_keywords and len(company.title_exclude_keywords) > 0)
+            or (
+                company.title_exclude_keywords
+                and len(company.title_exclude_keywords) > 0
+            )
             or _global_title_excl
         )
         if has_filters:
             before_count = len(unique_jobs)
-            unique_jobs, filtered_out = _apply_company_filters(unique_jobs, company, _global_title_excl)
+            unique_jobs, filtered_out = _apply_company_filters(
+                unique_jobs, company, _global_title_excl
+            )
             logger.info(
                 f"Keyword filter for {company.name}: {before_count} -> {len(unique_jobs)} kept, {len(filtered_out)} ignored"
             )
@@ -232,15 +299,20 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
         db = SessionLocal()
         new_jobs = 0
         try:
-            existing_ids = known_external_ids if known_external_ids is not None else get_existing_external_ids(db)
+            existing_ids = (
+                known_external_ids
+                if known_external_ids is not None
+                else get_existing_external_ids(db)
+            )
             # Per-company hoist for the per-job H-1B scan, avoiding a Settings read + JSON parse
             # and a company lookup per job.
             from backend.analyzer.h1b_checker import load_exclusion_phrases
+
             _phrases = load_exclusion_phrases(db)
             _company_lookup = {company.name.strip().lower(): company}
 
             jobs_needing_desc = []
-            known_here = {}   # ext_id -> scraped dict, for rows the feed already holds
+            known_here = {}  # ext_id -> scraped dict, for rows the feed already holds
             for j in unique_jobs:
                 ext_id = make_external_id(company.name, j["title"], j["url"])
                 content_hash = make_content_hash(company.name, j["title"])
@@ -265,15 +337,27 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
             # QA F6 / T5-04: the description fetch is the long await; a company deleted
             # meanwhile gets nothing inserted. (The locked re-check before the commit
             # covers the rest of the ingest.)
-            if jobs_needing_desc and db.query(Company.id).filter(Company.id == company_id).first() is None:
+            if (
+                jobs_needing_desc
+                and db.query(Company.id).filter(Company.id == company_id).first()
+                is None
+            ):
                 db.rollback()
-                logger.info(f"{company_name} was deleted during its scrape; ingest discarded")
-                return {"jobs_found": len(unique_jobs), "new_jobs": 0, "error": None,
-                        "duration": time.time() - start_time, "deleted": True}
+                logger.info(
+                    f"{company_name} was deleted during its scrape; ingest discarded"
+                )
+                return {
+                    "jobs_found": len(unique_jobs),
+                    "new_jobs": 0,
+                    "error": None,
+                    "duration": time.time() - start_time,
+                    "deleted": True,
+                }
 
             # The loop below writes rows; the H-1B lookup happens before it (S2-01).
             if jobs_needing_desc:
                 from backend.scraper._shared.analysis import prefetch_h1b
+
                 await prefetch_h1b([company.name])
 
             for j in jobs_needing_desc:
@@ -299,19 +383,28 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
                 # Always run even without a description — the company-level LCA check doesn't need it.
                 try:
                     from backend.analyzer.h1b_checker import check_job_h1b
-                    from backend.analyzer.salary_extractor import apply_salary_to_job
-                    from backend.analyzer.work_arrangement import apply_arrangement_to_job
                     from backend.analyzer.location import apply_location_to_job
-                    await check_job_h1b(job, db, company_lookup=_company_lookup, phrases=_phrases)
+                    from backend.analyzer.salary_extractor import apply_salary_to_job
+                    from backend.analyzer.work_arrangement import (
+                        apply_arrangement_to_job,
+                    )
+
+                    await check_job_h1b(
+                        job, db, company_lookup=_company_lookup, phrases=_phrases
+                    )
                     apply_salary_to_job(job, getattr(job, "_h1b_median", None))
                     apply_arrangement_to_job(job, structured=j.get("arrangement"))
                     apply_location_to_job(job, extra=j.get("locations"))
                 except Exception as analysis_err:
-                    logger.warning(f"Inline analysis failed for {j['title']}: {analysis_err}")
+                    logger.warning(
+                        f"Inline analysis failed for {j['title']}: {analysis_err}"
+                    )
 
                 if job.h1b_jd_flag:
                     _phrase = getattr(job, "_h1b_matched_phrase", None) or "?"
-                    logger.info(f"Skipping job (body exclusion): {j['title']} @ {job.company or company_name} — matched phrase: {_phrase!r}")
+                    logger.info(
+                        f"Skipping job (body exclusion): {j['title']} @ {job.company or company_name} — matched phrase: {_phrase!r}"
+                    )
                     mark_ignored(job)
 
                 try:
@@ -322,10 +415,14 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
                         new_jobs += counts_as_new(job)
                     existing_ids.add(ext_id)
                 except IntegrityError:
-                    logger.debug(f"Duplicate external_id for '{j['title']}' at {company.name}, skipping")
+                    logger.debug(
+                        f"Duplicate external_id for '{j['title']}' at {company.name}, skipping"
+                    )
                     continue
                 except Exception as e:
-                    logger.warning(f"Insert failed for '{j['title']}' at {company.name} ({j['url']}): {e}")
+                    logger.warning(
+                        f"Insert failed for '{j['title']}' at {company.name} ({j['url']}): {e}"
+                    )
                     continue
 
             # Save filtered-out jobs as "ignored" for dedup purposes
@@ -353,7 +450,9 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
                 except IntegrityError:
                     continue
                 except Exception as e:
-                    logger.warning(f"Insert failed for ignored job '{j['title']}' at {company.name} ({j['url']}): {e}")
+                    logger.warning(
+                        f"Insert failed for ignored job '{j['title']}' at {company.name} ({j['url']}): {e}"
+                    )
                     continue
 
             refreshed = _refresh_known_jobs(db, known_here) if known_here else 0
@@ -362,32 +461,53 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
             # board was fetched. Re-read it with a row lock just before the commit: gone →
             # throw this ingest away, so a deleted company's postings never reappear; there
             # → a concurrent DELETE waits for this commit (Postgres; SQLite has no FOR UPDATE).
-            comp = (db.query(Company).filter(Company.id == company_id)
-                    .with_for_update().first())
+            comp = (
+                db.query(Company)
+                .filter(Company.id == company_id)
+                .with_for_update()
+                .first()
+            )
             if comp is None:
                 db.rollback()
-                logger.info(f"{company_name} was deleted during its scrape; ingest discarded")
-                return {"jobs_found": len(unique_jobs), "new_jobs": 0, "error": None,
-                        "duration": time.time() - start_time, "deleted": True}
+                logger.info(
+                    f"{company_name} was deleted during its scrape; ingest discarded"
+                )
+                return {
+                    "jobs_found": len(unique_jobs),
+                    "new_jobs": 0,
+                    "error": None,
+                    "duration": time.time() - start_time,
+                    "deleted": True,
+                }
             comp.last_scraped_at = datetime.now(timezone.utc)
             # Postings gone from a full scrape twice in a row are marked closed.
             from backend.scraper._shared.missing_postings import note_scrape
+
             missing = note_scrape(db, comp, target_urls, all_postings, url_errors)
             if missing["closed"] or missing["reopened"]:
-                logger.info(f"{company_name}: {missing['closed']} closed (missing from the board), "
-                            f"{missing['reopened']} open again")
+                logger.info(
+                    f"{company_name}: {missing['closed']} closed (missing from the board), "
+                    f"{missing['reopened']} open again"
+                )
 
             db.commit()
             if refreshed:
-                logger.info(f"{company_name}: location/arrangement filled on {refreshed} existing job(s)")
+                logger.info(
+                    f"{company_name}: location/arrangement filled on {refreshed} existing job(s)"
+                )
         finally:
             db.close()
 
         duration = time.time() - start_time
 
         from backend.activity import log_activity
+
         ats_label = _ats_labels_for(target_urls)
-        log_activity("scrape", f"{company_name} ({ats_label}): {new_jobs} new / {len(unique_jobs)} found in {duration:.1f}s", company=company_name)
+        log_activity(
+            "scrape",
+            f"{company_name} ({ats_label}): {new_jobs} new / {len(unique_jobs)} found in {duration:.1f}s",
+            company=company_name,
+        )
 
         return {
             "jobs_found": len(unique_jobs),
@@ -402,7 +522,10 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
         logger.error(f"{company_name} ({ats_label}) scrape failed: {e}")
 
         from backend.activity import log_activity
-        log_activity("scrape", f"{company_name} ({ats_label}) failed: {e}", company=company_name)
+
+        log_activity(
+            "scrape", f"{company_name} ({ats_label}) failed: {e}", company=company_name
+        )
 
         return {"jobs_found": 0, "new_jobs": 0, "error": str(e), "duration": duration}
     finally:
@@ -415,13 +538,15 @@ async def scrape_single_career_page(company: Company, shared_browser=None,
 
 # ── Batch scraper ────────────────────────────────────────────────────────────
 
+
 def _row_still_there(db, row) -> bool:
     """False when `row` was deleted since it was loaded (refreshing an expired row then
     raises ObjectDeletedError). Rolls back a session left in a failed state first."""
-    from sqlalchemy.orm.exc import ObjectDeletedError
     from sqlalchemy.exc import PendingRollbackError
+    from sqlalchemy.orm.exc import ObjectDeletedError
+
     try:
-        row.id   # an expired row reloads here (a column load, not account-filtered)
+        row.id  # an expired row reloads here (a column load, not account-filtered)
         return True
     except ObjectDeletedError:
         return False
@@ -434,8 +559,9 @@ def _row_still_there(db, row) -> bool:
             return False
 
 
-async def scrape_career_pages(force: bool = False, account_ids=None,
-                              skip_company_ids=None) -> dict:
+async def scrape_career_pages(
+    force: bool = False, account_ids=None, skip_company_ids=None
+) -> dict:
     """Scrape career pages for every active company with a scrape URL (gated only on `active` and having a URL, deliberately not `playwright_enabled`), honoring per-company or global scrape_interval_minutes unless force=True skips interval checks; one company's failure is logged to its own ScrapeLog row without ending the batch, and one shared Playwright browser serves all companies that need it.
 
     MT-8: the companies of every account (`account_ids=None`) or of the listed accounts are
@@ -449,12 +575,19 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
     own scrape result (an ingest crash, a scoring sweep) are returned in `errors` as
     {"account", "where", "error"} for the run summary."""
     import uuid
-    from backend.accounts.settings import get_setting
+
     from backend.accounts.background import account_session, acting_as
+    from backend.accounts.settings import get_setting
     from backend.scraper.targets import (
-        company_due, company_key, company_target_due, group_targets, load_active, reusable_key,
+        company_due,
+        company_key,
+        company_target_due,
+        group_targets,
+        load_active,
+        reusable_key,
         shared_fetch_for,
     )
+
     db = SessionLocal()
     shared_pw = None
     shared_browser = None
@@ -486,7 +619,9 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
             + (f", {len(skipped)} active without URLs" if skipped else "")
         )
 
-        any_needs_browser = any(registry.needs_browser(c.scrape_urls or []) for c in companies)
+        any_needs_browser = any(
+            registry.needs_browser(c.scrape_urls or []) for c in companies
+        )
         if any_needs_browser:
             shared_pw, shared_browser = await _get_browser()
             logger.info("Playwright: launched shared browser for batch scrape")
@@ -497,7 +632,7 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
         external_ids_by_account: dict = {}
 
         now = datetime.now(timezone.utc)
-        sweep_accounts: list = []   # accounts that need the post-batch scoring sweep
+        sweep_accounts: list = []  # accounts that need the post-batch scoring sweep
         for target in group_targets(companies, company_key):
             # T5-01: the rows were loaded before earlier targets committed; drop subscribers
             # deleted since then before anything reads their attributes.
@@ -506,7 +641,12 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
                 if _row_still_there(db, company):
                     alive.append(company)
                 else:
-                    skipped.append({"name": ident[id(company)][1], "reason": "deleted during the run"})
+                    skipped.append(
+                        {
+                            "name": ident[id(company)][1],
+                            "reason": "deleted during the run",
+                        }
+                    )
             if not alive:
                 continue
             target.subscribers = alive
@@ -517,12 +657,18 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
                 due, _effective = company_target_due(target, now, global_interval)
                 if not due:
                     for company in target.subscribers:
-                        _, elapsed, interval = company_due(company, now, global_interval)
-                        logger.debug(f"Skipping {company.name}: scraped {elapsed:.0f}m ago (interval={interval}m)")
-                        skipped.append({
-                            "name": company.name,
-                            "reason": f"not due ({elapsed:.1f}m of {interval}m)",
-                        })
+                        _, elapsed, interval = company_due(
+                            company, now, global_interval
+                        )
+                        logger.debug(
+                            f"Skipping {company.name}: scraped {elapsed:.0f}m ago (interval={interval}m)"
+                        )
+                        skipped.append(
+                            {
+                                "name": company.name,
+                                "reason": f"not due ({elapsed:.1f}m of {interval}m)",
+                            }
+                        )
                     continue
 
             run_id = uuid.uuid4()
@@ -542,35 +688,52 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
                         # or account deleted since the batch loaded is skipped, never touched.
                         fresh = sdb.query(Company).filter(Company.id == cid).first()
                         if fresh is None:
-                            skipped.append({"name": cname, "reason": "deleted during the run"})
+                            skipped.append(
+                                {"name": cname, "reason": "deleted during the run"}
+                            )
                             continue
                         company = fresh
                         if account not in external_ids_by_account:
-                            external_ids_by_account[account] = get_existing_external_ids(sdb)
+                            external_ids_by_account[account] = (
+                                get_existing_external_ids(sdb)
+                            )
                         kwargs = {"shared_fetch": shared} if shared is not None else {}
                         result = await scrape_single_career_page(
-                            company, shared_browser=shared_browser,
-                            known_external_ids=external_ids_by_account[account], **kwargs)
+                            company,
+                            shared_browser=shared_browser,
+                            known_external_ids=external_ids_by_account[account],
+                            **kwargs,
+                        )
                         if result.get("deleted"):
-                            skipped.append({"name": cname, "reason": "deleted during the run"})
+                            skipped.append(
+                                {"name": cname, "reason": "deleted during the run"}
+                            )
                             continue
                         auto_depth = company.auto_scoring_depth
-                        record_company_scrape_log(cid, cname, result, db=sdb, run_id=run_id,
-                                                  scraped_at=now)
+                        record_company_scrape_log(
+                            cid, cname, result, db=sdb, run_id=run_id, scraped_at=now
+                        )
                         scraped += 1
                         if result.get("error"):
                             failed += 1
 
                         logger.info(
                             f"Playwright {cname}: found={result['jobs_found']}, new={result['new_jobs']}"
-                            + (f" (shared fetch, {len(target.subscribers)} subscribers)" if target.shared else "")
+                            + (
+                                f" (shared fetch, {len(target.subscribers)} subscribers)"
+                                if target.shared
+                                else ""
+                            )
                         )
 
                         # Mark for one pool sweep per account at batch end rather than per company — the
                         # sweep picks up all unscored auto-score jobs (including retries), so per-company
                         # would re-walk it N times.
-                        if (auto_depth in ("light", "full") and result.get("new_jobs", 0) > 0
-                                and account not in sweep_accounts):
+                        if (
+                            auto_depth in ("light", "full")
+                            and result.get("new_jobs", 0) > 0
+                            and account not in sweep_accounts
+                        ):
                             sweep_accounts.append(account)
                     except Exception as e:
                         # Roll back first: after a failed flush every ORM attribute access
@@ -580,25 +743,48 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
                         except Exception:
                             logger.exception("Rollback failed")
                         try:
-                            gone = sdb.query(Company.id).filter(Company.id == cid).first() is None
+                            gone = (
+                                sdb.query(Company.id).filter(Company.id == cid).first()
+                                is None
+                            )
                         except Exception:
                             gone = False
                         if gone:
-                            logger.info(f"Company '{cname}' was deleted during the run, skipped: {e}")
-                            skipped.append({"name": cname, "reason": "deleted during the run"})
+                            logger.info(
+                                f"Company '{cname}' was deleted during the run, skipped: {e}"
+                            )
+                            skipped.append(
+                                {"name": cname, "reason": "deleted during the run"}
+                            )
                             continue
                         failed += 1
-                        logger.exception(f"Company '{cname}' failed, batch continues: {e}")
-                        errors.append({"account": account, "where": f"company {cname}",
-                                       "error": f"{type(e).__name__}: {e}"})
+                        logger.exception(
+                            f"Company '{cname}' failed, batch continues: {e}"
+                        )
+                        errors.append(
+                            {
+                                "account": account,
+                                "where": f"company {cname}",
+                                "error": f"{type(e).__name__}: {e}",
+                            }
+                        )
                         try:
                             record_company_scrape_log(
-                                cid, cname,
-                                {"jobs_found": 0, "new_jobs": 0, "error": f"{type(e).__name__}: {e}", "duration": 0},
-                                run_id=run_id, scraped_at=now,
+                                cid,
+                                cname,
+                                {
+                                    "jobs_found": 0,
+                                    "new_jobs": 0,
+                                    "error": f"{type(e).__name__}: {e}",
+                                    "duration": 0,
+                                },
+                                run_id=run_id,
+                                scraped_at=now,
                             )
                         except Exception:
-                            logger.exception(f"Could not record the failure of '{cname}'")
+                            logger.exception(
+                                f"Could not record the failure of '{cname}'"
+                            )
 
             # End the batch session's read transaction and expire its rows, so the next
             # target's due/deleted checks read fresh values.
@@ -609,18 +795,31 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
             with acting_as(account):
                 try:
                     from backend.analyzer.cv_scorer import analyze_unscored_jobs
+
                     await analyze_unscored_jobs(status="new")
                 except Exception as e:
-                    logger.exception(f"Post-batch scoring sweep failed (scrape results are saved): {e}")
-                    errors.append({"account": account, "where": "company scoring sweep",
-                                   "error": f"{type(e).__name__}: {e}"})
+                    logger.exception(
+                        f"Post-batch scoring sweep failed (scrape results are saved): {e}"
+                    )
+                    errors.append(
+                        {
+                            "account": account,
+                            "where": "company scoring sweep",
+                            "error": f"{type(e).__name__}: {e}",
+                        }
+                    )
 
         if skipped:
             logger.info(
                 "Company scrapes skipped: "
                 + ", ".join(f"{s['name']} ({s['reason']})" for s in skipped)
             )
-        return {"scraped": scraped, "failed": failed, "skipped": skipped, "errors": errors}
+        return {
+            "scraped": scraped,
+            "failed": failed,
+            "skipped": skipped,
+            "errors": errors,
+        }
     finally:
         if shared_browser:
             await shared_browser.close()
@@ -631,6 +830,7 @@ async def scrape_career_pages(force: bool = False, account_ids=None,
 
 # ── Test scrape ──────────────────────────────────────────────────────────────
 
+
 async def preview(company: Company, db) -> dict:
     """Scrape a company's career pages and say what the run would keep, without saving.
 
@@ -639,12 +839,14 @@ async def preview(company: Company, db) -> dict:
     import base64
     import re
 
-    from backend.scraper._shared.browser import _get_browser, _new_page, _close_page
+    from backend.scraper._shared.browser import _close_page, _get_browser, _new_page
     from backend.scraper._shared.filters import match_title_expr
-    from backend.scraper.ats.generic import (
-        _extract_all_pages, _wait_for_content, _setup_route_blocks,
-    )
     from backend.scraper.ats import registry
+    from backend.scraper.ats.generic import (
+        _extract_all_pages,
+        _setup_route_blocks,
+        _wait_for_content,
+    )
 
     urls = company.scrape_urls or []
 
@@ -653,10 +855,15 @@ async def preview(company: Company, db) -> dict:
     # Mirrors the live scraper: title_exclude_global is applied at INSERT time (see
     # scraper/sources/company_pages.py:_apply_company_filters), so this reports what would actually save.
     from backend.models.db import get_global_title_exclude
+
     global_exclude_kws = [kw.lower() for kw in (get_global_title_exclude(db) or [])]
     # The run also drops jobs whose body matches body_exclusion_phrases (stored as
     # `ignored`); mirrored here with the same phrase scan, no live MyVisaJobs lookup.
-    from backend.analyzer.h1b_checker import load_exclusion_phrases, scan_jd_for_h1b_flags
+    from backend.analyzer.h1b_checker import (
+        load_exclusion_phrases,
+        scan_jd_for_h1b_flags,
+    )
+
     body_phrases = load_exclusion_phrases(db) or []
 
     all_jobs = []
@@ -678,26 +885,42 @@ async def preview(company: Company, db) -> dict:
             try:
                 handler = registry.detect(target_url)
                 if handler is not None:
-                    jobs, rejected = await handler.scrape(target_url, debug=True, browser=browser)
+                    jobs, rejected = await handler.scrape(
+                        target_url, debug=True, browser=browser
+                    )
                     all_jobs.extend(jobs)
                     all_rejected.extend(rejected)
-                    urls_scraped.append(f"{target_url[:80]}... ({len(jobs)} found via {handler.label})")
+                    urls_scraped.append(
+                        f"{target_url[:80]}... ({len(jobs)} found via {handler.label})"
+                    )
                     continue
 
                 page = await _new_page(browser)
                 await _setup_route_blocks(page)
-                await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
+                await page.goto(
+                    target_url, wait_until="domcontentloaded", timeout=30000
+                )
                 await _wait_for_content(page, company.wait_for_selector)
                 png_bytes = await page.screenshot(full_page=True)
-                screenshots.append({
-                    "url": target_url,
-                    "data": base64.b64encode(png_bytes).decode(),
-                })
-                jobs, rejected, pag_debug = await _extract_all_pages(page, target_url, max_pages, debug=True, wait_for_selector=company.wait_for_selector)
+                screenshots.append(
+                    {
+                        "url": target_url,
+                        "data": base64.b64encode(png_bytes).decode(),
+                    }
+                )
+                jobs, rejected, pag_debug = await _extract_all_pages(
+                    page,
+                    target_url,
+                    max_pages,
+                    debug=True,
+                    wait_for_selector=company.wait_for_selector,
+                )
                 all_jobs.extend(jobs)
                 all_rejected.extend(rejected)
                 all_pagination_debug.extend(pag_debug)
-                urls_scraped.append(f"{target_url} ({len(jobs)} found, {len(rejected)} rejected)")
+                urls_scraped.append(
+                    f"{target_url} ({len(jobs)} found, {len(rejected)} rejected)"
+                )
             except Exception as e:
                 urls_scraped.append(f"{target_url[:80]}... (error: {e})")
             finally:
@@ -707,9 +930,9 @@ async def preview(company: Company, db) -> dict:
         # Classify jobs with filter reasons across the layers the live run applies
         # (per-company title filters, then the global title_exclude_global setting).
         results = []
-        after_company_count = 0   # passes per-company only
-        would_save_count = 0      # passes per-company, global AND the body scan
-        body_excluded_count = 0   # would be stored as `ignored` by the real run
+        after_company_count = 0  # passes per-company only
+        would_save_count = 0  # passes per-company, global AND the body scan
+        body_excluded_count = 0  # would be stored as `ignored` by the real run
         body_unchecked_count = 0  # no description in the preview — can't say
         for j in all_jobs:
             title_lower = j["title"].lower()
@@ -717,12 +940,16 @@ async def preview(company: Company, db) -> dict:
             reason = None
             global_excluded_by = []
 
-            matched_exclude = [kw for kw in exclude_kws if re.search(r'\b' + re.escape(kw) + r'\b', title_lower)]
+            matched_exclude = [
+                kw
+                for kw in exclude_kws
+                if re.search(r"\b" + re.escape(kw) + r"\b", title_lower)
+            ]
             if matched_exclude:
                 reason = f"Excluded by: {', '.join(matched_exclude)}"
             elif include_expr and include_expr.strip():
-                    if not match_title_expr(include_expr, j["title"]):
-                        reason = f"No match for: {include_expr}"
+                if not match_title_expr(include_expr, j["title"]):
+                    reason = f"No match for: {include_expr}"
 
             passes_company = reason is None
             body_excluded_by = None
@@ -730,8 +957,11 @@ async def preview(company: Company, db) -> dict:
             if passes_company:
                 after_company_count += 1
                 global_excluded_by = [
-                    kw for kw in global_exclude_kws
-                    if re.search(r'\b' + re.escape(kw) + r'\b', title_orig, re.IGNORECASE)
+                    kw
+                    for kw in global_exclude_kws
+                    if re.search(
+                        r"\b" + re.escape(kw) + r"\b", title_orig, re.IGNORECASE
+                    )
                 ]
                 if global_excluded_by:
                     reason = f"[Global] Excluded by: {', '.join(global_excluded_by)}"
@@ -754,29 +984,33 @@ async def preview(company: Company, db) -> dict:
 
             kept = reason is None  # would actually save (passes all three layers)
 
-            results.append({
-                "title": j["title"],
-                "url": j["url"],
-                "kept": kept,
-                "reason": reason,
-                "passes_company_filter": passes_company,
-                "global_excluded_by": global_excluded_by,
-                # The phrase that would make the run store this as `ignored`, or null;
-                # body_checked is false when the preview had no description to scan.
-                "body_excluded_by": body_excluded_by,
-                "body_checked": body_checked,
-            })
+            results.append(
+                {
+                    "title": j["title"],
+                    "url": j["url"],
+                    "kept": kept,
+                    "reason": reason,
+                    "passes_company_filter": passes_company,
+                    "global_excluded_by": global_excluded_by,
+                    # The phrase that would make the run store this as `ignored`, or null;
+                    # body_checked is false when the preview had no description to scan.
+                    "body_excluded_by": body_excluded_by,
+                    "body_checked": body_checked,
+                }
+            )
 
         # Append rejected entries at the end so user can see what was dropped
         for r in all_rejected:
-            results.append({
-                "title": r["title"],
-                "url": r["url"],
-                "kept": False,
-                "reason": f"[Validation] {r['reason']} (via {r['selector']})",
-                "body_excluded_by": None,
-                "body_checked": False,
-            })
+            results.append(
+                {
+                    "title": r["title"],
+                    "url": r["url"],
+                    "kept": False,
+                    "reason": f"[Validation] {r['reason']} (via {r['selector']})",
+                    "body_excluded_by": None,
+                    "body_checked": False,
+                }
+            )
 
         return {
             "company": company.name,
@@ -789,7 +1023,7 @@ async def preview(company: Company, db) -> dict:
             "total_found": len(all_jobs),
             "total_rejected": len(all_rejected),
             "after_company_filter": after_company_count,  # passes per-company only
-            "after_filter": would_save_count,             # passes all three — what'd actually save
+            "after_filter": would_save_count,  # passes all three — what'd actually save
             # Footer arithmetic: kept · title-filtered · would-be-ignored
             "body_excluded_count": body_excluded_count,
             "body_unchecked_count": body_unchecked_count,

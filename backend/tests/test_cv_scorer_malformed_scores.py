@@ -1,5 +1,7 @@
 """A malformed LLM response ({"scores": null} / non-dict scores) must be treated as a transient failure (return None), never crash the scoring batch."""
+
 import asyncio
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -18,45 +20,65 @@ class FakeJob:
 @pytest.fixture
 def scorer_db(monkeypatch):
     from backend.models.db import Setting
+
     engine = create_engine("sqlite:///:memory:")
     Setting.__table__.create(engine)
     Session = sessionmaker(bind=engine)
     s = Session()
     s.add(Setting(key="scoring_rubric", value="RUBRIC"))
     s.add(Setting(key="scoring_output_light", value='{"scores": {CV_NAMES_HERE}}'))
-    s.add(Setting(key="scoring_output_full", value='FULL'))
+    s.add(Setting(key="scoring_output_full", value="FULL"))
     s.add(Setting(key="llm_model", value="claude-sonnet-4-6"))
     s.add(Setting(key="llm_provider", value="claude_api"))
     s.commit()
     s.close()
     from backend.analyzer import cv_scorer
+
     monkeypatch.setattr(cv_scorer, "SessionLocal", Session)
-    monkeypatch.setattr(cv_scorer, "_get_scoring_semaphore", lambda: asyncio.Semaphore(1))
+    monkeypatch.setattr(
+        cv_scorer, "_get_scoring_semaphore", lambda: asyncio.Semaphore(1)
+    )
     monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call", lambda **kw: None)
     return Session
 
 
 def _llm_returning(text):
     async def fake_call_llm(prompt, system, max_tokens, cached_prefix=None, **kwargs):
-        return {"text": text,
-                "usage": {"input_tokens": 1, "output_tokens": 1,
-                          "cache_read_tokens": 0, "cache_write_tokens": 0}}
+        return {
+            "text": text,
+            "usage": {
+                "input_tokens": 1,
+                "output_tokens": 1,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            },
+        }
+
     return fake_call_llm
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("bad_response", [
-    '{"scores": null, "best_cv": "PM"}',      # explicit null — .get default does NOT apply
-    '{"scores": "high", "best_cv": "PM"}',    # non-dict
-    '{"scores": [], "best_cv": "PM"}',        # wrong type
-    '{"scores": {}, "best_cv": "PM"}',        # empty — nothing scored
-    '{"best_cv": "PM"}',                      # key absent
-])
+@pytest.mark.parametrize(
+    "bad_response",
+    [
+        '{"scores": null, "best_cv": "PM"}',  # explicit null — .get default does NOT apply
+        '{"scores": "high", "best_cv": "PM"}',  # non-dict
+        '{"scores": [], "best_cv": "PM"}',  # wrong type
+        '{"scores": {}, "best_cv": "PM"}',  # empty — nothing scored
+        '{"best_cv": "PM"}',  # key absent
+    ],
+)
 async def test_malformed_scores_returns_none(scorer_db, monkeypatch, bad_response):
-    monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm", _llm_returning(bad_response))
+    monkeypatch.setattr(
+        "backend.analyzer.cv_scorer.call_llm", _llm_returning(bad_response)
+    )
     from backend.analyzer import cv_scorer
+
     result = await cv_scorer.score_job_sync(
-        FakeJob(), {"PM": "cv text"}, db=None, depth="light",
+        FakeJob(),
+        {"PM": "cv text"},
+        db=None,
+        depth="light",
         preloaded_text="JD text",
     )
     assert result is None, f"expected transient-failure None for {bad_response!r}"
@@ -64,11 +86,17 @@ async def test_malformed_scores_returns_none(scorer_db, monkeypatch, bad_respons
 
 @pytest.mark.asyncio
 async def test_valid_scores_still_succeed(scorer_db, monkeypatch):
-    monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm",
-                        _llm_returning('{"scores": {"PM": 72}, "best_cv": "PM"}'))
+    monkeypatch.setattr(
+        "backend.analyzer.cv_scorer.call_llm",
+        _llm_returning('{"scores": {"PM": 72}, "best_cv": "PM"}'),
+    )
     from backend.analyzer import cv_scorer
+
     result = await cv_scorer.score_job_sync(
-        FakeJob(), {"PM": "cv text"}, db=None, depth="light",
+        FakeJob(),
+        {"PM": "cv text"},
+        db=None,
+        depth="light",
         preloaded_text="JD text",
     )
     assert result is not None
@@ -76,19 +104,27 @@ async def test_valid_scores_still_succeed(scorer_db, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_prose_reply_is_a_transient_failure_worded_in_the_log(scorer_db, monkeypatch):
+async def test_prose_reply_is_a_transient_failure_worded_in_the_log(
+    scorer_db, monkeypatch
+):
     """A model that answers in prose must not crash the batch, and the logged reason must read as a sentence."""
     from backend.analyzer import cv_scorer
     from backend.analyzer.model_json import UNPARSEABLE_MESSAGE
 
     logged = {}
-    monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call",
-                        lambda **kw: logged.update(kw))
-    monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm",
-                        _llm_returning("I can't score that resume."))
+    monkeypatch.setattr(
+        "backend.analyzer.cv_scorer.log_llm_call", lambda **kw: logged.update(kw)
+    )
+    monkeypatch.setattr(
+        "backend.analyzer.cv_scorer.call_llm",
+        _llm_returning("I can't score that resume."),
+    )
 
     result = await cv_scorer.score_job_sync(
-        FakeJob(), {"PM": "cv text"}, db=None, depth="light",
+        FakeJob(),
+        {"PM": "cv text"},
+        db=None,
+        depth="light",
         preloaded_text="JD text",
     )
     assert result is None
@@ -98,11 +134,17 @@ async def test_prose_reply_is_a_transient_failure_worded_in_the_log(scorer_db, m
 
 @pytest.mark.asyncio
 async def test_scores_wrapped_in_prose_still_parse(scorer_db, monkeypatch):
-    monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm",
-                        _llm_returning('Here you go:\n```json\n{"scores": {"PM": 72}}\n```\nDone!'))
+    monkeypatch.setattr(
+        "backend.analyzer.cv_scorer.call_llm",
+        _llm_returning('Here you go:\n```json\n{"scores": {"PM": 72}}\n```\nDone!'),
+    )
     from backend.analyzer import cv_scorer
+
     result = await cv_scorer.score_job_sync(
-        FakeJob(), {"PM": "cv text"}, db=None, depth="light",
+        FakeJob(),
+        {"PM": "cv text"},
+        db=None,
+        depth="light",
         preloaded_text="JD text",
     )
     assert result["scores"] == {"PM": 72}

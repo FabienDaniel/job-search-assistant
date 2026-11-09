@@ -1,4 +1,5 @@
 """Pin that Playwright-based ATS scrapers (Google, Meta) honour max_pages. The scrapers need a real browser, so their own caps are checked by signature and source. The dispatch is checked with fakes."""
+
 import inspect
 import re
 
@@ -48,16 +49,23 @@ def test_meta_pagination_uses_max_pages_not_hardcoded_20():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("module, url", [
-    (google_ats, "https://www.google.com/about/careers/applications/jobs/results/?q=pm"),
-    (meta_ats, "https://www.metacareers.com/jobs?q=pm"),
-])
+@pytest.mark.parametrize(
+    "module, url",
+    [
+        (
+            google_ats,
+            "https://www.google.com/about/careers/applications/jobs/results/?q=pm",
+        ),
+        (meta_ats, "https://www.metacareers.com/jobs?q=pm"),
+    ],
+)
 async def test_dispatch_ats_forwards_max_pages_and_browser(monkeypatch, module, url):
     seen = {}
 
     async def fake_scrape(u, browser=None, max_pages=None, debug=False):
         seen.update(url=u, browser=browser, max_pages=max_pages)
         return []
+
     monkeypatch.setattr(module, "scrape", fake_scrape)
     browser = object()
 

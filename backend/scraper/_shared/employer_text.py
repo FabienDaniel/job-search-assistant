@@ -5,6 +5,7 @@ repost) never read word for word alike and `same_role.py` cannot prove them. Whe
 link is the employer's (not a board), fetch the description there and keep it instead; the
 board's summary stays when the fetch fails or gives too little text.
 """
+
 import asyncio
 import logging
 
@@ -12,11 +13,14 @@ from backend.scraper._shared.link_kinds import BOARD, link_kind
 
 logger = logging.getLogger("jobnavigator.employer_text")
 
-MIN_CHARS = 200   # a fetch shorter than this is a shell or an error page, not a description
+MIN_CHARS = (
+    200  # a fetch shorter than this is a shell or an error page, not a description
+)
 
 
-async def employer_descriptions(jobs: list[dict], landed: dict | None = None,
-                                max_concurrent: int = 5) -> int:
+async def employer_descriptions(
+    jobs: list[dict], landed: dict | None = None, max_concurrent: int = 5
+) -> int:
     """Replace each job dict's `description` with the employer's text in place. `landed` maps a
     short link to where it lands (resolve_short_links). Returns how many were replaced."""
     from backend.scraper.ats import _descriptions
@@ -43,7 +47,7 @@ async def employer_descriptions(jobs: list[dict], landed: dict | None = None,
     return sum(done)
 
 
-MAX_MISSES = 3   # in a row: the board has stopped answering (rate limit), so stop asking
+MAX_MISSES = 3  # in a row: the board has stopped answering (rate limit), so stop asking
 
 
 async def missing_descriptions(jobs: list[dict], pause: float = 1.5) -> int:
@@ -69,6 +73,8 @@ async def missing_descriptions(jobs: list[dict], pause: float = 1.5) -> int:
             continue
         misses += 1
         if misses >= MAX_MISSES:
-            logger.info(f"listing text: {MAX_MISSES} misses in a row, stopping after {i + 1}/{len(todo)}")
+            logger.info(
+                f"listing text: {MAX_MISSES} misses in a row, stopping after {i + 1}/{len(todo)}"
+            )
             break
     return filled

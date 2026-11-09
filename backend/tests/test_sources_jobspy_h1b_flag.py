@@ -1,11 +1,14 @@
 """Tests for H-1B flag application in jobspy source."""
-import pytest
+
 import inspect
+
+import pytest
 
 
 def test_jobspy_does_not_use_asyncio_run():
     """The source must NOT contain asyncio.run() calls — they fail nested in worker threads."""
     import backend.scraper.sources.jobspy as jobspy_src
+
     source = inspect.getsource(jobspy_src)
     assert "asyncio.run(check_job_h1b" not in source
     assert "asyncio.run(scan_jd_for_h1b_flags" not in source
@@ -14,7 +17,10 @@ def test_jobspy_does_not_use_asyncio_run():
 def test_jobspy_has_sync_h1b_helper():
     """Expose a sync-callable helper that's safe inside asyncio.to_thread workers."""
     from backend.scraper.sources import jobspy as jobspy_src
-    assert hasattr(jobspy_src, "_apply_h1b_inline") or hasattr(jobspy_src, "scan_jd_for_h1b_flags_sync")
+
+    assert hasattr(jobspy_src, "_apply_h1b_inline") or hasattr(
+        jobspy_src, "scan_jd_for_h1b_flags_sync"
+    )
 
 
 def test_apply_h1b_inline_sets_flag_on_match(monkeypatch):
@@ -31,9 +37,14 @@ def test_apply_h1b_inline_sets_flag_on_match(monkeypatch):
     )
 
     from backend.models.db import Job
+
     job = Job(
-        external_id="x", content_hash="c", company="Acme", title="Senior PM",
-        url="https://x.com/1", description="We do NOT sponsor visas.",
+        external_id="x",
+        content_hash="c",
+        company="Acme",
+        title="Senior PM",
+        url="https://x.com/1",
+        description="We do NOT sponsor visas.",
     )
 
     if hasattr(jobspy_src, "_apply_h1b_inline"):
@@ -57,8 +68,15 @@ def test_apply_h1b_inline_tolerates_exception(monkeypatch):
     )
 
     from backend.models.db import Job
-    job = Job(external_id="x", content_hash="c", company="Acme", title="PM",
-              url="https://x.com/1", description="...")
+
+    job = Job(
+        external_id="x",
+        content_hash="c",
+        company="Acme",
+        title="PM",
+        url="https://x.com/1",
+        description="...",
+    )
 
     if hasattr(jobspy_src, "_apply_h1b_inline"):
         jobspy_src._apply_h1b_inline(job)

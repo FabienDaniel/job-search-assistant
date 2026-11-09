@@ -1,4 +1,5 @@
 """is_bot_wall() must flag an anti-bot interstitial and leave a real page alone."""
+
 import pytest
 
 from backend.scraper._shared.bot_wall import is_bot_wall
@@ -23,6 +24,8 @@ def test_flags_an_interstitial(html):
     assert is_bot_wall(html) is True
 
 
-@pytest.mark.parametrize("html", [_REAL_PAGE_BEHIND_CLOUDFLARE, "<html><body>ok</body></html>", "", None])
+@pytest.mark.parametrize(
+    "html", [_REAL_PAGE_BEHIND_CLOUDFLARE, "<html><body>ok</body></html>", "", None]
+)
 def test_leaves_a_real_page_alone(html):
     assert is_bot_wall(html) is False

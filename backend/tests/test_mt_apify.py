@@ -4,6 +4,7 @@ A is the owner (install values), B a member. The token is a paid credential, so 
 on its own 'apify' section must use its own token and never fall back to the owner's; a
 member on 'inherit' runs on the owner's (the owner pays, by choice).
 """
+
 import pytest
 
 from backend.accounts.context import use_account
@@ -28,6 +29,7 @@ def _own(db, account_id, key, value):
 
 def test_token_key_has_a_policy_section():
     from backend.accounts.settings import SETTING_SECTIONS, section_of
+
     assert section_of("apify_api_key") == "apify"
     assert SETTING_SECTIONS["apify"]["scope"] == "policy"
     assert SETTING_SECTIONS["apify"]["default"] == "own"
@@ -68,23 +70,37 @@ async def _fake_account_name():
 
 
 @pytest.mark.asyncio
-async def test_check_key_hides_the_owner_account_from_an_inheriting_member(test_db, accounts, monkeypatch):
+async def test_check_key_hides_the_owner_account_from_an_inheriting_member(
+    test_db, accounts, monkeypatch
+):
     """M4: a member on 'inherit' checks the owner's key; it learns only that the key works."""
     from backend.api.routes_settings import check_apify_key
+
     a, b = accounts
     monkeypatch.setattr(apify, "account_name", _fake_account_name)
     test_db.add(SectionPolicy(account_id=b, section="apify", mode="inherit"))
     test_db.commit()
     with use_account(b):
-        assert await check_apify_key(db=test_db) == {"ok": True, "username": None, "inherited": True}
+        assert await check_apify_key(db=test_db) == {
+            "ok": True,
+            "username": None,
+            "inherited": True,
+        }
     with use_account(a):
-        assert await check_apify_key(db=test_db) == {"ok": True, "username": "owner-login"}
+        assert await check_apify_key(db=test_db) == {
+            "ok": True,
+            "username": "owner-login",
+        }
 
 
 @pytest.mark.asyncio
 async def test_check_key_names_a_member_own_account(test_db, accounts, monkeypatch):
     from backend.api.routes_settings import check_apify_key
+
     _, b = accounts
     monkeypatch.setattr(apify, "account_name", _fake_account_name)
-    with use_account(b):    # 'own' is the default
-        assert await check_apify_key(db=test_db) == {"ok": True, "username": "owner-login"}
+    with use_account(b):  # 'own' is the default
+        assert await check_apify_key(db=test_db) == {
+            "ok": True,
+            "username": "owner-login",
+        }

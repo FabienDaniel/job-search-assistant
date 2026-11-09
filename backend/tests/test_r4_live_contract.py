@@ -8,6 +8,7 @@ stack, over HTTP, using GETs only — this module never writes.
 Auto-skips when the stack is not reachable, so the suite stays green outside the
 backend container.
 """
+
 import os
 
 import pytest
@@ -22,6 +23,7 @@ def _key():
         return os.getenv("JN_API_KEY")
     try:
         from backend.config import INITIAL_API_KEY
+
         return INITIAL_API_KEY or ""
     except Exception:
         return ""
@@ -34,7 +36,7 @@ def live():
     client = httpx.Client(base_url=BASE, headers={"X-API-Key": _key()}, timeout=30)
     try:
         r = client.get("/health")
-    except Exception as e:                      # noqa: BLE001 - any transport error
+    except Exception as e:  # noqa: BLE001 - any transport error
         client.close()
         pytest.skip(f"live stack not reachable at {BASE}: {e}")
     if r.status_code != 200:
@@ -49,22 +51,40 @@ def live():
 
 def _clean(resp, *allowed):
     body = resp.text or ""
-    for marker in ("Traceback (most recent call last)", "/app/backend/",
-                   "site-packages", 'File "', "sqlalchemy.exc", "psycopg2.errors"):
+    for marker in (
+        "Traceback (most recent call last)",
+        "/app/backend/",
+        "site-packages",
+        'File "',
+        "sqlalchemy.exc",
+        "psycopg2.errors",
+    ):
         assert marker not in body, f"{marker!r} leaked: {body[:300]}"
     if allowed:
-        assert resp.status_code in allowed, f"expected {allowed}, got {resp.status_code}: {body[:300]}"
+        assert resp.status_code in allowed, (
+            f"expected {allowed}, got {resp.status_code}: {body[:300]}"
+        )
     return resp
 
 
 # ── DataError -> 404 (malformed UUID in a path segment) ──────────────────────
 
-@pytest.mark.parametrize("path", [
-    "/api/jobs/abc", "/api/jobs/1", "/api/jobs/%C3%A9%C3%A8",
-    "/api/monitor/run/abc", "/api/resumes/abc", "/api/cover-letters/abc",
-    "/api/jobs/abc/cached-page", "/api/resumes/abc/preview",
-    "/api/resumes/abc/tracer-stats", "/api/cover-letters/abc/tracer-stats",
-])
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/jobs/abc",
+        "/api/jobs/1",
+        "/api/jobs/%C3%A9%C3%A8",
+        "/api/monitor/run/abc",
+        "/api/resumes/abc",
+        "/api/cover-letters/abc",
+        "/api/jobs/abc/cached-page",
+        "/api/resumes/abc/preview",
+        "/api/resumes/abc/tracer-stats",
+        "/api/cover-letters/abc/tracer-stats",
+    ],
+)
 def test_malformed_uuid_in_a_path_is_404(live, path):
     _clean(live.get(path), 404)
     assert live.get(path).json()["detail"] == "Not found"
@@ -72,7 +92,10 @@ def test_malformed_uuid_in_a_path_is_404(live, path):
 
 # ── Malformed UUID in a query filter ─────────────────────────────────────────
 
-@pytest.mark.parametrize("path", ["/api/jobs?search_id=abc", "/api/cover-letters?job_id=abc"])
+
+@pytest.mark.parametrize(
+    "path", ["/api/jobs?search_id=abc", "/api/cover-letters?job_id=abc"]
+)
 def test_malformed_uuid_in_a_filter_is_not_a_404(live, path):
     """R4-T1-09: a bad filter used to answer "Not found" via the DataError handler.
 
@@ -83,14 +106,17 @@ def test_malformed_uuid_in_a_filter_is_not_a_404(live, path):
     assert r.status_code != 404
 
 
-@pytest.mark.parametrize("path", ["/api/jobs?search_id=abc", "/api/cover-letters?job_id=abc"])
+@pytest.mark.parametrize(
+    "path", ["/api/jobs?search_id=abc", "/api/cover-letters?job_id=abc"]
+)
 def test_malformed_uuid_in_a_filter_should_be_422(live, path):
     """A bad *filter* value is a request error, not a missing resource."""
     assert live.get(path).status_code == 422
 
 
-@pytest.mark.parametrize("path", ["/api/monitor/finished?job_ids=abc",
-                                  "/api/monitor/in-flight?job_ids=abc"])
+@pytest.mark.parametrize(
+    "path", ["/api/monitor/finished?job_ids=abc", "/api/monitor/in-flight?job_ids=abc"]
+)
 def test_monitor_filters_drop_unparseable_ids_instead(live, path):
     """These two do it the graceful way — the inconsistency is the finding."""
     _clean(live.get(path), 200)
@@ -125,6 +151,7 @@ def test_negative_offset_is_clamped_not_an_error(live):
 
 # ── Other numeric edges ──────────────────────────────────────────────────────
 
+
 def test_health_entities_rejects_a_negative_window(live):
     assert live.get("/api/health/entities?window=-1").status_code == 422
 
@@ -148,20 +175,33 @@ def test_timeline_out_of_range_never_leaks_internals(live):
 
 # ── Things that already behave ───────────────────────────────────────────────
 
-@pytest.mark.parametrize("path", [
-    "/api/jobs?min_score=abc", "/api/jobs?remote=maybe", "/api/jobs?limit=abc",
-    "/api/stats/timeline?days=abc", "/api/companies?tier=abc",
-    "/api/companies?active=maybe",
-])
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/jobs?min_score=abc",
+        "/api/jobs?remote=maybe",
+        "/api/jobs?limit=abc",
+        "/api/stats/timeline?days=abc",
+        "/api/companies?tier=abc",
+        "/api/companies?active=maybe",
+    ],
+)
 def test_wrongly_typed_query_params_are_422(live, path):
     _clean(live.get(path), 422)
 
 
-@pytest.mark.parametrize("path", [
-    "/api/jobs?company=%F0%9F%9A%80", "/api/jobs?title_search=%F0%9F%9A%80%20Se%C3%B1or",
-    "/api/activity-log?company=%F0%9F%9A%80", "/api/jobs?status=zzz",
-    "/api/jobs?source=zzz", "/api/applications?status=zzz",
-])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/jobs?company=%F0%9F%9A%80",
+        "/api/jobs?title_search=%F0%9F%9A%80%20Se%C3%B1or",
+        "/api/activity-log?company=%F0%9F%9A%80",
+        "/api/jobs?status=zzz",
+        "/api/jobs?source=zzz",
+        "/api/applications?status=zzz",
+    ],
+)
 def test_unicode_and_unknown_filter_values_return_an_empty_page(live, path):
     _clean(live.get(path), 200)
 
@@ -178,8 +218,13 @@ def test_llm_models_unknown_provider_is_400(live):
 def test_settings_never_return_a_secret_value(live):
     body = live.get("/api/settings").text
     _clean(live.get("/api/settings"), 200)
-    for env_key in ("ANTHROPIC_API_KEY", "TELEGRAM_BOT_TOKEN", "GMAIL_CLIENT_SECRET",
-                    "GMAIL_REFRESH_TOKEN", "INITIAL_API_KEY"):
+    for env_key in (
+        "ANTHROPIC_API_KEY",
+        "TELEGRAM_BOT_TOKEN",
+        "GMAIL_CLIENT_SECRET",
+        "GMAIL_REFRESH_TOKEN",
+        "INITIAL_API_KEY",
+    ):
         value = os.getenv(env_key, "")
         if len(value) > 8:
             assert value not in body, f"{env_key} leaked through GET /api/settings"

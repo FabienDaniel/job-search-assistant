@@ -1,13 +1,18 @@
 """Cover-letter generation — builds the prompt and calls the LLM. Voice comes from the paired resume plus a selectable voice preset, with persona preferences supplying the "why this role/company" beat.
 Prompt-caching split: cacheable PREFIX = resume + preferences + schema (stable per resume), per-job SUFFIX = JD + voice + length, so switching voice/length reuses the cached prefix."""
-from backend.analyzer.prompt_fence import fence
+
 import json
 import logging
 
+from backend.accounts.settings import get_setting
 from backend.analyzer.cv_scorer import _flatten_resume
 from backend.analyzer.llm_client import call_cover_letter_llm
-from backend.analyzer.model_json import UNPARSEABLE_MESSAGE, ModelReplyError, parse_model_json
-from backend.accounts.settings import get_setting
+from backend.analyzer.model_json import (
+    UNPARSEABLE_MESSAGE,
+    ModelReplyError,
+    parse_model_json,
+)
+from backend.analyzer.prompt_fence import fence
 
 logger = logging.getLogger("jobnavigator.cover_letter")
 
@@ -40,9 +45,14 @@ def resolve_voice_instruction(db, voice_id: str | None) -> tuple[str, str]:
     return "", "Professional, concise, concrete. No corporate filler."
 
 
-def build_cover_letter_prompt(resume_data: dict, preferences: dict, jd_text: str,
-                              voice_instruction: str, length: str,
-                              prompt_template: str) -> tuple[str, str]:
+def build_cover_letter_prompt(
+    resume_data: dict,
+    preferences: dict,
+    jd_text: str,
+    voice_instruction: str,
+    length: str,
+    prompt_template: str,
+) -> tuple[str, str]:
     """Return (cached_prefix, suffix_prompt): the prefix is resume + preferences + schema (stable per resume), the suffix is the editable prompt with JD/voice/length filled in."""
     resume_text = _flatten_resume(resume_data or {})
     pref_text = ""
@@ -57,13 +67,17 @@ def build_cover_letter_prompt(resume_data: dict, preferences: dict, jd_text: str
         "resume and persona preferences — never invent employers, titles, "
         "metrics, or skills.\n\n"
         "=== CANDIDATE RESUME ===\n" + resume_text + "\n\n"
-        "=== PERSONA PREFERENCES (what the candidate values) ===\n" + (pref_text or "(none)")
+        "=== PERSONA PREFERENCES (what the candidate values) ===\n"
+        + (pref_text or "(none)")
     )
 
-    length_instruction = _LENGTH_INSTRUCTIONS.get(length, _LENGTH_INSTRUCTIONS["standard"])
+    length_instruction = _LENGTH_INSTRUCTIONS.get(
+        length, _LENGTH_INSTRUCTIONS["standard"]
+    )
     suffix = (
-        prompt_template
-        .replace("{voice_instruction}", voice_instruction or "Professional and concise.")
+        prompt_template.replace(
+            "{voice_instruction}", voice_instruction or "Professional and concise."
+        )
         .replace("{length_instruction}", length_instruction)
         .replace("{job_description}", fence((jd_text or "")[:6000], "JOB POSTING"))
     )
@@ -75,15 +89,24 @@ def parse_cover_letter_response(raw: str) -> dict:
     data = parse_model_json(raw)
     return {
         "greeting": (data.get("greeting") or "Dear Hiring Team,").strip(),
-        "body_paragraphs": [str(p).strip() for p in (data.get("body_paragraphs") or []) if str(p).strip()],
+        "body_paragraphs": [
+            str(p).strip()
+            for p in (data.get("body_paragraphs") or [])
+            if str(p).strip()
+        ],
         "closing": (data.get("closing") or "Sincerely,").strip(),
         "signature": (data.get("signature") or "").strip(),
     }
 
 
-async def generate_cover_letter_body(resume_data: dict, preferences: dict, jd_text: str,
-                                     voice_instruction: str, length: str,
-                                     prompt_template: str) -> dict:
+async def generate_cover_letter_body(
+    resume_data: dict,
+    preferences: dict,
+    jd_text: str,
+    voice_instruction: str,
+    length: str,
+    prompt_template: str,
+) -> dict:
     """Call the LLM and return the parsed body dict. Caching enabled via prefix."""
     cached_prefix, suffix = build_cover_letter_prompt(
         resume_data, preferences, jd_text, voice_instruction, length, prompt_template
@@ -93,7 +116,9 @@ async def generate_cover_letter_body(resume_data: dict, preferences: dict, jd_te
         "grounded strictly in the candidate's resume and the job description. "
         "Never fabricate facts. Output only the requested JSON."
     )
-    resp = await call_cover_letter_llm(suffix, system, max_tokens=1500, cached_prefix=cached_prefix)
+    resp = await call_cover_letter_llm(
+        suffix, system, max_tokens=1500, cached_prefix=cached_prefix
+    )
     try:
         parsed = parse_cover_letter_response(resp["text"])
     except json.JSONDecodeError as e:

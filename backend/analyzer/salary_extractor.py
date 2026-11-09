@@ -9,8 +9,9 @@ an amount wins over a period named before it. A yearly figure under 1000, an unt
 10,000 and one over 2,000,000 are not salaries. A dollar with a country prefix (TT$, J$, HK$, A$, C$,
 NZ$, …) or a non-USD ISO code next to it is not USD and is never read.
 """
-import re
+
 import logging
+import re
 import unicodedata
 
 logger = logging.getLogger("jobnavigator.salary")
@@ -28,19 +29,43 @@ UNSTATED_PERIOD_FLOOR = 10_000
 
 # Shorter periods first: a salary string naming both ("$60/hr ($124,800 a year)") is not a clean
 # yearly figure for a source field, so the shorter one wins there.
-_PERIOD_RES = tuple((unit, re.compile(rx, re.IGNORECASE)) for unit, rx in (
-    ("HOUR", r"\bhourly\b|\b(?:per|an?|each|every)\s+(?:hour|hr)s?\b|/\s*(?:hour|hr|h)s?\b"
-             r"|\bp\s*/\s*h\b|\bp\.\s*h\.|\bph\b"),
-    ("DAY", r"\bdaily\b|\bday\s+rate\b|\b(?:per|an?|each|every)\s+days?\b|/\s*(?:day|d)s?\b|\bp\s*/\s*d\b"),
-    ("WEEK", r"\bweekly\b|\b(?:per|an?|each|every)\s+(?:week|wk)s?\b|/\s*(?:week|wk|w)s?\b"
-             r"|\bp\s*/\s*w\b|\bpw\b"),
-    ("MONTH", r"\bmonthly\b|\bpcm\b|\b(?:per|an?|each|every)\s+(?:month|mo|mth)s?\b"
-              r"|/\s*(?:month|mo|mth|m)s?\b|\bp\s*/\s*m\b"),
-    ("YEAR", r"\b(?:yearly|annual|annually|annum)\b|\b(?:per|an?|each|every)\s+(?:year|yr)s?\b"
-             r"|/\s*(?:year|yr|annum)s?\b|\bp\.?a\.?(?![a-z])"),
-))
+_PERIOD_RES = tuple(
+    (unit, re.compile(rx, re.IGNORECASE))
+    for unit, rx in (
+        (
+            "HOUR",
+            r"\bhourly\b|\b(?:per|an?|each|every)\s+(?:hour|hr)s?\b|/\s*(?:hour|hr|h)s?\b"
+            r"|\bp\s*/\s*h\b|\bp\.\s*h\.|\bph\b",
+        ),
+        (
+            "DAY",
+            r"\bdaily\b|\bday\s+rate\b|\b(?:per|an?|each|every)\s+days?\b|/\s*(?:day|d)s?\b|\bp\s*/\s*d\b",
+        ),
+        (
+            "WEEK",
+            r"\bweekly\b|\b(?:per|an?|each|every)\s+(?:week|wk)s?\b|/\s*(?:week|wk|w)s?\b"
+            r"|\bp\s*/\s*w\b|\bpw\b",
+        ),
+        (
+            "MONTH",
+            r"\bmonthly\b|\bpcm\b|\b(?:per|an?|each|every)\s+(?:month|mo|mth)s?\b"
+            r"|/\s*(?:month|mo|mth|m)s?\b|\bp\s*/\s*m\b",
+        ),
+        (
+            "YEAR",
+            r"\b(?:yearly|annual|annually|annum)\b|\b(?:per|an?|each|every)\s+(?:year|yr)s?\b"
+            r"|/\s*(?:year|yr|annum)s?\b|\bp\.?a\.?(?![a-z])",
+        ),
+    )
+)
 # A bare unit as a structured field gives it (schema.org `unitText`: "MONTH", "YEAR").
-_BARE_UNITS = {"hour": "HOUR", "day": "DAY", "week": "WEEK", "month": "MONTH", "year": "YEAR"}
+_BARE_UNITS = {
+    "hour": "HOUR",
+    "day": "DAY",
+    "week": "WEEK",
+    "month": "MONTH",
+    "year": "YEAR",
+}
 _NON_ANNUAL_UNITS = ("HOUR", "DAY", "WEEK", "MONTH")
 
 
@@ -75,14 +100,47 @@ _NON_USD_CODE_RE = re.compile(r"\b(" + _NON_USD_CODES + r")\b")
 # Dollars with a country prefix. Two-letter prefixes may stand apart ("TT $8,000"); a single
 # letter only counts written on ("A$120k"), so "a $120k salary" stays USD.
 _DOLLAR_PREFIXES = {
-    "AU": "AUD", "A": "AUD", "CA": "CAD", "C": "CAD", "NZ": "NZD", "HK": "HKD", "SG": "SGD",
-    "S": "SGD", "R": "BRL", "MX": "MXN", "NT": "TWD", "TT": "TTD", "J": "JMD", "EC": "XCD",
-    "BZ": "BZD", "BDS": "BBD", "BD": "BBD", "CI": "KYD", "G": "GYD", "B": "BSD",
+    "AU": "AUD",
+    "A": "AUD",
+    "CA": "CAD",
+    "C": "CAD",
+    "NZ": "NZD",
+    "HK": "HKD",
+    "SG": "SGD",
+    "S": "SGD",
+    "R": "BRL",
+    "MX": "MXN",
+    "NT": "TWD",
+    "TT": "TTD",
+    "J": "JMD",
+    "EC": "XCD",
+    "BZ": "BZD",
+    "BDS": "BBD",
+    "BD": "BBD",
+    "CI": "KYD",
+    "G": "GYD",
+    "B": "BSD",
 }
 _MULTI_PREFIXES = "BDS|BD|AU|CA|NZ|HK|SG|MX|NT|TT|EC|BZ|CI"
-_FOREIGN_DOLLAR_RE = re.compile(r"\b(" + _MULTI_PREFIXES + r")\s?\$|\b(A|C|S|R|J|G|B)\$")
-_SYMBOLS = {"€": "EUR", "£": "GBP", "¥": "JPY", "₹": "INR", "₱": "PHP", "₦": "NGN", "₩": "KRW",
-            "₺": "TRY", "₪": "ILS", "₫": "VND", "฿": "THB", "₽": "RUB", "₴": "UAH", "₨": "PKR"}
+_FOREIGN_DOLLAR_RE = re.compile(
+    r"\b(" + _MULTI_PREFIXES + r")\s?\$|\b(A|C|S|R|J|G|B)\$"
+)
+_SYMBOLS = {
+    "€": "EUR",
+    "£": "GBP",
+    "¥": "JPY",
+    "₹": "INR",
+    "₱": "PHP",
+    "₦": "NGN",
+    "₩": "KRW",
+    "₺": "TRY",
+    "₪": "ILS",
+    "₫": "VND",
+    "฿": "THB",
+    "₽": "RUB",
+    "₴": "UAH",
+    "₨": "PKR",
+}
 _USD_RE = re.compile(r"\b[Uu][Ss][Dd]\b|\bUS\s?\$")
 
 
@@ -128,7 +186,10 @@ def yearly_usd(low, high, currency: str, period: str) -> tuple:
     period = (period or "").upper()
     if period not in ("", "YEAR"):
         return None, None
-    if low < (_MIN_YEARLY if period else UNSTATED_PERIOD_FLOOR) or max(low, high or 0) > _MAX_YEARLY:
+    if (
+        low < (_MIN_YEARLY if period else UNSTATED_PERIOD_FLOOR)
+        or max(low, high or 0) > _MAX_YEARLY
+    ):
         return None, None
     return low, high
 
@@ -146,14 +207,18 @@ _PERIOD_WORDS = (
 # Same strings as r"\s*(?:\(?\s*(?:USD|US\s?\$|dollars?)\s*\)?)?\s*\(?\s*", written so no two
 # "\s*" touch: a long run of spaces after an amount made that one cubic.
 _TAG_PREFIX = r"\s*(?:(?:\(\s*)?(?:USD|US\s?\$|dollars?)(?:\s*\))?\s*)?(?:\(\s*)?"
-_PERIOD_AFTER_RE = re.compile(_TAG_PREFIX + r"(?:" + _PERIOD_WORDS + r")", re.IGNORECASE)
+_PERIOD_AFTER_RE = re.compile(
+    _TAG_PREFIX + r"(?:" + _PERIOD_WORDS + r")", re.IGNORECASE
+)
 _YEARLY_WORDS = (
     r"per\s*(?:year|annum)|annually\b|annual\b|yearly\b|an?\s*year\b|/\s*(?:yr|year|annum)\b"
     r"|p\.?a\.?(?![a-z])"
 )
 # An explicit yearly tag right after the amount wins over any period word before it:
 # "Paid monthly: $150,000 - $180,000 per year".
-_YEARLY_AFTER_RE = re.compile(_TAG_PREFIX + r"(?:" + _YEARLY_WORDS + r")", re.IGNORECASE)
+_YEARLY_AFTER_RE = re.compile(
+    _TAG_PREFIX + r"(?:" + _YEARLY_WORDS + r")", re.IGNORECASE
+)
 _YEARLY_IN_RE = re.compile(_YEARLY_WORDS, re.IGNORECASE)
 # The tail of an earlier amount ("k" and its own period tag): "$30 an hour ($62,400 a year)"
 # — the "an hour" belongs to the $30, not to the yearly figure after it.
@@ -177,7 +242,9 @@ _SHORT_PERIOD_RE = re.compile(r"hour|hr|da(?:y|ily)|week", re.IGNORECASE)
 
 # A non-USD code or a spaced country prefix right before the "$" ("CAD $150,000", "TT $180,000";
 # not "CA $", which is far more often California), or a code right after the amount.
-_CODE_BEFORE_RE = re.compile(r"\b(?:" + _NON_USD_CODES + r"|BDS|BD|AU|NZ|HK|SG|MX|NT|TT|EC|BZ|CI)\s*$")
+_CODE_BEFORE_RE = re.compile(
+    r"\b(?:" + _NON_USD_CODES + r"|BDS|BD|AU|NZ|HK|SG|MX|NT|TT|EC|BZ|CI)\s*$"
+)
 # "\s*\(?\s*X" written so a run of spaces has one way to match (no quadratic backtracking).
 _CODE_AFTER_RE = re.compile(r"\s*(?:\(\s*)?(?:" + _NON_USD_CODES + r")\b")
 
@@ -186,18 +253,18 @@ def _period_before(text: str, start: int) -> bool:
     """True when a shorter period is named earlier in the amount's own clause. An hour, day or
     week word inside a parenthetical that closes before the amount is an aside, not the amount's
     period: "(Exempt or non-exempt hourly rate)role ranges from $140,000 to $160,000"."""
-    before = text[max(0, start - 60):start]
+    before = text[max(0, start - 60) : start]
     breaks = list(_CLAUSE_BREAK_RE.finditer(before))
     if breaks:
         last = breaks[-1]
-        before = before[last.end():]
+        before = before[last.end() :]
         if last.group().isdigit():
             tail = _EARLIER_TAIL_RE.match(before)
             if tail:
-                before = before[tail.end():]
+                before = before[tail.end() :]
     before = _SCHEDULE_RE.sub(" ", before)
     for m in _PERIOD_BEFORE_RE.finditer(before):
-        paren = re.search(r"[()]", before[m.end():])
+        paren = re.search(r"[()]", before[m.end() :])
         if not (paren and paren.group() == ")" and _SHORT_PERIOD_RE.search(m.group())):
             return True
     return False
@@ -219,19 +286,22 @@ def _foreign_near(text: str, start: int, end: int) -> bool:
     span = text[start:end]
     if _FOREIGN_DOLLAR_RE.search(span) or _NON_USD_CODE_RE.search(span):
         return True
-    if _CODE_BEFORE_RE.search(text[max(0, start - 8):start]):
+    if _CODE_BEFORE_RE.search(text[max(0, start - 8) : start]):
         return True
     return bool(_CODE_AFTER_RE.match(text, end))
 
 
 def _names_usd(text: str, start: int, end: int) -> bool:
     """True when the amount at text[start:end] says US dollars explicitly (USD, US$)."""
-    return bool(_USD_RE.search(text[start:end]) or _usd_before(text[max(0, start - 6):start])
-                or _usd_after(text[end:end + 40]))
+    return bool(
+        _USD_RE.search(text[start:end])
+        or _usd_before(text[max(0, start - 6) : start])
+        or _usd_after(text[end : end + 40])
+    )
 
 
 def _usd_after(chunk: str) -> bool:
-    """"USD" as a word right after the amount, optionally inside "("; a string check, not a regex."""
+    """ "USD" as a word right after the amount, optionally inside "("; a string check, not a regex."""
     t = chunk.lstrip()
     if t.startswith("("):
         t = t[1:].lstrip()
@@ -239,7 +309,7 @@ def _usd_after(chunk: str) -> bool:
 
 
 def _usd_before(chunk: str) -> bool:
-    """"US" or "USD" as a word right before the amount (only spaces between); a string check, not a regex."""
+    """ "US" or "USD" as a word right before the amount (only spaces between); a string check, not a regex."""
     t = chunk.rstrip()
     for word in ("USD", "US"):
         if t.endswith(word):
@@ -256,7 +326,9 @@ def _to_int(amount: str) -> int:
 # A "$" that is not part of a prefixed dollar (HK$, A$, TT$): USD, US$, USD$ or a bare "$".
 # A prefix is a run of one to three capitals ("HK$", "BDS$", "RD$", also glued on as in
 # "SalaryHK$"); a "$" after a longer or lower-case word is a missing space ("Compensation$102,460").
-_BARE = r"(?-i:(?<![A-Z])|(?<=[A-Z]{4}))\$"  # case-sensitive inside IGNORECASE patterns too
+_BARE = (
+    r"(?-i:(?<![A-Z])|(?<=[A-Z]{4}))\$"  # case-sensitive inside IGNORECASE patterns too
+)
 _D = r"(?:(?:\b|(?-i:(?<=[a-z])))USD?\s?\$|" + _BARE + r")"
 # An optional dollar marker with the spaces after it. The spaces sit inside the group (and
 # "USD $" keeps its "$" with its own spaces) so no two "\s*" touch: a long run of spaces
@@ -268,31 +340,56 @@ _SEP = r"(?:[-–—/]+|(?:and\s+)?up\s+to|to)"
 _PATTERNS = (
     # 1: $XXX,XXX - $XXX,XXX, e.g. $140,000 USD - $210,000 USD, USD$150,000 - USD$200,000,
     #    $122,550.00-$201,000.00. Cents are matched and dropped.
-    (re.compile(
-        _D + r'\s*(\d{1,3}(?:,\d{3})*)(?:\.\d{1,2})?\s*(?:(?:USD|per\s*year|per\s*annum|annually|/\s*yr|/\s*year|a\s*year)\s*)?(?:[-–—/]+|(?:and\s+)?up\s+to|to|and)\s*' + _D_OPT + r'(\d{1,3}(?:,\d{3})*)(?:\.\d{1,2})?'
-    ), lambda m: (_to_int(m.group(1)), _to_int(m.group(2)))),
+    (
+        re.compile(
+            _D
+            + r"\s*(\d{1,3}(?:,\d{3})*)(?:\.\d{1,2})?\s*(?:(?:USD|per\s*year|per\s*annum|annually|/\s*yr|/\s*year|a\s*year)\s*)?(?:[-–—/]+|(?:and\s+)?up\s+to|to|and)\s*"
+            + _D_OPT
+            + r"(\d{1,3}(?:,\d{3})*)(?:\.\d{1,2})?"
+        ),
+        lambda m: (_to_int(m.group(1)), _to_int(m.group(2))),
+    ),
     # 1b: bare numbers with USD: 173,900.00 - 235,200.00 USD
-    (re.compile(
-        r'(\d{1,3}(?:,\d{3})*)(?:\.\d{1,2})?\s*(?:USD\s*)?' + _SEP + r'\s*(\d{1,3}(?:,\d{3})*)(?:\.\d{1,2})?\s*USD'
-    ), lambda m: (_to_int(m.group(1)), _to_int(m.group(2)))),
+    (
+        re.compile(
+            r"(\d{1,3}(?:,\d{3})*)(?:\.\d{1,2})?\s*(?:USD\s*)?"
+            + _SEP
+            + r"\s*(\d{1,3}(?:,\d{3})*)(?:\.\d{1,2})?\s*USD"
+        ),
+        lambda m: (_to_int(m.group(1)), _to_int(m.group(2))),
+    ),
     # 1c: bare numbers after USD: USD 120,000 - 150,000
-    (re.compile(
-        r'\bUSD\s*(\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?\s*' + _SEP + r'\s*(?:USD\s*)?(\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?'
-    ), lambda m: (_to_int(m.group(1)), _to_int(m.group(2)))),
+    (
+        re.compile(
+            r"\bUSD\s*(\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?\s*"
+            + _SEP
+            + r"\s*(?:USD\s*)?(\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?"
+        ),
+        lambda m: (_to_int(m.group(1)), _to_int(m.group(2))),
+    ),
     # 2: $XXXk - $XXXk
-    (re.compile(
-        _D + r'\s*(\d{2,3})\s*[kK]\s*' + _SEP + r'\s*' + _D + r'\s*(\d{2,3})\s*[kK]'
-    ), lambda m: (int(m.group(1)) * 1000, int(m.group(2)) * 1000)),
+    (
+        re.compile(
+            _D + r"\s*(\d{2,3})\s*[kK]\s*" + _SEP + r"\s*" + _D + r"\s*(\d{2,3})\s*[kK]"
+        ),
+        lambda m: (int(m.group(1)) * 1000, int(m.group(2)) * 1000),
+    ),
     # 3: $XXX,XXX per year / annually (single amount)
-    (re.compile(
-        _D + r'\s*(\d{1,3}(?:,\d{3})*)(?:\.\d{1,2})?\s*(?:per\s*year|per\s*annum|annually|/\s*yr|/\s*year|a\s*year)',
-        re.IGNORECASE,
-    ), lambda m: (_to_int(m.group(1)),) * 2),
+    (
+        re.compile(
+            _D
+            + r"\s*(\d{1,3}(?:,\d{3})*)(?:\.\d{1,2})?\s*(?:per\s*year|per\s*annum|annually|/\s*yr|/\s*year|a\s*year)",
+            re.IGNORECASE,
+        ),
+        lambda m: (_to_int(m.group(1)),) * 2,
+    ),
     # 4: $XXXk (single)
-    (re.compile(_D + r'\s*(\d{2,3})\s*[kK]'), lambda m: (int(m.group(1)) * 1000,) * 2),
+    (re.compile(_D + r"\s*(\d{2,3})\s*[kK]"), lambda m: (int(m.group(1)) * 1000,) * 2),
     # 5: a single bare $XXX,XXX of at least 30,000 (not the start of $X,XXX,XXX)
-    (re.compile(_D + r'\s*(\d{3},\d{3})(?!,\d)(?:\.\d{1,2})?'),
-     lambda m: (_to_int(m.group(1)),) * 2 if _to_int(m.group(1)) >= 30000 else None),
+    (
+        re.compile(_D + r"\s*(\d{3},\d{3})(?!,\d)(?:\.\d{1,2})?"),
+        lambda m: (_to_int(m.group(1)),) * 2 if _to_int(m.group(1)) >= 30000 else None,
+    ),
 )
 
 
@@ -310,10 +407,13 @@ def _find_yearly(description: str, explicit_usd: bool = False):
             if not found:
                 continue
             low, high = found
-            if (min(low, high) < _MIN_YEARLY or max(low, high) > _MAX_YEARLY
-                    or _foreign_near(description, start, end)
-                    or (explicit_usd and not _names_usd(description, start, end))
-                    or _not_yearly(description, start, end, min(low, high))):
+            if (
+                min(low, high) < _MIN_YEARLY
+                or max(low, high) > _MAX_YEARLY
+                or _foreign_near(description, start, end)
+                or (explicit_usd and not _names_usd(description, start, end))
+                or _not_yearly(description, start, end, min(low, high))
+            ):
                 rejected.append((start, end))
                 continue
             return low, high
@@ -329,9 +429,9 @@ def _strip_tags(text: str) -> str:
         if lt == -1:
             break
         gt = text.find(">", lt + 1)
-        if gt == -1:          # no '>' after this '<', so none after any later '<' either
+        if gt == -1:  # no '>' after this '<', so none after any later '<' either
             break
-        if gt == lt + 1:      # "<>" is no tag ([^>]+ needs a character); keep it and go on
+        if gt == lt + 1:  # "<>" is no tag ([^>]+ needs a character); keep it and go on
             out.append(text[i:gt])
             i = gt
             continue
@@ -342,7 +442,9 @@ def _strip_tags(text: str) -> str:
     return "".join(out)
 
 
-def extract_salary(description: str, h1b_median_salary: int = None, explicit_usd: bool = False) -> dict:
+def extract_salary(
+    description: str, h1b_median_salary: int = None, explicit_usd: bool = False
+) -> dict:
     """Extract salary range from job description text, falling back to H-1B LCA median if none
     found. With `explicit_usd`, a bare "$" does not count as US dollars (boards where "$" is
     usually a local dollar)."""
@@ -361,11 +463,16 @@ def extract_salary(description: str, h1b_median_salary: int = None, explicit_usd
 
     if "<" in description and ">" in description:
         import html as _html
+
         description = _html.unescape(_strip_tags(description))
 
     found = _find_yearly(description, explicit_usd=explicit_usd)
     if found:
-        return {"salary_min": found[0], "salary_max": found[1], "salary_source": "posting"}
+        return {
+            "salary_min": found[0],
+            "salary_max": found[1],
+            "salary_source": "posting",
+        }
 
     # Fallback to LCA median
     if h1b_median_salary:

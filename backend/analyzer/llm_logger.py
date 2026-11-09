@@ -1,4 +1,5 @@
 """Persist LLM call metrics to the llm_call_log table. Non-fatal on errors."""
+
 import asyncio
 import logging
 import time
@@ -6,8 +7,8 @@ from contextlib import asynccontextmanager
 from typing import Optional
 from uuid import UUID
 
-from backend.models.db import SessionLocal, LlmCallLog
 from backend.analyzer.llm_cost import calc_cost
+from backend.models.db import LlmCallLog, SessionLocal
 
 logger = logging.getLogger("jobnavigator.llm_logger")
 
@@ -63,8 +64,12 @@ async def track_llm_call(purpose: str, provider: str, model: str, job_id=None):
 
     class _Tracker:
         def __init__(self, provider, model):
-            self.usage = {"input_tokens": 0, "output_tokens": 0,
-                          "cache_read_tokens": 0, "cache_write_tokens": 0}
+            self.usage = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            }
             self.provider = provider
             self.model = model
 
@@ -97,6 +102,7 @@ async def track_llm_call(purpose: str, provider: str, model: str, job_id=None):
             if t.provider == "openrouter":
                 try:
                     from backend.analyzer.llm_cost import refresh_openrouter_prices
+
                     await refresh_openrouter_prices()
                 except Exception:
                     pass

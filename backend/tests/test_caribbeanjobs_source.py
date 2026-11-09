@@ -1,4 +1,5 @@
 """caribbeanjobs source — param forwarding + parsing (no network)."""
+
 from types import SimpleNamespace
 
 import pytest
@@ -8,33 +9,49 @@ from backend.scraper.sources import caribbeanjobs
 
 
 def _card(html):
-    return caribbeanjobs._parse_card(BeautifulSoup(html, "html.parser").select_one("div.job-result"))
+    return caribbeanjobs._parse_card(
+        BeautifulSoup(html, "html.parser").select_one("div.job-result")
+    )
 
 
 def test_query_plan_forwards_url_filters_and_splits_keywords_out():
     s = SimpleNamespace(
         direct_url="https://www.caribbeanjobs.com/ShowResults.aspx?Keywords=go&Location=123&Category=3&Page=2",
-        search_term="")
-    assert caribbeanjobs._query_plan(s) == ({"Location": "123", "Category": "3"}, ["go"])
+        search_term="",
+    )
+    assert caribbeanjobs._query_plan(s) == (
+        {"Location": "123", "Category": "3"},
+        ["go"],
+    )
 
 
 def test_query_plan_splits_the_term_on_commas_and_overrides_the_url_keywords():
     s = SimpleNamespace(
         direct_url="https://www.caribbeanjobs.com/ShowResults.aspx?Keywords=old&Location=123",
-        search_term="software engineer, developer ,, backend")
-    assert caribbeanjobs._query_plan(s) == ({"Location": "123"}, ["software engineer", "developer", "backend"])
+        search_term="software engineer, developer ,, backend",
+    )
+    assert caribbeanjobs._query_plan(s) == (
+        {"Location": "123"},
+        ["software engineer", "developer", "backend"],
+    )
 
 
 def test_query_plan_splits_the_url_keywords_on_commas_too():
     """The OR-alternatives rule applies whether the phrases came from the term or the URL."""
     s = SimpleNamespace(
         direct_url="https://www.caribbeanjobs.com/ShowResults.aspx?Keywords=alpha%2C+beta+gamma&Location=123",
-        search_term="")
-    assert caribbeanjobs._query_plan(s) == ({"Location": "123"}, ["alpha", "beta gamma"])
+        search_term="",
+    )
+    assert caribbeanjobs._query_plan(s) == (
+        {"Location": "123"},
+        ["alpha", "beta gamma"],
+    )
 
 
 def test_query_plan_ignores_a_non_caribbeanjobs_url():
-    s = SimpleNamespace(direct_url="https://example.com/ShowResults.aspx?Keywords=go", search_term="")
+    s = SimpleNamespace(
+        direct_url="https://example.com/ShowResults.aspx?Keywords=go", search_term=""
+    )
     assert caribbeanjobs._query_plan(s) == ({}, [])
 
 
@@ -57,14 +74,18 @@ async def test_fetch_listings_merges_queries_and_dedupes(monkeypatch):
         }.get(keyword, [])
 
     monkeypatch.setattr(caribbeanjobs, "_fetch_keyword", fake_keyword)
-    rows = await caribbeanjobs._fetch_listings(object(), {}, ["software engineer", "developer"], 10)
+    rows = await caribbeanjobs._fetch_listings(
+        object(), {}, ["software engineer", "developer"], 10
+    )
     assert [r["url"] for r in rows] == ["u1", "u2", "u3"]
     assert calls[0] == ("software engineer", 10)
-    assert calls[1] == ("developer", 8)   # the second query only needs the remainder
+    assert calls[1] == ("developer", 8)  # the second query only needs the remainder
 
 
 @pytest.mark.asyncio
-async def test_fetch_listings_with_no_keywords_queries_the_url_filters_once(monkeypatch):
+async def test_fetch_listings_with_no_keywords_queries_the_url_filters_once(
+    monkeypatch,
+):
     calls = []
 
     async def fake_keyword(client, base, keyword, wanted):
@@ -78,8 +99,12 @@ async def test_fetch_listings_with_no_keywords_queries_the_url_filters_once(monk
 
 
 def test_clean_url_strips_the_tracking_query():
-    assert caribbeanjobs._clean_url("/Electrical-Engineer-Job-238881.aspx?p=1|application_confirmed") == \
-        "https://www.caribbeanjobs.com/Electrical-Engineer-Job-238881.aspx"
+    assert (
+        caribbeanjobs._clean_url(
+            "/Electrical-Engineer-Job-238881.aspx?p=1|application_confirmed"
+        )
+        == "https://www.caribbeanjobs.com/Electrical-Engineer-Job-238881.aspx"
+    )
     assert caribbeanjobs._clean_url("") == ""
 
 
@@ -121,7 +146,9 @@ def test_parse_card_maps_every_listing_field():
         </div>""")
     assert j["title"] == "Electrical Engineer"
     assert j["company"] == "Renu Energy TCI"
-    assert j["url"] == "https://www.caribbeanjobs.com/Electrical-Engineer-Job-238881.aspx"
+    assert (
+        j["url"] == "https://www.caribbeanjobs.com/Electrical-Engineer-Job-238881.aspx"
+    )
     assert j["location"] == "Turks and Caicos Islands"
     assert j["posted"] == "2026-09-18"
     assert "Solar PV design." in j["description"]
@@ -148,7 +175,9 @@ def test_parse_detail_prefers_json_ld():
          "hiringOrganization": {"name": "Renu Energy TCI"},
          "jobLocation": {"address": {"addressLocality": "Turks and Caicos Islands"}}}
         </script></body></html>"""
-    out = caribbeanjobs._parse_detail(html, {"title": "ignored", "company": "", "location": ""})
+    out = caribbeanjobs._parse_detail(
+        html, {"title": "ignored", "company": "", "location": ""}
+    )
     assert out["title"] == "Electrical Engineer"
     assert out["company"] == "Renu Energy TCI"
     assert "duties" in out["description"] and "<" not in out["description"]
@@ -167,7 +196,9 @@ def test_parse_detail_falls_back_to_the_html_description():
         </ul>
         <div class="job-details"><p>Build the <b>thing</b>.</p></div>
         </body></html>"""
-    out = caribbeanjobs._parse_detail(html, {"title": "Site Engineer", "company": "", "location": ""})
+    out = caribbeanjobs._parse_detail(
+        html, {"title": "Site Engineer", "company": "", "location": ""}
+    )
     assert "Build the thing." in out["description"].replace("\n", " ")
     assert out["employment_type"] == "Permanent full-time"
 
@@ -178,7 +209,12 @@ def test_parse_detail_marks_a_past_valid_through_as_expired():
         <script id="jobPostingSchema" type="application/ld+json">
         {"@type": "JobPosting", "title": "Old", "validThrough": "2020-01-01T00:00:00+00:00"}
         </script></body></html>"""
-    assert caribbeanjobs._parse_detail(html, {"title": "Old", "company": "", "location": ""})["expired"] is True
+    assert (
+        caribbeanjobs._parse_detail(
+            html, {"title": "Old", "company": "", "location": ""}
+        )["expired"]
+        is True
+    )
 
 
 def test_parse_detail_ignores_the_always_present_expired_banner():
@@ -218,6 +254,7 @@ def test_retry_after_parses_and_caps():
 async def test_get_backs_off_on_429_then_returns(monkeypatch):
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(caribbeanjobs.asyncio, "sleep", _no_sleep)
 
     client = _FakeClient([429, 429, 200])
@@ -230,9 +267,10 @@ async def test_get_backs_off_on_429_then_returns(monkeypatch):
 async def test_get_returns_the_last_429_after_giving_up(monkeypatch):
     async def _no_sleep(_seconds):
         return None
+
     monkeypatch.setattr(caribbeanjobs.asyncio, "sleep", _no_sleep)
 
     client = _FakeClient([429, 429, 429])
     resp = await caribbeanjobs._get(client, "u")
-    assert resp.status_code == 429   # the caller raises; the run reports the board error
+    assert resp.status_code == 429  # the caller raises; the run reports the board error
     assert client.calls == 3

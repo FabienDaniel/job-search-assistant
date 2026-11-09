@@ -8,14 +8,19 @@ h.py is not edited; every context here sets the modern keys through `extra_ls`,
 and `raw_ctx()` builds a context with NOTHING seeded but what it is handed, which
 is what the theme-migration and welcome-modal cases need.
 """
-import json, os, re, sys, time
+
+import json
+import os
+import re
+import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import h  # noqa: E402  the harness, copied in beside these files
 
 BASE = h.BASE
 KEY = h.KEY
-LIVE = os.environ.get('JN_E2E_LIVE') == '1'
+LIVE = os.environ.get("JN_E2E_LIVE") == "1"
 
 # Pin h.owner_mode() now, before any case runs: with 2+ accounts every context and
 # h.api call acts as the owner; on a one-account install nothing changes, even after
@@ -23,7 +28,7 @@ LIVE = os.environ.get('JN_E2E_LIVE') == '1'
 try:
     h.owner_mode()
 except Exception as _e:  # backend down: h.api retries the decision on first use
-    print(f'_common: account check deferred ({_e})', flush=True)
+    print(f"_common: account check deferred ({_e})", flush=True)
 
 
 def single_account_only(ctx):
@@ -31,8 +36,12 @@ def single_account_only(ctx):
     (the mt-* cases add and remove a scratch member and refuse to touch a real one)."""
     n = h.account_count()
     if n != 1:
-        ctx.skip(f'install has {n} accounts — this case needs exactly one (it adds and removes its own member)')
-PREFIX = 'ZZE'
+        ctx.skip(
+            f"install has {n} accounts — this case needs exactly one (it adds and removes its own member)"
+        )
+
+
+PREFIX = "ZZE"
 # Both global overlays have to be marked seen for a driving case to reach the app
 # at all: `jobnavigator_welcomed` retires the first-run tour, and this retires the
 # 2.0 upgrade modal. A seeded context carries `jobnavigator_welcomed`, which makes
@@ -40,23 +49,25 @@ PREFIX = 'ZZE'
 # this second mark every seeded page opens behind a scrim and every click in the
 # suite times out against it. Cases that are ABOUT an overlay use `raw_page` and
 # seed neither. Bump alongside App.jsx's NEWUI_VERSION.
-NEWUI_VERSION = '3.1'
+NEWUI_VERSION = "3.1"
 
 # X-Frame-Options / CSP iframe noise from the Feed's cached-page preview is
 # expected and ignored, exactly as every previous smoke pass did.
 NOISE = re.compile(
-    r'X-Frame-Options|Content Security Policy|frame-ancestors|Refused to display|'
-    r'Refused to frame|ERR_BLOCKED_BY_RESPONSE|ERR_BLOCKED_BY_CLIENT', re.I)
+    r"X-Frame-Options|Content Security Policy|frame-ancestors|Refused to display|"
+    r"Refused to frame|ERR_BLOCKED_BY_RESPONSE|ERR_BLOCKED_BY_CLIENT",
+    re.I,
+)
 
 
 def live_only(ctx, what):
     """Skip the calling case unless JN_E2E_LIVE=1."""
     if not LIVE:
-        ctx.skip(f'needs JN_E2E_LIVE=1 — {what}')
+        ctx.skip(f"needs JN_E2E_LIVE=1 — {what}")
 
 
 # ── contexts ────────────────────────────────────────────────────────────────
-_SEED_GUARD = '__jn_e2e_seeded'
+_SEED_GUARD = "__jn_e2e_seeded"
 
 
 def raw_ctx(b, ls=None, width=1440, height=900, api_key=True, telemetry=None):
@@ -69,15 +80,19 @@ def raw_ctx(b, ls=None, width=1440, height=900, api_key=True, telemetry=None):
     """
     store = dict(ls or {})
     if api_key:
-        store['jobnavigator_api_key'] = KEY
-    ctx = b.new_context(viewport={'width': width, 'height': height})
+        store["jobnavigator_api_key"] = KEY
+    ctx = b.new_context(viewport={"width": width, "height": height})
     h.telemetry_answer(ctx, **(telemetry or {}))
-    sets = ''.join(f'localStorage.setItem({json.dumps(k)},{json.dumps(v)});' for k, v in store.items())
+    sets = "".join(
+        f"localStorage.setItem({json.dumps(k)},{json.dumps(v)});"
+        for k, v in store.items()
+    )
     ctx.add_init_script(
         f"try{{if(!localStorage.getItem({json.dumps(_SEED_GUARD)})){{"
-        f"localStorage.setItem({json.dumps(_SEED_GUARD)},'1');{sets}}}}}catch(e){{}}")
+        f"localStorage.setItem({json.dumps(_SEED_GUARD)},'1');{sets}}}}}catch(e){{}}"
+    )
     if api_key:
-        h.owner_cookie(ctx)   # 2+ accounts: the owner's jn_account, so no picker
+        h.owner_cookie(ctx)  # 2+ accounts: the owner's jn_account, so no picker
     return ctx
 
 
@@ -87,20 +102,30 @@ def raw_page(b, **kw):
     return pg
 
 
-def mpage(b, appearance='light', theme='default', width=1440, height=900, extra=None):
+def mpage(b, appearance="light", theme="default", width=1440, height=900, extra=None):
     """Authed, warmed-up page using the CURRENT appearance/theme keys."""
-    ls = {'jobnavigator_appearance': appearance, 'jobnavigator_theme': theme,
-          'jobnavigator_welcomed': '1', 'jobnavigator_newui_seen': NEWUI_VERSION}
+    ls = {
+        "jobnavigator_appearance": appearance,
+        "jobnavigator_theme": theme,
+        "jobnavigator_welcomed": "1",
+        "jobnavigator_newui_seen": NEWUI_VERSION,
+    }
     ls.update(extra or {})
     return h.page(b, appearance=appearance, width=width, height=height, extra_ls=ls)
 
 
-def seeded_page(b, extra=None, appearance='light', theme='default', width=1440, height=900):
+def seeded_page(
+    b, extra=None, appearance="light", theme="default", width=1440, height=900
+):
     """Like mpage, but the seed runs ONCE per context (raw_ctx's guard) instead of
     on every navigation — required by any case that reloads and expects the app's
     own writes to survive. h.context's init script re-seeds on each navigation."""
-    ls = {'jobnavigator_appearance': appearance, 'jobnavigator_theme': theme,
-          'jobnavigator_welcomed': '1', 'jobnavigator_newui_seen': NEWUI_VERSION}
+    ls = {
+        "jobnavigator_appearance": appearance,
+        "jobnavigator_theme": theme,
+        "jobnavigator_welcomed": "1",
+        "jobnavigator_newui_seen": NEWUI_VERSION,
+    }
     ls.update(extra or {})
     return raw_page(b, ls=ls, width=width, height=height)
 
@@ -112,8 +137,12 @@ def go(pg, route, settle=900):
 # ── page probes ─────────────────────────────────────────────────────────────
 def console_errors(pg):
     log = pg.jn_log
-    errs = [c['text'] for c in log['console'] if c['type'] == 'error' and not NOISE.search(c['text'])]
-    perrs = [e for e in log['pageerrors'] if not NOISE.search(e)]
+    errs = [
+        c["text"]
+        for c in log["console"]
+        if c["type"] == "error" and not NOISE.search(c["text"])
+    ]
+    perrs = [e for e in log["pageerrors"] if not NOISE.search(e)]
     return errs, perrs
 
 
@@ -191,7 +220,11 @@ def rail_counts_within(pg, ms=1200):
     last = None
     while (time.time() - t0) * 1000 < ms:
         last = rail(pg)
-        if last and last['counts'] and all(v not in ('', None) for v in last['counts'].values()):
+        if (
+            last
+            and last["counts"]
+            and all(v not in ("", None) for v in last["counts"].values())
+        ):
             return last, int((time.time() - t0) * 1000)
         pg.wait_for_timeout(80)
     return last, int((time.time() - t0) * 1000)
@@ -207,7 +240,10 @@ def heading(pg):
 
 
 def ls_get(pg, key):
-    return pg.evaluate('(k) => { try { return localStorage.getItem(k) } catch (e) { return "ERR" } }', key)
+    return pg.evaluate(
+        '(k) => { try { return localStorage.getItem(k) } catch (e) { return "ERR" } }',
+        key,
+    )
 
 
 def html_attrs(pg):
@@ -242,8 +278,8 @@ def outside_point(pg):
     above a Drawer's own scrim (see smoke-final DS-S-01) — this uses the page
     title strip inside <main> instead.
     """
-    r = h.rect(pg, 'main')
-    return (int(r['left'] + 40), int(r['top'] + 14))
+    r = h.rect(pg, "main")
+    return (int(r["left"] + 40), int(r["top"] + 14))
 
 
 # ── row targeting ───────────────────────────────────────────────────────────
@@ -280,7 +316,7 @@ def row_index(pg, sel, marker, others):
     guessing here once deleted a real user row.
     """
     r = pg.evaluate(ROW_INDEX_JS, [sel, marker, list(others)])
-    return None if (not r or r.get('none')) else r
+    return None if (not r or r.get("none")) else r
 
 
 def row_index_debug(pg, sel, marker, others):
@@ -305,7 +341,7 @@ def sweep():
     """Delete every ZZE row this run created, and report anything left behind."""
     left = []
     for kind, rid in list(_TRASH):
-        st, _ = h.delete(f'/{kind}/{rid}')
+        st, _ = h.delete(f"/{kind}/{rid}")
         if st not in (200, 204, 404):
             left.append((kind, rid, st))
         else:
@@ -316,10 +352,16 @@ def sweep():
 def stray_zze():
     """ZZE rows visible through the API — never touches anything else."""
     out = {}
-    for kind, field in (('searches', 'name'), ('companies', 'name'), ('resumes', 'name')):
-        st, d = h.get(f'/{kind}')
+    for kind, field in (
+        ("searches", "name"),
+        ("companies", "name"),
+        ("resumes", "name"),
+    ):
+        st, d = h.get(f"/{kind}")
         if st == 200 and isinstance(d, list):
-            out[kind] = [r.get('id') for r in d if str(r.get(field) or '').startswith(PREFIX)]
+            out[kind] = [
+                r.get("id") for r in d if str(r.get(field) or "").startswith(PREFIX)
+            ]
     return out
 
 
@@ -334,13 +376,18 @@ def account_token(account, pin=None):
     per call, so a PIN change in the middle of a case never leaves a stale one behind."""
     import urllib.error
     import urllib.request
-    body = {'account_id': str(account)}
+
+    body = {"account_id": str(account)}
     if pin:
-        body['pin'] = pin
-    req = urllib.request.Request(BASE + '/api/auth/verify-pin', data=json.dumps(body).encode(), method='POST',
-                                 headers={'X-API-Key': KEY, 'Content-Type': 'application/json'})
+        body["pin"] = pin
+    req = urllib.request.Request(
+        BASE + "/api/auth/verify-pin",
+        data=json.dumps(body).encode(),
+        method="POST",
+        headers={"X-API-Key": KEY, "Content-Type": "application/json"},
+    )
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
-            return json.loads(r.read().decode())['token']
+            return json.loads(r.read().decode())["token"]
     except urllib.error.HTTPError as e:
-        raise RuntimeError(f'verify-pin for {account}: {e.code} {e.read()[:200]!r}')
+        raise RuntimeError(f"verify-pin for {account}: {e.code} {e.read()[:200]!r}")

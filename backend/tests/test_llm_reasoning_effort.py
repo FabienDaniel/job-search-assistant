@@ -1,9 +1,11 @@
 """Reasoning effort: which setting a call reads, what each provider receives, and the output cap it gets."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from backend.analyzer import llm_client as L
-from backend.analyzer.llm_client import NonRetryableLLMError, REASONING_HEADROOM
+from backend.analyzer.llm_client import REASONING_HEADROOM, NonRetryableLLMError
 from backend.models.db import Setting
 
 
@@ -15,30 +17,49 @@ def _settings(db, **values):
 
 # ── resolve_llm_config ───────────────────────────────────────────────────────
 
+
 def test_primary_effort_is_resolved(test_db):
-    _settings(test_db, llm_provider="claude_api", llm_model="claude-opus-5-5", llm_effort="high")
+    _settings(
+        test_db,
+        llm_provider="claude_api",
+        llm_model="claude-opus-5-5",
+        llm_effort="high",
+    )
     assert L.resolve_llm_config("")["effort"] == "high"
 
 
 def test_feature_on_the_primary_provider_inherits_the_primary_effort(test_db):
-    _settings(test_db, llm_provider="claude_api", llm_effort="high",
-              scoring_llm_provider="claude_api", scoring_llm_model="claude-haiku-4-5")
+    _settings(
+        test_db,
+        llm_provider="claude_api",
+        llm_effort="high",
+        scoring_llm_provider="claude_api",
+        scoring_llm_model="claude-haiku-4-5",
+    )
     assert L.resolve_llm_config("scoring")["effort"] == "high"
 
 
 def test_feature_on_another_provider_does_not_inherit_the_primary_effort(test_db):
     """claude_api has no "none" and openai has no "max" — an effort is only meaningful on its own provider."""
-    _settings(test_db, llm_provider="claude_api", llm_effort="max",
-              email_llm_provider="openai", email_llm_model="gpt-6-luna")
+    _settings(
+        test_db,
+        llm_provider="claude_api",
+        llm_effort="max",
+        email_llm_provider="openai",
+        email_llm_model="gpt-6-luna",
+    )
     assert L.resolve_llm_config("email")["effort"] == ""
 
 
 def test_feature_effort_wins_over_the_primary_effort(test_db):
-    _settings(test_db, llm_provider="openai", llm_effort="high", cv_tailor_llm_effort="low")
+    _settings(
+        test_db, llm_provider="openai", llm_effort="high", cv_tailor_llm_effort="low"
+    )
     assert L.resolve_llm_config("cv_tailor")["effort"] == "low"
 
 
 # ── _dispatch: filter + cap ──────────────────────────────────────────────────
+
 
 def _capture(monkeypatch, name):
     seen = {}
@@ -54,13 +75,21 @@ def _capture(monkeypatch, name):
 @pytest.mark.asyncio
 async def test_an_effort_the_provider_lacks_is_dropped(monkeypatch):
     seen = _capture(monkeypatch, "_call_claude_api")
-    await L._dispatch("claude_api", "claude-opus-5-5", "k", "p", "s", 600, effort="none")
+    await L._dispatch(
+        "claude_api", "claude-opus-5-5", "k", "p", "s", 600, effort="none"
+    )
     assert seen["kwargs"]["effort"] == ""
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider,fn", [("claude_api", "_call_claude_api"), ("openai", "_call_openai"),
-                                         ("openrouter", "_call_openai")])
+@pytest.mark.parametrize(
+    "provider,fn",
+    [
+        ("claude_api", "_call_claude_api"),
+        ("openai", "_call_openai"),
+        ("openrouter", "_call_openai"),
+    ],
+)
 async def test_api_providers_get_headroom_for_reasoning(monkeypatch, provider, fn):
     seen = _capture(monkeypatch, fn)
     await L._dispatch(provider, "m", "k", "p", "s", 600, effort="high")
@@ -69,8 +98,12 @@ async def test_api_providers_get_headroom_for_reasoning(monkeypatch, provider, f
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider,fn", [("openai", "_call_openai"), ("openrouter", "_call_openai")])
-async def test_openai_style_providers_keep_the_cap_until_an_effort_is_set(monkeypatch, provider, fn):
+@pytest.mark.parametrize(
+    "provider,fn", [("openai", "_call_openai"), ("openrouter", "_call_openai")]
+)
+async def test_openai_style_providers_keep_the_cap_until_an_effort_is_set(
+    monkeypatch, provider, fn
+):
     """gpt-4o and the small-cap OpenRouter models refuse a 16,600 cap; with no effort chosen nothing reasons."""
     seen = _capture(monkeypatch, fn)
     await L._dispatch(provider, "gpt-4o", "k", "p", "s", 600, effort="")
@@ -102,25 +135,40 @@ async def test_cli_providers_keep_the_callers_cap(monkeypatch):
 
 # ── what each provider receives ──────────────────────────────────────────────
 
+
 def _claude_client(monkeypatch, content, stop_reason="end_turn"):
     resp = MagicMock(content=content, stop_reason=stop_reason)
-    resp.usage = MagicMock(input_tokens=1, output_tokens=1, cache_read_input_tokens=0,
-                           cache_creation_input_tokens=0)
+    resp.usage = MagicMock(
+        input_tokens=1,
+        output_tokens=1,
+        cache_read_input_tokens=0,
+        cache_creation_input_tokens=0,
+    )
     client = MagicMock()
     client.messages.create = AsyncMock(return_value=resp)
     import anthropic
+
     monkeypatch.setattr(anthropic, "AsyncAnthropic", lambda **kw: client)
     return client
 
 
 @pytest.mark.asyncio
-async def test_claude_api_sends_effort_in_output_config_and_skips_the_thinking_block(monkeypatch):
+async def test_claude_api_sends_effort_in_output_config_and_skips_the_thinking_block(
+    monkeypatch,
+):
     """The pinned SDK reads a thinking block as a TextBlock with text=None; it must not become the answer."""
-    client = _claude_client(monkeypatch, [MagicMock(type="thinking", text=None),
-                                          MagicMock(type="text", text=" answer ")])
+    client = _claude_client(
+        monkeypatch,
+        [
+            MagicMock(type="thinking", text=None),
+            MagicMock(type="text", text=" answer "),
+        ],
+    )
     res = await L._call_claude_api("p", "s", "claude-opus-5-5", "k", 100, effort="high")
     assert res["text"] == "answer"
-    assert client.messages.create.call_args.kwargs["extra_body"] == {"output_config": {"effort": "high"}}
+    assert client.messages.create.call_args.kwargs["extra_body"] == {
+        "output_config": {"effort": "high"}
+    }
 
 
 @pytest.mark.asyncio
@@ -132,18 +180,23 @@ async def test_claude_api_without_effort_sends_no_output_config(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_claude_api_reasoning_that_fills_the_cap_is_not_retried(monkeypatch):
-    _claude_client(monkeypatch, [MagicMock(type="thinking", text=None)], stop_reason="max_tokens")
+    _claude_client(
+        monkeypatch, [MagicMock(type="thinking", text=None)], stop_reason="max_tokens"
+    )
     with pytest.raises(NonRetryableLLMError, match="lower the reasoning effort"):
         await L._call_claude_api("p", "s", "claude-opus-5-5", "k", 100, effort="max")
 
 
 def _openai_client(monkeypatch, content="ok", finish_reason="stop"):
     resp = MagicMock()
-    resp.choices = [MagicMock(message=MagicMock(content=content), finish_reason=finish_reason)]
+    resp.choices = [
+        MagicMock(message=MagicMock(content=content), finish_reason=finish_reason)
+    ]
     resp.usage = MagicMock(prompt_tokens=1, completion_tokens=1)
     client = MagicMock()
     client.chat.completions.create = AsyncMock(return_value=resp)
     import openai
+
     monkeypatch.setattr(openai, "AsyncOpenAI", lambda **kw: client)
     return client
 
@@ -161,7 +214,15 @@ async def test_openai_takes_max_completion_tokens_and_reasoning_effort(monkeypat
 @pytest.mark.asyncio
 async def test_openrouter_takes_max_tokens_and_a_reasoning_object(monkeypatch):
     client = _openai_client(monkeypatch)
-    await L._call_openai("p", "s", "openai/gpt-6-sol", "k", 700, base_url=L.OPENROUTER_BASE_URL, effort="xhigh")
+    await L._call_openai(
+        "p",
+        "s",
+        "openai/gpt-6-sol",
+        "k",
+        700,
+        base_url=L.OPENROUTER_BASE_URL,
+        effort="xhigh",
+    )
     kw = client.chat.completions.create.call_args.kwargs
     assert kw["max_tokens"] == 700 and "max_completion_tokens" not in kw
     assert kw["extra_body"] == {"reasoning": {"effort": "xhigh"}}
@@ -196,20 +257,35 @@ async def test_codex_passes_effort_as_a_toml_string(monkeypatch):
         seen.setdefault("cmds", []).append(cmd)
         if cmd[:3] == ["codex", "login", "status"]:
             return 0, b"", b""
-        return 0, b'{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}\n', b""
+        return (
+            0,
+            b'{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}\n',
+            b"",
+        )
 
     monkeypatch.setattr(L, "_run_cli", fake_run_cli)
     await L._call_codex_cli("p", "s", "gpt-6-sol", 100, effort="high")
     cmd = seen["cmds"][-1]
-    assert cmd[cmd.index("-c", cmd.index("--model")) + 1] == 'model_reasoning_effort="high"'
+    assert (
+        cmd[cmd.index("-c", cmd.index("--model")) + 1]
+        == 'model_reasoning_effort="high"'
+    )
 
 
 # ── call_llm fallback + settings API ─────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_the_fallback_uses_its_own_effort(test_db, monkeypatch):
-    _settings(test_db, llm_provider="claude_api", llm_model="a", llm_effort="max",
-              llm_fallback_provider="openai", llm_fallback_model="b", llm_fallback_effort="none")
+    _settings(
+        test_db,
+        llm_provider="claude_api",
+        llm_model="a",
+        llm_effort="max",
+        llm_fallback_provider="openai",
+        llm_fallback_model="b",
+        llm_fallback_effort="none",
+    )
     efforts = []
 
     async def fake_dispatch(provider, model, *a, cached_prefix=None, effort=""):
@@ -227,6 +303,7 @@ def _seed_first_run(test_db):
     """Open access for the API client: with INITIAL_API_KEY set in the environment the
     middleware wants a key unless the dashboard_api_key row exists and is empty."""
     from backend.models.db import Setting
+
     test_db.add(Setting(key="dashboard_api_key", value=""))
     test_db.commit()
 
@@ -237,5 +314,11 @@ def test_settings_api_lists_efforts_and_rejects_an_unknown_one(api_client, test_
     assert efforts["claude_code"] == ["low", "medium", "high", "xhigh", "max"]
     assert "antigravity_cli" not in efforts
 
-    assert api_client.patch("/api/settings", json={"llm_effort": "xhigh"}).status_code == 200
-    assert api_client.patch("/api/settings", json={"llm_effort": "turbo"}).status_code == 400
+    assert (
+        api_client.patch("/api/settings", json={"llm_effort": "xhigh"}).status_code
+        == 200
+    )
+    assert (
+        api_client.patch("/api/settings", json={"llm_effort": "turbo"}).status_code
+        == 400
+    )

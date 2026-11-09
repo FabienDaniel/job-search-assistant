@@ -1,8 +1,10 @@
 """Pytest fixtures for JobNavigator tests."""
+
 import os
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, MagicMock
 
 # Force SQLite for tests before any imports that touch the engine
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
@@ -56,12 +58,12 @@ def _clean_auth_throttle():
             mod._reset_auth_throttle()
         auth = sys.modules.get("backend.accounts.auth")
         if auth is not None:
-            auth.reset_pin_cooldowns()   # MT-10 per-account PIN cooldowns
-            auth.forget_touches()        # MT-11 last_active_at throttle
-            auth.invalidate_accounts_cache()   # QA F9 T6-02
+            auth.reset_pin_cooldowns()  # MT-10 per-account PIN cooldowns
+            auth.forget_touches()  # MT-11 last_active_at throttle
+            auth.invalidate_accounts_cache()  # QA F9 T6-02
         tg = sys.modules.get("backend.notifier.telegram")
         if tg is not None:
-            tg.reset_link_state()        # QA F8: link codes + per-chat/global wrong-code counters
+            tg.reset_link_state()  # QA F8: link codes + per-chat/global wrong-code counters
 
     _reset()
     yield
@@ -73,6 +75,7 @@ def _no_reused_fetches():
     """Cross-run fetch reuse (`targets.shared_fetch_for`) keeps recent fetches in-process;
     one test's fake postings must never reach the next test's run."""
     from backend.scraper.targets import reset_shared_fetches
+
     reset_shared_fetches()
     yield
     reset_shared_fetches()
@@ -84,20 +87,25 @@ def _mt_unscoped_by_default():
     unscoped, as before MT-2. The shared `test_db` fixture switches back to scoped and
     runs the test as its owner account."""
     from backend.accounts.context import unscoped
+
     with unscoped():
         yield
 
 
 # ── Anthropic mock fixtures ───────────────────────────────────────────────
 
+
 @pytest.fixture
 def mock_anthropic_response():
     """Factory for a fake anthropic.messages.create response."""
-    def _make(text: str = '{"scores":{"CV":75},"best_cv":"CV"}',
-              input_tokens: int = 1000,
-              output_tokens: int = 50,
-              cache_read: int = 0,
-              cache_write: int = 0):
+
+    def _make(
+        text: str = '{"scores":{"CV":75},"best_cv":"CV"}',
+        input_tokens: int = 1000,
+        output_tokens: int = 50,
+        cache_read: int = 0,
+        cache_write: int = 0,
+    ):
         resp = MagicMock()
         resp.content = [MagicMock(type="text", text=text)]
         resp.usage = MagicMock(
@@ -107,6 +115,7 @@ def mock_anthropic_response():
             cache_creation_input_tokens=cache_write,
         )
         return resp
+
     return _make
 
 
@@ -120,11 +129,13 @@ def mock_anthropic_client(mock_anthropic_response, monkeypatch):
         return client
 
     import anthropic
+
     monkeypatch.setattr(anthropic, "AsyncAnthropic", _fake_ctor)
     return client
 
 
 # ── DB + TestClient fixtures ─────────────────────────────────────────────
+
 
 @pytest.fixture
 def test_db(request):
@@ -133,28 +144,30 @@ def test_db(request):
     MT-2: the DB gets an owner account and the test runs in its account context, as every
     request and background run does in production. `@pytest.mark.mt_no_owner` skips both
     and runs the test inside `unscoped()` instead."""
+    # Patch Uuid.bind_processor once so string-shaped UUID binds work under SQLite.
+    import uuid as _uuid
+
     from sqlalchemy import create_engine
     from sqlalchemy.pool import StaticPool
+    from sqlalchemy.sql.sqltypes import Uuid as _SAUuid
+
     import backend.models.db as db_mod
     from backend.models.db import Base
 
-    # Patch Uuid.bind_processor once so string-shaped UUID binds work under SQLite.
-    import uuid as _uuid
-    from sqlalchemy.sql.sqltypes import Uuid as _SAUuid
     if not getattr(_SAUuid, "_jn_test_patched", False):
         _orig_bind = _SAUuid.bind_processor
 
         def _lenient_bind(self, dialect):
-            character_based = (
-                not dialect.supports_native_uuid or not self.native_uuid
-            )
+            character_based = not dialect.supports_native_uuid or not self.native_uuid
             if character_based and self.as_uuid:
+
                 def process(value):
                     if value is None:
                         return None
                     if isinstance(value, _uuid.UUID):
                         return value.hex
                     return _uuid.UUID(str(value)).hex
+
                 return process
             return _orig_bind(self, dialect)
 
@@ -188,11 +201,14 @@ def test_db(request):
     db_mod.SessionLocal.configure(bind=test_engine)
 
     from backend.accounts import context as mt
+
     session = db_mod.SessionLocal()
     if request.node.get_closest_marker("mt_no_owner"):
         account_ctx = mt.unscoped()
     else:
-        owner = db_mod.Account(name="Owner", role="owner", color=db_mod.ACCOUNT_COLORS[0])
+        owner = db_mod.Account(
+            name="Owner", role="owner", color=db_mod.ACCOUNT_COLORS[0]
+        )
         session.add(owner)
         session.commit()
         mt.remember_owner(test_engine, owner.id)
@@ -216,6 +232,7 @@ def no_account_ctx(test_db):
     In strict mode any query on account-owned rows that its entry point did not scope
     raises, so background entry points tested here must set their own context."""
     from backend.accounts.context import no_account_context
+
     with no_account_context():
         yield test_db
 
@@ -227,15 +244,17 @@ def api_client(test_db, monkeypatch):
 
     # Pre-import backend.main + heavy modules so lazy imports capture bindings before monkeypatches.
     import backend.main  # noqa: F401
-    import backend.scraper.sources.linkedin_extension  # noqa: F401
 
     # Stub the lifespan dependencies so TestClient startup is a no-op.
     import backend.main as main_mod
+    import backend.scraper.sources.linkedin_extension  # noqa: F401
+
     monkeypatch.setattr(main_mod, "create_tables", lambda: None)
     monkeypatch.setattr(main_mod, "run_seeds", lambda: None)
     monkeypatch.setattr(main_mod, "cleanup_stale_runs", lambda: None)
     # Prevent the real scheduler from booting.
     import backend.scheduler as sched_mod
+
     monkeypatch.setattr(sched_mod, "configure_scheduler", lambda: None)
     fake_scheduler = MagicMock()
     fake_scheduler.start = MagicMock()
@@ -254,6 +273,7 @@ def api_client(test_db, monkeypatch):
 
     from backend.main import app
     from backend.models.db import get_db
+
     app.dependency_overrides[get_db] = override_get_db
 
     try:
@@ -264,6 +284,7 @@ def api_client(test_db, monkeypatch):
 
 
 # ── httpx + Telegram mock fixtures ───────────────────────────────────────
+
 
 @pytest.fixture
 def mock_httpx(monkeypatch):
@@ -281,6 +302,7 @@ def mock_httpx(monkeypatch):
     client.__aexit__ = AsyncMock(return_value=False)
 
     import httpx
+
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: client)
     return {"client": client, "response": resp}
 
@@ -304,6 +326,7 @@ def mock_telegram(monkeypatch):
     client.__aexit__ = AsyncMock(return_value=False)
 
     import httpx
+
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: client)
     return sent
 
@@ -311,8 +334,8 @@ def mock_telegram(monkeypatch):
 # SQLite gives a column typed UUID NUMERIC affinity, so a random hex id made only of digits
 # and one 'e' (e.g. '1234e567...') is stored as a float and reads back as inf. CHAR(32)
 # gives it TEXT affinity, which is what the hex strings are.
-from sqlalchemy.ext.compiler import compiles as _compiles  # noqa: E402
 from sqlalchemy.dialects.postgresql import UUID as _PGUUID  # noqa: E402
+from sqlalchemy.ext.compiler import compiles as _compiles  # noqa: E402
 from sqlalchemy.sql.sqltypes import Uuid as _SAUuidType  # noqa: E402
 
 

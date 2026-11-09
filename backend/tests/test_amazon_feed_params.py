@@ -1,9 +1,12 @@
 """The Amazon search page's country filter must reach the JSON feed under the key the feed reads."""
+
 from backend.scraper.ats.amazon import _feed_params
 
-PAGE_QUERY = ("offset=0&result_limit=10&sort=recent&category%5B%5D=project-program-product-management-technical"
-              "&job_type%5B%5D=Full-Time&country%5B%5D=USA&category_type=Corporate&latitude=&longitude="
-              "&loc_query=&base_query=&city=&country=&region=&county=&query_options=&")
+PAGE_QUERY = (
+    "offset=0&result_limit=10&sort=recent&category%5B%5D=project-program-product-management-technical"
+    "&job_type%5B%5D=Full-Time&country%5B%5D=USA&category_type=Corporate&latitude=&longitude="
+    "&loc_query=&base_query=&city=&country=&region=&county=&query_options=&"
+)
 
 
 def test_country_filter_is_translated_and_blanks_dropped():

@@ -1,4 +1,5 @@
 """Regression: gmail_client top-level errors propagate so tracked_run marks JobRun failed."""
+
 import pytest
 
 
@@ -27,6 +28,7 @@ async def test_check_emails_propagates_service_error(monkeypatch):
     # Stub activity log to avoid DB writes — it's imported locally inside the
     # except block via `from backend.activity import log_activity`.
     import backend.activity as _activity
+
     monkeypatch.setattr(_activity, "log_activity", lambda *a, **kw: None, raising=False)
 
     with pytest.raises(RuntimeError, match="simulated gmail"):

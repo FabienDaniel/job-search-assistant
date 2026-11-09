@@ -6,6 +6,7 @@ the summary is kept as `result_summary`, the reason lands in `error`. These test
 pin both halves plus the ContextVar hygiene that keeps one run's reason out of
 the next run's row.
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -18,6 +19,7 @@ from sqlalchemy.orm import sessionmaker
 def _clean_monitor_globals():
     """No in-memory run and no pending failure reason may leak between tests."""
     import backend.job_monitor as jm
+
     jm._running.clear()
     jm._run_failure.set(None)
     yield
@@ -29,6 +31,7 @@ def _clean_monitor_globals():
 def bound_session(test_db, monkeypatch):
     """Point job_monitor's SessionLocal at the in-memory test DB."""
     import backend.job_monitor as jm
+
     TestSession = sessionmaker(bind=test_db.get_bind())
     monkeypatch.setattr(jm, "SessionLocal", TestSession)
     return TestSession
@@ -36,6 +39,7 @@ def bound_session(test_db, monkeypatch):
 
 def _run_row(TestSession, job_type):
     from backend.models.db import JobRun
+
     s = TestSession()
     try:
         return s.query(JobRun).filter_by(job_type=job_type).one()
@@ -46,6 +50,7 @@ def _run_row(TestSession, job_type):
 async def _drain(job_type):
     """Yield to the loop until launch_background's wrapper has finished."""
     import backend.job_monitor as jm
+
     for _ in range(200):
         await asyncio.sleep(0)
         if job_type not in jm._running:
@@ -63,8 +68,11 @@ def test_get_running_by_job_type_finds_a_scoped_run():
     started = datetime.now(timezone.utc) - timedelta(seconds=5)
     run_id = uuid.uuid4()
     jm._running["company_scrape:abc"] = jm.RunningJob(
-        run_id=run_id, job_type="company_scrape", trigger="manual",
-        started_at=started, scope_key="abc",
+        run_id=run_id,
+        job_type="company_scrape",
+        trigger="manual",
+        started_at=started,
+        scope_key="abc",
     )
 
     info = jm._get_running_by_job_type("company_scrape")
@@ -82,7 +90,9 @@ def test_get_running_by_job_type_returns_none_for_other_types():
     import backend.job_monitor as jm
 
     jm._running["email_check"] = jm.RunningJob(
-        run_id=uuid.uuid4(), job_type="email_check", trigger="scheduler",
+        run_id=uuid.uuid4(),
+        job_type="email_check",
+        trigger="scheduler",
         started_at=datetime.now(timezone.utc),
     )
     assert jm._get_running_by_job_type("scrape_all") is None
@@ -91,6 +101,7 @@ def test_get_running_by_job_type_returns_none_for_other_types():
 def test_get_running_by_job_type_returns_none_when_idle():
     """Nothing running at all → None."""
     import backend.job_monitor as jm
+
     assert jm._get_running_by_job_type("scrape_all") is None
 
 
@@ -203,7 +214,7 @@ async def test_launch_background_summary_plus_marked_failure(bound_session):
 
     row = _run_row(bound_session, "cov_bg_failed")
     assert row.status == "failed"
-    assert row.result_summary == "0 of 3 jobs scored"   # stripped by the wrapper
+    assert row.result_summary == "0 of 3 jobs scored"  # stripped by the wrapper
     assert row.error == "all 3 LLM calls failed"
 
 
@@ -225,7 +236,9 @@ async def test_launch_background_blank_summary_is_not_stored(bound_session):
 
 
 @pytest.mark.asyncio
-async def test_launch_background_failure_does_not_leak_to_the_next_launch(bound_session):
+async def test_launch_background_failure_does_not_leak_to_the_next_launch(
+    bound_session,
+):
     """Two sequential background runs: only the one that marked itself is failed."""
     import backend.job_monitor as jm
 

@@ -1,16 +1,18 @@
 """LLM-based CV scorer — scores job vs all uploaded CV versions dynamically."""
-from backend.analyzer.prompt_fence import fence
+
 import asyncio
 import json
 import logging
 import time
+
+from backend.accounts.settings import get_setting
 from backend.analyzer.llm_client import call_llm, llm_feature
 from backend.analyzer.llm_logger import log_llm_call
 from backend.analyzer.model_json import UNPARSEABLE_MESSAGE, parse_model_json
-from backend.models.db import SessionLocal, Job
-from backend.accounts.settings import get_setting
-from backend.scraper._shared.link_kinds import job_link
+from backend.analyzer.prompt_fence import fence
+from backend.models.db import Job, SessionLocal
 from backend.scraper._shared.levels_jobs import is_levels_job
+from backend.scraper._shared.link_kinds import job_link
 
 logger = logging.getLogger("jobnavigator.cv_scorer")
 
@@ -24,12 +26,14 @@ logger = logging.getLogger("jobnavigator.cv_scorer")
 def _get_scoring_semaphore():
     """The process-wide scoring gate (`scoring_max_concurrent`)."""
     from backend.job_monitor import get_limiter
+
     return get_limiter("scoring")
 
 
 def reset_scoring_semaphore():
     """Drop the gate so the next call re-reads the limit. Called on settings change."""
     from backend.job_monitor import reset_limiter
+
     reset_limiter("scoring")
 
 
@@ -126,7 +130,9 @@ def _flatten_resume(json_data: dict) -> str:
                 continue
             title = pub.get("title", "")
             # schema is {title, description}; keep venue/year as back-compat
-            detail = pub.get("description") or " ".join(x for x in (pub.get("venue"), pub.get("year")) if x)
+            detail = pub.get("description") or " ".join(
+                x for x in (pub.get("venue"), pub.get("year")) if x
+            )
             line = f"{title} — {detail}".strip(" —,")
             if line:
                 parts.append(line)
@@ -135,7 +141,13 @@ def _flatten_resume(json_data: dict) -> str:
 
 
 from backend.analyzer.score_keys import (  # noqa: E402
-    PERSONA, TAILORED, ScoringSet, display_best, key_for, keyed, names_for,
+    PERSONA,
+    TAILORED,
+    ScoringSet,
+    display_best,
+    key_for,
+    keyed,
+    names_for,
 )
 
 # Reserved id used in selected_resume_ids / default_resume_id to mean
@@ -147,6 +159,7 @@ _PERSONA_DISPLAY = "Persona"
 def _get_persona_text(db) -> dict:
     """Return {'Persona': flattened_text} when the current account's persona has non-empty resume_content, else {} — only resume_content is used for scoring."""
     from backend.accounts.owned import get_persona
+
     p = get_persona(db, create=False)
     if not p:
         return {}
@@ -161,6 +174,7 @@ def _get_persona_text(db) -> dict:
 def _get_resume_texts(db) -> dict:
     """Return {Resume.name: flattened_text} for every base Resume + Persona (if populated, always last), ordered by Resume.id for stable cache keys."""
     from backend.models.db import Resume
+
     out = ScoringSet()
     for r in db.query(Resume).filter(Resume.is_base == True).order_by(Resume.id).all():
         text = _flatten_resume(r.json_data or {})
@@ -173,6 +187,7 @@ def _get_resume_texts(db) -> dict:
 def _get_default_resume(db) -> dict:
     """Return {Resume.name: flat_text} for the default Resume (special id 'persona' returns persona text); empty dict if not set or not found."""
     from backend.models.db import Resume
+
     # Résumé query is account-scoped: an id from another account finds nothing.
     default_id = (get_setting(db, "default_resume_id") or "").strip()
     if not default_id:
@@ -182,6 +197,7 @@ def _get_default_resume(db) -> dict:
     # R3-05: a stored value that is not a UUID counts as unset (Postgres would raise a
     # DataError in the scoring sweep otherwise).
     import uuid as _uuid
+
     try:
         rid = _uuid.UUID(default_id)
     except ValueError:
@@ -201,12 +217,18 @@ def _get_default_resume(db) -> dict:
 def _get_resume_texts_for_company(db, company) -> dict:
     """Return resume texts for a company from company.selected_resume_ids (which can mix Resume UUIDs with 'persona'), falling back to the default, then all base resumes."""
     from backend.models.db import Resume
+
     selected = getattr(company, "selected_resume_ids", None) or []
     if selected:
         out = ScoringSet()
         resume_ids = [s for s in selected if s != _PERSONA_KEY]
         if resume_ids:
-            for r in db.query(Resume).filter(Resume.is_base == True, Resume.id.in_(resume_ids)).order_by(Resume.id).all():
+            for r in (
+                db.query(Resume)
+                .filter(Resume.is_base == True, Resume.id.in_(resume_ids))
+                .order_by(Resume.id)
+                .all()
+            ):
                 text = _flatten_resume(r.json_data or {})
                 if text:
                     out.add(r.name, text, str(r.id))
@@ -227,10 +249,13 @@ def _cv_texts_for_ids(db, cv_ids: list) -> dict:
     'persona' id; no is_base filter — explicit IDs are the caller's responsibility.
     """
     from backend.models.db import Resume
+
     cv_texts = ScoringSet()
     resume_ids = [c for c in cv_ids if c != _PERSONA_KEY]
     if resume_ids:
-        resumes = db.query(Resume).filter(Resume.id.in_(resume_ids)).order_by(Resume.id).all()
+        resumes = (
+            db.query(Resume).filter(Resume.id.in_(resume_ids)).order_by(Resume.id).all()
+        )
         # A single tailored resume is labeled "Tailored" so the frontend's tailored-link
         # handler picks it up; multiple in one batch fall back to Resume.name to avoid a dict-key collision.
         tailored_count = sum(1 for r in resumes if not r.is_base)
@@ -257,8 +282,11 @@ def resolve_score_resume_names(db, job=None, cv_ids: list | None = None) -> list
     if cv_ids:
         return list(_cv_texts_for_ids(db, cv_ids))
     company = _find_company_for_job(db, job) if job is not None else None
-    texts = (_get_resume_texts_for_company(db, company) if company
-             else (_get_default_resume(db) or _get_resume_texts(db)))
+    texts = (
+        _get_resume_texts_for_company(db, company)
+        if company
+        else (_get_default_resume(db) or _get_resume_texts(db))
+    )
     return list(texts)
 
 
@@ -284,6 +312,7 @@ async def _levels_text(job_id, url: str) -> str | None:
     short session after the fetch, like _fetch_job_text."""
     from backend.scraper._shared.levels_jobs import fetch_job
     from backend.scraper._shared.link_kinds import BOARD, EASY_APPLY
+
     data = await fetch_job(url)
     if not data:
         logger.info(f"Job {job_id}: no job data on its levels.fyi page")
@@ -295,7 +324,11 @@ async def _levels_text(job_id, url: str) -> str | None:
         if row is not None:
             if desc and not (row.description or "").strip():
                 row.description = desc
-            if not data.get("application_url") and not row.apply_url and row.link_kind in (BOARD, None):
+            if (
+                not data.get("application_url")
+                and not row.apply_url
+                and row.link_kind in (BOARD, None)
+            ):
                 row.link_kind = EASY_APPLY
             db.commit()
     except Exception as e:
@@ -320,6 +353,7 @@ async def _fetch_job_text(job_id, url: str) -> str | None:
     logger.info(f"Job {job_id}: no text available, fetching live page")
     try:
         from backend.scraper._shared.page_cache import _cache_job_page
+
         await _cache_job_page(str(job_id), url)
     except Exception as e:
         logger.warning(f"Job {job_id}: live page fetch failed: {e}")
@@ -359,18 +393,24 @@ async def _get_job_text(job: Job, db=None) -> str | None:
     return text
 
 
-async def score_job_sync(job: Job, cv_texts: dict, db=None, depth="light", preloaded_text: str = None) -> dict:
+async def score_job_sync(
+    job: Job, cv_texts: dict, db=None, depth="light", preloaded_text: str = None
+) -> dict:
     """Score a job against all provided CV versions under the global scoring semaphore; depth='full' includes a detailed report."""
     sem = _get_scoring_semaphore()
     async with sem:
         return await _score_job_inner(job, cv_texts, db, depth, preloaded_text)
 
 
-async def _score_job_inner(job: Job, cv_texts: dict, db=None, depth="light", preloaded_text: str = None) -> dict:
+async def _score_job_inner(
+    job: Job, cv_texts: dict, db=None, depth="light", preloaded_text: str = None
+) -> dict:
     """Inner scoring logic (called under the semaphore); returns a dict on success, or None for either an intentional skip (no text/CVs — callers must pre-check before calling) or a transient LLM failure that should be retried next pass."""
     job_text = preloaded_text or await _get_job_text(job, db)
     if not job_text:
-        logger.warning(f"Job {job.id} has no text (description, cache, or live), skipping scoring")
+        logger.warning(
+            f"Job {job.id} has no text (description, cache, or live), skipping scoring"
+        )
         return None
 
     if len(cv_texts) < 1:
@@ -381,17 +421,23 @@ async def _score_job_inner(job: Job, cv_texts: dict, db=None, depth="light", pre
     settings_db = db or SessionLocal()
     try:
         rubric = get_setting(settings_db, "scoring_rubric") or ""
-        schema_key = "scoring_output_full" if depth == "full" else "scoring_output_light"
+        schema_key = (
+            "scoring_output_full" if depth == "full" else "scoring_output_light"
+        )
         output_schema = get_setting(settings_db, schema_key) or ""
         # Scoring can override the Primary model (empty = use Primary); the Fallback
         # is applied inside call_llm regardless, which reports the pair that answered.
         from backend.analyzer.llm_client import resolve_llm_config
+
         _cfg = resolve_llm_config("scoring", db=settings_db)
         provider_for_log = _cfg["provider"]
         model_for_log = _cfg["model"]
         scoring_api_key = _cfg["api_key"]
         scoring_effort = _cfg["effort"]
-        caching_enabled = get_setting(settings_db, "prompt_caching_enabled", "true").strip().lower() == "true"
+        caching_enabled = (
+            get_setting(settings_db, "prompt_caching_enabled", "true").strip().lower()
+            == "true"
+        )
     finally:
         if not db:
             settings_db.close()
@@ -425,7 +471,12 @@ async def _score_job_inner(job: Job, cv_texts: dict, db=None, depth="light", pre
     started = time.monotonic()
     call_success = True
     call_error = None
-    usage = {"input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "cache_write_tokens": 0}
+    usage = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+    }
     return_value = None
 
     try:
@@ -435,11 +486,21 @@ async def _score_job_inner(job: Job, cv_texts: dict, db=None, depth="light", pre
         if caching_enabled:
             effective_prefix, effective_prompt = cached_prefix, user_prompt
         else:
-            effective_prefix, effective_prompt = None, f"{cached_prefix}\n\n{user_prompt}"
+            effective_prefix, effective_prompt = (
+                None,
+                f"{cached_prefix}\n\n{user_prompt}",
+            )
         with llm_feature("scoring"):
-            resp = await call_llm(effective_prompt, system_msg, max_tokens, cached_prefix=effective_prefix,
-                                  provider=provider_for_log, model=model_for_log, api_key=scoring_api_key,
-                                  effort=scoring_effort)
+            resp = await call_llm(
+                effective_prompt,
+                system_msg,
+                max_tokens,
+                cached_prefix=effective_prefix,
+                provider=provider_for_log,
+                model=model_for_log,
+                api_key=scoring_api_key,
+                effort=scoring_effort,
+            )
         text = resp["text"]
         usage = resp.get("usage", usage)
         # If call_llm fell back to the secondary pair, log what actually ran.
@@ -454,9 +515,7 @@ async def _score_job_inner(job: Job, cv_texts: dict, db=None, depth="light", pre
         if not isinstance(result.get("scores"), dict) or not result["scores"]:
             call_success = False
             call_error = "malformed LLM response: 'scores' missing, null, or not a dict"
-            logger.warning(
-                f"Job {job.id}: {call_error} — raw head: {text[:200]!r}"
-            )
+            logger.warning(f"Job {job.id}: {call_error} — raw head: {text[:200]!r}")
             result = None
 
         # For full depth, extract scoring_report fields
@@ -464,8 +523,16 @@ async def _score_job_inner(job: Job, cv_texts: dict, db=None, depth="light", pre
             pass  # fall through with return_value = None (transient failure)
         elif depth == "full":
             report = {}
-            for key in ["summary", "breakdown", "requirement_mapping", "keyword_coverage_pct",
-                         "matched_keywords", "missing_keywords", "hard_blockers", "ats_tip"]:
+            for key in [
+                "summary",
+                "breakdown",
+                "requirement_mapping",
+                "keyword_coverage_pct",
+                "matched_keywords",
+                "missing_keywords",
+                "hard_blockers",
+                "ats_tip",
+            ]:
                 if key in result:
                     report[key] = result[key]
             if report:
@@ -478,7 +545,9 @@ async def _score_job_inner(job: Job, cv_texts: dict, db=None, depth="light", pre
     except json.JSONDecodeError as e:
         call_success = False
         call_error = UNPARSEABLE_MESSAGE
-        logger.error(f"Failed to parse LLM response as JSON: {e} — raw head: {(text or '')[:200]!r}")
+        logger.error(
+            f"Failed to parse LLM response as JSON: {e} — raw head: {(text or '')[:200]!r}"
+        )
     except Exception as e:
         call_success = False
         call_error = str(e)
@@ -491,6 +560,7 @@ async def _score_job_inner(job: Job, cv_texts: dict, db=None, depth="light", pre
             # provider outage then shows green in Stats (R4-T1-28).
             try:
                 from backend.job_monitor import mark_run_failed
+
                 mark_run_failed(f"Scoring failed: {call_error or 'unknown LLM error'}")
             except Exception:
                 pass
@@ -518,14 +588,21 @@ def _alert_snapshot(job: Job):
     committed ORM instance would have its attributes expired by then.
     """
     from types import SimpleNamespace
+
     return SimpleNamespace(
-        id=job.id, company=job.company, title=job.title, url=job_link(job),
-        location=job.location, remote=job.remote,
-        salary_min=job.salary_min, salary_max=job.salary_max,
+        id=job.id,
+        company=job.company,
+        title=job.title,
+        url=job_link(job),
+        location=job.location,
+        remote=job.remote,
+        salary_min=job.salary_min,
+        salary_max=job.salary_max,
         h1b_verdict=job.h1b_verdict,
         h1b_company_lca_count=job.h1b_company_lca_count,
         h1b_company_approval_rate=job.h1b_company_approval_rate,
-        h1b_jd_flag=job.h1b_jd_flag, h1b_jd_snippet=job.h1b_jd_snippet,
+        h1b_jd_flag=job.h1b_jd_flag,
+        h1b_jd_snippet=job.h1b_jd_snippet,
         # By name, as the alert shows them (stored by résumé id, score_keys.py).
         cv_scores=_display_scores(job),
     )
@@ -533,15 +610,27 @@ def _alert_snapshot(job: Job):
 
 def _display_scores(job) -> dict:
     from sqlalchemy.orm import object_session
+
     from backend.analyzer.score_keys import display, resume_names
+
     sess = object_session(job)
     names = resume_names(sess) if sess is not None else {}
-    return display(dict(job.cv_scores or {}), None, None, getattr(job, "cv_score_names", None), names)[0] or {}
+    return (
+        display(
+            dict(job.cv_scores or {}),
+            None,
+            None,
+            getattr(job, "cv_score_names", None),
+            names,
+        )[0]
+        or {}
+    )
 
 
 def _find_company_for_job(db, job: Job):
     """Find the Company record matching a job's company name or alias (case-insensitive)."""
     from backend.models.db import find_company_by_name
+
     return find_company_by_name(db, job.company)
 
 
@@ -553,7 +642,8 @@ def unscored_filter():
     instead -- the same predicate /api/jobs/feed-stats uses. A `'{}'::jsonb`
     literal here raises UndefinedFunction and fails the whole scoring pass.
     """
-    from sqlalchemy import cast, Text
+    from sqlalchemy import Text, cast
+
     return (Job.cv_scores == None) | (cast(Job.cv_scores, Text) == "{}")
 
 
@@ -601,6 +691,7 @@ _no_resume_logged: set = set()
 
 def _account_key():
     from backend.accounts.context import current_account
+
     return current_account.get()
 
 
@@ -615,8 +706,11 @@ def _log_no_base_resumes():
 
 async def _analyze_unscored_jobs(status: str, attempted: set):
     from types import SimpleNamespace
-    from sqlalchemy import or_, func
-    from backend.models.db import Search, Company as CompanyModel
+
+    from sqlalchemy import func, or_
+
+    from backend.models.db import Company as CompanyModel
+    from backend.models.db import Search
 
     batch_size = 20
     total_scored = 0
@@ -633,14 +727,23 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
         # For "new" jobs, only score those from entities with auto_scoring_depth != 'off'
         auto_score_filter = None
         if status != "saved":
-            auto_companies = db.query(CompanyModel).filter(CompanyModel.auto_scoring_depth.in_(["light", "full"])).all()
+            auto_companies = (
+                db.query(CompanyModel)
+                .filter(CompanyModel.auto_scoring_depth.in_(["light", "full"]))
+                .all()
+            )
             auto_company_names = set()
             for c in auto_companies:
                 auto_company_names.add(c.name.lower())
                 if c.aliases:
                     for alias in c.aliases:
                         auto_company_names.add(alias.lower())
-            auto_search_ids = [s.id for s in db.query(Search).filter(Search.auto_scoring_depth.in_(["light", "full"])).all()]
+            auto_search_ids = [
+                s.id
+                for s in db.query(Search)
+                .filter(Search.auto_scoring_depth.in_(["light", "full"]))
+                .all()
+            ]
 
             conditions = []
             if auto_company_names:
@@ -649,7 +752,9 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
                 conditions.append(Job.search_id.in_(auto_search_ids))
 
             if not conditions:
-                logger.info("No entities with auto_scoring_depth enabled, skipping new job analysis")
+                logger.info(
+                    "No entities with auto_scoring_depth enabled, skipping new job analysis"
+                )
                 return
 
             auto_score_filter = or_(*conditions)
@@ -664,7 +769,7 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
         # -- Phase 1 (short session, no network): pick a batch, resolve the CV
         # set, the depth and whatever text is already on the row. Jobs with no
         # text and no URL get their _skipped sentinel here. ------------------
-        to_score = []     # (job_ref, cv_texts, depth, preloaded_text)
+        to_score = []  # (job_ref, cv_texts, depth, preloaded_text)
         needs_fetch = []  # (job_ref, cv_texts, depth, url)
         db = SessionLocal()
         try:
@@ -688,11 +793,17 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
                 attempted.add(job.id)
                 _sweep_claims.add(job.id)
 
-            logger.info(f"Analyzing batch of {len(unscored)} unscored jobs (total so far: {total_scored})")
+            logger.info(
+                f"Analyzing batch of {len(unscored)} unscored jobs (total so far: {total_scored})"
+            )
 
             for job in unscored:
                 company = _find_company_for_job(db, job)
-                cv_texts = _get_resume_texts_for_company(db, company) if company else default_cv_texts
+                cv_texts = (
+                    _get_resume_texts_for_company(db, company)
+                    if company
+                    else default_cv_texts
+                )
 
                 if status == "saved":
                     depth = "full"  # Saved jobs always get full report
@@ -710,7 +821,9 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
                 # Detached snapshot: the scorer only needs the id (LLM cost rows)
                 # plus company/title for its log lines, and phases 2-3 run with
                 # this session closed.
-                job_ref = SimpleNamespace(id=job.id, company=job.company, title=job.title)
+                job_ref = SimpleNamespace(
+                    id=job.id, company=job.company, title=job.title
+                )
 
                 # Pre-check for job text so a permanent "no JD" condition gets a
                 # sentinel here, distinct from a transient LLM failure inside score_job_sync.
@@ -730,7 +843,7 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
         # -- Phase 1b: live page fetches, with no connection held -------------
         if needs_fetch:
             no_text_ids = []
-            for (job_ref, cv_texts, depth, url) in needs_fetch:
+            for job_ref, cv_texts, depth, url in needs_fetch:
                 fetched = await _fetch_job_text(job_ref.id, url)
                 if fetched:
                     to_score.append((job_ref, cv_texts, depth, fetched))
@@ -750,8 +863,10 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
         # -- Phase 2 (parallel): LLM calls, no session anywhere. Concurrency is
         # capped by the scoring gate. ----------------------------------------
         results = await asyncio.gather(
-            *[score_job_sync(j, c, db=None, depth=d, preloaded_text=t)
-              for (j, c, d, t) in to_score],
+            *[
+                score_job_sync(j, c, db=None, depth=d, preloaded_text=t)
+                for (j, c, d, t) in to_score
+            ],
             return_exceptions=True,
         )
 
@@ -775,7 +890,9 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
                     continue
                 job = job_map.get(job_ref.id)
                 if job is None:
-                    logger.warning(f"Job {job_ref.id} disappeared mid-run - result dropped")
+                    logger.warning(
+                        f"Job {job_ref.id} disappeared mid-run - result dropped"
+                    )
                     total_scored += 1
                     continue
                 if result:
@@ -791,11 +908,18 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
                         continue
                     # The model answers by label (the résumé's name); stored by résumé id.
                     job.cv_scores = keyed(scores, cv_texts)
-                    job.cv_score_names = {**(job.cv_score_names or {}), **names_for(cv_texts, scores)}
+                    job.cv_score_names = {
+                        **(job.cv_score_names or {}),
+                        **names_for(cv_texts, scores),
+                    }
                     # Precompute max score for fast DB filtering
                     try:
                         _scores = job.cv_scores or {}
-                        _numeric = [float(v) for v in _scores.values() if isinstance(v, (int, float))]
+                        _numeric = [
+                            float(v)
+                            for v in _scores.values()
+                            if isinstance(v, (int, float))
+                        ]
                         job.best_cv_score = max(_numeric) if _numeric else None
                     except (ValueError, TypeError):
                         job.best_cv_score = None
@@ -807,14 +931,22 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
                         existing = dict(job.scoring_report or {})
                         # Migrate flat format to nested if needed
                         if existing and "summary" in existing:
-                            old_cv = existing.pop("scored_with", job.best_cv or "Unknown")
+                            old_cv = existing.pop(
+                                "scored_with", job.best_cv or "Unknown"
+                            )
                             existing = {old_cv: existing}
                         scored_keys = list(job.cv_scores.keys())
-                        cv_key = scored_keys[0] if len(scored_keys) == 1 else job.best_cv or scored_keys[0]
+                        cv_key = (
+                            scored_keys[0]
+                            if len(scored_keys) == 1
+                            else job.best_cv or scored_keys[0]
+                        )
                         existing[cv_key] = report
                         job.scoring_report = existing
 
-                    numeric_scores = [v for v in scores.values() if isinstance(v, (int, float))]
+                    numeric_scores = [
+                        v for v in scores.values() if isinstance(v, (int, float))
+                    ]
                     best_score = max(numeric_scores) if numeric_scores else 0
                     score_summary = ", ".join(f"{k}={v}" for k, v in scores.items())
                     logger.info(
@@ -842,6 +974,7 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
         for snapshot, best_score in alerts:
             try:
                 from backend.notifier.telegram import send_job_alert
+
                 await send_job_alert({"job": snapshot, "best_score": best_score})
             except Exception as e:
                 logger.error(f"Failed to send Telegram alert: {e}")
@@ -851,7 +984,10 @@ async def _analyze_unscored_jobs(status: str, attempted: set):
     db = SessionLocal()
     try:
         from backend.activity import log_activity
-        log_activity("cv_score", f"Resume scoring complete: {total_scored} jobs processed", db=db)
+
+        log_activity(
+            "cv_score", f"Resume scoring complete: {total_scored} jobs processed", db=db
+        )
         db.commit()
     finally:
         db.close()
@@ -883,11 +1019,16 @@ async def score_single_job(job_id: str, cv_ids: list = None, depth: str = "full"
             cv_texts = _cv_texts_for_ids(db, cv_ids)
         else:
             company = _find_company_for_job(db, job)
-            cv_texts = _get_resume_texts_for_company(db, company) if company else (_get_default_resume(db) or _get_resume_texts(db))
+            cv_texts = (
+                _get_resume_texts_for_company(db, company)
+                if company
+                else (_get_default_resume(db) or _get_resume_texts(db))
+            )
         if not cv_texts:
             logger.warning(
                 "score_single_job: empty cv_texts (job=%s, cv_ids=%r) — nothing to score against",
-                job_id, cv_ids,
+                job_id,
+                cv_ids,
             )
             return "No resumes to score against"
 
@@ -905,7 +1046,9 @@ async def score_single_job(job_id: str, cv_ids: list = None, depth: str = "full"
         return "No job text to score"
 
     # ── Phase 2: LLM scoring (no DB connection held) ──
-    result = await score_job_sync(job_ref, cv_texts, db=None, depth=depth, preloaded_text=job_text)
+    result = await score_job_sync(
+        job_ref, cv_texts, db=None, depth=depth, preloaded_text=job_text
+    )
     if not result:
         return "Scoring failed"
 
@@ -919,23 +1062,32 @@ async def score_single_job(job_id: str, cv_ids: list = None, depth: str = "full"
         # Defensive: .get's default doesn't catch an explicit "scores": null.
         new_scores = result.get("scores")
         if not isinstance(new_scores, dict):
-            logger.warning(f"Job {job_id}: rescore result has invalid scores — not persisting")
+            logger.warning(
+                f"Job {job_id}: rescore result has invalid scores — not persisting"
+            )
             return "Malformed LLM response - not persisted"
         # The model answers by label (the résumé's name); stored by résumé id.
         new_scores = keyed(new_scores, cv_texts)
         merged = dict(job.cv_scores or {})
         merged.update(new_scores)
         job.cv_scores = merged
-        job.cv_score_names = {**(job.cv_score_names or {}), **names_for(cv_texts, result.get("scores"))}
+        job.cv_score_names = {
+            **(job.cv_score_names or {}),
+            **names_for(cv_texts, result.get("scores")),
+        }
         # Precompute max score for fast DB filtering (Task 2)
         try:
             _scores = job.cv_scores or {}
-            _numeric = [float(v) for v in _scores.values() if isinstance(v, (int, float))]
+            _numeric = [
+                float(v) for v in _scores.values() if isinstance(v, (int, float))
+            ]
             job.best_cv_score = max(_numeric) if _numeric else None
         except (ValueError, TypeError):
             job.best_cv_score = None
 
-        numeric_merged = {k: v for k, v in merged.items() if isinstance(v, (int, float))}
+        numeric_merged = {
+            k: v for k, v in merged.items() if isinstance(v, (int, float))
+        }
         if numeric_merged:
             job.best_cv = max(numeric_merged, key=numeric_merged.get)
         else:
@@ -948,21 +1100,32 @@ async def score_single_job(job_id: str, cv_ids: list = None, depth: str = "full"
                 old_cv = existing.pop("scored_with", job.best_cv or "Unknown")
                 existing = {old_cv: existing}
             scored_keys = list(new_scores.keys())
-            cv_key = scored_keys[0] if len(scored_keys) == 1 else job.best_cv or scored_keys[0]
+            cv_key = (
+                scored_keys[0]
+                if len(scored_keys) == 1
+                else job.best_cv or scored_keys[0]
+            )
             existing[cv_key] = report
             job.scoring_report = existing
 
         db.commit()
 
         from backend.activity import log_activity
+
         numeric_new = [v for v in new_scores.values() if isinstance(v, (int, float))]
         best = max(numeric_new) if numeric_new else 0
-        log_activity("cv_score", f"Scored job '{job_title}' at {job_company}: best={best}", company=job_company)
+        log_activity(
+            "cv_score",
+            f"Scored job '{job_title}' at {job_company}: best={best}",
+            company=job_company,
+        )
 
         # Returned string becomes JobRun.result_summary (Stats -> Run history).
         best_name = display_best(job, db=db)
-        return (f"{job_title} - best {best}"
-                + (f" ({best_name})" if best_name else "")
-                + f", {depth}")
+        return (
+            f"{job_title} - best {best}"
+            + (f" ({best_name})" if best_name else "")
+            + f", {depth}"
+        )
     finally:
         db.close()

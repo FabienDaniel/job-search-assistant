@@ -1,4 +1,5 @@
 """`max_chars` is enforced server-side, not just suggested to the model — the extension only caps fields that declare a `maxLength`."""
+
 import pytest
 
 from backend.api.routes_autofill import _trim_to_chars
@@ -23,8 +24,8 @@ def test_falls_back_to_a_word_boundary_when_no_sentence_ends_in_range():
     assert trimmed is True
     assert len(out) <= 30
     assert not out.endswith(" ")
-    assert text.startswith(out)          # never invents or reorders text
-    assert text[len(out)] == " "         # the cut landed on a word boundary
+    assert text.startswith(out)  # never invents or reorders text
+    assert text[len(out)] == " "  # the cut landed on a word boundary
 
 
 def test_trailing_punctuation_is_cleaned_off_a_word_cut():
@@ -40,8 +41,10 @@ def test_hard_cut_when_there_is_no_boundary_at_all():
 
 @pytest.mark.parametrize("budget", [120, 250, 600, 1200])
 def test_never_exceeds_the_budget(budget):
-    text = ("I aligned four engineering teams on one roadmap, cut the review cycle "
-            "from three weeks to four days, and shipped the platform launch. ") * 20
+    text = (
+        "I aligned four engineering teams on one roadmap, cut the review cycle "
+        "from three weeks to four days, and shipped the platform launch. "
+    ) * 20
     out, trimmed = _trim_to_chars(text, budget)
     assert trimmed is True
     assert len(out) <= budget

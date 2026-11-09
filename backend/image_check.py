@@ -18,6 +18,7 @@ A mismatch is logged as one ERROR at boot and reported on /health. The backend
 keeps running: the schema migration and most features work in the old image.
 Stdlib only (plus `packaging` when the image has it), so it cannot fail itself.
 """
+
 from __future__ import annotations
 
 import importlib.metadata
@@ -34,7 +35,9 @@ from backend.version import APP_VERSION
 logger = logging.getLogger("jobnavigator.image_check")
 
 REQUIREMENTS_FILE = Path(__file__).with_name("requirements.txt")
-IMAGE_VERSION_FILE = Path(os.getenv("JN_IMAGE_VERSION_FILE", "/opt/jobnavigator/image-version"))
+IMAGE_VERSION_FILE = Path(
+    os.getenv("JN_IMAGE_VERSION_FILE", "/opt/jobnavigator/image-version")
+)
 
 # Distributions whose import name is checked too: installed metadata alone does
 # not prove the module loads, and these are imported lazily, so a broken one would
@@ -44,7 +47,9 @@ REQUIRED_IMPORTS = {"python-docx": "docx"}
 FIX_OLDER = "Run `docker compose pull && docker compose up -d`, or `docker compose up --build -d`."
 FIX_NEWER = "Run `git pull`, then `docker compose up -d`."
 
-_PIN = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*==\s*([^\s;#]+)")
+_PIN = re.compile(
+    r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*==\s*([^\s;#]+)"
+)
 
 
 def canonical(name: str) -> str:
@@ -90,6 +95,7 @@ def read_image_version(path: Path = IMAGE_VERSION_FILE) -> Optional[str]:
 def _same(have: str, want: str) -> bool:
     try:
         from packaging.version import Version
+
         return Version(have) == Version(want)
     except Exception:
         return have.strip() == want.strip()
@@ -128,9 +134,9 @@ def check(
     message = None
     if details:
         if newer:
-            message = (f"The backend image is newer than the code ({'; '.join(details)}). {FIX_NEWER}")
+            message = f"The backend image is newer than the code ({'; '.join(details)}). {FIX_NEWER}"
         else:
-            message = (f"The backend image is older than the code ({'; '.join(details)}). {FIX_OLDER}")
+            message = f"The backend image is older than the code ({'; '.join(details)}). {FIX_OLDER}"
     return {
         "image_outdated": bool(details),
         "image_message": message,
@@ -148,7 +154,9 @@ def image_status() -> dict:
     try:
         pins = parse_pins(REQUIREMENTS_FILE.read_text(encoding="utf-8"))
     except OSError as error:
-        logger.warning("Image check skipped: cannot read %s (%s)", REQUIREMENTS_FILE, error)
+        logger.warning(
+            "Image check skipped: cannot read %s (%s)", REQUIREMENTS_FILE, error
+        )
         pins = {}
     try:
         return check(pins, image_version=read_image_version())

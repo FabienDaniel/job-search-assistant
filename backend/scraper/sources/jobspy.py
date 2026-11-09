@@ -1,4 +1,5 @@
 """JobSpy-backed keyword search source — searches LinkedIn, Indeed, ZipRecruiter, Google Jobs via a single multi-board request."""
+
 import asyncio
 import json
 import logging
@@ -9,10 +10,10 @@ from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.countries import DEFAULT_COUNTRY, compose_location
-from backend.models.db import SessionLocal, Search, Job, get_existing_external_ids
 from backend.accounts.settings import get_setting
-from backend.scraper._shared.dedup import make_external_id, make_content_hash
+from backend.countries import DEFAULT_COUNTRY, compose_location
+from backend.models.db import Job, Search, SessionLocal, get_existing_external_ids
+from backend.scraper._shared.dedup import make_content_hash, make_external_id
 from backend.scraper._shared.posting_links import counts_as_new, employer_link
 from backend.scraper._shared.postings import is_short_link, resolve_short_link
 
@@ -22,6 +23,7 @@ logger = logging.getLogger("jobnavigator.scraper.sources.jobspy")
 def _clean(v):
     """Null-safe scalar → clean string, or None when empty; a bare str(cell) on a pandas NaN yields the literal text 'nan', which passes emptiness checks downstream and broke resume tailoring."""
     import pandas as pd
+
     try:
         if v is None or pd.isna(v):
             return None
@@ -44,9 +46,12 @@ def _jobspy_yearly(interval, *amounts) -> bool:
         return False
 
 
-def _apply_h1b_inline(job, db=None, company_lookup=None, phrases=None, loop=None) -> None:
+def _apply_h1b_inline(
+    job, db=None, company_lookup=None, phrases=None, loop=None
+) -> None:
     """Sync-safe H-1B JD scan: runs check_job_h1b in an event loop for asyncio.to_thread() workers; batch callers should pass a shared `loop` plus `company_lookup`/`phrases` to skip per-job DB lookups."""
     import asyncio as _asyncio
+
     from backend.analyzer.h1b_checker import check_job_h1b
 
     try:
@@ -54,12 +59,18 @@ def _apply_h1b_inline(job, db=None, company_lookup=None, phrases=None, loop=None
         if own_loop:
             loop = _asyncio.new_event_loop()
         try:
-            loop.run_until_complete(check_job_h1b(job, db=db, company_lookup=company_lookup, phrases=phrases))
+            loop.run_until_complete(
+                check_job_h1b(
+                    job, db=db, company_lookup=company_lookup, phrases=phrases
+                )
+            )
         finally:
             if own_loop:
                 loop.close()
     except Exception as e:
-        logger.warning(f"_apply_h1b_inline failed for job {getattr(job, 'id', '?')}: {e}")
+        logger.warning(
+            f"_apply_h1b_inline failed for job {getattr(job, 'id', '?')}: {e}"
+        )
 
 
 # A board that fails does not stop the others; jobspy (1.4+) names each failed board and its
@@ -67,7 +78,7 @@ def _apply_h1b_inline(job, db=None, company_lookup=None, phrases=None, loop=None
 
 
 def _condense_error(msg: str) -> str:
-    """"ZipRecruiter response status code 403" -> "403"; anything else trimmed."""
+    """ "ZipRecruiter response status code 403" -> "403"; anything else trimmed."""
     text = " ".join(str(msg).split())
     m = re.search(r"\b([45]\d\d)\b", text)
     if m:
@@ -80,7 +91,9 @@ def _condense_error(msg: str) -> str:
 # its condensed text, so a failure nobody diagnosed stays visible as it is.
 # The frontend flags the same two boards in frontend/src/sourceBlocks.js.
 ZIP_RECRUITER_REDIRECTED = "the US site redirects this location to a regional ZipRecruiter site, which this scraper does not read: HTTP 307"
-ZIP_RECRUITER_BLOCKED = "the server refuses the requests that this scraper sends: HTTP 403"
+ZIP_RECRUITER_BLOCKED = (
+    "the server refuses the requests that this scraper sends: HTTP 403"
+)
 # The capture sees the log line, not the page. A real page with zero jobs logs the
 # same error, so the Google text names the likely cause, not a certain one.
 GOOGLE_BLOCKED = "the server returned no job data, which is usually a JavaScript check page that this scraper cannot read"
@@ -93,7 +106,9 @@ _KNOWN_BLOCKS = {
     ],
     # jobspy/google/__init__.py fails with this when page 1 has neither jobs nor a cursor
     # ("no job data returned" since 1.4, "returned no job data" before).
-    "google": [(re.compile(r"returned no job data|no job data returned", re.I), GOOGLE_BLOCKED)],
+    "google": [
+        (re.compile(r"returned no job data|no job data returned", re.I), GOOGLE_BLOCKED)
+    ],
 }
 
 
@@ -115,14 +130,21 @@ def _board_errors(errors: dict, jobs_df, sources) -> dict:
     returned = set()
     if jobs_df is not None and not jobs_df.empty and "site" in jobs_df.columns:
         returned = {str(s).lower() for s in jobs_df["site"].unique()}
-    return {k: v for k, v in (errors or {}).items()
-            if k in sources and not (k == "google" and v == GOOGLE_BLOCKED and k in returned)}
+    return {
+        k: v
+        for k, v in (errors or {}).items()
+        if k in sources
+        and not (k == "google" and v == GOOGLE_BLOCKED and k in returned)
+    }
 
 
 def _errors_of(jobs_df) -> dict:
     """{board: text} for each board that failed in one scrape_jobs() call."""
     raw = (getattr(jobs_df, "attrs", None) or {}).get("errors") or {}
-    return {str(site).lower(): _describe_error(str(site).lower(), msg) for site, msg in raw.items()}
+    return {
+        str(site).lower(): _describe_error(str(site).lower(), msg)
+        for site, msg in raw.items()
+    }
 
 
 def jobspy_kwargs(search, proxy_url: str = None) -> dict:
@@ -132,11 +154,14 @@ def jobspy_kwargs(search, proxy_url: str = None) -> dict:
     search saved with a country it has since dropped says so instead of searching the US.
     """
     from backend.countries import normalize_country
+
     sources = [s for s in (search.sources or []) if s != "direct"]
     country = normalize_country(search.country or DEFAULT_COUNTRY)
     if country is None:
-        raise ValueError(f"Indeed has no site for the country {search.country!r} any more; "
-                         f"pick another country for this search")
+        raise ValueError(
+            f"Indeed has no site for the country {search.country!r} any more; "
+            f"pick another country for this search"
+        )
     kwargs = {
         "site_name": sources,
         "search_term": search.search_term or "",
@@ -172,12 +197,18 @@ def _count_returned(breakdown: dict, jobs_df) -> dict:
     empty = jobs_df is None or jobs_df.empty
     if not empty and "site" not in jobs_df.columns:
         return breakdown
-    counts = {} if empty else {
-        str(site).lower(): int(n)
-        for site, n in jobs_df["site"].value_counts().items()
-    }
+    counts = (
+        {}
+        if empty
+        else {
+            str(site).lower(): int(n)
+            for site, n in jobs_df["site"].value_counts().items()
+        }
+    )
     for key in set(breakdown) | set(counts):
-        breakdown.setdefault(key, {"seen": 0, "new": 0})["returned"] = counts.get(key, 0)
+        breakdown.setdefault(key, {"seen": 0, "new": 0})["returned"] = counts.get(
+            key, 0
+        )
     return breakdown
 
 
@@ -210,6 +241,7 @@ def _employer_link(row, url: str, loop):
     no known employer system is kept only when it leaves the board's own site.
     """
     from urllib.parse import urlparse
+
     direct = _clean(row.get("job_url_direct"))
     if not direct or not direct.startswith(("http://", "https://")):
         return None
@@ -231,14 +263,24 @@ def _fill_linkedin_descriptions(jobs_df, existing_ids, loop) -> int:
     from LinkedIn's public job page (no account), paced, before they are stored. Writes into
     jobs_df; returns how many were filled."""
     from backend.scraper._shared.employer_text import missing_descriptions
+
     if jobs_df is None or jobs_df.empty or "site" not in jobs_df.columns:
         return 0
     todo = []
     for idx, row in jobs_df.iterrows():
         url = _clean(row.get("job_url")) or ""
-        if str(row.get("site", "")).lower() != "linkedin" or _clean(row.get("description")) or not url:
+        if (
+            str(row.get("site", "")).lower() != "linkedin"
+            or _clean(row.get("description"))
+            or not url
+        ):
             continue
-        if make_external_id(_clean(row.get("company")) or "", _clean(row.get("title")) or "", url) in existing_ids:
+        if (
+            make_external_id(
+                _clean(row.get("company")) or "", _clean(row.get("title")) or "", url
+            )
+            in existing_ids
+        ):
             continue
         todo.append({"idx": idx, "url": url, "description": None})
     if not todo:
@@ -272,8 +314,10 @@ def apply_title_filters(jobs_df, include_keywords: list, exclude_keywords: list)
         mask &= jobs_df["title"].str.contains(pattern, case=False, na=False)
 
     if exclude_keywords:
-        pattern = "|".join(r'\b' + re.escape(kw) + r'\b' for kw in exclude_keywords)
-        mask &= ~jobs_df["title"].str.contains(pattern, case=False, na=False, regex=True)
+        pattern = "|".join(r"\b" + re.escape(kw) + r"\b" for kw in exclude_keywords)
+        mask &= ~jobs_df["title"].str.contains(
+            pattern, case=False, na=False, regex=True
+        )
 
     return jobs_df[mask], jobs_df[~mask]
 
@@ -286,8 +330,13 @@ def apply_company_filter(jobs_df, company_filter: list):
     return jobs_df[jobs_df["company"].str.lower().isin(cf_set)]
 
 
-def trim_postings(jobs_df, results_wanted: int, hours_old: int,
-                  fetched_results: int, fetched_hours: int):
+def trim_postings(
+    jobs_df,
+    results_wanted: int,
+    hours_old: int,
+    fetched_results: int,
+    fetched_hours: int,
+):
     """Cut a shared fetch (MT-8, made at the largest results_wanted / hours_old among the
     subscribers) down to one account's own values.
 
@@ -297,17 +346,33 @@ def trim_postings(jobs_df, results_wanted: int, hours_old: int,
     - results_wanted: JobSpy's limit is per board, so the first N rows of each board are
       kept, in the order the boards returned them.
     Nothing is touched when the account's values equal the fetched ones."""
-    import pandas as pd
     from datetime import timedelta
+
+    import pandas as pd
+
     if jobs_df is None or jobs_df.empty:
         return jobs_df
-    if hours_old and fetched_hours and hours_old < fetched_hours and "date_posted" in jobs_df.columns:
-        cutoff = pd.Timestamp((datetime.now(timezone.utc) - timedelta(hours=hours_old)).date())
+    if (
+        hours_old
+        and fetched_hours
+        and hours_old < fetched_hours
+        and "date_posted" in jobs_df.columns
+    ):
+        cutoff = pd.Timestamp(
+            (datetime.now(timezone.utc) - timedelta(hours=hours_old)).date()
+        )
         posted = pd.to_datetime(jobs_df["date_posted"], errors="coerce")
         jobs_df = jobs_df[posted.isna() | (posted >= cutoff)]
-    if results_wanted and fetched_results and results_wanted < fetched_results and not jobs_df.empty:
+    if (
+        results_wanted
+        and fetched_results
+        and results_wanted < fetched_results
+        and not jobs_df.empty
+    ):
         if "site" in jobs_df.columns:
-            jobs_df = jobs_df.groupby("site", sort=False, group_keys=False).head(results_wanted)
+            jobs_df = jobs_df.groupby("site", sort=False, group_keys=False).head(
+                results_wanted
+            )
         else:
             jobs_df = jobs_df.head(results_wanted)
     return jobs_df
@@ -331,29 +396,46 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
         # Build source list — filter out 'direct' which is Playwright
         sources = [s for s in (search.sources or []) if s != "direct"]
         if not sources:
-            return {"jobs_found": 0, "new_jobs": 0, "ignored_jobs": 0,
-                    "error": "No JobSpy sources configured", "source_breakdown": {}}
+            return {
+                "jobs_found": 0,
+                "new_jobs": 0,
+                "ignored_jobs": 0,
+                "error": "No JobSpy sources configured",
+                "source_breakdown": {},
+            }
         breakdown = {s: {"seen": 0, "new": 0} for s in sources}
 
         kwargs = jobspy_kwargs(search, proxy_url)
 
         if shared is None:
-            logger.info(f"Running JobSpy search: {search.name} — term='{search.search_term}', sources={sources}")
+            logger.info(
+                f"Running JobSpy search: {search.name} — term='{search.search_term}', sources={sources}"
+            )
             jobs_df = scrape_jobs(**kwargs)
             captured = _errors_of(jobs_df)
         else:
             own_results, own_hours = kwargs["results_wanted"], kwargs["hours_old"]
-            kwargs["results_wanted"] = shared.params.get("results_wanted") or own_results
+            kwargs["results_wanted"] = (
+                shared.params.get("results_wanted") or own_results
+            )
             kwargs["hours_old"] = shared.params.get("hours_old") or own_hours
 
             def _fetch():
-                logger.info(f"Running shared JobSpy search: {search.name} — term='{search.search_term}', "
-                            f"sources={sources}, results={kwargs['results_wanted']}, hours={kwargs['hours_old']}")
+                logger.info(
+                    f"Running shared JobSpy search: {search.name} — term='{search.search_term}', "
+                    f"sources={sources}, results={kwargs['results_wanted']}, hours={kwargs['hours_old']}"
+                )
                 df = scrape_jobs(**kwargs)
                 return df, _errors_of(df)
+
             jobs_df, captured = shared.get_sync(_fetch)
-            jobs_df = trim_postings(jobs_df, own_results, own_hours,
-                                    kwargs["results_wanted"], kwargs["hours_old"])
+            jobs_df = trim_postings(
+                jobs_df,
+                own_results,
+                own_hours,
+                kwargs["results_wanted"],
+                kwargs["hours_old"],
+            )
         _merge_source_errors(breakdown, _board_errors(captured, jobs_df, sources))
         # Rows each board returned, counted here — before the title filter, the
         # company allow-list and the company exclude. It is the only truthful
@@ -365,18 +447,28 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
 
         if jobs_df is None or jobs_df.empty:
             duration = time.time() - start_time
-            return {"jobs_found": 0, "new_jobs": 0, "ignored_jobs": 0, "error": None,
-                    "duration": duration, "source_breakdown": breakdown}
+            return {
+                "jobs_found": 0,
+                "new_jobs": 0,
+                "ignored_jobs": 0,
+                "error": None,
+                "duration": duration,
+                "source_breakdown": breakdown,
+            }
 
         # Apply filters (merge global title exclude with per-search)
         db_excl = SessionLocal()
         try:
-            global_title_excl = json.loads(get_setting_value(db_excl, "title_exclude_global", "[]"))
+            global_title_excl = json.loads(
+                get_setting_value(db_excl, "title_exclude_global", "[]")
+            )
         except Exception:
             global_title_excl = []
         finally:
             db_excl.close()
-        merged_exclude = list(set((search.title_exclude_keywords or []) + global_title_excl))
+        merged_exclude = list(
+            set((search.title_exclude_keywords or []) + global_title_excl)
+        )
         jobs_df, rejected_df = apply_title_filters(
             jobs_df,
             search.title_include_keywords or [],
@@ -389,14 +481,23 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
         db_excl = SessionLocal()
         try:
             from backend.scraper._shared.filters import build_search_exclude_sets
-            global_exclude_set, search_exclude_set = build_search_exclude_sets(db_excl, search)
-            if (global_exclude_set or search_exclude_set) and jobs_df is not None and not jobs_df.empty:
+
+            global_exclude_set, search_exclude_set = build_search_exclude_sets(
+                db_excl, search
+            )
+            if (
+                (global_exclude_set or search_exclude_set)
+                and jobs_df is not None
+                and not jobs_df.empty
+            ):
                 before = len(jobs_df)
+
                 def _excl(name):
                     nl = str(name).lower()
                     if nl in global_exclude_set:
                         return True
                     return nl in search_exclude_set
+
                 mask = jobs_df["company"].apply(_excl)
                 jobs_df = jobs_df[~mask]
                 if len(jobs_df) < before:
@@ -421,8 +522,10 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
         # Hoisted per run (not per job): one event loop, one company lookup, one parsed phrase list —
         # avoids a fresh loop + full company scan + Settings JSON-parse thousands of times per scrape.
         import asyncio as _asyncio
-        from backend.models.db import build_company_lookup
+
         from backend.analyzer.h1b_checker import load_exclusion_phrases
+        from backend.models.db import build_company_lookup
+
         h1b_loop = _asyncio.new_event_loop()
         try:
             existing_ids = get_existing_external_ids(db)
@@ -432,10 +535,16 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
             # The loop below writes rows; H-1B lookups for the new jobs happen before it (S2-01).
             # Non-fatal like `_apply_h1b_inline`: without it the jobs keep what the cache has.
             from backend.scraper._shared.analysis import prefetch_h1b
+
             _new_companies = [
-                _clean(r.get("company")) for _, r in jobs_df.iterrows()
-                if make_external_id(_clean(r.get("company")) or "", _clean(r.get("title")) or "",
-                                    _clean(r.get("job_url")) or "") not in existing_ids
+                _clean(r.get("company"))
+                for _, r in jobs_df.iterrows()
+                if make_external_id(
+                    _clean(r.get("company")) or "",
+                    _clean(r.get("title")) or "",
+                    _clean(r.get("job_url")) or "",
+                )
+                not in existing_ids
             ]
             _prefetch = prefetch_h1b(_new_companies)
             try:
@@ -447,9 +556,13 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
             try:
                 _filled = _fill_linkedin_descriptions(jobs_df, existing_ids, h1b_loop)
                 if _filled:
-                    logger.info(f"JobSpy: LinkedIn description for {_filled} new jobs in '{search.name}'")
+                    logger.info(
+                        f"JobSpy: LinkedIn description for {_filled} new jobs in '{search.name}'"
+                    )
             except Exception as e:  # the jobs are stored without one, as before
-                logger.warning(f"JobSpy LinkedIn descriptions skipped for '{search.name}': {e}")
+                logger.warning(
+                    f"JobSpy LinkedIn descriptions skipped for '{search.name}': {e}"
+                )
 
             for _, row in jobs_df.iterrows():
                 company = _clean(row.get("company")) or ""
@@ -512,20 +625,35 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
                         pass
 
                 # H-1B check + salary extraction inline, using the shared loop/lookup/phrases hoisted above.
-                _apply_h1b_inline(job, db, company_lookup=company_lookup, phrases=phrases, loop=h1b_loop)
+                _apply_h1b_inline(
+                    job,
+                    db,
+                    company_lookup=company_lookup,
+                    phrases=phrases,
+                    loop=h1b_loop,
+                )
                 try:
-                    from backend.analyzer.salary_extractor import apply_salary_to_job
-                    from backend.analyzer.work_arrangement import apply_arrangement_to_job
                     from backend.analyzer.location import apply_location_to_job
+                    from backend.analyzer.salary_extractor import apply_salary_to_job
+                    from backend.analyzer.work_arrangement import (
+                        apply_arrangement_to_job,
+                    )
+
                     apply_salary_to_job(job, getattr(job, "_h1b_median", None))
-                    apply_arrangement_to_job(job, structured=_structured_arrangement(row, site))
+                    apply_arrangement_to_job(
+                        job, structured=_structured_arrangement(row, site)
+                    )
                     apply_location_to_job(job)
                 except Exception as analysis_err:
-                    logger.warning(f"Inline salary analysis failed for {title}: {analysis_err}")
+                    logger.warning(
+                        f"Inline salary analysis failed for {title}: {analysis_err}"
+                    )
 
                 if job.h1b_jd_flag:
                     _phrase = getattr(job, "_h1b_matched_phrase", None) or "?"
-                    logger.info(f"Skipping job (body exclusion): {title} @ {company} — matched phrase: {_phrase!r}")
+                    logger.info(
+                        f"Skipping job (body exclusion): {title} @ {company} — matched phrase: {_phrase!r}"
+                    )
                     continue
 
                 try:
@@ -534,13 +662,19 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
                         db.flush()
                     if counts_as_new(job):
                         new_jobs += 1
-                        breakdown.setdefault(site or "unknown", {"seen": 0, "new": 0})["new"] += 1
+                        breakdown.setdefault(site or "unknown", {"seen": 0, "new": 0})[
+                            "new"
+                        ] += 1
                     existing_ids.add(ext_id)
                 except IntegrityError:
-                    logger.debug(f"Duplicate external_id for '{title}' at {company}, skipping")
+                    logger.debug(
+                        f"Duplicate external_id for '{title}' at {company}, skipping"
+                    )
                     continue
                 except Exception as e:
-                    logger.warning(f"Insert failed for '{title}' at {company} ({url}): {e}")
+                    logger.warning(
+                        f"Insert failed for '{title}' at {company} ({url}): {e}"
+                    )
                     continue
 
             # Save filtered-out jobs as "ignored" for dedup purposes
@@ -582,12 +716,16 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
                             db.flush()
                         existing_ids.add(ext_id)
                         ignored_jobs += 1
-                        entry = breakdown.setdefault(site or "unknown", {"seen": 0, "new": 0})
+                        entry = breakdown.setdefault(
+                            site or "unknown", {"seen": 0, "new": 0}
+                        )
                         entry["filtered"] = entry.get("filtered", 0) + 1
                     except IntegrityError:
                         continue
                     except Exception as e:
-                        logger.warning(f"Insert failed for ignored job '{title}' at {company} ({url}): {e}")
+                        logger.warning(
+                            f"Insert failed for ignored job '{title}' at {company} ({url}): {e}"
+                        )
                         continue
 
             db.commit()
@@ -604,22 +742,39 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
         duration = time.time() - start_time
 
         from backend.activity import log_activity
-        log_activity("scrape", f"JobSpy search '{search.name}': {new_jobs} new / {jobs_found} found"
-                     + (f" ({ignored_jobs} filtered out)" if ignored_jobs else "")
-                     + f" in {duration:.1f}s")
 
-        return {"jobs_found": jobs_found, "new_jobs": new_jobs, "ignored_jobs": ignored_jobs,
-                "error": None, "duration": duration, "source_breakdown": breakdown}
+        log_activity(
+            "scrape",
+            f"JobSpy search '{search.name}': {new_jobs} new / {jobs_found} found"
+            + (f" ({ignored_jobs} filtered out)" if ignored_jobs else "")
+            + f" in {duration:.1f}s",
+        )
+
+        return {
+            "jobs_found": jobs_found,
+            "new_jobs": new_jobs,
+            "ignored_jobs": ignored_jobs,
+            "error": None,
+            "duration": duration,
+            "source_breakdown": breakdown,
+        }
 
     except Exception as e:
         duration = time.time() - start_time
         logger.error(f"JobSpy search failed for '{search.name}': {e}")
 
         from backend.activity import log_activity
+
         log_activity("scrape", f"JobSpy search '{search.name}' failed: {e}")
 
-        return {"jobs_found": 0, "new_jobs": 0, "ignored_jobs": 0, "error": str(e),
-                "duration": duration, "source_breakdown": breakdown}
+        return {
+            "jobs_found": 0,
+            "new_jobs": 0,
+            "ignored_jobs": 0,
+            "error": str(e),
+            "duration": duration,
+            "source_breakdown": breakdown,
+        }
 
 
 async def run(search, proxy_url: str = None, shared=None) -> dict:
@@ -648,7 +803,9 @@ async def preview(search: Search, db) -> dict:
     try:
         jobs_df = await asyncio.to_thread(scrape_jobs, **kwargs)
     except Exception:
-        logger.exception("JobSpy scrape_jobs failed during test for search %s", search.name)
+        logger.exception(
+            "JobSpy scrape_jobs failed during test for search %s", search.name
+        )
         return {
             "search_name": search.name,
             "error": "Scrape failed; see server logs for details.",
@@ -710,8 +867,10 @@ async def preview(search: Search, db) -> dict:
         pattern = "|".join(include_kw)
         mask &= jobs_df["title"].str.contains(pattern, case=False, na=False)
     if exclude_kw:
-        pattern = "|".join(r'\b' + re.escape(kw) + r'\b' for kw in exclude_kw)
-        mask &= ~jobs_df["title"].str.contains(pattern, case=False, na=False, regex=True)
+        pattern = "|".join(r"\b" + re.escape(kw) + r"\b" for kw in exclude_kw)
+        mask &= ~jobs_df["title"].str.contains(
+            pattern, case=False, na=False, regex=True
+        )
 
     company_filter = search.company_filter or []
     if company_filter:
@@ -719,32 +878,42 @@ async def preview(search: Search, db) -> dict:
         mask &= jobs_df["company"].str.lower().isin(cf_set)
 
     import json
+
     from backend.scraper._shared.filters import build_search_exclude_sets, title_kept
+
     global_exclude_set, search_exclude_set = build_search_exclude_sets(db, search)
     all_exclude = list(global_exclude_set | search_exclude_set)
     if global_exclude_set or search_exclude_set:
+
         def _kw_excl(name):
             nl = str(name).lower()
             if nl in global_exclude_set:
                 return True
             return nl in search_exclude_set
+
         excl_mask = jobs_df["company"].apply(_kw_excl)
         mask &= ~excl_mask
 
     # The run merges title_exclude_global into the exclude list before storing (see
     # _run_sync); applied after the per-search layers here too, mirroring routes_companies.py.
     from backend.models.db import get_global_title_exclude
-    global_exclude_kw = [kw for kw in (get_global_title_exclude(db) or []) if str(kw).strip()]
-    after_search_filter = int(mask.sum())   # passes the per-search layers only
-    global_hits = {}                        # df index -> the global keywords that matched
+
+    global_exclude_kw = [
+        kw for kw in (get_global_title_exclude(db) or []) if str(kw).strip()
+    ]
+    after_search_filter = int(mask.sum())  # passes the per-search layers only
+    global_hits = {}  # df index -> the global keywords that matched
     if global_exclude_kw:
         for idx in jobs_df.index:
             if not mask[idx]:
                 continue
             title_text = str(jobs_df.at[idx, "title"])
             matched_global = [
-                kw for kw in global_exclude_kw
-                if re.search(r'\b' + re.escape(str(kw)) + r'\b', title_text, re.IGNORECASE)
+                kw
+                for kw in global_exclude_kw
+                if re.search(
+                    r"\b" + re.escape(str(kw)) + r"\b", title_text, re.IGNORECASE
+                )
             ]
             if matched_global:
                 global_hits[idx] = matched_global
@@ -758,13 +927,20 @@ async def preview(search: Search, db) -> dict:
         except json.JSONDecodeError:
             pass
     # Record which phrase hit (and which rows couldn't be checked at all) so each row can report it inline.
-    body_hits = {}          # df index -> the exclusion phrase that matched
-    body_unchecked = set()  # df index -> passed the title layers, but had no description
+    body_hits = {}  # df index -> the exclusion phrase that matched
+    body_unchecked = (
+        set()
+    )  # df index -> passed the title layers, but had no description
     if body_phrases:
         from backend.analyzer.h1b_checker import scan_jd_for_h1b_flags
+
         for idx in jobs_df.index:
             if mask[idx]:
-                desc = str(jobs_df.at[idx, "description"]) if "description" in jobs_df.columns else ""
+                desc = (
+                    str(jobs_df.at[idx, "description"])
+                    if "description" in jobs_df.columns
+                    else ""
+                )
                 if desc and desc != "nan":
                     result = scan_jd_for_h1b_flags(desc, body_phrases)
                     if result["jd_flag"]:
@@ -826,24 +1002,26 @@ async def preview(search: Search, db) -> dict:
 
         has_desc = bool(desc and desc != "nan" and len(desc) > 50)
 
-        results.append({
-            "title": title,
-            "company": company,
-            "url": url,
-            "source": site,
-            "location": location if location != "nan" else "",
-            "salary": salary,
-            "has_description": has_desc,
-            "desc_length": len(desc) if has_desc else 0,
-            "kept": kept,
-            "reason": reason,
-            # The global title-exclude keywords that matched, or [].
-            "global_excluded_by": global_hits.get(idx, []),
-            # The phrase that would make the run store this row as `ignored`, or
-            # null; body_checked is false when there was no description to scan.
-            "body_excluded_by": body_hits.get(idx),
-            "body_checked": bool(body_phrases) and idx not in body_unchecked,
-        })
+        results.append(
+            {
+                "title": title,
+                "company": company,
+                "url": url,
+                "source": site,
+                "location": location if location != "nan" else "",
+                "salary": salary,
+                "has_description": has_desc,
+                "desc_length": len(desc) if has_desc else 0,
+                "kept": kept,
+                "reason": reason,
+                # The global title-exclude keywords that matched, or [].
+                "global_excluded_by": global_hits.get(idx, []),
+                # The phrase that would make the run store this row as `ignored`, or
+                # null; body_checked is false when there was no description to scan.
+                "body_excluded_by": body_hits.get(idx),
+                "body_checked": bool(body_phrases) and idx not in body_unchecked,
+            }
+        )
 
     after_filter = sum(1 for j in results if j["kept"])
     body_excluded_count = len(body_hits)

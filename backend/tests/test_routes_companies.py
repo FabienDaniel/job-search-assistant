@@ -1,9 +1,11 @@
 """Tests for /api/companies CRUD (there is no DELETE endpoint) and the ATS label from ats.registry.scrape_type."""
+
 import pytest
 
 
 def _seed_first_run(db):
     from backend.models.db import Setting
+
     db.add(Setting(key="dashboard_api_key", value=""))
     db.commit()
 
@@ -11,14 +13,17 @@ def _seed_first_run(db):
 @pytest.fixture(autouse=True)
 def _stub_h1b_background(monkeypatch):
     """Prevent real H-1B network fetches from any create/patch flow."""
+
     async def _noop(*a, **kw):
         return None
 
     # Stub both the private BackgroundTasks target and the underlying fetcher.
     import backend.api.routes_companies as rc
+
     monkeypatch.setattr(rc, "_fire_h1b_async", _noop, raising=False)
     try:
         import backend.analyzer.h1b_checker as h1b
+
         if hasattr(h1b, "fetch_h1b_for_company_id"):
             monkeypatch.setattr(h1b, "fetch_h1b_for_company_id", _noop, raising=False)
         if hasattr(h1b, "fetch_h1b_for_company"):
@@ -32,11 +37,14 @@ def _stub_h1b_background(monkeypatch):
 
 def test_create_company(api_client, test_db):
     _seed_first_run(test_db)
-    resp = api_client.post("/api/companies", json={
-        "name": "TestCoAlpha",
-        "scrape_urls": ["https://nvidia.wd5.myworkdayjobs.com/CareerSite"],
-        "tier": 1,
-    })
+    resp = api_client.post(
+        "/api/companies",
+        json={
+            "name": "TestCoAlpha",
+            "scrape_urls": ["https://nvidia.wd5.myworkdayjobs.com/CareerSite"],
+            "tier": 1,
+        },
+    )
     assert resp.status_code in (200, 201), f"Unexpected {resp.status_code}: {resp.text}"
     data = resp.json()
     assert data.get("name") == "TestCoAlpha"
@@ -47,19 +55,24 @@ def test_create_company_rejects_duplicate(api_client, test_db):
     """POST with an existing name should return 409."""
     _seed_first_run(test_db)
     from backend.models.db import Company
+
     test_db.add(Company(name="DupCo", scrape_urls=[]))
     test_db.commit()
 
-    resp = api_client.post("/api/companies", json={
-        "name": "DupCo",
-        "scrape_urls": [],
-    })
+    resp = api_client.post(
+        "/api/companies",
+        json={
+            "name": "DupCo",
+            "scrape_urls": [],
+        },
+    )
     assert resp.status_code == 409
 
 
 def test_list_companies(api_client, test_db):
     _seed_first_run(test_db)
     from backend.models.db import Company
+
     test_db.add(Company(name="ListedCo", scrape_urls=[]))
     test_db.commit()
 
@@ -75,6 +88,7 @@ def test_list_companies(api_client, test_db):
 def test_update_company(api_client, test_db):
     _seed_first_run(test_db)
     from backend.models.db import Company
+
     co = Company(name="BeforeName", scrape_urls=[], tier=1)
     test_db.add(co)
     test_db.commit()
@@ -92,6 +106,7 @@ def test_update_company_not_found(api_client, test_db):
     """PATCH on unknown ID returns 404."""
     _seed_first_run(test_db)
     import uuid
+
     resp = api_client.patch(f"/api/companies/{uuid.uuid4()}", json={"tier": 2})
     assert resp.status_code == 404
 
@@ -101,19 +116,22 @@ def test_update_company_not_found(api_client, test_db):
 
 def test_scrape_type_workday():
     from backend.scraper.ats.registry import scrape_type
-    assert scrape_type(
-        "https://nvidia.wd5.myworkdayjobs.com/CareerSite"
-    ) == "Workday API"
+
+    assert (
+        scrape_type("https://nvidia.wd5.myworkdayjobs.com/CareerSite") == "Workday API"
+    )
 
 
 def test_scrape_type_greenhouse():
     from backend.scraper.ats.registry import scrape_type
+
     result = scrape_type("https://boards.greenhouse.io/acme")
     assert "Greenhouse" in result
 
 
 def test_scrape_type_generic_fallback():
     from backend.scraper.ats.registry import scrape_type
+
     # An unknown career page should fall through to the Playwright generic path.
     result = scrape_type("https://example.com/careers")
     assert "Playwright" in result or "Generic" in result

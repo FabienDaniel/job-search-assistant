@@ -1,4 +1,5 @@
 """Classify emails as positive/rejection/auto-reply/ambiguous."""
+
 import logging
 
 logger = logging.getLogger("jobnavigator.email_parser")
@@ -105,11 +106,13 @@ def classify_email(subject: str, body: str) -> dict:
     return {"classification": "ambiguous", "confidence": 0.2}
 
 
-async def classify_email_llm(from_header: str, subject: str, body: str, active_apps: list) -> dict | None:
+async def classify_email_llm(
+    from_header: str, subject: str, body: str, active_apps: list
+) -> dict | None:
     """Classify an ambiguous email via LLM; returns dict with match_index/status/confidence/summary, or None on failure.
     active_apps: list of dicts with keys index (1-based), id, company, title, status, applied_at."""
-    from backend.models.db import SessionLocal
     from backend.accounts.settings import get_setting
+    from backend.models.db import SessionLocal
 
     db = SessionLocal()
     try:
@@ -118,15 +121,21 @@ async def classify_email_llm(from_header: str, subject: str, body: str, active_a
 
         prompt_template = get_setting(db, "email_llm_prompt")
         if not prompt_template:
-            logger.warning("email_llm_prompt setting is empty, skipping LLM classification")
+            logger.warning(
+                "email_llm_prompt setting is empty, skipping LLM classification"
+            )
             return None
     finally:
         db.close()
 
     app_lines = []
     for app in active_apps:
-        app_lines.append(f"{app['index']}. {app['company']} — {app['title']} ({app['status']} since {app['applied_at']})")
-    applications_text = "\n".join(app_lines) if app_lines else "(no active applications)"
+        app_lines.append(
+            f"{app['index']}. {app['company']} — {app['title']} ({app['status']} since {app['applied_at']})"
+        )
+    applications_text = (
+        "\n".join(app_lines) if app_lines else "(no active applications)"
+    )
 
     truncated_body = body[:1500] if body else ""
     prompt = prompt_template.replace("{applications}", applications_text)
@@ -137,12 +146,13 @@ async def classify_email_llm(from_header: str, subject: str, body: str, active_a
     system = "You classify recruiter emails and match them to job applications. Return only valid JSON."
 
     try:
-        from backend.analyzer.llm_client import call_email_llm
-        from backend.analyzer.llm_logger import track_llm_call
         import json
+
         # Use the same resolver call_email_llm dispatches with, so the log row can't
         # name a model that was never called.
-        from backend.analyzer.llm_client import resolve_llm_config
+        from backend.analyzer.llm_client import call_email_llm, resolve_llm_config
+        from backend.analyzer.llm_logger import track_llm_call
+
         _cfg = resolve_llm_config("email")
         _provider, _model = _cfg["provider"], _cfg["model"]
         async with track_llm_call("email", _provider, _model) as _tracker:
@@ -152,8 +162,9 @@ async def classify_email_llm(from_header: str, subject: str, body: str, active_a
 
         # Extract JSON from response — handles markdown fences and trailing commentary
         import re
+
         text = raw.strip()
-        match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
+        match = re.search(r"\{[^{}]*\}", text, re.DOTALL)
         if match:
             text = match.group(0)
         else:
@@ -161,22 +172,32 @@ async def classify_email_llm(from_header: str, subject: str, body: str, active_a
             if text.startswith("```"):
                 text = text.split("\n", 1)[1] if "\n" in text else text[3:]
             if "```" in text:
-                text = text[:text.index("```")]
+                text = text[: text.index("```")]
             text = text.strip()
 
         result = json.loads(text)
 
         if not isinstance(result.get("confidence"), (int, float)):
-            logger.warning(f"Email LLM: missing/invalid confidence in response: {raw[:200]}")
+            logger.warning(
+                f"Email LLM: missing/invalid confidence in response: {raw[:200]}"
+            )
             return None
         if result.get("status") not in ("interview", "offer", "rejected", "no_change"):
-            logger.warning(f"Email LLM: invalid status '{result.get('status')}' in response")
+            logger.warning(
+                f"Email LLM: invalid status '{result.get('status')}' in response"
+            )
             result["status"] = "no_change"
 
         match_idx = result.get("match_index")
         if match_idx is not None:
-            if not isinstance(match_idx, int) or match_idx < 1 or match_idx > len(active_apps):
-                logger.warning(f"Email LLM: invalid match_index {match_idx}, setting to null")
+            if (
+                not isinstance(match_idx, int)
+                or match_idx < 1
+                or match_idx > len(active_apps)
+            ):
+                logger.warning(
+                    f"Email LLM: invalid match_index {match_idx}, setting to null"
+                )
                 result["match_index"] = None
 
         return result

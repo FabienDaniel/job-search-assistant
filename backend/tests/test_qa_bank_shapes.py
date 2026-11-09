@@ -1,4 +1,5 @@
 """_flatten_qa_bank must read both qa_bank shapes: the canonical {"question": ..., "answer": ...} (what POST /persona/qa-bank writes) and a legacy single-key map {"<question>": "<answer>"}."""
+
 from backend.api.routes_autofill import _flatten_qa_bank, _qa_pair
 
 
@@ -13,10 +14,12 @@ def test_legacy_single_key_shape():
 
 
 def test_mixed_bank_keeps_every_entry():
-    out = _flatten_qa_bank([
-        {"A?": "1"},
-        {"question": "B?", "answer": "2"},
-    ])
+    out = _flatten_qa_bank(
+        [
+            {"A?": "1"},
+            {"question": "B?", "answer": "2"},
+        ]
+    )
     assert out == "Q: A?\nA: 1\n\nQ: B?\nA: 2"
 
 
@@ -24,11 +27,17 @@ def test_empty_and_junk_entries_are_dropped():
     assert _flatten_qa_bank([]) == "(empty)"
     assert _flatten_qa_bank(None) == "(empty)"
     # entries that carry no text at all must not pad the prompt with blank pairs
-    assert _flatten_qa_bank([{}, None, "nonsense", {"question": "", "answer": ""}]) == "(empty)"
+    assert (
+        _flatten_qa_bank([{}, None, "nonsense", {"question": "", "answer": ""}])
+        == "(empty)"
+    )
 
 
 def test_partial_canonical_entry_is_kept():
-    assert _flatten_qa_bank([{"question": "Only a question?"}]) == "Q: Only a question?\nA: "
+    assert (
+        _flatten_qa_bank([{"question": "Only a question?"}])
+        == "Q: Only a question?\nA: "
+    )
 
 
 def test_qa_pair_normalisation():

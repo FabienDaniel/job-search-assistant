@@ -9,13 +9,19 @@ account's own key. One account failing does not stop the next.
 Install-level jobs (DB backup, H-1B refresh, the scrape-health system alert) do not use
 this; they keep running once, as the owner (`as_owner`).
 """
+
 import logging
 import uuid
 from contextlib import contextmanager
 from typing import Awaitable, Callable, Iterable, Optional
 
 from backend.accounts.context import (
-    _session_list, _unscoped, drop_foreign, flush_pending, owner_account_id, unscoped,
+    _session_list,
+    _unscoped,
+    drop_foreign,
+    flush_pending,
+    owner_account_id,
+    unscoped,
     use_account,
 )
 
@@ -29,6 +35,7 @@ def all_account_ids() -> list[Optional[uuid.UUID]]:
     the job then runs once in the owner fallback context, exactly as before MT-7."""
     from backend.models import db as db_mod
     from backend.models.db import Account
+
     try:
         s = db_mod.SessionLocal()
         try:
@@ -41,7 +48,9 @@ def all_account_ids() -> list[Optional[uuid.UUID]]:
         return [None]
     if not rows:
         return [None]
-    rows.sort(key=lambda r: (r.role != "owner", r.created_at is None, r.created_at or 0))
+    rows.sort(
+        key=lambda r: (r.role != "owner", r.created_at is None, r.created_at or 0)
+    )
     return [r.id for r in rows]
 
 
@@ -54,6 +63,7 @@ def gmail_account_ids() -> list[Optional[uuid.UUID]]:
         return ids[:1]
     from backend.email_monitor.gmail_auth import connected_member_ids
     from backend.models import db as db_mod
+
     try:
         s = db_mod.SessionLocal()
         try:
@@ -61,7 +71,9 @@ def gmail_account_ids() -> list[Optional[uuid.UUID]]:
         finally:
             s.close()
     except Exception as e:
-        logger.error("Could not read members' Gmail tokens, checking the owner only: %s", e)
+        logger.error(
+            "Could not read members' Gmail tokens, checking the owner only: %s", e
+        )
         return ids[:1]
     return ids[:1] + [i for i in ids[1:] if i in members]
 
@@ -102,6 +114,7 @@ def account_session(account_id: Optional[uuid.UUID], session_factory=None):
     another account."""
     if session_factory is None:
         from backend.models import db as db_mod
+
         session_factory = db_mod.SessionLocal
     with acting_as(account_id):
         s = session_factory()
@@ -132,6 +145,7 @@ async def for_each_account(
     QA F10 / R1-05: a `session` the bodies share is isolated at every switch (rows of the
     previous account are dropped from it); bodies that open their own session need none."""
     import backend.job_monitor as jm
+
     ids = list(account_ids) if account_ids is not None else all_account_ids()
     first_error: Optional[BaseException] = None
     # QA F3 / R2-08: the sweep registers the accounts it will visit, so an account
@@ -139,7 +153,9 @@ async def for_each_account(
     with jm.fanning_out(ids):
         for acc in ids:
             if jm.is_removing(acc):
-                logger.info("%s skipped for account %s: it is being removed", label, acc)
+                logger.info(
+                    "%s skipped for account %s: it is being removed", label, acc
+                )
                 continue
             try:
                 with acting_as(acc, session=session):
@@ -147,11 +163,21 @@ async def for_each_account(
             except Exception as e:
                 # The first failure is re-raised below (and logged with its traceback by
                 # APScheduler); later ones only exist here, so they carry their own.
-                logger.error("%s failed for account %s: %s", label, acc or "owner", e,
-                             exc_info=first_error is not None or errors is not None)
+                logger.error(
+                    "%s failed for account %s: %s",
+                    label,
+                    acc or "owner",
+                    e,
+                    exc_info=first_error is not None or errors is not None,
+                )
                 if errors is not None:
-                    errors.append({"account": acc, "where": label,
-                                   "error": f"{type(e).__name__}: {e}"})
+                    errors.append(
+                        {
+                            "account": acc,
+                            "where": label,
+                            "error": f"{type(e).__name__}: {e}",
+                        }
+                    )
                     continue
                 if first_error is None:
                     first_error = e

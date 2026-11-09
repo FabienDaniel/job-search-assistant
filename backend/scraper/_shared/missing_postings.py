@@ -10,6 +10,7 @@ two full scrapes in a row is marked closed (open_state); one that comes back is 
 - Only the company scrape's own rows (`source == "direct"`) of that company, in the current
   account. The application status never changes.
 """
+
 import hashlib
 from datetime import datetime, timezone
 
@@ -19,19 +20,45 @@ REASON = "Not on the company's careers page in the last 2 scrapes"
 
 
 def _full_board(url: str) -> bool:
-    from backend.scraper.ats import (ashby, greenhouse, lever, oracle_hcm, phenom, rippling,
-                                     smartrecruiters, workday)
-    return any(is_(url) for is_ in (greenhouse.is_greenhouse, lever.is_lever, ashby.is_ashby,
-                                    rippling.is_rippling, smartrecruiters.is_smartrecruiters,
-                                    workday.is_workday, oracle_hcm.is_oracle_hcm, phenom.is_phenom))
+    from backend.scraper.ats import (
+        ashby,
+        greenhouse,
+        lever,
+        oracle_hcm,
+        phenom,
+        rippling,
+        smartrecruiters,
+        workday,
+    )
+
+    return any(
+        is_(url)
+        for is_ in (
+            greenhouse.is_greenhouse,
+            lever.is_lever,
+            ashby.is_ashby,
+            rippling.is_rippling,
+            smartrecruiters.is_smartrecruiters,
+            workday.is_workday,
+            oracle_hcm.is_oracle_hcm,
+            phenom.is_phenom,
+        )
+    )
 
 
 def is_full_scrape(target_urls, postings, url_errors) -> bool:
-    return bool(target_urls) and bool(postings) and not url_errors and all(_full_board(u) for u in target_urls)
+    return (
+        bool(target_urls)
+        and bool(postings)
+        and not url_errors
+        and all(_full_board(u) for u in target_urls)
+    )
 
 
 def signature(target_urls) -> str:
-    return hashlib.sha256("\n".join(sorted(u.strip() for u in target_urls)).encode()).hexdigest()
+    return hashlib.sha256(
+        "\n".join(sorted(u.strip() for u in target_urls)).encode()
+    ).hexdigest()
 
 
 def note_scrape(db, company, target_urls, postings, url_errors) -> dict:
@@ -40,15 +67,23 @@ def note_scrape(db, company, target_urls, postings, url_errors) -> dict:
     from backend.models.db import Job
     from backend.scraper._shared.dedup import make_external_id
     from backend.scraper._shared.postings import posting_key
+
     out = {"counted": False, "closed": 0, "reopened": 0}
     if not is_full_scrape(target_urls, postings, url_errors):
         return out
     sig, count = signature(target_urls), len(postings)
     prev_sig, prev_count = company.board_signature, company.board_count
     company.board_signature, company.board_count = sig, count
-    rows = (db.query(Job).filter(Job.company == company.name, Job.source == "direct",
-                                 Job.status.notin_(("ignored", "duplicate"))).all())
-    if prev_sig != sig:                       # first full scrape, or other links: start again
+    rows = (
+        db.query(Job)
+        .filter(
+            Job.company == company.name,
+            Job.source == "direct",
+            Job.status.notin_(("ignored", "duplicate")),
+        )
+        .all()
+    )
+    if prev_sig != sig:  # first full scrape, or other links: start again
         for job in rows:
             job.missed_scrapes = None
         return out

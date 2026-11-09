@@ -1,19 +1,20 @@
 """Workday ATS handler — JSON API via POST /wday/cxs/{company}/{site}/jobs; detected by hostname match on myworkdayjobs.com."""
+
 import json
 import logging
 import re
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 
-from backend.scraper._shared.urls import host_matches
-from backend.scraper._shared.filters import _validate_job
-from backend.scraper._shared.errors import raise_if_board_gone
 from backend.analyzer.location import COUNT_ONLY, canonical, group_pieces
+from backend.scraper._shared.errors import raise_if_board_gone
+from backend.scraper._shared.filters import _validate_job
+from backend.scraper._shared.urls import host_matches
 
 logger = logging.getLogger("jobnavigator.scraper.ats.workday")
 
-_LOCALE_PATH_RE = re.compile(r'^[a-z]{2}(-[A-Z]{2})?$')  # en-US, en, de-DE, etc.
+_LOCALE_PATH_RE = re.compile(r"^[a-z]{2}(-[A-Z]{2})?$")  # en-US, en, de-DE, etc.
 
 
 def is_workday(url: str) -> bool:
@@ -152,8 +153,11 @@ def _facet_options(facets: list) -> list[tuple[str, list[tuple[str, int]]]]:
             out.extend(_facet_options(values))
             continue
         param = f.get("facetParameter")
-        pairs = [(v.get("id"), int(v.get("count") or 0)) for v in values
-                 if isinstance(v, dict) and v.get("id")]
+        pairs = [
+            (v.get("id"), int(v.get("count") or 0))
+            for v in values
+            if isinstance(v, dict) and v.get("id")
+        ]
         pairs = [(i, c) for i, c in pairs if c > 0]
         if param and pairs:
             out.append((param, pairs))
@@ -168,7 +172,11 @@ def _split_facet(options, applied: dict, total: int):
     and among those the one that costs the fewest requests: a facet whose values
     overlap (a posting in several locations) fetches the same posting twice.
     """
-    candidates = [(param, pairs) for param, pairs in options if param not in applied and len(pairs) > 1]
+    candidates = [
+        (param, pairs)
+        for param, pairs in options
+        if param not in applied and len(pairs) > 1
+    ]
     if not candidates:
         return None
 
@@ -182,21 +190,39 @@ def _split_facet(options, applied: dict, total: int):
     return min(candidates, key=rank)
 
 
-async def _walk(client, api_url: str, facets: dict, label: str, debug: bool, rejected: list):
+async def _walk(
+    client, api_url: str, facets: dict, label: str, debug: bool, rejected: list
+):
     """Page through one search. Returns (status of the first page, total, facets, postings)."""
     postings: list[dict] = []
     offset = 0
     total = None  # Capture from first page only (Workday returns 0 on later pages)
     first_facets = []
     while True:
-        payload = {"appliedFacets": facets, "limit": _PAGE, "offset": offset, "searchText": ""}
+        payload = {
+            "appliedFacets": facets,
+            "limit": _PAGE,
+            "offset": offset,
+            "searchText": "",
+        }
         resp = await client.post(api_url, json=payload, headers=_HEADERS)
         if resp.status_code != 200:
             logger.warning(f"Workday API returned {resp.status_code} for {label}")
             if debug:
-                rejected.append({"title": "(none)", "url": api_url, "selector": "workday_api",
-                                 "reason": f"HTTP {resp.status_code}"})
-            return (resp.status_code if offset == 0 else 200), total or 0, first_facets, postings
+                rejected.append(
+                    {
+                        "title": "(none)",
+                        "url": api_url,
+                        "selector": "workday_api",
+                        "reason": f"HTTP {resp.status_code}",
+                    }
+                )
+            return (
+                (resp.status_code if offset == 0 else 200),
+                total or 0,
+                first_facets,
+                postings,
+            )
         data = json.loads(resp.text)
         if total is None:
             total = data.get("total", 0) or 0
@@ -211,27 +237,45 @@ async def _walk(client, api_url: str, facets: dict, label: str, debug: bool, rej
     return 200, total or 0, first_facets, postings
 
 
-async def _collect(client, api_url, facets, label, debug, rejected, found: dict, depth: int = 0):
+async def _collect(
+    client, api_url, facets, label, debug, rejected, found: dict, depth: int = 0
+):
     """Fetch one search into `found` (keyed by externalPath); split it when it hits the ceiling."""
-    status, total, facet_list, postings = await _walk(client, api_url, facets, label, debug, rejected)
+    status, total, facet_list, postings = await _walk(
+        client, api_url, facets, label, debug, rejected
+    )
     for p in postings:
         found.setdefault(p.get("externalPath") or id(p), p)
     if total < _CEILING or depth >= _MAX_SPLIT_DEPTH:
         if total >= _CEILING:
-            logger.warning(f"Workday API: {label} still at the {_CEILING}-result ceiling after "
-                           f"{depth} splits; some jobs may be missing")
+            logger.warning(
+                f"Workday API: {label} still at the {_CEILING}-result ceiling after "
+                f"{depth} splits; some jobs may be missing"
+            )
         return status, total
     choice = _split_facet(_facet_options(facet_list), facets, total)
     if choice is None:
-        logger.warning(f"Workday API: {label} is at the {_CEILING}-result ceiling and offers no facet "
-                       f"to split by; some jobs may be missing")
+        logger.warning(
+            f"Workday API: {label} is at the {_CEILING}-result ceiling and offers no facet "
+            f"to split by; some jobs may be missing"
+        )
         return status, total
     param, pairs = choice
-    logger.info(f"Workday API: {label} hit the {_CEILING}-result ceiling; splitting by {param} "
-                f"({len(pairs)} parts)")
+    logger.info(
+        f"Workday API: {label} hit the {_CEILING}-result ceiling; splitting by {param} "
+        f"({len(pairs)} parts)"
+    )
     for value_id, _count in pairs:
-        await _collect(client, api_url, {**facets, param: [value_id]}, label, debug, rejected,
-                       found, depth + 1)
+        await _collect(
+            client,
+            api_url,
+            {**facets, param: [value_id]},
+            label,
+            debug,
+            rejected,
+            found,
+            depth + 1,
+        )
     return status, total
 
 
@@ -242,7 +286,14 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
     if not company_slug or not site:
         logger.warning(f"Workday: could not parse company/site from {url}")
         if debug:
-            return [], [{"title": "(none)", "url": url, "selector": "workday_api", "reason": "Bad URL format"}]
+            return [], [
+                {
+                    "title": "(none)",
+                    "url": url,
+                    "selector": "workday_api",
+                    "reason": "Bad URL format",
+                }
+            ]
         return []
 
     api_url = f"{origin}/wday/cxs/{company_slug}/{site}/jobs"
@@ -254,7 +305,9 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
     found: dict = {}
 
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-        status, total = await _collect(client, api_url, applied_facets, label, debug, rejected, found)
+        status, total = await _collect(
+            client, api_url, applied_facets, label, debug, rejected, found
+        )
     if status != 200 and not found:
         if not debug:
             raise_if_board_gone(status, "Workday", label)
@@ -270,11 +323,23 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
         if reason is None:
             # `locations` is filled in later, from the detail JSON the
             # description fetch already downloads for each new job.
-            jobs.append({"title": title, "url": job_url,
-                         "location": _board_location_of(p),
-                         "arrangement": _arrangement_of(p)})
+            jobs.append(
+                {
+                    "title": title,
+                    "url": job_url,
+                    "location": _board_location_of(p),
+                    "arrangement": _arrangement_of(p),
+                }
+            )
         elif debug:
-            rejected.append({"title": title, "url": job_url, "selector": "workday_api", "reason": reason})
+            rejected.append(
+                {
+                    "title": title,
+                    "url": job_url,
+                    "selector": "workday_api",
+                    "reason": reason,
+                }
+            )
 
     logger.info(f"Workday API: fetched {len(jobs)} jobs for {label}")
     if debug:

@@ -1,8 +1,10 @@
 """End-to-end: scoring uses Resumes, never reads the cvs table."""
-import pytest
+
 from unittest.mock import AsyncMock
 
-from backend.models.db import Resume, Job, Setting
+import pytest
+
+from backend.models.db import Job, Resume, Setting
 
 
 @pytest.mark.asyncio
@@ -15,7 +17,11 @@ async def test_score_unscored_jobs_uses_resumes(test_db, monkeypatch):
         json_data={
             "summary": "Senior PM with fintech expertise",
             "experience": [
-                {"company": "Additiv", "title": "Senior PM", "bullets": ["shipped wealth platform"]},
+                {
+                    "company": "Additiv",
+                    "title": "Senior PM",
+                    "bullets": ["shipped wealth platform"],
+                },
             ],
             "skills": {"core": ["Python", "SQL"]},
         },
@@ -36,23 +42,33 @@ async def test_score_unscored_jobs_uses_resumes(test_db, monkeypatch):
     async def fake_call_llm(prompt, system, max_tokens, cached_prefix=None, **kwargs):
         return {
             "text": '{"scores":{"PM":78},"best_cv":"PM"}',
-            "usage": {"input_tokens": 100, "output_tokens": 20,
-                      "cache_read_tokens": 0, "cache_write_tokens": 0},
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            },
         }
+
     monkeypatch.setattr("backend.analyzer.cv_scorer.call_llm", fake_call_llm)
     monkeypatch.setattr("backend.analyzer.cv_scorer.log_llm_call", lambda **kw: None)
 
     import backend.analyzer.cv_scorer as cv_scorer
+
     monkeypatch.setattr(cv_scorer, "_scoring_semaphore", None, raising=False)
 
     # score_job_sync directly since analyze_unscored_jobs is async + DB-heavy
-    from backend.analyzer.cv_scorer import score_job_sync, _get_resume_texts
+    from backend.analyzer.cv_scorer import _get_resume_texts, score_job_sync
+
     cv_texts = _get_resume_texts(test_db)
-    assert cv_texts == {"PM": pytest.approx(cv_texts["PM"], abs=0)}, "Resume must be the source"
+    assert cv_texts == {"PM": pytest.approx(cv_texts["PM"], abs=0)}, (
+        "Resume must be the source"
+    )
     assert "fintech expertise" in cv_texts["PM"]
 
-    result = await score_job_sync(job, cv_texts, db=test_db, depth="light",
-                                   preloaded_text=job.description)
+    result = await score_job_sync(
+        job, cv_texts, db=test_db, depth="light", preloaded_text=job.description
+    )
     assert result is not None
     assert result["scores"] == {"PM": 78}
     assert result["best_cv"] == "PM"

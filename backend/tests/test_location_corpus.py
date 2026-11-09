@@ -15,6 +15,7 @@ parser, look at the diff, and regenerate it deliberately:
 `test_the_traps` is the specification. Every case in it is a reading the parser
 must get right, and no regeneration can paper over one of them.
 """
+
 import csv
 import pathlib
 
@@ -43,6 +44,7 @@ GOLDEN = _rows("location_golden.csv")
 
 # ── the corpus itself ────────────────────────────────────────────────────────
 
+
 def test_the_corpus_and_the_golden_file_cover_the_same_strings():
     assert [row["raw"] for row in CORPUS] == [row["raw"] for row in GOLDEN]
     assert len(CORPUS) > 500, "the corpus is the whole location column, not a sample"
@@ -50,13 +52,17 @@ def test_the_corpus_and_the_golden_file_cover_the_same_strings():
 
 def test_the_parser_still_reads_the_corpus_the_way_the_golden_file_records():
     """Any drift shows up here as a diff over real strings, one row at a time."""
-    wrong = [(row["raw"], {k: row[k] for k in FIELDS}, golden_row(row["raw"]))
-             for row in GOLDEN if golden_row(row["raw"]) != row]
+    wrong = [
+        (row["raw"], {k: row[k] for k in FIELDS}, golden_row(row["raw"]))
+        for row in GOLDEN
+        if golden_row(row["raw"]) != row
+    ]
     assert not wrong, (
         "%d corpus strings parse differently than the golden file records. "
         "If the change is intended, regenerate it with "
         "`python -m backend.tests.fixtures.generate_location_golden` and review "
-        "the diff. First three: %r" % (len(wrong), wrong[:3]))
+        "the diff. First three: %r" % (len(wrong), wrong[:3])
+    )
 
 
 def test_the_corpus_never_produces_an_over_long_part():
@@ -109,8 +115,8 @@ TRAPS = [
     ("Bangalore", "IN", None, "Bengaluru"),
     ("London", "GB", None, "London"),
     ("Tokyo", "JP", None, "Tokyo"),
-    ("Atlanta, GA", "US", "GA", "Atlanta"),          # not Gabon
-    ("Wilmington, DE", "US", "DE", "Wilmington"),    # not Germany
+    ("Atlanta, GA", "US", "GA", "Atlanta"),  # not Gabon
+    ("Wilmington, DE", "US", "DE", "Wilmington"),  # not Germany
     ("Indianapolis, IN", "US", "IN", "Indianapolis"),  # not India
     ("New Orleans, LA", "US", "LA", "New Orleans"),  # not Laos
     # a country already fixed forbids the US-state reading
@@ -136,7 +142,7 @@ TRAPS = [
     # as a US state put 365 live rows in the wrong country.
     ("IN, KA, Bengaluru", "IN", "KA", "Bengaluru"),
     ("IN, TS, Hyderabad", "IN", "TS", "Hyderabad"),
-    ("IN, TN, Chennai", "IN", "TN", "Chennai"),     # Tamil Nadu, not Tennessee
+    ("IN, TN, Chennai", "IN", "TN", "Chennai"),  # Tamil Nadu, not Tennessee
     ("DE, NI, Cloppenburg", "DE", "NI", "Cloppenburg"),
     ("GB, ENG, London", "GB", "ENG", "London"),
     ("AU, NSW, Sydney", "AU", "NSW", "Sydney"),
@@ -174,8 +180,12 @@ TRAPS = [
     ("United States-California-Irvine", "US", "CA", "Irvine"),
     # a hyphen inside one name is not a separator
     ("Wilkes-Barre, PA", "US", "PA", "Wilkes-Barre"),
-    ("Saint-Jean-sur-Richelieu, Quebec, Canada", "CA", "QC",
-     "Saint-Jean-sur-Richelieu"),
+    (
+        "Saint-Jean-sur-Richelieu, Quebec, Canada",
+        "CA",
+        "QC",
+        "Saint-Jean-sur-Richelieu",
+    ),
     ("Mörfelden-Walldorf, Hesse, Germany", "DE", "Hesse", "Mörfelden-Walldorf"),
     # remote, with no city invented for it
     ("Fully Remote", None, None, None),
@@ -196,30 +206,38 @@ TRAPS = [
 @pytest.mark.parametrize("text,country,region,city", TRAPS)
 def test_the_traps(text, country, region, city):
     result = parse(text)
-    assert (result["country"], result["region"], result["city"]) == (country, region, city)
+    assert (result["country"], result["region"], result["city"]) == (
+        country,
+        region,
+        city,
+    )
 
 
-@pytest.mark.parametrize("text,arrangement", [
-    ("Fully Remote", "remote"),
-    ("Remote - Anywhere", "remote"),
-    ("Anywhere", "remote"),
-    ("Work from home", "remote"),
-    ("WFH", "remote"),
-    ("Global", "remote"),
-    ("Telecommute", "remote"),
-    ("Remote First", "remote"),
-    # Amazon's own word for a job attached to an office but worked from home
-    ("IN, KA, Bangalore - Virtual", "remote"),
-    ("100% Remote", "remote"),
-    ("New York, NY (Hybrid)", "hybrid"),
-    ("Toronto, ON | Hybrid", "hybrid"),
-    ("San Francisco / Palo Alto (In-Office)", "onsite"),
-])
+@pytest.mark.parametrize(
+    "text,arrangement",
+    [
+        ("Fully Remote", "remote"),
+        ("Remote - Anywhere", "remote"),
+        ("Anywhere", "remote"),
+        ("Work from home", "remote"),
+        ("WFH", "remote"),
+        ("Global", "remote"),
+        ("Telecommute", "remote"),
+        ("Remote First", "remote"),
+        # Amazon's own word for a job attached to an office but worked from home
+        ("IN, KA, Bangalore - Virtual", "remote"),
+        ("100% Remote", "remote"),
+        ("New York, NY (Hybrid)", "hybrid"),
+        ("Toronto, ON | Hybrid", "hybrid"),
+        ("San Francisco / Palo Alto (In-Office)", "onsite"),
+    ],
+)
 def test_the_arrangement_survives_the_place(text, arrangement):
     assert parse(text)["arrangement"] == arrangement
 
 
 # ── a list of places is a list of answers ────────────────────────────────────
+
 
 def test_a_semicolon_list_is_several_places_not_one_city():
     assert split_places("New York; London; Tokyo") == ["New York", "London", "Tokyo"]
@@ -229,11 +247,14 @@ def test_a_semicolon_list_is_several_places_not_one_city():
     assert ("JP", None, "tokyo") in places
 
 
-@pytest.mark.parametrize("text", [
-    "New York, NY | London | Tokyo",
-    "New York, NY • London • Tokyo",
-    "New York, NY / London / Tokyo",
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "New York, NY | London | Tokyo",
+        "New York, NY • London • Tokyo",
+        "New York, NY / London / Tokyo",
+    ],
+)
 def test_the_other_list_separators_split_the_same_way(text):
     assert len(_places_of([text])) == 3
 
@@ -244,8 +265,9 @@ def test_a_list_that_names_one_place_and_an_arrangement_stays_one_place():
 
 # ── a held-out code and the rest of the posting ──────────────────────────────
 
+
 def test_a_second_place_settles_a_held_out_code():
-    """"San Francisco, CA" beside "Miami, FL" is California."""
+    """ "San Francisco, CA" beside "Miami, FL" is California."""
     places = _places_of(["Miami, FL", "San Francisco, CA"])
     assert ("US", "CA", "san francisco") in places
 
@@ -265,11 +287,19 @@ def test_a_code_that_fits_two_candidate_countries_stays_unread():
 
 # ── bad input ────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.parametrize("value", [None, 17, 3.5, True, b"x", ["Berlin"], {"a": 1}])
 def test_parse_never_raises_on_a_non_string(value):
-    assert parse(value) == {"city": None, "region": None, "country": None,
-                            "arrangement": None, "alt": 0, "ambiguous": False,
-                            "assumed": None, "note": None}
+    assert parse(value) == {
+        "city": None,
+        "region": None,
+        "country": None,
+        "arrangement": None,
+        "alt": 0,
+        "ambiguous": False,
+        "assumed": None,
+        "note": None,
+    }
 
 
 def test_a_whole_address_is_cut_to_what_the_index_holds():

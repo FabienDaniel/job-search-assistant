@@ -1,14 +1,15 @@
 """Lever ATS handler: GET api.lever.co/v0/postings/{company}; matched on `jobs.lever.co/` (trailing
 slash guards against attacker-controlled paths) with department/team/location/commitment filters
 forwarded from the original query string."""
+
 import json
 import logging
 from urllib.parse import parse_qs, quote, urlparse
 
 import httpx
 
-from backend.scraper._shared.filters import _validate_job
 from backend.scraper._shared.errors import raise_if_board_gone
+from backend.scraper._shared.filters import _validate_job
 
 logger = logging.getLogger("jobnavigator.scraper.ats.lever")
 
@@ -25,7 +26,14 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
     path_parts = [p for p in parsed.path.strip("/").split("/") if p]
     if not path_parts:
         if debug:
-            return [], [{"title": "(none)", "url": url, "selector": "lever_api", "reason": "No company slug in URL"}]
+            return [], [
+                {
+                    "title": "(none)",
+                    "url": url,
+                    "selector": "lever_api",
+                    "reason": "No company slug in URL",
+                }
+            ]
         return []
     company_slug = path_parts[0]
 
@@ -47,7 +55,14 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
             if not debug:
                 raise_if_board_gone(resp.status_code, "Lever", company_slug)
             if debug:
-                return [], [{"title": "(none)", "url": api_url, "selector": "lever_api", "reason": f"HTTP {resp.status_code}"}]
+                return [], [
+                    {
+                        "title": "(none)",
+                        "url": api_url,
+                        "selector": "lever_api",
+                        "reason": f"HTTP {resp.status_code}",
+                    }
+                ]
             return []
 
         postings = json.loads(resp.text)
@@ -60,12 +75,24 @@ async def scrape(url: str, debug: bool = False) -> list[dict] | tuple:
                 # `allLocations` is the full list; 9 of 75 postings on one live
                 # board name more than one place.
                 every = [x for x in (categories.get("allLocations") or []) if x]
-                jobs.append({"title": title, "url": job_url,
-                             "location": categories.get("location") or None,
-                             "locations": every,
-                             "arrangement": p.get("workplaceType") or None})
+                jobs.append(
+                    {
+                        "title": title,
+                        "url": job_url,
+                        "location": categories.get("location") or None,
+                        "locations": every,
+                        "arrangement": p.get("workplaceType") or None,
+                    }
+                )
             elif debug:
-                rejected.append({"title": title, "url": job_url, "selector": "lever_api", "reason": reason})
+                rejected.append(
+                    {
+                        "title": title,
+                        "url": job_url,
+                        "selector": "lever_api",
+                        "reason": reason,
+                    }
+                )
 
     logger.info(f"Lever API: fetched {len(jobs)} jobs for {company_slug}")
     if debug:

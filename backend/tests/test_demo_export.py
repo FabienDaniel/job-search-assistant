@@ -1,4 +1,5 @@
 """Demo export: posting selection, sanitising and the export file."""
+
 import json
 import re
 import uuid
@@ -6,14 +7,23 @@ import uuid
 from backend.models.db import Application, Job
 from backend.scripts import demo_export as de
 
-DESC = ("Own the growth roadmap for a consumer mobile app used by millions of users. "
-        "You will run experimentation on onboarding and retention, and improve engagement. " * 14)
+DESC = (
+    "Own the growth roadmap for a consumer mobile app used by millions of users. "
+    "You will run experimentation on onboarding and retention, and improve engagement. "
+    * 14
+)
 
 
 def _job(i, title="Senior Product Manager, Growth", company=None, url=None, **kw):
-    return Job(id=uuid.uuid4(), external_id=f"ext-{i}", title=title, company=company or f"Co{i}",
-               url=url or f"https://boards.greenhouse.io/co{i}/jobs/{i}", description=kw.pop("description", DESC),
-               **{"location": "Remote, US", "loc_country": "US", **kw})
+    return Job(
+        id=uuid.uuid4(),
+        external_id=f"ext-{i}",
+        title=title,
+        company=company or f"Co{i}",
+        url=url or f"https://boards.greenhouse.io/co{i}/jobs/{i}",
+        description=kw.pop("description", DESC),
+        **{"location": "Remote, US", "loc_country": "US", **kw},
+    )
 
 
 def test_sanitize_strips_name_email_phone():
@@ -24,19 +34,24 @@ def test_sanitize_strips_name_email_phone():
 
 
 def test_sanitize_recruiter_label_and_plain_text():
-    assert "Maria Lopez" not in de.sanitize("Your recruiter: Maria Lopez will reach out.")
+    assert "Maria Lopez" not in de.sanitize(
+        "Your recruiter: Maria Lopez will reach out."
+    )
     plain = "We build a mobile app for millions of users."
     assert de.sanitize(plain) == plain
 
 
 def test_clean_url_drops_tracking():
-    assert de.clean_url("https://boards.greenhouse.io/a/jobs/1?gh_src=x&utm_source=y") == "https://boards.greenhouse.io/a/jobs/1"
+    assert (
+        de.clean_url("https://boards.greenhouse.io/a/jobs/1?gh_src=x&utm_source=y")
+        == "https://boards.greenhouse.io/a/jobs/1"
+    )
 
 
 def test_select_postings_counts_and_filters(test_db):
     for i in range(50):
         test_db.add(_job(i))
-    test_db.add(_job(100, title="Technical Program Manager"))                      # excluded title
+    test_db.add(_job(100, title="Technical Program Manager"))  # excluded title
     test_db.add(_job(101, title="Product Manager", location="Berlin, Germany"))
     applied = _job(102)
     test_db.add(applied)
@@ -67,15 +82,29 @@ def test_export_writes_valid_json(test_db, tmp_path):
 
 def test_inline_snapshot_is_offline_and_clean():
     from backend.scripts import demo_snapshot as ds
-    html = ('<html><head><link rel="stylesheet" href="/a.css"><script>evil()</script>'
-            '<link rel="preload" href="/x.js"></head><body onload="x()">'
-            '<img src="/p.png" srcset="/p2.png 2x"><img src="/missing.png">'
-            '<iframe src="https://x.test"></iframe><a href="/apply">Apply</a>'
-            '<p>Contact Jane Doe at jane@x.com</p><div id="onetrust-banner">cookies</div></body></html>')
-    res = {"https://j.test/a.css": ("text/css", b'body{background:url("/bg.png")} .f{src:url(/f.woff2)}'),
-           "https://j.test/bg.png": ("image/png", b"PNG"), "https://j.test/p.png": ("image/png", b"PNG")}
+
+    html = (
+        '<html><head><link rel="stylesheet" href="/a.css"><script>evil()</script>'
+        '<link rel="preload" href="/x.js"></head><body onload="x()">'
+        '<img src="/p.png" srcset="/p2.png 2x"><img src="/missing.png">'
+        '<iframe src="https://x.test"></iframe><a href="/apply">Apply</a>'
+        '<p>Contact Jane Doe at jane@x.com</p><div id="onetrust-banner">cookies</div></body></html>'
+    )
+    res = {
+        "https://j.test/a.css": (
+            "text/css",
+            b'body{background:url("/bg.png")} .f{src:url(/f.woff2)}',
+        ),
+        "https://j.test/bg.png": ("image/png", b"PNG"),
+        "https://j.test/p.png": ("image/png", b"PNG"),
+    }
     out = ds.inline_snapshot(html, "https://j.test/jobs/1", res)
-    assert "<script" not in out and "<iframe" not in out and "onload" not in out and "onetrust" not in out
+    assert (
+        "<script" not in out
+        and "<iframe" not in out
+        and "onload" not in out
+        and "onetrust" not in out
+    )
     assert "jane@x.com" not in out and "Jane Doe" not in out
     assert "data:image/png;base64," in out and "/p2.png" not in out
     assert 'href="https://j.test/apply"' in out

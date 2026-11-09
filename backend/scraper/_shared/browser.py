@@ -1,5 +1,7 @@
 """Playwright lifecycle + stealth constants shared across all scraper modules."""
+
 import logging
+
 from playwright.async_api import async_playwright
 
 logger = logging.getLogger("jobnavigator.scraper.browser")
@@ -60,7 +62,7 @@ async def _new_page(browser, viewport=None):
 async def _close_page(page):
     """Close a stealth page and its context."""
     try:
-        ctx = getattr(page, '_stealth_ctx', None)
+        ctx = getattr(page, "_stealth_ctx", None)
         await page.close()
         if ctx:
             await ctx.close()

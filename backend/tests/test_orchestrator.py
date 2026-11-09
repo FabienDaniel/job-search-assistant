@@ -1,20 +1,25 @@
 """Tests for orchestrator.py — entry-point dispatch."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 
 def test_orchestrator_exposes_run_all():
     from backend.scraper import orchestrator
+
     assert hasattr(orchestrator, "run_all")
 
 
 def test_orchestrator_exposes_run_search():
     from backend.scraper import orchestrator
+
     assert hasattr(orchestrator, "run_search")
 
 
 def test_orchestrator_exposes_run_company():
     from backend.scraper import orchestrator
+
     assert hasattr(orchestrator, "run_company")
 
 
@@ -34,6 +39,7 @@ async def test_run_search_dispatches_keyword(monkeypatch):
         search_mode = "keyword"
 
     from backend.scraper.orchestrator import run_search
+
     await run_search(FakeSearch())
     assert called["src"] == "jobspy"
 
@@ -41,10 +47,14 @@ async def test_run_search_dispatches_keyword(monkeypatch):
 @pytest.mark.asyncio
 async def test_run_search_rejects_legacy_url_mode():
     """The legacy `url` search mode was removed — it is now an unknown mode."""
+
     class FakeSearch:
-        id = "s-1"; search_mode = "url"; direct_url = "https://example.com/jobs"
+        id = "s-1"
+        search_mode = "url"
+        direct_url = "https://example.com/jobs"
 
     from backend.scraper import orchestrator
+
     assert orchestrator._search_mode_is_valid(FakeSearch()) is False
     with pytest.raises(ValueError):
         await orchestrator.run_search(FakeSearch())
@@ -53,14 +63,19 @@ async def test_run_search_rejects_legacy_url_mode():
 @pytest.mark.asyncio
 async def test_run_search_dispatches_levelsfyi(monkeypatch):
     called = {"src": None}
+
     async def fake_levels(search):
-        called["src"] = "levels_fyi"; return {}
+        called["src"] = "levels_fyi"
+        return {}
+
     monkeypatch.setattr("backend.scraper.sources.levelsfyi.run", fake_levels)
 
     class FakeSearch:
-        id = "s-1"; search_mode = "levels_fyi"
+        id = "s-1"
+        search_mode = "levels_fyi"
 
     from backend.scraper.orchestrator import run_search
+
     await run_search(FakeSearch())
     assert called["src"] == "levels_fyi"
 
@@ -68,14 +83,19 @@ async def test_run_search_dispatches_levelsfyi(monkeypatch):
 @pytest.mark.asyncio
 async def test_run_search_dispatches_linkedin_personal(monkeypatch):
     called = {"src": None}
+
     async def fake_li(search):
-        called["src"] = "linkedin_personal"; return {}
+        called["src"] = "linkedin_personal"
+        return {}
+
     monkeypatch.setattr("backend.scraper.sources.linkedin_personal.run", fake_li)
 
     class FakeSearch:
-        id = "s-1"; search_mode = "linkedin_personal"
+        id = "s-1"
+        search_mode = "linkedin_personal"
 
     from backend.scraper.orchestrator import run_search
+
     await run_search(FakeSearch())
     assert called["src"] == "linkedin_personal"
 
@@ -83,14 +103,19 @@ async def test_run_search_dispatches_linkedin_personal(monkeypatch):
 @pytest.mark.asyncio
 async def test_run_search_dispatches_jobright(monkeypatch):
     called = {"src": None}
+
     async def fake_jr(search):
-        called["src"] = "jobright"; return {}
+        called["src"] = "jobright"
+        return {}
+
     monkeypatch.setattr("backend.scraper.sources.jobright.run", fake_jr)
 
     class FakeSearch:
-        id = "s-1"; search_mode = "jobright"
+        id = "s-1"
+        search_mode = "jobright"
 
     from backend.scraper.orchestrator import run_search
+
     await run_search(FakeSearch())
     assert called["src"] == "jobright"
 
@@ -98,10 +123,13 @@ async def test_run_search_dispatches_jobright(monkeypatch):
 @pytest.mark.asyncio
 async def test_run_search_linkedin_extension_is_noop(monkeypatch):
     """linkedin_extension has no scraper — jobs arrive via POST /api/jobs/linkedin-import."""
+
     class FakeSearch:
-        id = "s-1"; search_mode = "linkedin_extension"
+        id = "s-1"
+        search_mode = "linkedin_extension"
 
     from backend.scraper.orchestrator import run_search
+
     result = await run_search(FakeSearch())
     # Should return without raising; result should indicate no scrape happened
     assert result is not None
@@ -111,9 +139,11 @@ async def test_run_search_linkedin_extension_is_noop(monkeypatch):
 @pytest.mark.asyncio
 async def test_run_search_raises_on_unknown_mode():
     class FakeSearch:
-        id = "s-1"; search_mode = "unknown_mode"
+        id = "s-1"
+        search_mode = "unknown_mode"
 
     from backend.scraper.orchestrator import run_search
+
     with pytest.raises(ValueError):
         await run_search(FakeSearch())
 
@@ -136,5 +166,6 @@ async def test_run_company_delegates_to_company_pages(monkeypatch):
         scrape_urls = ["https://x.com"]
 
     from backend.scraper.orchestrator import run_company
+
     await run_company(FakeCompany())
     assert called["name"] == "Acme"

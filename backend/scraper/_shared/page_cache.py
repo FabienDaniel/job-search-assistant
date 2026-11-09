@@ -5,6 +5,7 @@ The feed's reader view shows `cached_page_html`. Scoring and tailoring fall back
 Pages too thin to be the posting (SPAs such as Meta or Apple) are rendered with Playwright.
 A bot-protection page is never stored: its text would pass as the job description.
 """
+
 import logging
 
 from backend.models.db import Job, SessionLocal
@@ -21,26 +22,78 @@ def _extract_clean_content(raw_html: str) -> tuple:
 
     soup = BeautifulSoup(raw_html, "html.parser")
 
-    for tag in soup.find_all([
-        "script", "style", "nav", "footer", "header", "noscript",
-        "iframe", "svg", "img", "video", "audio", "picture", "source",
-        "form", "input", "button", "select", "textarea", "label",
-        "figure", "figcaption", "canvas", "map", "area",
-    ]):
+    for tag in soup.find_all(
+        [
+            "script",
+            "style",
+            "nav",
+            "footer",
+            "header",
+            "noscript",
+            "iframe",
+            "svg",
+            "img",
+            "video",
+            "audio",
+            "picture",
+            "source",
+            "form",
+            "input",
+            "button",
+            "select",
+            "textarea",
+            "label",
+            "figure",
+            "figcaption",
+            "canvas",
+            "map",
+            "area",
+        ]
+    ):
         tag.decompose()
 
     for tag in soup.find_all(True, attrs={"aria-hidden": "true"}):
         tag.decompose()
-    for tag in soup.find_all(True, style=lambda s: s and "display:none" in s.replace(" ", "").lower()):
+    for tag in soup.find_all(
+        True, style=lambda s: s and "display:none" in s.replace(" ", "").lower()
+    ):
         tag.decompose()
 
     KEEP_TAGS = {
-        "h1", "h2", "h3", "h4", "h5", "h6",
-        "p", "ul", "ol", "li", "dl", "dt", "dd",
-        "strong", "b", "em", "i", "a", "br",
-        "div", "span", "section", "article", "main",
-        "table", "tr", "td", "th", "thead", "tbody",
-        "blockquote", "pre", "code", "hr",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "p",
+        "ul",
+        "ol",
+        "li",
+        "dl",
+        "dt",
+        "dd",
+        "strong",
+        "b",
+        "em",
+        "i",
+        "a",
+        "br",
+        "div",
+        "span",
+        "section",
+        "article",
+        "main",
+        "table",
+        "tr",
+        "td",
+        "th",
+        "thead",
+        "tbody",
+        "blockquote",
+        "pre",
+        "code",
+        "hr",
     }
 
     # Strip all attributes except href on <a> tags
@@ -58,9 +111,10 @@ def _extract_clean_content(raw_html: str) -> tuple:
 
     # Collapse excessive whitespace / empty divs
     import re
-    clean_html = re.sub(r'(<br\s*/?>[\s]*){3,}', '<br><br>', clean_html)
-    clean_html = re.sub(r'(<div>\s*</div>\s*){2,}', '', clean_html)
-    clean_html = re.sub(r'\n{3,}', '\n\n', clean_html)
+
+    clean_html = re.sub(r"(<br\s*/?>[\s]*){3,}", "<br><br>", clean_html)
+    clean_html = re.sub(r"(<div>\s*</div>\s*){2,}", "", clean_html)
+    clean_html = re.sub(r"\n{3,}", "\n\n", clean_html)
 
     # Plain text for search/analysis
     text = soup.get_text(separator="\n", strip=True)[:50_000]
@@ -70,8 +124,9 @@ def _extract_clean_content(raw_html: str) -> tuple:
 
 async def _fetch_with_playwright(url: str) -> str:
     """Fetch a page using Playwright for SPA/JS-rendered sites. Returns raw HTML."""
-    from backend.scraper._shared.browser import _get_browser, _new_page, _close_page
+    from backend.scraper._shared.browser import _close_page, _get_browser, _new_page
     from backend.scraper._shared.url_safety import assert_public_http_url
+
     # Revalidate here too — this function is also reachable directly, and a
     # single missed caller elsewhere would reopen the SSRF hole.
     assert_public_http_url(url)
@@ -118,8 +173,13 @@ async def _cache_job_page(job_id: str, url: str):
     is what took the container to 2.5 GB -- hence the `page_cache` gate.
     """
     from datetime import datetime, timezone
-    from backend.scraper._shared.url_safety import safe_get, assert_public_http_url, UnsafeURLError
+
     from backend.job_monitor import get_limiter
+    from backend.scraper._shared.url_safety import (
+        UnsafeURLError,
+        assert_public_http_url,
+        safe_get,
+    )
 
     if not url:
         return
@@ -149,9 +209,13 @@ async def _cache_job_page(job_id: str, url: str):
             # Try httpx first (fast, works for most sites)
             html = None
             try:
-                resp = await safe_get(url, timeout=20, headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                })
+                resp = await safe_get(
+                    url,
+                    timeout=20,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    },
+                )
                 resp.raise_for_status()
                 html = resp.text[:1_000_000]
             except UnsafeURLError as e:
@@ -177,14 +241,18 @@ async def _cache_job_page(job_id: str, url: str):
 
             # If too little content, fall back to Playwright (handles SPAs like Meta, Apple)
             if len(text) < 200:
-                logger.info(f"Thin content ({len(text)} chars) for job {job_id}, trying Playwright")
+                logger.info(
+                    f"Thin content ({len(text)} chars) for job {job_id}, trying Playwright"
+                )
                 try:
                     pw_html = await _fetch_with_playwright(url)
                     if is_bot_wall(pw_html):
                         last_error = f"playwright: {_BOT_WALL_ERROR}"
                     elif pw_html:
                         clean_html, text = _extract_clean_content(pw_html)
-                        logger.info(f"Playwright got {len(text)} text chars for job {job_id}")
+                        logger.info(
+                            f"Playwright got {len(text)} text chars for job {job_id}"
+                        )
                     pw_html = None
                 except Exception as e:
                     logger.warning(f"Playwright fallback failed for job {job_id}: {e}")
@@ -205,7 +273,9 @@ async def _cache_job_page(job_id: str, url: str):
             job.page_cached_at = datetime.now(timezone.utc)
             job.cache_error = None
             db.commit()
-            logger.info(f"Cached page for job {job_id}: {len(clean_html)} clean HTML, {len(text)} text chars")
+            logger.info(
+                f"Cached page for job {job_id}: {len(clean_html)} clean HTML, {len(text)} text chars"
+            )
         except Exception as e:
             db.rollback()
             logger.warning(f"Failed to store cached page for job {job_id}: {e}")

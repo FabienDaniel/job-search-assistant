@@ -1,11 +1,14 @@
 """Tests for sources/jobspy.py — JobSpy multi-board keyword scrape entry point."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 
 def test_sources_jobspy_exposes_run():
     """Module has a `run` function as its public entry point."""
     from backend.scraper.sources import jobspy
+
     assert hasattr(jobspy, "run")
 
 
@@ -44,4 +47,9 @@ def test_structured_arrangement_reads_only_tagged_boards():
     # False is "not tagged remote", not "on-site"
     assert _structured_arrangement({"is_remote": False}, "indeed") is None
     assert _structured_arrangement({"is_remote": float("nan")}, "indeed") is None
-    assert _structured_arrangement({"work_from_home_type": "Hybrid", "is_remote": False}, "naukri") == "Hybrid"
+    assert (
+        _structured_arrangement(
+            {"work_from_home_type": "Hybrid", "is_remote": False}, "naukri"
+        )
+        == "Hybrid"
+    )

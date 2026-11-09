@@ -9,6 +9,7 @@ Every contract test ends with `assert_clean(resp, ...)`: the status must be one
 of the expected ones, must never be 500, and the body must not carry a stack
 trace or a file path from inside the container.
 """
+
 import json
 import uuid
 from unittest.mock import MagicMock
@@ -39,6 +40,7 @@ def account_token(account_id) -> str:
     """A valid API token for `account_id` as of now (its current PIN fingerprint)."""
     import backend.models.db as db_mod
     from backend.accounts import auth as A
+
     s = db_mod.SessionLocal()
     try:
         acc = A._find(A.load_accounts(s), account_id)
@@ -68,20 +70,22 @@ def client(test_db, monkeypatch):
     reachable through TestClient startup.
     """
     from fastapi.testclient import TestClient
+
     from backend.models.db import Setting
 
     test_db.add(Setting(key="dashboard_api_key", value=API_KEY))
     test_db.commit()
 
     import backend.main  # noqa: F401
+    import backend.main as main_mod
     import backend.scraper.sources.linkedin_extension  # noqa: F401
 
-    import backend.main as main_mod
     monkeypatch.setattr(main_mod, "create_tables", lambda: None)
     monkeypatch.setattr(main_mod, "run_seeds", lambda: None)
     monkeypatch.setattr(main_mod, "cleanup_stale_runs", lambda: None)
 
     import backend.scheduler as sched_mod
+
     monkeypatch.setattr(sched_mod, "configure_scheduler", lambda: None)
     fake_scheduler = MagicMock()
     fake_scheduler.start = MagicMock()
@@ -99,6 +103,7 @@ def client(test_db, monkeypatch):
 
     from backend.main import app
     from backend.models.db import get_db
+
     app.dependency_overrides[get_db] = override_get_db
 
     try:
@@ -110,6 +115,7 @@ def client(test_db, monkeypatch):
             # request hook mints a fresh token for it on every request (so a test that
             # sets a PIN afterwards keeps working). Pop ACT_AS for the browser path.
             from backend.models.db import Account
+
             owner = test_db.query(Account.id).filter(Account.role == "owner").first()
             if owner is not None:
                 c.headers.update({ACT_AS: str(owner[0])})
@@ -129,13 +135,14 @@ def _no_outbound(monkeypatch):
     TestClient runs BackgroundTasks inline, so without this every application
     create pays a real 6 s page fetch and an H-1B lookup.
     """
+
     async def _noop(*a, **k):
         return None
 
+    import backend.analyzer.h1b_checker as h1b
     import backend.api.routes_applications as ra
     import backend.api.routes_companies as rc
     import backend.scraper._shared.page_cache as page_cache
-    import backend.analyzer.h1b_checker as h1b
 
     monkeypatch.setattr(page_cache, "_cache_job_page", _noop)
     monkeypatch.setattr(ra, "_fetch_and_store_description", _noop, raising=False)
@@ -146,6 +153,7 @@ def _no_outbound(monkeypatch):
 
     async def _no_h1b(db, name, allow_live=False):
         return None
+
     monkeypatch.setattr(h1b, "resolve_company_h1b", _no_h1b, raising=False)
 
 
@@ -153,6 +161,7 @@ def _no_outbound(monkeypatch):
 def _clear_running_state():
     """Never let one test's in-memory run leak into the next."""
     import backend.job_monitor as jm
+
     jm._running.clear()
     yield
     jm._running.clear()
@@ -165,8 +174,9 @@ def assert_clean(resp, *allowed):
     for marker in LEAK_MARKERS:
         assert marker not in body, f"internal detail {marker!r} in body: {body[:400]}"
     if allowed:
-        assert resp.status_code in allowed, \
+        assert resp.status_code in allowed, (
             f"expected {allowed}, got {resp.status_code}: {body[:400]}"
+        )
     return resp
 
 
@@ -194,13 +204,17 @@ def big_string(mb=10):
 def make_job(db, **kw):
     from backend.models.db import Job
     from backend.scraper._shared.dedup import make_external_id
+
     company = kw.pop("company", "Acme")
     title = kw.pop("title", "Senior PM")
     url = kw.pop("url", f"https://x.com/jobs/{uuid.uuid4().hex[:8]}")
     job = Job(
         external_id=kw.pop("external_id", make_external_id(company, title, url)),
-        company=company, title=title, url=url,
-        source=kw.pop("source", "test"), status=kw.pop("status", "new"),
+        company=company,
+        title=title,
+        url=url,
+        source=kw.pop("source", "test"),
+        status=kw.pop("status", "new"),
         **kw,
     )
     db.add(job)
@@ -211,6 +225,7 @@ def make_job(db, **kw):
 
 def make_company(db, name="Acme", **kw):
     from backend.models.db import Company
+
     c = Company(name=name, **kw)
     db.add(c)
     db.commit()
@@ -220,6 +235,7 @@ def make_company(db, name="Acme", **kw):
 
 def make_search(db, name="S1", **kw):
     from backend.models.db import Search
+
     s = Search(name=name, **kw)
     db.add(s)
     db.commit()
@@ -229,7 +245,13 @@ def make_search(db, name="S1", **kw):
 
 def make_resume(db, name="Base", is_base=True, **kw):
     from backend.models.db import Resume
-    r = Resume(name=name, is_base=is_base, json_data=kw.pop("json_data", {"header": {"name": "A"}}), **kw)
+
+    r = Resume(
+        name=name,
+        is_base=is_base,
+        json_data=kw.pop("json_data", {"header": {"name": "A"}}),
+        **kw,
+    )
     db.add(r)
     db.commit()
     db.refresh(r)
@@ -239,15 +261,25 @@ def make_resume(db, name="Base", is_base=True, **kw):
 def make_persona(db):
     """The current account's Persona (created empty when missing)."""
     from backend.accounts.owned import get_persona
+
     return get_persona(db)
 
 
 def set_setting(db, key, value):
     from backend.models.db import Setting
+
     # The install value (MT-9: members' own rows carry an account_id)
-    row = db.query(Setting).filter(Setting.key == key, Setting.account_id.is_(None)).first()
+    row = (
+        db.query(Setting)
+        .filter(Setting.key == key, Setting.account_id.is_(None))
+        .first()
+    )
     if row:
         row.value = value if isinstance(value, str) else json.dumps(value)
     else:
-        db.add(Setting(key=key, value=value if isinstance(value, str) else json.dumps(value)))
+        db.add(
+            Setting(
+                key=key, value=value if isinstance(value, str) else json.dumps(value)
+            )
+        )
     db.commit()

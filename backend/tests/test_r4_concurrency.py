@@ -8,6 +8,7 @@ the DB row always agrees with the in-memory entry.
 SQLite strips tz from DateTime(timezone=True), so a load listener re-applies UTC
 — without it `cleanup_stale_runs()` subtracts a naive from an aware datetime.
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -16,8 +17,13 @@ import pytest
 from sqlalchemy import event
 
 from backend.tests.r4_support import (  # noqa: F401
-    client, _clear_running_state, _no_outbound, assert_clean,
-    make_company, make_search, MISSING_UUID,
+    MISSING_UUID,
+    _clear_running_state,
+    _no_outbound,
+    assert_clean,
+    client,
+    make_company,
+    make_search,
 )
 
 
@@ -38,6 +44,7 @@ def _utc_tz_on_jobrun_load():
 
 def _runs(db, **filters):
     from backend.models.db import JobRun
+
     db.expire_all()
     q = db.query(JobRun)
     for k, v in filters.items():
@@ -46,6 +53,7 @@ def _runs(db, **filters):
 
 
 # ══ One live run per scope key ═══════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_manual_launch_is_refused_while_the_scheduler_holds_the_scope(test_db):
@@ -65,6 +73,7 @@ async def test_manual_launch_is_refused_while_the_scheduler_holds_the_scope(test
 @pytest.mark.asyncio
 async def test_scheduler_is_refused_while_a_manual_run_holds_the_scope(test_db):
     import backend.job_monitor as jm
+
     gate = asyncio.Event()
 
     async def _slow():
@@ -84,94 +93,135 @@ async def test_scheduler_run_all_scrapes_skips_instead_of_raising(test_db, monke
     """The scheduler swallows JobAlreadyRunningError so APScheduler is not poisoned."""
     import backend.job_monitor as jm
     from backend.scheduler import run_all_scrapes
+
     jm._running["scrape_all:scheduled"] = jm.RunningJob(
-        run_id=uuid.uuid4(), job_type="scrape_all", trigger="scheduler",
-        started_at=datetime.now(timezone.utc))
-    await run_all_scrapes()          # must not raise
+        run_id=uuid.uuid4(),
+        job_type="scrape_all",
+        trigger="scheduler",
+        started_at=datetime.now(timezone.utc),
+    )
+    await run_all_scrapes()  # must not raise
     assert _runs(test_db, job_type="scrape_all") == []
 
 
 @pytest.mark.asyncio
-async def test_scheduler_run_all_scrapes_runs_beside_the_owners_manual_run(test_db, monkeypatch):
+async def test_scheduler_run_all_scrapes_runs_beside_the_owners_manual_run(
+    test_db, monkeypatch
+):
     """QA F6 / R4-02 (was: the tick skipped): the owner's manual Run all no longer blocks
     the scheduled tick; the tick runs and names the owner as left out."""
     import backend.job_monitor as jm
     from backend.scheduler import run_all_scrapes
+
     gate = asyncio.Event()
 
     async def _slow():
         await gate.wait()
 
     jm.launch_background("scrape_all", _slow, trigger="manual")
-    await run_all_scrapes()          # must not raise
+    await run_all_scrapes()  # must not raise
     gate.set()
     await asyncio.sleep(0)
     rows = {r.trigger: r for r in _runs(test_db, job_type="scrape_all")}
     assert set(rows) == {"manual", "scheduler"}
     assert rows["scheduler"].status == "completed"
-    assert "skipped (manual run in progress)" in (rows["scheduler"].result_summary or "")
+    assert "skipped (manual run in progress)" in (
+        rows["scheduler"].result_summary or ""
+    )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("fn_name", ["run_email_check", "send_daily_digest",
-                                     "refresh_h1b_data", "run_auto_reject",
-                                     "run_job_cleanup_auto", "run_db_backup"])
+@pytest.mark.parametrize(
+    "fn_name",
+    [
+        "run_email_check",
+        "send_daily_digest",
+        "refresh_h1b_data",
+        "run_auto_reject",
+        "run_job_cleanup_auto",
+        "run_db_backup",
+    ],
+)
 async def test_every_scheduled_job_skips_a_busy_scope_without_raising(test_db, fn_name):
     import backend.job_monitor as jm
     import backend.scheduler as sched
 
     job_type = {
-        "run_email_check": "email_check", "send_daily_digest": "daily_digest",
-        "refresh_h1b_data": "h1b_refresh", "run_auto_reject": "auto_reject",
-        "run_job_cleanup_auto": "job_cleanup", "run_db_backup": "db_backup",
+        "run_email_check": "email_check",
+        "send_daily_digest": "daily_digest",
+        "refresh_h1b_data": "h1b_refresh",
+        "run_auto_reject": "auto_reject",
+        "run_job_cleanup_auto": "job_cleanup",
+        "run_db_backup": "db_backup",
     }[fn_name]
     jm._running[job_type] = jm.RunningJob(
-        run_id=uuid.uuid4(), job_type=job_type, trigger="manual",
-        started_at=datetime.now(timezone.utc))
-    await getattr(sched, fn_name)()   # must not raise
+        run_id=uuid.uuid4(),
+        job_type=job_type,
+        trigger="manual",
+        started_at=datetime.now(timezone.utc),
+    )
+    await getattr(sched, fn_name)()  # must not raise
     assert _runs(test_db, job_type=job_type) == []
 
 
 def test_manual_trigger_answers_409_while_the_scheduler_run_is_live(client):
     """The HTTP surface of the same guard."""
     import backend.job_monitor as jm
+
     jm._running["scrape_all"] = jm.RunningJob(
-        run_id=uuid.uuid4(), job_type="scrape_all", trigger="scheduler",
-        started_at=datetime.now(timezone.utc))
+        run_id=uuid.uuid4(),
+        job_type="scrape_all",
+        trigger="scheduler",
+        started_at=datetime.now(timezone.utc),
+    )
     assert_clean(client.post("/api/scrape/run-all"), 409)
 
 
-def test_different_scope_keys_of_one_job_type_run_side_by_side(client, test_db, monkeypatch):
+def test_different_scope_keys_of_one_job_type_run_side_by_side(
+    client, test_db, monkeypatch
+):
     import backend.scraper.sources.company_pages as cp
+
     gate = asyncio.Event()
 
     async def _slow(company):
         await gate.wait()
         return {}
+
     monkeypatch.setattr(cp, "scrape_single_career_page", _slow, raising=False)
-    monkeypatch.setattr(cp, "record_company_scrape_log", lambda *a, **k: None, raising=False)
+    monkeypatch.setattr(
+        cp, "record_company_scrape_log", lambda *a, **k: None, raising=False
+    )
 
     a = make_company(test_db, name="A")
     b = make_company(test_db, name="B")
     assert_clean(client.post(f"/api/scrape/company/{a.id}"), 202)
     assert_clean(client.post(f"/api/scrape/company/{b.id}"), 202)
     import backend.job_monitor as jm
+
     assert len([r for r in jm._running.values() if r.job_type == "company_scrape"]) == 2
     gate.set()
 
 
 def test_scheduler_jobs_view_reports_a_scoped_company_run_as_running(client, test_db):
     import backend.job_monitor as jm
+
     c = make_company(test_db, name="A", active=True, scrape_interval_minutes=30)
     jm._running[f"company_scrape:{c.id}"] = jm.RunningJob(
-        run_id=uuid.uuid4(), job_type="company_scrape", trigger="manual",
-        started_at=datetime.now(timezone.utc), scope_key=str(c.id), company_id=str(c.id))
+        run_id=uuid.uuid4(),
+        job_type="company_scrape",
+        trigger="manual",
+        started_at=datetime.now(timezone.utc),
+        scope_key=str(c.id),
+        company_id=str(c.id),
+    )
     rows = assert_clean(client.get("/api/scheduler/jobs"), 200).json()
     row = next(r for r in rows if r["id"] == f"company_{c.id}")
     assert row["running"] and row["running"]["elapsed_seconds"] >= 0
 
 
 # ══ In-memory state vs JobRun rows ═══════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_tracked_run_row_matches_the_in_memory_entry_while_live(test_db):
@@ -224,7 +274,9 @@ async def test_launch_background_string_return_becomes_the_summary(test_db):
 
     jm.launch_background("scrape_all", _ok, trigger="manual")
     await asyncio.sleep(0.05)
-    assert _runs(test_db, job_type="scrape_all")[0].result_summary == "4 sources - +2 new"
+    assert (
+        _runs(test_db, job_type="scrape_all")[0].result_summary == "4 sources - +2 new"
+    )
 
 
 @pytest.mark.asyncio
@@ -248,18 +300,33 @@ async def test_no_orphan_running_rows_after_a_burst_of_runs(test_db):
 
 # ══ Stale-run recovery (container killed mid-run) ════════════════════════════
 
+
 def test_cleanup_stale_runs_fails_every_orphan_row(test_db):
     """Simulates the process dying mid-run: rows say 'running', memory is empty."""
-    from backend.models.db import JobRun
     from backend.job_monitor import cleanup_stale_runs
+    from backend.models.db import JobRun
 
     started = datetime.now(timezone.utc) - timedelta(minutes=45)
     for jt in ("scrape_all", "email_check", "company_scrape"):
-        test_db.add(JobRun(id=uuid.uuid4(), job_type=jt, trigger="scheduler",
-                           status="running", started_at=started))
-    test_db.add(JobRun(id=uuid.uuid4(), job_type="db_backup", trigger="scheduler",
-                       status="completed", started_at=started,
-                       finished_at=started + timedelta(seconds=3)))
+        test_db.add(
+            JobRun(
+                id=uuid.uuid4(),
+                job_type=jt,
+                trigger="scheduler",
+                status="running",
+                started_at=started,
+            )
+        )
+    test_db.add(
+        JobRun(
+            id=uuid.uuid4(),
+            job_type="db_backup",
+            trigger="scheduler",
+            status="completed",
+            started_at=started,
+            finished_at=started + timedelta(seconds=3),
+        )
+    )
     test_db.commit()
 
     assert cleanup_stale_runs() == 3
@@ -274,12 +341,18 @@ def test_cleanup_stale_runs_fails_every_orphan_row(test_db):
 
 
 def test_cleanup_stale_runs_is_idempotent(test_db):
-    from backend.models.db import JobRun
     from backend.job_monitor import cleanup_stale_runs
+    from backend.models.db import JobRun
 
-    test_db.add(JobRun(id=uuid.uuid4(), job_type="scrape_all", trigger="scheduler",
-                       status="running",
-                       started_at=datetime.now(timezone.utc) - timedelta(minutes=5)))
+    test_db.add(
+        JobRun(
+            id=uuid.uuid4(),
+            job_type="scrape_all",
+            trigger="scheduler",
+            status="running",
+            started_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+        )
+    )
     test_db.commit()
     assert cleanup_stale_runs() == 1
     assert cleanup_stale_runs() == 0
@@ -287,19 +360,28 @@ def test_cleanup_stale_runs_is_idempotent(test_db):
 
 def test_cleanup_stale_runs_on_an_empty_table(test_db):
     from backend.job_monitor import cleanup_stale_runs
+
     assert cleanup_stale_runs() == 0
 
 
 def test_monitor_history_shows_a_recovered_run_as_failed(client, test_db):
-    from backend.models.db import JobRun
     from backend.job_monitor import cleanup_stale_runs
+    from backend.models.db import JobRun
 
-    test_db.add(JobRun(id=uuid.uuid4(), job_type="scrape_all", trigger="scheduler",
-                       status="running",
-                       started_at=datetime.now(timezone.utc) - timedelta(minutes=5)))
+    test_db.add(
+        JobRun(
+            id=uuid.uuid4(),
+            job_type="scrape_all",
+            trigger="scheduler",
+            status="running",
+            started_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+        )
+    )
     test_db.commit()
     cleanup_stale_runs()
-    rows = assert_clean(client.get("/api/monitor/history?job_type=scrape_all"), 200).json()
+    rows = assert_clean(
+        client.get("/api/monitor/history?job_type=scrape_all"), 200
+    ).json()
     assert rows[0]["status"] == "failed" and rows[0]["error"] == "Process restarted"
 
 
@@ -309,53 +391,80 @@ def test_stale_recovery_does_not_touch_a_run_that_is_genuinely_live(test_db):
     `cleanup_stale_runs()` runs only in the lifespan, when `_running` is empty by
     construction — but if it were ever called mid-process it would fail a live run.
     """
-    from backend.models.db import JobRun
-    from backend.job_monitor import cleanup_stale_runs
     import backend.job_monitor as jm
+    from backend.job_monitor import cleanup_stale_runs
+    from backend.models.db import JobRun
 
     rid = uuid.uuid4()
-    test_db.add(JobRun(id=rid, job_type="scrape_all", trigger="manual", status="running",
-                       started_at=datetime.now(timezone.utc)))
+    test_db.add(
+        JobRun(
+            id=rid,
+            job_type="scrape_all",
+            trigger="manual",
+            status="running",
+            started_at=datetime.now(timezone.utc),
+        )
+    )
     test_db.commit()
-    jm._running["scrape_all"] = jm.RunningJob(run_id=rid, job_type="scrape_all",
-                                              trigger="manual",
-                                              started_at=datetime.now(timezone.utc))
-    assert cleanup_stale_runs() == 1        # current behaviour: memory is not consulted
+    jm._running["scrape_all"] = jm.RunningJob(
+        run_id=rid,
+        job_type="scrape_all",
+        trigger="manual",
+        started_at=datetime.now(timezone.utc),
+    )
+    assert cleanup_stale_runs() == 1  # current behaviour: memory is not consulted
     test_db.expire_all()
     assert test_db.query(JobRun).filter(JobRun.id == rid).first().status == "failed"
-    assert "scrape_all" in jm._running       # …while the monitor still shows it running
+    assert "scrape_all" in jm._running  # …while the monitor still shows it running
 
 
 @pytest.mark.xfail(strict=True, reason="R4-T1-27")
 def test_stale_recovery_should_skip_runs_the_monitor_still_owns(test_db):
     """A mid-process call must not fail a run the in-memory monitor is still driving."""
-    from backend.models.db import JobRun
-    from backend.job_monitor import cleanup_stale_runs
     import backend.job_monitor as jm
+    from backend.job_monitor import cleanup_stale_runs
+    from backend.models.db import JobRun
 
     rid = uuid.uuid4()
-    test_db.add(JobRun(id=rid, job_type="scrape_all", trigger="manual", status="running",
-                       started_at=datetime.now(timezone.utc)))
+    test_db.add(
+        JobRun(
+            id=rid,
+            job_type="scrape_all",
+            trigger="manual",
+            status="running",
+            started_at=datetime.now(timezone.utc),
+        )
+    )
     test_db.commit()
-    jm._running["scrape_all"] = jm.RunningJob(run_id=rid, job_type="scrape_all",
-                                              trigger="manual",
-                                              started_at=datetime.now(timezone.utc))
+    jm._running["scrape_all"] = jm.RunningJob(
+        run_id=rid,
+        job_type="scrape_all",
+        trigger="manual",
+        started_at=datetime.now(timezone.utc),
+    )
     assert cleanup_stale_runs() == 0
 
 
 # ══ Monitor endpoints agree with memory ══════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_monitor_active_and_in_flight_agree_with_running_state(client, test_db):
     import backend.job_monitor as jm
+
     jid = uuid.uuid4()
     gate = asyncio.Event()
 
     async def _slow():
         await gate.wait()
 
-    jm.launch_background("analyze_job", _slow, trigger="manual",
-                         scope_key=f"{jid}:on-save", target_job_id=jid)
+    jm.launch_background(
+        "analyze_job",
+        _slow,
+        trigger="manual",
+        scope_key=f"{jid}:on-save",
+        target_job_id=jid,
+    )
     active = client.get("/api/monitor/active").json()
     in_flight = client.get("/api/monitor/in-flight").json()
     assert len(active) == 1 and active[0]["target_job_id"] == str(jid)
@@ -372,13 +481,15 @@ async def test_monitor_active_and_in_flight_agree_with_running_state(client, tes
 @pytest.mark.asyncio
 async def test_finished_run_shows_up_in_monitor_finished(client, test_db):
     import backend.job_monitor as jm
+
     jid = uuid.uuid4()
 
     async def _ok():
         return "scored"
 
-    jm.launch_background("analyze_job", _ok, trigger="manual",
-                         scope_key=str(jid), target_job_id=jid)
+    jm.launch_background(
+        "analyze_job", _ok, trigger="manual", scope_key=str(jid), target_job_id=jid
+    )
     await asyncio.sleep(0.05)
     rows = client.get(f"/api/monitor/finished?job_ids={jid}").json()
     assert rows and rows[0]["status"] == "completed"
@@ -387,13 +498,15 @@ async def test_finished_run_shows_up_in_monitor_finished(client, test_db):
 @pytest.mark.asyncio
 async def test_failed_run_shows_up_in_monitor_finished_as_failed(client, test_db):
     import backend.job_monitor as jm
+
     jid = uuid.uuid4()
 
     async def _boom():
         raise RuntimeError("nope")
 
-    jm.launch_background("analyze_job", _boom, trigger="manual",
-                         scope_key=str(jid), target_job_id=jid)
+    jm.launch_background(
+        "analyze_job", _boom, trigger="manual", scope_key=str(jid), target_job_id=jid
+    )
     await asyncio.sleep(0.05)
     rows = client.get(f"/api/monitor/finished?job_ids={jid}").json()
     assert rows and rows[0]["status"] == "failed"

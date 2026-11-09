@@ -11,6 +11,7 @@ R1-06  acting_as(None) clears unscoped.  R1-07 install-wide runs are the owner's
 R1-08  the owner unlock does not ride into background tasks.  R1-09 fixture
        `no_account_ctx` runs entry points with no context at all.
 """
+
 import asyncio
 import contextvars
 import re
@@ -21,8 +22,14 @@ import pytest
 from sqlalchemy import exists, func, insert, select, update
 
 from backend.accounts.context import (
-    AccountContextMissing, OwnerLookupFailed, current_account, is_owner_unlocked,
-    is_unscoped, owner_unlocked, unscoped, use_account,
+    AccountContextMissing,
+    OwnerLookupFailed,
+    current_account,
+    is_owner_unlocked,
+    is_unscoped,
+    owner_unlocked,
+    unscoped,
+    use_account,
 )
 from backend.models.db import Account, Job, JobLocation, JobRun, Setting
 from backend.tests.r4_support import make_job, set_setting
@@ -40,6 +47,7 @@ def accounts(test_db):
 @pytest.fixture(autouse=True)
 def _clear_running():
     import backend.job_monitor as jm
+
     jm._running.clear()
     yield
     jm._running.clear()
@@ -52,6 +60,7 @@ def _ctx():
 def _poisoned(member):
     """What routes_settings._reconfigure runs in for a member with the owner unlock."""
     from contextlib import ExitStack
+
     st = ExitStack()
     st.enter_context(use_account(member))
     st.enter_context(owner_unlocked(True))
@@ -67,15 +76,19 @@ def _runs(test_db, job_type):
 
 # ── R1-01: registration from a clean context (real APScheduler) ──────────────
 
+
 @pytest.mark.asyncio
 async def test_configure_scheduler_from_a_member_request_thread_fires_clean(
-        test_db, accounts, monkeypatch):
+    test_db, accounts, monkeypatch
+):
     """Ported from T4 `test_PROVE_R1_01_*`: configure_scheduler() runs in a worker thread
     under the member + unscoped + unlock context (as a settings PATCH does). The job it
     registers must fire with no account context."""
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
     from apscheduler.triggers.interval import IntervalTrigger
+
     import backend.scheduler as sched_mod
+
     a, b = accounts
     set_setting(test_db, "scrape_interval_minutes", "5")
     set_setting(test_db, "email_check_interval_minutes", "0")
@@ -83,23 +96,29 @@ async def test_configure_scheduler_from_a_member_request_thread_fires_clean(
     seen = []
     fired = asyncio.Event()
 
-    async def _probe():                       # the raw job: no scheduled_job wrapper
+    async def _probe():  # the raw job: no scheduled_job wrapper
         seen.append(_ctx())
         fired.set()
+
     monkeypatch.setattr(sched_mod, "run_all_scrapes", _probe)
-    monkeypatch.setattr(sched_mod, "IntervalTrigger",
-                        lambda minutes: IntervalTrigger(seconds=0.2))
+    monkeypatch.setattr(
+        sched_mod, "IntervalTrigger", lambda minutes: IntervalTrigger(seconds=0.2)
+    )
     # the first scrape fires now, not after the usual overdue delay
     from datetime import datetime, timezone
-    monkeypatch.setattr(sched_mod, "next_scrape_time",
-                        lambda minutes: datetime.now(timezone.utc))
+
+    monkeypatch.setattr(
+        sched_mod, "next_scrape_time", lambda minutes: datetime.now(timezone.utc)
+    )
     real = AsyncIOScheduler()
     monkeypatch.setattr(sched_mod, "scheduler", real)
-    contextvars.Context().run(real.start)     # boot: clean, as the lifespan does
+    contextvars.Context().run(real.start)  # boot: clean, as the lifespan does
     try:
+
         def _patch_settings_thread():
             with _poisoned(b):
                 sched_mod.configure_scheduler()
+
         await asyncio.to_thread(_patch_settings_thread)
         await asyncio.wait_for(fired.wait(), 5)
     finally:
@@ -109,12 +128,15 @@ async def test_configure_scheduler_from_a_member_request_thread_fires_clean(
 
 @pytest.mark.asyncio
 async def test_a_job_added_from_a_poisoned_context_still_runs_per_account_clean(
-        test_db, accounts, monkeypatch):
+    test_db, accounts, monkeypatch
+):
     """Second layer: even when add_job() itself is called from the poisoned context,
     the entry point (`scheduled_job`) resets it before `for_each_account`."""
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
     import backend.notifier.telegram as tg
     import backend.scheduler as sched_mod
+
     a, b = accounts
     seen = []
     done = asyncio.Event()
@@ -123,13 +145,17 @@ async def test_a_job_added_from_a_poisoned_context_still_runs_per_account_clean(
         seen.append(_ctx())
         if len(seen) == 2:
             done.set()
+
     monkeypatch.setattr(tg, "send_digest", _digest)
     real = AsyncIOScheduler()
     contextvars.Context().run(real.start)
     try:
         with _poisoned(b):
-            real.add_job(sched_mod.send_daily_digest, "date",
-                         run_date=datetime.now(timezone.utc) + timedelta(seconds=0.2))
+            real.add_job(
+                sched_mod.send_daily_digest,
+                "date",
+                run_date=datetime.now(timezone.utc) + timedelta(seconds=0.2),
+            )
         await asyncio.wait_for(done.wait(), 5)
     finally:
         real.shutdown(wait=False)
@@ -150,6 +176,7 @@ def _stub_bodies(monkeypatch, record):
     async def _rec(*_a, **_k):
         record.append(_ctx())
         return {}
+
     monkeypatch.setattr(orch, "run_all", _rec)
     monkeypatch.setattr(scorer, "analyze_unscored_jobs", _rec)
     monkeypatch.setattr(h1b, "refresh_all_h1b", _rec)
@@ -159,23 +186,32 @@ def _stub_bodies(monkeypatch, record):
     def _dump():
         record.append(_ctx())
         return {"path": "/x", "file": "x.sql", "size_mb": 1.0, "pruned": 0}
+
     monkeypatch.setattr(db_backup, "run_pg_dump", _dump)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("fn_name,job_type", [
-    ("run_db_backup", "db_backup"), ("refresh_h1b_data", "h1b_refresh"),
-    ("run_all_scrapes", "scrape_all"), ("send_daily_digest", "daily_digest"),
-    ("run_email_check", "email_check"), ("run_auto_reject", "auto_reject"),
-    ("run_job_cleanup_auto", "job_cleanup"),
-])
+@pytest.mark.parametrize(
+    "fn_name,job_type",
+    [
+        ("run_db_backup", "db_backup"),
+        ("refresh_h1b_data", "h1b_refresh"),
+        ("run_all_scrapes", "scrape_all"),
+        ("send_daily_digest", "daily_digest"),
+        ("run_email_check", "email_check"),
+        ("run_auto_reject", "auto_reject"),
+        ("run_job_cleanup_auto", "job_cleanup"),
+    ],
+)
 @pytest.mark.parametrize("caller", ["none", "member_poisoned"])
 async def test_every_scheduled_entry_point_sets_its_own_context(
-        no_account_ctx, accounts, monkeypatch, fn_name, job_type, caller):
+    no_account_ctx, accounts, monkeypatch, fn_name, job_type, caller
+):
     """R1-09: with NO context (strict mode raises on any unscoped query) and with the
     R1-01 poisoned context, each entry point runs its body as the owner / per account,
     never unscoped or unlocked, and install-level runs are the owner's."""
     import backend.scheduler as sched_mod
+
     a, b = accounts
     record = []
     _stub_bodies(monkeypatch, record)
@@ -194,24 +230,30 @@ async def test_every_scheduled_entry_point_sets_its_own_context(
         assert owners == {a}
         assert all(acc == a for acc, _u, _l in record[:1])
     elif fn_name == "run_email_check":
-        assert owners == {a}          # only the Gmail-connected account (the owner)
+        assert owners == {a}  # only the Gmail-connected account (the owner)
     else:
         assert owners == {a, b}
-    assert all(r.status == "completed" for r in runs), [(r.status, r.error) for r in runs]
+    assert all(r.status == "completed" for r in runs), [
+        (r.status, r.error) for r in runs
+    ]
 
 
 # ── R1-07: install-wide run records are the owner's ──────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_member_with_unlock_triggering_a_backup_records_it_as_the_owners(
-        test_db, accounts, monkeypatch):
+    test_db, accounts, monkeypatch
+):
     import backend.job_monitor as jm
+
     a, b = accounts
     done = asyncio.Event()
 
     async def _backup():
         done.set()
         return "ok"
+
     with use_account(b), owner_unlocked(True):
         jm.launch_background("db_backup", _backup)
     await asyncio.wait_for(done.wait(), 5)
@@ -222,9 +264,11 @@ async def test_member_with_unlock_triggering_a_backup_records_it_as_the_owners(
 
 # ── R1-08: the owner unlock does not ride into background tasks ──────────────
 
+
 @pytest.mark.asyncio
 async def test_launch_background_drops_the_owner_unlock(test_db, accounts):
     import backend.job_monitor as jm
+
     a, b = accounts
     seen = []
     done = asyncio.Event()
@@ -232,6 +276,7 @@ async def test_launch_background_drops_the_owner_unlock(test_db, accounts):
     async def _task():
         seen.append(_ctx())
         done.set()
+
     with use_account(b), owner_unlocked(True):
         jm.launch_background("tailor_resume", _task, scope_key="x")
     await asyncio.wait_for(done.wait(), 5)
@@ -240,8 +285,10 @@ async def test_launch_background_drops_the_owner_unlock(test_db, accounts):
 
 # ── R1-06: acting_as(None) ───────────────────────────────────────────────────
 
+
 def test_acting_as_none_clears_unscoped_and_acts_as_the_owner(test_db, accounts):
     from backend.accounts.background import acting_as
+
     a, b = accounts
     make_job(test_db, title="A job")
     with use_account(b):
@@ -253,6 +300,7 @@ def test_acting_as_none_clears_unscoped_and_acts_as_the_owner(test_db, accounts)
 
 
 # ── R1-02 / R1-09: strict mode with no context ───────────────────────────────
+
 
 def _seed(test_db, accounts):
     a, b = accounts
@@ -267,17 +315,22 @@ def _seed(test_db, accounts):
 
 SHAPES = {
     "query_count": lambda s, jid: s.query(Job).count(),
-    "func_count": lambda s, jid: s.execute(select(func.count()).select_from(Job)).scalar(),
+    "func_count": lambda s, jid: s.execute(
+        select(func.count()).select_from(Job)
+    ).scalar(),
     "exists": lambda s, jid: s.query(exists().where(Job.id == jid)).scalar(),
-    "unowned_join": lambda s, jid: s.query(JobLocation).join(Job, JobLocation.job_id == Job.id).all(),
+    "unowned_join": lambda s, jid: (
+        s.query(JobLocation).join(Job, JobLocation.job_id == Job.id).all()
+    ),
     "union": lambda s, jid: s.execute(select(Job.id).union(select(Job.id))).all(),
-    "in_subquery": lambda s, jid: s.query(JobLocation).filter(
-        JobLocation.job_id.in_(select(Job.id))).all(),
-    "correlated_exists": lambda s, jid: s.query(JobLocation).filter(
-        exists().where(Job.id == JobLocation.job_id)).all(),
+    "in_subquery": lambda s, jid: (
+        s.query(JobLocation).filter(JobLocation.job_id.in_(select(Job.id))).all()
+    ),
+    "correlated_exists": lambda s, jid: (
+        s.query(JobLocation).filter(exists().where(Job.id == JobLocation.job_id)).all()
+    ),
     "core_select": lambda s, jid: s.execute(select(Job.__table__.c.id)).all(),
-    "core_update": lambda s, jid: s.execute(
-        update(Job.__table__).values(status="x")),
+    "core_update": lambda s, jid: s.execute(update(Job.__table__).values(status="x")),
 }
 
 
@@ -295,7 +348,7 @@ def test_strict_mode_still_allows_unowned_tables_without_a_context(test_db, acco
     with use_account(None):
         test_db.query(Setting).all()
         test_db.query(Account).count()
-        assert test_db.query(JobLocation).count() == 2   # child table alone: unowned
+        assert test_db.query(JobLocation).count() == 2  # child table alone: unowned
 
 
 @pytest.mark.parametrize("shape", ["query_count", "func_count", "union"])
@@ -310,9 +363,16 @@ def test_shapes_are_scoped_under_a_context(test_db, accounts, shape):
 
 # ── R1-04: INSERT stamping ───────────────────────────────────────────────────
 
+
 def _job_row(**kw):
-    d = {"external_id": kw.pop("external_id"), "company": "Acme", "title": "T",
-         "url": "https://x/1", "source": "test", "status": "new"}
+    d = {
+        "external_id": kw.pop("external_id"),
+        "company": "Acme",
+        "title": "T",
+        "url": "https://x/1",
+        "source": "test",
+        "status": "new",
+    }
     d.update(kw)
     return d
 
@@ -320,7 +380,11 @@ def _job_row(**kw):
 def _account_of(test_db, external_id):
     with unscoped():
         test_db.expire_all()
-        return test_db.query(Job.account_id).filter(Job.external_id == external_id).scalar()
+        return (
+            test_db.query(Job.account_id)
+            .filter(Job.external_id == external_id)
+            .scalar()
+        )
 
 
 def test_orm_insert_values_is_stamped(test_db, accounts):
@@ -334,17 +398,27 @@ def test_orm_insert_values_is_stamped(test_db, accounts):
 def test_orm_bulk_insert_with_params_is_stamped(test_db, accounts):
     a, b = accounts
     with use_account(b):
-        test_db.execute(insert(Job), [_job_row(external_id="bulk-1"),
-                                      _job_row(external_id="bulk-2", url="https://x/2")])
+        test_db.execute(
+            insert(Job),
+            [
+                _job_row(external_id="bulk-1"),
+                _job_row(external_id="bulk-2", url="https://x/2"),
+            ],
+        )
         test_db.commit()
     assert _account_of(test_db, "bulk-1") == b and _account_of(test_db, "bulk-2") == b
 
 
 def test_core_table_insert_through_the_session_is_stamped(test_db, accounts):
     import uuid
+
     a, b = accounts
     with use_account(b):
-        test_db.execute(insert(Job.__table__).values(id=uuid.uuid4(), **_job_row(external_id="core-1")))
+        test_db.execute(
+            insert(Job.__table__).values(
+                id=uuid.uuid4(), **_job_row(external_id="core-1")
+            )
+        )
         test_db.commit()
     assert _account_of(test_db, "core-1") == b
 
@@ -380,6 +454,7 @@ def test_no_bulk_save_helpers_in_backend():
 
 # ── R1-03: fail closed ───────────────────────────────────────────────────────
 
+
 class _Bind:
     pass
 
@@ -397,18 +472,26 @@ class _BrokenSession:
         class _C:
             def execute(self, *_a, **_k):
                 raise exc
+
         return _C()
 
 
 def test_owner_lookup_error_raises():
     from backend.accounts.context import owner_id_for_session
+
     with pytest.raises(OwnerLookupFailed):
-        owner_id_for_session(_BrokenSession(RuntimeError("current transaction is aborted")))
+        owner_id_for_session(
+            _BrokenSession(RuntimeError("current transaction is aborted"))
+        )
 
 
 def test_owner_lookup_without_an_accounts_table_is_none():
     from backend.accounts.context import owner_id_for_session
-    assert owner_id_for_session(_BrokenSession(RuntimeError("no such table: accounts"))) is None
+
+    assert (
+        owner_id_for_session(_BrokenSession(RuntimeError("no such table: accounts")))
+        is None
+    )
 
 
 def test_owner_context_raises_when_the_lookup_fails(test_db, monkeypatch):
@@ -417,6 +500,7 @@ def test_owner_context_raises_when_the_lookup_fails(test_db, monkeypatch):
 
     def _boom():
         raise OwnerLookupFailed("db down")
+
     monkeypatch.setattr(context, "owner_account_id", _boom)
     with use_account(None):
         with pytest.raises(OwnerLookupFailed):
@@ -428,6 +512,7 @@ def test_no_null_account_row_while_accounts_exist(test_db, accounts, monkeypatch
     """Non-strict, no context, owner unresolvable: the flush refuses instead of writing
     a NULL account row."""
     from backend.accounts import context, scoping
+
     monkeypatch.delenv("MT_STRICT")
     monkeypatch.setattr(context, "owner_id_for_session", lambda session: None)
     monkeypatch.setattr(scoping, "owner_id_for_session", lambda session: None)
