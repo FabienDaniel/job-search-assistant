@@ -226,6 +226,7 @@ export default function V2JobFeed() {
   // {id, html} once the reader body for job `id` arrives; html is null when the job has no text to show
   const [readerDoc, setReaderDoc] = useState(null)
   const readerCache = useRef(new Map())
+  const readerInFlight = useRef(new Set())   // job ids whose reader request has not settled
   // Posting zoom. `postZoom` is what the frames render at whether or not the
   // floater is shown — turning the control off hides the affordance, it does not
   // resize what is already on screen; `feed_zoom_floater` only gates the pill.
@@ -812,23 +813,29 @@ export default function V2JobFeed() {
 
   // Reader body fetch. Kept per job for the page's life, so flipping between Reader and Live
   // does not refetch LinkedIn each time.
+  // Keyed on ids: the full job record replacing the list row must not start a second request.
+  const readerJobId = detail?.id
+  const readerDocId = readerDoc?.id
   useEffect(() => {
-    if (!detail || postView !== 'reader') return
-    const id = detail.id
-    if (readerDoc?.id === id) return
+    if (!readerJobId || postView !== 'reader') return
+    const id = readerJobId
+    if (readerDocId === id) return
     if (readerCache.current.has(id)) { setReaderDoc({ id, html: readerCache.current.get(id) }); return }
+    if (readerInFlight.current.has(id)) return
+    readerInFlight.current.add(id)
     setReaderDoc(null)
     api.get(`/jobs/${id}/reader`, { responseType: 'text', transformResponse: (r) => r })
       .then(({ data }) => typeof data === 'string' && data.trim() ? data : null)
       .catch(() => null)
       .then((html) => {
+        readerInFlight.current.delete(id)
         if (html) {
           if (readerCache.current.size >= 50) readerCache.current.delete(readerCache.current.keys().next().value)
           readerCache.current.set(id, html)
         }
         if (detailRef.current?.id === id) setReaderDoc({ id, html })
       })
-  }, [detail, postView, readerDoc])
+  }, [readerJobId, postView, readerDocId])
 
   // cached page fetch when toggled on
   useEffect(() => {
