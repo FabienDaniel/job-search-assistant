@@ -2174,7 +2174,7 @@ msgstr "Calls"
 msgid "Cancel"
 msgstr "Cancel"
 
-#: src/screens/JobFeed.jsx
+#: src/sourceLabels.js
 msgid "Career page"
 msgstr "Career page"
 
@@ -2440,7 +2440,7 @@ msgstr "Company"
 msgid "Company A–Z"
 msgstr "Company A–Z"
 
-#: src/screens/JobFeed.jsx
+#: src/sourceLabels.js
 msgid "Company careers"
 msgstr "Company careers"
 
@@ -3401,7 +3401,7 @@ msgid "Detected in recent runs"
 msgstr "Detected in recent runs"
 
 #: src/linkKinds.js
-#: src/screens/JobFeed.jsx
+#: src/sourceLabels.js
 msgid "Direct"
 msgstr "Direct"
 
@@ -3910,8 +3910,8 @@ msgstr "Export my data"
 msgid "Exporting…"
 msgstr "Exporting…"
 
-#: src/screens/JobFeed.jsx
 #: src/searchModes.js
+#: src/sourceLabels.js
 msgid "Extension"
 msgstr "Extension"
 
@@ -4967,8 +4967,8 @@ msgstr "Linked job not found"
 msgid "LinkedIn emailed a PIN."
 msgstr "LinkedIn emailed a PIN."
 
-#: src/screens/JobFeed.jsx
 #: src/searchModes.js
+#: src/sourceLabels.js
 msgid "LinkedIn Extension"
 msgstr "LinkedIn Extension"
 
@@ -4985,8 +4985,8 @@ msgid "LinkedIn is shared from the account owner; only the owner can refresh the
 msgstr "LinkedIn is shared from the account owner; only the owner can refresh the session"
 
 #: src/screens/Applications.jsx
-#: src/screens/JobFeed.jsx
 #: src/searchModes.js
+#: src/sourceLabels.js
 msgid "LinkedIn Personal"
 msgstr "LinkedIn Personal"
 
@@ -9419,8 +9419,8 @@ msgstr "Waiting longest"
 msgid "Waiting on a first response"
 msgstr "Waiting on a first response"
 
-#: src/screens/JobFeed.jsx
 #: src/screens/Searches.jsx
+#: src/sourceLabels.js
 msgid "Wana Create"
 msgstr "Wana Create"
 
@@ -9577,8 +9577,8 @@ msgstr "Work authorization"
 msgid "Work authorization type"
 msgstr "Work authorization type"
 
-#: src/screens/JobFeed.jsx
 #: src/screens/Searches.jsx
+#: src/sourceLabels.js
 msgid "Work With Indies"
 msgstr "Work With Indies"
 

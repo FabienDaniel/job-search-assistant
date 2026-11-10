@@ -11,7 +11,8 @@ import { isShortcut, track } from '../telemetry'
 import { Button, Card, Check as UICheck, CheckGlyph, CopyGlyph, CrossGlyph, Dot, FooterRow, GlyphBadge, HeaderRow, Heading, Helper, IconButton, Input, kb, Label, Link, Menu, MenuItem, Meter, ModalPanel, NavLink, PageTitle, Pill, Row, Rule, ScoreRing, SearchInput, SectionHead, Segmented, Spinner, TableHead, TableRow, Tag, ZOOM_MAX, ZOOM_MIN, ZoomFloater } from '../ui'
 import { ANALYZE, NO_BASES_HINT, SCORE_RESUME, TAILOR, activityText, noScoreSource,feedActivity, flightDetail, flightTypes, ghostTabs, tabBusy, tabBusyHint, tailorMarkTitle } from './feedActivity'
 import { PICK_KEY, clickMods, clickSelection } from './rowSelect'
-import { useApifyBoards, apifySourceLabel } from '../apifyBoards'
+import { useApifyBoards } from '../apifyBoards'
+import { srcLabel } from '../sourceLabels'
 
 const FILTERS_KEY = 'v2_feed_filters'
 const SORT_KEY = 'v2_feed_sort'
@@ -94,13 +95,6 @@ const RAIL_BTN = {
   // --ctl-line, not the v2-ctl 1: at 1 the line box is the em and Plex's ink rides high in a centred box (see Select)
   display: 'flex', alignItems: 'center', fontSize: 11.5, lineHeight: 'var(--ctl-line)', color: 'var(--rail-ink)', cursor: 'pointer',
 }
-const SOURCE_LABELS = {
-  direct: t`Direct`, extension: t`Extension`, jobspy_linkedin: 'LinkedIn', jobspy_indeed: 'Indeed',
-  jobspy_zip_recruiter: 'ZipRecruiter', jobspy_google: 'Google', levels_fyi: 'Levels', linkedin_personal: t`LinkedIn Personal`,
-  linkedin_extension: t`LinkedIn Extension`, jobright: 'Jobright', freehire: 'FreeHire', caribbeanjobs: 'CaribbeanJobs', trulyremote: 'TrulyRemoteWork', behance: 'Behance', hollylist: 'Hollylist', wanacreate: t`Wana Create`, himalayas: 'Himalayas', eluta: 'Eluta', dribbble: 'Dribbble', artstation: 'ArtStation', workwithindies: t`Work With Indies`, playwright_url: t`Company careers`, playwright_direct: t`Career page`,
-}
-// `boards` (useApifyBoards) names the `apify_<board>` sources.
-const srcLabel = (s, boards = []) => SOURCE_LABELS[s] || apifySourceLabel(boards, s) || s || ''
 // `duplicate`: a copy of a posting the feed already has (posting_links.py); the posting lists it under "Also on".
 const STATUS_OPTS = [['new', t`New`], ['saved', t`Saved`], ['applied', t`Applied`], ['skip', t`Skip`], ['ignored', t`Ignored`]]
 const SORT_OPTS = [['score', t`Top score`], ['date', t`Newest first`], ['salary', t`Salary, high to low`], ['company', t`Company A–Z`]]
