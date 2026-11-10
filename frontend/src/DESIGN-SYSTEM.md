@@ -72,7 +72,7 @@ Where each one draws:
 
 Light and Full depth are **not** distinguished visually anywhere.
 
-**Posting zoom.** The posting frame (live or cached) is zoomed by scaling the *element* — `transform: scale(z/100)` with `transform-origin: 0 0` and `width`/`height` at `(10000/z)%` — inside a `position:relative; overflow:hidden` wrapper, so a cross-origin page reflows to the new width instead of being cropped and the pane's own box never moves. `ZoomFloater` is the control; the level (50–200 in tens) lives in `localStorage.jobnavigator_post_zoom`, one level for every posting. The `feed_zoom_floater` setting hides the control only — what is on screen keeps the level it had.
+**Posting zoom.** The posting frame (reader, live or cached) is zoomed by scaling the *element* — `transform: scale(z/100)` with `transform-origin: 0 0` and `width`/`height` at `(10000/z)%` — inside a `position:relative; overflow:hidden` wrapper, so a cross-origin page reflows to the new width instead of being cropped and the pane's own box never moves. `ZoomFloater` is the control; the level (50–200 in tens) lives in `localStorage.jobnavigator_post_zoom`, one level for every posting. The `feed_zoom_floater` setting hides the control only — what is on screen keeps the level it had.
 
 ## Routes
 

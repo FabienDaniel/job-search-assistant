@@ -128,7 +128,7 @@ Follow steps here manually or ask AI to: [Upgrading from 2.x](CHANGELOG.md#upgra
 | **Scheduling** | Intervals and crons for scraping, email, backups, cleanup, auto-reject; every cron field explains itself and offers presets |
 | **Themes** | Paper, Green Paper, Stone, V1 Style, Windows 98 × light / dark / system |
 
-> The posting preview is an `iframe`; sites that refuse framing show blank unless the extension (which strips the frame-blocking headers) is installed. "Open" always works, and applied jobs keep a cached snapshot.
+> The posting preview is an `iframe`; sites that refuse framing show blank unless the extension (which strips the frame-blocking headers) is installed. "Open" always works, and applied jobs keep a cached snapshot. The reader view shows only the posting text (LinkedIn's own description, or the description stored at scrape time), and Settings › Display picks which sources open in it.
 
 ## Quick Start
 
