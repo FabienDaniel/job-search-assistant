@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspens
 import { Trans } from '@lingui/react/macro'
 import ConfirmDialog, { PromptDialog } from '../ConfirmDialog'
 import { useEscape, useSettled, useSingleOpen, NBSP } from '../hooks'
-import { Button, FooterRow, GlyphBadge, Heading, HeaderRow, Helper, IconButton, Input, Label, Link, Menu, MenuHead, MenuItem, ModalPanel, Mono, PageTitle, Pill, Select, Spinner, Surface, Switch, Textarea, ToolbarTrigger, VisuallyHidden } from '../ui'
+import { Button, Chip, FooterRow, GlyphBadge, Heading, HeaderRow, Helper, IconButton, Input, Label, Link, Menu, MenuHead, MenuItem, ModalPanel, Mono, PageTitle, Pill, Select, Spinner, Surface, Switch, Textarea, ToolbarTrigger, VisuallyHidden } from '../ui'
 import { useTheme, MODE_OPTIONS, themeOptions } from '../theme'
 import { t } from '@lingui/core/macro'
 import LanguageSelect from '../LanguageSelect'
@@ -19,6 +19,9 @@ import {
 } from './SettingsAccounts'
 import '../theme.css'
 import { loadDemo } from '../demoHooks'
+import { useApifyBoards } from '../apifyBoards'
+import { srcLabel } from '../sourceLabels'
+import { DEFAULT_READER_SOURCES, parseReaderSources } from '../postingView'
 
 // QA F7 / R6-06: a locked row stays in the accessibility tree (read-only, aria-disabled);
 // its controls are taken out of the tab order and marked read-only, and given back
@@ -545,6 +548,8 @@ export default function Settings() {
         // a DB setting (feed_zoom_floater, the backend's "feed" section) shown with the look rows
         SW(t`Zoom control on postings`, t`The small + / − floater top-right of a posting.`, t`Hidden — postings open at last selected zoom level.`, 'feed_zoom_floater',
           { dflt: true, info: t`Zoom is remembered per browser, not per job: set it once and every posting opens at that size. Both the live page and the cached copy are frames, so zoom scales the frame and the page reflows to the new width.` }),
+        { kind: 'readerSources', key: 'feed_reader_sources', label: t`Reader view by default`, help: t`Postings from the highlighted sources open in the reader view. The others open the live page.`,
+          info: t`The reader view shows the posting without the site around it. LinkedIn postings are read from LinkedIn's public job page. Other sources show the description saved when the job was found. The switch above a posting changes the view for that job.` },
       ]],
       ['models', t`AI`, t`Models`, '', [
         { kind: 'pair', label: t`Primary provider · model`, help: t`Every AI feature uses this pair unless overridden below.`,
@@ -1147,6 +1152,9 @@ function Row({ r, ctx }) {
         return <ApiKeyRow value={val('dashboard_api_key')} save={save} flash={flash} />
       case 'telemetry':
         return <TelemetrySettingRow />
+      // not val(): an empty list is a real choice (every source opens live), not "unset"
+      case 'readerSources':
+        return <ReaderSourcesRow value={S?.[r.key] ?? DEFAULT_READER_SOURCES} onSave={(v) => save(r.key, v)} />
       case 'readonly': {
         const set = !!val(r.key)
         if (!set) return <Helper style={{ flex: 1, minWidth: 0 }}>{r.emptyText || 'Not set'}</Helper>
@@ -1244,6 +1252,25 @@ function ActionBtn({ label, state, onClick, ariaLabel }) {
 }
 
 // v1 wrote the mask into localStorage when saved without retyping, locking you out; this only writes a key you actually entered.
+// One chip per job source the account has, plus any already chosen: on = opens in the reader view.
+function ReaderSourcesRow({ value, onSave }) {
+  const boards = useApifyBoards()
+  const [known, setKnown] = useState([])
+  useEffect(() => { api.get('/jobs/sources/list').then(({ data }) => setKnown(Array.isArray(data) ? data : [])).catch(() => { /* silent: the chosen sources still show */ }) }, [])
+  const chosen = parseReaderSources(value)
+  const sources = [...new Set([...known, ...chosen])].sort((a, b) => srcLabel(a, boards).localeCompare(srcLabel(b, boards)))
+  const toggle = (src) => {
+    const next = new Set(chosen)
+    if (next.has(src)) next.delete(src); else next.add(src)
+    onSave([...next].join(','))
+  }
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: 1, minWidth: 0 }}>
+      {sources.map((src) => <Chip key={src} on={chosen.has(src)} onClick={() => toggle(src)}>{srcLabel(src, boards)}</Chip>)}
+    </div>
+  )
+}
+
 function ApiKeyRow({ value, save, flash }) {
   const [local, setLocal] = useState('')
   const [shown, setShown] = useState(false)

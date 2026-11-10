@@ -5060,6 +5060,10 @@ msgid "Loading more…"
 msgstr "Chargement…"
 
 #: src/screens/JobFeed.jsx
+msgid "Loading reader view…"
+msgstr "Chargement de la vue lecture…"
+
+#: src/screens/JobFeed.jsx
 #: src/screens/Stats.jsx
 msgid "Loading…"
 msgstr "Chargement…"
@@ -5586,6 +5590,10 @@ msgid "no data yet"
 msgstr "pas encore de données"
 
 #: src/screens/JobFeed.jsx
+msgid "No description captured for this job"
+msgstr "Aucune description enregistrée pour cette offre"
+
+#: src/screens/JobFeed.jsx
 #: src/ui.jsx
 msgid "No fit"
 msgstr "Pas d’adéquation"
@@ -6098,6 +6106,10 @@ msgstr "Ouvrir la lettre de motivation"
 msgid "Open in feed"
 msgstr "Ouvrir dans le fil"
 
+#: src/screens/JobFeed.jsx
+msgid "Open in new tab ↗"
+msgstr "Ouvrir dans un nouvel onglet ↗"
+
 #. placeholder {0}: __DEMO__ ? t` · original may have expired` : ''
 #: src/screens/JobFeed.jsx
 msgid "Open in new tab ↗{0}"
@@ -6587,6 +6599,10 @@ msgstr "Vue de l’offre"
 msgid "Posting{0}"
 msgstr "Offre{0}"
 
+#: src/screens/Settings.jsx
+msgid "Postings from the highlighted sources open in the reader view. The others open the live page."
+msgstr "Les offres des sources mises en évidence s’ouvrent en vue lecture. Les autres ouvrent la page en ligne."
+
 #: src/screens/Companies.jsx
 msgid "Postings under these names are matched to this company."
 msgstr "Les offres publiées sous ces noms sont associées à cette entreprise."
@@ -6749,6 +6765,26 @@ msgstr "Nouvelle adaptation depuis {0} · remplace le CV adapté actuel"
 #: src/NewUiModal.jsx
 msgid "Read the release notes"
 msgstr "Lire les notes de version"
+
+#: src/screens/JobFeed.jsx
+msgid "reader"
+msgstr "lecture"
+
+#: src/screens/JobFeed.jsx
+msgid "Reader"
+msgstr "Lecture"
+
+#: src/screens/JobFeed.jsx
+msgid "Reader view"
+msgstr "Vue lecture"
+
+#: src/screens/JobFeed.jsx
+msgid "Reader view · the posting without the site around it"
+msgstr "Vue lecture · l’offre sans le site autour"
+
+#: src/screens/Settings.jsx
+msgid "Reader view by default"
+msgstr "Vue lecture par défaut"
 
 #: src/screens/Companies.jsx
 msgid "Reading the board — nothing is saved"
@@ -8830,6 +8866,10 @@ msgstr "L’URL de base publique où Telegram doit envoyer les mises à jour."
 #: src/screens/Settings.jsx
 msgid "The questions added at the end of the prep handover."
 msgstr "Les questions ajoutées à la fin du dossier d’entretien."
+
+#: src/screens/Settings.jsx
+msgid "The reader view shows the posting without the site around it. LinkedIn postings are read from LinkedIn's public job page. Other sources show the description saved when the job was found. The switch above a posting changes the view for that job."
+msgstr "La vue lecture affiche l’offre sans le site autour. Les offres LinkedIn sont lues depuis la page publique de l’offre sur LinkedIn. Les autres sources affichent la description enregistrée lors de la découverte de l’offre. Le sélecteur au-dessus d’une offre change la vue pour cette offre."
 
 #: src/hooks.js
 msgid "the run did not finish"

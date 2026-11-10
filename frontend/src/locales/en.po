@@ -5060,6 +5060,10 @@ msgid "Loading more…"
 msgstr "Loading more…"
 
 #: src/screens/JobFeed.jsx
+msgid "Loading reader view…"
+msgstr "Loading reader view…"
+
+#: src/screens/JobFeed.jsx
 #: src/screens/Stats.jsx
 msgid "Loading…"
 msgstr "Loading…"
@@ -5586,6 +5590,10 @@ msgid "no data yet"
 msgstr "no data yet"
 
 #: src/screens/JobFeed.jsx
+msgid "No description captured for this job"
+msgstr "No description captured for this job"
+
+#: src/screens/JobFeed.jsx
 #: src/ui.jsx
 msgid "No fit"
 msgstr "No fit"
@@ -6098,6 +6106,10 @@ msgstr "Open cover letter"
 msgid "Open in feed"
 msgstr "Open in feed"
 
+#: src/screens/JobFeed.jsx
+msgid "Open in new tab ↗"
+msgstr "Open in new tab ↗"
+
 #. placeholder {0}: __DEMO__ ? t` · original may have expired` : ''
 #: src/screens/JobFeed.jsx
 msgid "Open in new tab ↗{0}"
@@ -6587,6 +6599,10 @@ msgstr "Posting view"
 msgid "Posting{0}"
 msgstr "Posting{0}"
 
+#: src/screens/Settings.jsx
+msgid "Postings from the highlighted sources open in the reader view. The others open the live page."
+msgstr "Postings from the highlighted sources open in the reader view. The others open the live page."
+
 #: src/screens/Companies.jsx
 msgid "Postings under these names are matched to this company."
 msgstr "Postings under these names are matched to this company."
@@ -6749,6 +6765,26 @@ msgstr "Re-tailoring from {0} · replaces the current tailored résumé"
 #: src/NewUiModal.jsx
 msgid "Read the release notes"
 msgstr "Read the release notes"
+
+#: src/screens/JobFeed.jsx
+msgid "reader"
+msgstr "reader"
+
+#: src/screens/JobFeed.jsx
+msgid "Reader"
+msgstr "Reader"
+
+#: src/screens/JobFeed.jsx
+msgid "Reader view"
+msgstr "Reader view"
+
+#: src/screens/JobFeed.jsx
+msgid "Reader view · the posting without the site around it"
+msgstr "Reader view · the posting without the site around it"
+
+#: src/screens/Settings.jsx
+msgid "Reader view by default"
+msgstr "Reader view by default"
 
 #: src/screens/Companies.jsx
 msgid "Reading the board — nothing is saved"
@@ -8830,6 +8866,10 @@ msgstr "The public base URL Telegram should post updates to."
 #: src/screens/Settings.jsx
 msgid "The questions added at the end of the prep handover."
 msgstr "The questions added at the end of the prep handover."
+
+#: src/screens/Settings.jsx
+msgid "The reader view shows the posting without the site around it. LinkedIn postings are read from LinkedIn's public job page. Other sources show the description saved when the job was found. The switch above a posting changes the view for that job."
+msgstr "The reader view shows the posting without the site around it. LinkedIn postings are read from LinkedIn's public job page. Other sources show the description saved when the job was found. The switch above a posting changes the view for that job."
 
 #: src/hooks.js
 msgid "the run did not finish"
