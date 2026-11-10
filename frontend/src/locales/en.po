@@ -2152,10 +2152,6 @@ msgstr "cached"
 msgid "Cached"
 msgstr "Cached"
 
-#: src/screens/JobFeed.jsx
-msgid "Cached snapshot · captured when you applied"
-msgstr "Cached snapshot · captured when you applied"
-
 #: src/screens/Stats.jsx
 msgid "Calls"
 msgstr "Calls"
@@ -2174,7 +2170,7 @@ msgstr "Calls"
 msgid "Cancel"
 msgstr "Cancel"
 
-#: src/screens/JobFeed.jsx
+#: src/sourceLabels.js
 msgid "Career page"
 msgstr "Career page"
 
@@ -2440,7 +2436,7 @@ msgstr "Company"
 msgid "Company A–Z"
 msgstr "Company A–Z"
 
-#: src/screens/JobFeed.jsx
+#: src/sourceLabels.js
 msgid "Company careers"
 msgstr "Company careers"
 
@@ -3401,7 +3397,7 @@ msgid "Detected in recent runs"
 msgstr "Detected in recent runs"
 
 #: src/linkKinds.js
-#: src/screens/JobFeed.jsx
+#: src/sourceLabels.js
 msgid "Direct"
 msgstr "Direct"
 
@@ -3910,8 +3906,8 @@ msgstr "Export my data"
 msgid "Exporting…"
 msgstr "Exporting…"
 
-#: src/screens/JobFeed.jsx
 #: src/searchModes.js
+#: src/sourceLabels.js
 msgid "Extension"
 msgstr "Extension"
 
@@ -4967,8 +4963,8 @@ msgstr "Linked job not found"
 msgid "LinkedIn emailed a PIN."
 msgstr "LinkedIn emailed a PIN."
 
-#: src/screens/JobFeed.jsx
 #: src/searchModes.js
+#: src/sourceLabels.js
 msgid "LinkedIn Extension"
 msgstr "LinkedIn Extension"
 
@@ -4985,8 +4981,8 @@ msgid "LinkedIn is shared from the account owner; only the owner can refresh the
 msgstr "LinkedIn is shared from the account owner; only the owner can refresh the session"
 
 #: src/screens/Applications.jsx
-#: src/screens/JobFeed.jsx
 #: src/searchModes.js
+#: src/sourceLabels.js
 msgid "LinkedIn Personal"
 msgstr "LinkedIn Personal"
 
@@ -5009,10 +5005,6 @@ msgstr "Live"
 #: src/screens/Applications.jsx
 msgid "Live ↗"
 msgstr "Live ↗"
-
-#: src/screens/JobFeed.jsx
-msgid "Live posting"
-msgstr "Live posting"
 
 #: src/screens/Settings.jsx
 msgid "LLM classification"
@@ -5058,6 +5050,10 @@ msgstr "Loading live models…"
 #: src/screens/JobFeed.jsx
 msgid "Loading more…"
 msgstr "Loading more…"
+
+#: src/screens/JobFeed.jsx
+msgid "Loading reader view…"
+msgstr "Loading reader view…"
 
 #: src/screens/JobFeed.jsx
 #: src/screens/Stats.jsx
@@ -5586,6 +5582,10 @@ msgid "no data yet"
 msgstr "no data yet"
 
 #: src/screens/JobFeed.jsx
+msgid "No description captured for this job"
+msgstr "No description captured for this job"
+
+#: src/screens/JobFeed.jsx
 #: src/ui.jsx
 msgid "No fit"
 msgstr "No fit"
@@ -6098,6 +6098,10 @@ msgstr "Open cover letter"
 msgid "Open in feed"
 msgstr "Open in feed"
 
+#: src/screens/JobFeed.jsx
+msgid "Open in new tab ↗"
+msgstr "Open in new tab ↗"
+
 #. placeholder {0}: __DEMO__ ? t` · original may have expired` : ''
 #: src/screens/JobFeed.jsx
 msgid "Open in new tab ↗{0}"
@@ -6587,6 +6591,10 @@ msgstr "Posting view"
 msgid "Posting{0}"
 msgstr "Posting{0}"
 
+#: src/screens/Settings.jsx
+msgid "Postings from the highlighted sources open in the reader view. The others open the live page."
+msgstr "Postings from the highlighted sources open in the reader view. The others open the live page."
+
 #: src/screens/Companies.jsx
 msgid "Postings under these names are matched to this company."
 msgstr "Postings under these names are matched to this company."
@@ -6749,6 +6757,22 @@ msgstr "Re-tailoring from {0} · replaces the current tailored résumé"
 #: src/NewUiModal.jsx
 msgid "Read the release notes"
 msgstr "Read the release notes"
+
+#: src/screens/JobFeed.jsx
+msgid "reader"
+msgstr "reader"
+
+#: src/screens/JobFeed.jsx
+msgid "Reader"
+msgstr "Reader"
+
+#: src/screens/JobFeed.jsx
+msgid "Reader view"
+msgstr "Reader view"
+
+#: src/screens/Settings.jsx
+msgid "Reader view by default"
+msgstr "Reader view by default"
 
 #: src/screens/Companies.jsx
 msgid "Reading the board — nothing is saved"
@@ -8831,6 +8855,10 @@ msgstr "The public base URL Telegram should post updates to."
 msgid "The questions added at the end of the prep handover."
 msgstr "The questions added at the end of the prep handover."
 
+#: src/screens/Settings.jsx
+msgid "The reader view shows the posting without the site around it. LinkedIn postings are read from LinkedIn's public job page. Other sources show the description saved when the job was found. The switch beside a job's Open button changes the view for that job."
+msgstr "The reader view shows the posting without the site around it. LinkedIn postings are read from LinkedIn's public job page. Other sources show the description saved when the job was found. The switch beside a job's Open button changes the view for that job."
+
 #: src/hooks.js
 msgid "the run did not finish"
 msgstr "the run did not finish"
@@ -9419,8 +9447,8 @@ msgstr "Waiting longest"
 msgid "Waiting on a first response"
 msgstr "Waiting on a first response"
 
-#: src/screens/JobFeed.jsx
 #: src/screens/Searches.jsx
+#: src/sourceLabels.js
 msgid "Wana Create"
 msgstr "Wana Create"
 
@@ -9577,8 +9605,8 @@ msgstr "Work authorization"
 msgid "Work authorization type"
 msgstr "Work authorization type"
 
-#: src/screens/JobFeed.jsx
 #: src/screens/Searches.jsx
+#: src/sourceLabels.js
 msgid "Work With Indies"
 msgstr "Work With Indies"
 

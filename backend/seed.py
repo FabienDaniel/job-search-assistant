@@ -321,6 +321,11 @@ DEFAULT_SETTINGS = {
         "true",
         "Show the + / - zoom control on postings in the Jobs pane",
     ),
+    # Dashboard-only, like the zoom switch: the Jobs pane picks a posting's first view from it.
+    "feed_reader_sources": (
+        "jobspy_linkedin,linkedin_extension,linkedin_personal",
+        "Job sources whose postings open in the reader view in the Jobs pane (comma-separated). Other sources open the embedded page.",
+    ),
     "on_save_action": ("off", "Action when job is saved: off, light, or full"),
     "email_llm_enabled": (
         "false",
@@ -1285,6 +1290,7 @@ def run_migrations(db):
             "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS best_cv_score FLOAT",
             "CREATE INDEX IF NOT EXISTS ix_jobs_best_cv_score ON jobs(best_cv_score)",
             "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS cache_error TEXT",
+            "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS description_html TEXT",
             # cv_scores is declared Column(JSON), so create_all() builds it as native
             # `json` on a fresh DB and as `jsonb` on DBs predating that change. The
             # jsonb_* functions have no `json` overload, so every reference is cast

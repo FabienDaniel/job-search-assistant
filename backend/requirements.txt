@@ -18,6 +18,7 @@ numpy==2.5.4
 playwright==1.49.1
 python-docx==1.2.0  # Word resume export (MIT); uses the lxml below
 beautifulsoup4==4.12.3
+markdown==3.11.3  # renders Markdown job descriptions in the reader view
 pydantic==2.10.4
 # Transitive-dep overrides to fix CVEs flagged by pip-audit.
 # pdfplumber 0.11.4 pulled pdfminer.six 20231228 (CVE-2025-64512, 70559) — fixed by bumping pdfplumber to 0.11.9

@@ -62,7 +62,7 @@ async def missing_descriptions(jobs: list[dict], pause: float = 1.5) -> int:
         if i and pause:
             await asyncio.sleep(pause)
         try:
-            text = await _descriptions._fetch_job_description(j["url"])
+            text = await _descriptions._fetch_job_description(j["url"], job=j)
         except Exception as e:  # noqa: BLE001 - the job keeps no description
             logger.info(f"listing text: {j['url']}: {e}")
             text = None

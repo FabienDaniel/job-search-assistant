@@ -486,6 +486,9 @@ class Job(AccountScoped, Base):
     # compute one boolean. Use `has_cached_page` (SQL expression) for that instead.
     cached_page_html = deferred(Column(Text, nullable=True))
     cached_page_text = deferred(Column(Text, nullable=True))
+    # The posting's own HTML, cleaned, for the Jobs pane's reader view (scraper/_shared/reader.py).
+    # Scoring and tailoring read `description`, never this.
+    description_html = deferred(Column(Text, nullable=True))
     page_cached_at = Column(DateTime(timezone=True), nullable=True)
     cache_error = Column(Text, nullable=True)
     seen = Column(Boolean, default=False)

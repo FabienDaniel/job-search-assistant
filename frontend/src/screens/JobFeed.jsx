@@ -6,12 +6,14 @@ import api from '../api'
 import { useToasts, ToastStack } from '../Toast'
 import ConfirmDialog from '../ConfirmDialog'
 import { useEscape, useSettled, useSingleOpen, useWarm, NBSP, DASH } from '../hooks'
-import { LINK_KINDS, closedTag, linkKindParam, linkTag, openLink } from '../linkKinds'
+import { LINK_KINDS, closedTag, linkKindParam, openLink } from '../linkKinds'
 import { isShortcut, track } from '../telemetry'
-import { Button, Card, Check as UICheck, CheckGlyph, CopyGlyph, CrossGlyph, Dot, FooterRow, GlyphBadge, HeaderRow, Heading, Helper, IconButton, Input, kb, Label, Link, Menu, MenuItem, Meter, ModalPanel, NavLink, PageTitle, Pill, Row, Rule, ScoreRing, SearchInput, SectionHead, Segmented, Spinner, TableHead, TableRow, Tag, ZOOM_MAX, ZOOM_MIN, ZoomFloater } from '../ui'
+import { Button, Card, Check as UICheck, CheckGlyph, CopyGlyph, CrossGlyph, Dot, FooterRow, GlyphBadge, HeaderRow, Heading, Helper, IconButton, Input, kb, Label, Link, Menu, MenuItem, Meter, ModalPanel, NavLink, PageTitle, Pill, Row, Rule, ScoreRing, SearchInput, SectionHead, Segmented, Spinner, TableHead, TableRow, ZOOM_MAX, ZOOM_MIN, ZoomFloater } from '../ui'
 import { ANALYZE, NO_BASES_HINT, SCORE_RESUME, TAILOR, activityText, noScoreSource,feedActivity, flightDetail, flightTypes, ghostTabs, tabBusy, tabBusyHint, tailorMarkTitle } from './feedActivity'
 import { PICK_KEY, clickMods, clickSelection } from './rowSelect'
-import { useApifyBoards, apifySourceLabel } from '../apifyBoards'
+import { useApifyBoards } from '../apifyBoards'
+import { srcLabel } from '../sourceLabels'
+import { DEFAULT_READER_SOURCES, defaultPostingView, parseReaderSources } from '../postingView'
 
 const FILTERS_KEY = 'v2_feed_filters'
 const SORT_KEY = 'v2_feed_sort'
@@ -94,13 +96,6 @@ const RAIL_BTN = {
   // --ctl-line, not the v2-ctl 1: at 1 the line box is the em and Plex's ink rides high in a centred box (see Select)
   display: 'flex', alignItems: 'center', fontSize: 11.5, lineHeight: 'var(--ctl-line)', color: 'var(--rail-ink)', cursor: 'pointer',
 }
-const SOURCE_LABELS = {
-  direct: t`Direct`, extension: t`Extension`, jobspy_linkedin: 'LinkedIn', jobspy_indeed: 'Indeed',
-  jobspy_zip_recruiter: 'ZipRecruiter', jobspy_google: 'Google', levels_fyi: 'Levels', linkedin_personal: t`LinkedIn Personal`,
-  linkedin_extension: t`LinkedIn Extension`, jobright: 'Jobright', freehire: 'FreeHire', caribbeanjobs: 'CaribbeanJobs', trulyremote: 'TrulyRemoteWork', behance: 'Behance', hollylist: 'Hollylist', wanacreate: t`Wana Create`, himalayas: 'Himalayas', eluta: 'Eluta', dribbble: 'Dribbble', artstation: 'ArtStation', workwithindies: t`Work With Indies`, playwright_url: t`Company careers`, playwright_direct: t`Career page`,
-}
-// `boards` (useApifyBoards) names the `apify_<board>` sources.
-const srcLabel = (s, boards = []) => SOURCE_LABELS[s] || apifySourceLabel(boards, s) || s || ''
 // `duplicate`: a copy of a posting the feed already has (posting_links.py); the posting lists it under "Also on".
 const STATUS_OPTS = [['new', t`New`], ['saved', t`Saved`], ['applied', t`Applied`], ['skip', t`Skip`], ['ignored', t`Ignored`]]
 const SORT_OPTS = [['score', t`Top score`], ['date', t`Newest first`], ['salary', t`Salary, high to low`], ['company', t`Company A–Z`]]
@@ -220,8 +215,18 @@ export default function V2JobFeed() {
   const [keywordOpen, setKeywordOpen] = useState(() => loadUI().keywordOpen ?? true)
   const [reqOpen, setReqOpen] = useState(() => loadUI().reqOpen ?? true)
   useEffect(() => { try { localStorage.setItem(UI_KEY, JSON.stringify({ headOpen, reportOpen, breakdownOpen, keywordOpen, reqOpen, reqFilter, showMatched })) } catch {} }, [headOpen, reportOpen, breakdownOpen, keywordOpen, reqOpen, reqFilter, showMatched])
-  const [viewCached, setViewCached] = useState(__DEMO__)
+  // The posting's view: the app's reader, the live page, or the snapshot cached on apply.
+  // A job opens in `feed_reader_sources`' choice for its source; the pane's switch overrides it per job.
+  const [postView, setPostView] = useState(__DEMO__ ? 'cached' : 'live')
+  const viewCached = postView === 'cached'
+  const setViewCached = (on) => setPostView(on ? 'cached' : 'live')
+  const readerSourcesRef = useRef(parseReaderSources(DEFAULT_READER_SOURCES))
+  const firstView = useCallback((j) => (__DEMO__ ? 'cached' : defaultPostingView(j, readerSourcesRef.current)), [])
   const [cachedHtml, setCachedHtml] = useState(null)
+  // {id, html} once the reader body for job `id` arrives; html is null when the job has no text to show
+  const [readerDoc, setReaderDoc] = useState(null)
+  const readerCache = useRef(new Map())
+  const readerInFlight = useRef(new Set())   // job ids whose reader request has not settled
   // Posting zoom. `postZoom` is what the frames render at whether or not the
   // floater is shown — turning the control off hides the affordance, it does not
   // resize what is already on screen; `feed_zoom_floater` only gates the pill.
@@ -484,9 +489,9 @@ export default function V2JobFeed() {
     pinnedRef.current = null                 // picking from the list releases a ?job= pin
     deadPinRef.current = false
     setSel(idx); lastIdx.current = idx
-    setDetail(j); setReportTab(0); setViewCached(__DEMO__); setCachedHtml(null); setFrameOk(frameGuess(openLink(j))); setFrameDeadId(null)
+    setDetail(j); setReportTab(0); setPostView(firstView(j)); setCachedHtml(null); setFrameOk(frameGuess(openLink(j))); setFrameDeadId(null)
     api.get(`/jobs/${j.id}`).then(({ data }) => setDetail((c) => (c && c.id === data.id ? data : c))).catch(() => { /* silent: a background refresh of an already-rendered panel — the row data stays */ })
-  }, [frameGuess])
+  }, [frameGuess, firstView])
   const focusAt = useCallback((idx) => {
     const list = jobsRef.current
     if (idx < 0 || idx >= list.length) return
@@ -806,6 +811,32 @@ export default function V2JobFeed() {
   }, [focusAt])
   useEffect(() => { const el = listRef.current?.querySelector(`[data-row="${sel}"]`); if (el) el.scrollIntoView({ block: 'nearest' }) }, [sel])
 
+  // Reader body fetch. Kept per job for the page's life, so flipping between Reader and Live
+  // does not refetch LinkedIn each time.
+  // Keyed on ids: the full job record replacing the list row must not start a second request.
+  const readerJobId = detail?.id
+  const readerDocId = readerDoc?.id
+  useEffect(() => {
+    if (!readerJobId || postView !== 'reader') return
+    const id = readerJobId
+    if (readerDocId === id) return
+    if (readerCache.current.has(id)) { setReaderDoc({ id, html: readerCache.current.get(id) }); return }
+    if (readerInFlight.current.has(id)) return
+    readerInFlight.current.add(id)
+    setReaderDoc(null)
+    api.get(`/jobs/${id}/reader`, { responseType: 'text', transformResponse: (r) => r })
+      .then(({ data }) => typeof data === 'string' && data.trim() ? data : null)
+      .catch(() => null)
+      .then((html) => {
+        readerInFlight.current.delete(id)
+        if (html) {
+          if (readerCache.current.size >= 50) readerCache.current.delete(readerCache.current.keys().next().value)
+          readerCache.current.set(id, html)
+        }
+        if (detailRef.current?.id === id) setReaderDoc({ id, html })
+      })
+  }, [readerJobId, postView, readerDocId])
+
   // cached page fetch when toggled on
   useEffect(() => {
     if (!detail || !viewCached || cachedHtml) return
@@ -821,7 +852,7 @@ export default function V2JobFeed() {
   // Extension off: probe whether the posting will embed (X-Frame-Options / CSP frame-ancestors).
   // Always try the live iframe first — only a confident block routes to the extension message; the probe runs once per host and is cached.
   useEffect(() => {
-    if (!detail || !openLink(detail) || viewCached || extActive) return
+    if (!detail || !openLink(detail) || postView !== 'live' || extActive) return
     const host = hostOf(openLink(detail))
     if (!host || frameCache.current[host] !== undefined) return
     const id = detail.id
@@ -834,13 +865,13 @@ export default function V2JobFeed() {
       try { localStorage.setItem(FRAME_KEY, JSON.stringify(next)) } catch {}
       if (detailRef.current?.id === id) setFrameOk(ok)
     }).catch(() => { /* unknown — leave the optimistic frame up */ })
-  }, [detail, viewCached, extActive])
+  }, [detail, postView, extActive])
 
   // The src the live posting frame gets. Any route away from it (cached snapshot, confirmed block,
   // a load that never arrived) makes it null, and the pane renders the cached or fallback branch.
   const cachedAvail = __DEMO__ ? !!detail : !!(detail && detail.status === 'applied' && detail.has_cached_page)
   const frameJobId = detail?.id || null
-  const frameSrc = (openLink(detail) && !(viewCached && cachedAvail) && (extActive || frameOk !== false) && frameDeadId !== detail.id) ? openLink(detail) : null
+  const frameSrc = (openLink(detail) && postView === 'live' && (extActive || frameOk !== false) && frameDeadId !== detail.id) ? openLink(detail) : null
   // Cover goes up when a frame mounts/src changes, down on load/error or the safety timeout (closed-over id
   // guards a stale timer). Layout effect so the cover paints with the frame's first frame, not one paint late.
   useLayoutEffect(() => {
@@ -881,6 +912,12 @@ export default function V2JobFeed() {
     api.get('/settings').then(({ data }) => {
       setDefaultDepth(data?.scoring_default_depth === 'full' ? 'full' : 'light')
       setZoomFloater(!(data?.feed_zoom_floater === false || data?.feed_zoom_floater === 'false'))
+      if (data && 'feed_reader_sources' in data) {
+        readerSourcesRef.current = parseReaderSources(data.feed_reader_sources)
+        // a job opened before the settings arrived (a ?job= link) takes the account's choice
+        const d = detailRef.current
+        if (d) setPostView((v) => (v === 'cached' ? v : firstView(d)))
+      }
       const every = Number(data?.scrape_interval_minutes)
       setScrapeEvery(Number.isFinite(every) ? every : null)
     }).catch(() => { /* silent: the light default already applies */ })
@@ -911,7 +948,7 @@ export default function V2JobFeed() {
     pinnedRef.current = jid
     api.get(`/jobs/${jid}`).then(({ data }) => {
       if (pinnedRef.current !== jid) return
-      setDetail(data); setReportTab(0); setViewCached(__DEMO__); setCachedHtml(null); setFrameOk(frameGuess(openLink(data))); setFrameDeadId(null)
+      setDetail(data); setReportTab(0); setPostView(firstView(data)); setCachedHtml(null); setFrameOk(frameGuess(openLink(data))); setFrameDeadId(null)
     }).catch(() => {
       if (pinnedRef.current !== jid) return
       pinnedRef.current = null; deadPinRef.current = true   // don't fall through to an unrelated job
@@ -1492,7 +1529,12 @@ export default function V2JobFeed() {
                         the collapsing detail header (36/30) like the ✦ button beside it. */}
                     {/* the employer's own posting when there is one (linkKinds.js openLink), else the job's link */}
                     {closedTag(d) && <span title={closedTag(d).title} onClick={() => setRecheck((n) => n + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--dot-bad)', cursor: 'pointer' }}><Dot tone="bad" />{closedTag(d).text}</span>}
-                    {linkTag(d) && <Tag title={linkTag(d).title}>{linkTag(d).text}</Tag>}
+                    {(openLink(d) || dCached) && !__DEMO__ && (
+                      <Segmented variant="inset" ariaLabel={t`Posting view`} value={postView} onChange={setPostView}
+                        options={[{ value: 'reader', label: t`Reader` },
+                          ...(openLink(d) ? [{ value: 'live', label: t`Live` }] : []),
+                          ...(dCached ? [{ value: 'cached', label: t`Cached` }] : [])]} />
+                    )}
                     {openLink(d) && <Button variant="secondary" size="sm" href={openLink(d)} target="_blank" title={openLink(d)} onClick={() => opened(d)} style={{ height: headOpen ? 36 : 30 }}><Trans>Open ↗</Trans></Button>}
                     {/* Routed through Button (not hand-drawn) so it reads --btn-shadow/--btn-weight/--btn-primary-bg/-ink
                         and the hover/pressed rules; the style override only restores height/padding/line-height, which track the collapsing header. */}
@@ -1753,17 +1795,31 @@ export default function V2JobFeed() {
               {/* posting area — always mounted (display toggled, not unmounted) so the
                   iframe isn't reloaded each time the report is opened/closed */}
               <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: reportCovers ? 'none' : 'flex', flexDirection: 'column' }} className="v2-scroll">
-                  {/* live / cached posting — full-bleed iframe */}
+                  {/* reader / live / cached posting — full-bleed iframe */}
                   <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                    {dCached && !__DEMO__ && (
-                      <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 30px', borderBottom: '1px solid var(--line)', background: 'var(--surface-2)' }}>
-                        <span style={{ fontSize: 12, color: viewCached ? 'var(--accent)' : 'var(--muted)' }}>{viewCached ? t`Cached snapshot · captured when you applied` : t`Live posting`}</span>
-                        <Segmented variant="inset" ariaLabel={t`Posting view`} value={viewCached ? 'cached' : 'live'}
-                          onChange={(v) => setViewCached(v === 'cached')} style={{ marginLeft: 'auto' }}
-                          options={[{ value: 'live', label: t`Live` }, { value: 'cached', label: t`Cached` }]} />
-                      </div>
-                    )}
-                    {viewCached && dCached ? (
+                    {postView === 'reader' ? (
+                      readerDoc?.id !== d.id ? (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                          <Spinner size={12} />
+                          <Helper>{t`Loading reader view…`}</Helper>
+                        </div>
+                      ) : readerDoc.html ? (
+                        /* same sandbox and zoom wrapper as the cached snapshot below: cleaned
+                           third-party HTML that needs no script and must never reach this origin */
+                        <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+                          <iframe title={t`reader`} srcDoc={readerDoc.html} sandbox="allow-popups" referrerPolicy="no-referrer" style={{ position: 'absolute', top: 0, left: 0, border: 'none', background: 'var(--iframe-bg)', ...zoomStyle }} />
+                          {zoomFloater && (
+                            <ZoomFloater zoom={postZoom} onIn={() => zoomTo(postZoom + 10)} onOut={() => zoomTo(postZoom - 10)}
+                              onReset={() => zoomTo(100)} style={{ position: 'absolute', right: 30, top: 14, zIndex: 6 }} />
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 11, padding: '44px 30px', textAlign: 'center' }}>
+                          <Heading><Trans>No description captured for this job</Trans></Heading>
+                          {openLink(d) && <Button size="sm" href={openLink(d)} target="_blank" style={{ height: 34 }}><Trans>Open in new tab ↗</Trans></Button>}
+                        </div>
+                      )
+                    ) : viewCached && dCached ? (
                       /* stored third-party HTML: no allow-same-origin (a script in here must never
                          reach this origin's storage or API) and no allow-scripts — a cleaned
                          snapshot needs neither. srcdoc carries no response CSP, so the sandbox
@@ -1818,6 +1874,7 @@ export default function V2JobFeed() {
                             <Button size="sm" href={openLink(d)} target="_blank" style={{ height: 34 }}><Trans>Open in new tab ↗{__DEMO__ ? t` · original may have expired` : ''}</Trans></Button>
                             {/* ui: keep — h34 to match the native anchor it sits beside (which stays inline) */}
                             {dCached && <Button variant="secondary" size="sm" hover="v2-act" onClick={() => setViewCached(true)} style={{ height: 34 }}><Trans>View cached snapshot</Trans></Button>}
+                            <Button variant="secondary" size="sm" hover="v2-act" onClick={() => setPostView('reader')} style={{ height: 34 }}><Trans>Reader view</Trans></Button>
                           </div>
                         </div>
                       </div>

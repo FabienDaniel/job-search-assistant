@@ -84,7 +84,14 @@ def _llm_keys() -> list:
 # (id, label, scope, default mode, Settings-screen sections it appears in, keys)
 _SECTIONS = [
     # shown under Display on the Settings screen, with the browser-only look rows
-    ("feed", "Feed", POLICY, OWN, ["appearance"], ["feed_zoom_floater"]),
+    (
+        "feed",
+        "Feed",
+        POLICY,
+        OWN,
+        ["appearance"],
+        ["feed_zoom_floater", "feed_reader_sources"],
+    ),
     # claude_code_oauth_token: the Claude Code subscription login per account (MT-15).
     (
         "models",
