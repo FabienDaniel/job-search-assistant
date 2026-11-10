@@ -124,3 +124,29 @@ def test_unknown_job_is_404(client):
     assert_clean(
         client.get("/api/jobs/00000000-0000-0000-0000-000000000000/reader"), 404
     )
+
+
+def test_stored_html_is_served_without_a_fetch(client, test_db, guest):
+    job = _linkedin_job(test_db, description_html="<p>kept from the scrape</p>")
+    r = assert_clean(client.get(f"/api/jobs/{job.id}/reader"), 200)
+    assert "<p>kept from the scrape</p>" in r.text
+    assert guest.urls == []
+
+
+def test_a_fetched_posting_is_saved_and_not_fetched_again(client, test_db, guest):
+    job = _linkedin_job(test_db)
+    first = assert_clean(client.get(f"/api/jobs/{job.id}/reader"), 200)
+    test_db.refresh(job)
+    assert "<li> un Chef de Projet Data ; </li>" in job.description_html
+    second = assert_clean(client.get(f"/api/jobs/{job.id}/reader"), 200)
+    assert len(guest.urls) == 1
+    assert second.text == first.text
+
+
+def test_a_rate_limited_fetch_saves_nothing(client, test_db, guest):
+    guest.resp = _Resp("", status_code=429)
+    job = _linkedin_job(test_db, description="stored text")
+    r = assert_clean(client.get(f"/api/jobs/{job.id}/reader"), 200)
+    assert "stored text" in r.text
+    test_db.refresh(job)
+    assert job.description_html is None

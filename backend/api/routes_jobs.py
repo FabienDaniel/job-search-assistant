@@ -1542,13 +1542,18 @@ async def get_reader(job_id: str, db: Session = Depends(get_db)):
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    body = job.description_html
     key = job.posting_key or ""
-    if key.startswith("linkedin:"):
+    if not body and key.startswith("linkedin:"):
+        # LinkedIn rate-limits its guest endpoint: fetch a posting once and keep it.
         body = await linkedin_posting(key.split(":", 1)[1])
         if body:
-            return HTMLResponse(
-                content=_reader_html(body, "LinkedIn posting"), headers=_READER_CSP
-            )
+            job.description_html = body
+            db.commit()
+    if body:
+        return HTMLResponse(
+            content=_reader_html(body, "LinkedIn posting"), headers=_READER_CSP
+        )
     body = description_html(job.description)
     if not body:
         raise HTTPException(status_code=404, detail="No description captured")
