@@ -321,6 +321,11 @@ DEFAULT_SETTINGS = {
         "true",
         "Show the + / - zoom control on postings in the Jobs pane",
     ),
+    # Dashboard-only, like the zoom switch: the Jobs pane picks a posting's first view from it.
+    "feed_reader_sources": (
+        "jobspy_linkedin,linkedin_extension,linkedin_personal",
+        "Job sources whose postings open in the reader view in the Jobs pane (comma-separated). Other sources open the embedded page.",
+    ),
     "on_save_action": ("off", "Action when job is saved: off, light, or full"),
     "email_llm_enabled": (
         "false",
