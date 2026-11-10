@@ -2152,10 +2152,6 @@ msgstr "en cache"
 msgid "Cached"
 msgstr "En cache"
 
-#: src/screens/JobFeed.jsx
-msgid "Cached snapshot · captured when you applied"
-msgstr "Instantané en cache · capturé lors de votre candidature"
-
 #: src/screens/Stats.jsx
 msgid "Calls"
 msgstr "Appels"
@@ -5010,10 +5006,6 @@ msgstr "En ligne"
 msgid "Live ↗"
 msgstr "En ligne ↗"
 
-#: src/screens/JobFeed.jsx
-msgid "Live posting"
-msgstr "Offre en ligne"
-
 #: src/screens/Settings.jsx
 msgid "LLM classification"
 msgstr "Classification LLM"
@@ -6777,10 +6769,6 @@ msgstr "Lecture"
 #: src/screens/JobFeed.jsx
 msgid "Reader view"
 msgstr "Vue lecture"
-
-#: src/screens/JobFeed.jsx
-msgid "Reader view · the posting without the site around it"
-msgstr "Vue lecture · l’offre sans le site autour"
 
 #: src/screens/Settings.jsx
 msgid "Reader view by default"
@@ -8868,8 +8856,8 @@ msgid "The questions added at the end of the prep handover."
 msgstr "Les questions ajoutées à la fin du dossier d’entretien."
 
 #: src/screens/Settings.jsx
-msgid "The reader view shows the posting without the site around it. LinkedIn postings are read from LinkedIn's public job page. Other sources show the description saved when the job was found. The switch above a posting changes the view for that job."
-msgstr "La vue lecture affiche l’offre sans le site autour. Les offres LinkedIn sont lues depuis la page publique de l’offre sur LinkedIn. Les autres sources affichent la description enregistrée lors de la découverte de l’offre. Le sélecteur au-dessus d’une offre change la vue pour cette offre."
+msgid "The reader view shows the posting without the site around it. LinkedIn postings are read from LinkedIn's public job page. Other sources show the description saved when the job was found. The switch beside a job's Open button changes the view for that job."
+msgstr "La vue lecture affiche l’offre sans le site autour. Les offres LinkedIn sont lues depuis la page publique de l’offre sur LinkedIn. Les autres sources affichent la description enregistrée lors de la découverte de l’offre. Le sélecteur à côté du bouton Ouvrir d’une offre change la vue pour cette offre."
 
 #: src/hooks.js
 msgid "the run did not finish"

@@ -6,9 +6,9 @@ import api from '../api'
 import { useToasts, ToastStack } from '../Toast'
 import ConfirmDialog from '../ConfirmDialog'
 import { useEscape, useSettled, useSingleOpen, useWarm, NBSP, DASH } from '../hooks'
-import { LINK_KINDS, closedTag, linkKindParam, linkTag, openLink } from '../linkKinds'
+import { LINK_KINDS, closedTag, linkKindParam, openLink } from '../linkKinds'
 import { isShortcut, track } from '../telemetry'
-import { Button, Card, Check as UICheck, CheckGlyph, CopyGlyph, CrossGlyph, Dot, FooterRow, GlyphBadge, HeaderRow, Heading, Helper, IconButton, Input, kb, Label, Link, Menu, MenuItem, Meter, ModalPanel, NavLink, PageTitle, Pill, Row, Rule, ScoreRing, SearchInput, SectionHead, Segmented, Spinner, TableHead, TableRow, Tag, ZOOM_MAX, ZOOM_MIN, ZoomFloater } from '../ui'
+import { Button, Card, Check as UICheck, CheckGlyph, CopyGlyph, CrossGlyph, Dot, FooterRow, GlyphBadge, HeaderRow, Heading, Helper, IconButton, Input, kb, Label, Link, Menu, MenuItem, Meter, ModalPanel, NavLink, PageTitle, Pill, Row, Rule, ScoreRing, SearchInput, SectionHead, Segmented, Spinner, TableHead, TableRow, ZOOM_MAX, ZOOM_MIN, ZoomFloater } from '../ui'
 import { ANALYZE, NO_BASES_HINT, SCORE_RESUME, TAILOR, activityText, noScoreSource,feedActivity, flightDetail, flightTypes, ghostTabs, tabBusy, tabBusyHint, tailorMarkTitle } from './feedActivity'
 import { PICK_KEY, clickMods, clickSelection } from './rowSelect'
 import { useApifyBoards } from '../apifyBoards'
@@ -1529,7 +1529,12 @@ export default function V2JobFeed() {
                         the collapsing detail header (36/30) like the ✦ button beside it. */}
                     {/* the employer's own posting when there is one (linkKinds.js openLink), else the job's link */}
                     {closedTag(d) && <span title={closedTag(d).title} onClick={() => setRecheck((n) => n + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--dot-bad)', cursor: 'pointer' }}><Dot tone="bad" />{closedTag(d).text}</span>}
-                    {linkTag(d) && <Tag title={linkTag(d).title}>{linkTag(d).text}</Tag>}
+                    {(openLink(d) || dCached) && !__DEMO__ && (
+                      <Segmented variant="inset" ariaLabel={t`Posting view`} value={postView} onChange={setPostView}
+                        options={[{ value: 'reader', label: t`Reader` },
+                          ...(openLink(d) ? [{ value: 'live', label: t`Live` }] : []),
+                          ...(dCached ? [{ value: 'cached', label: t`Cached` }] : [])]} />
+                    )}
                     {openLink(d) && <Button variant="secondary" size="sm" href={openLink(d)} target="_blank" title={openLink(d)} onClick={() => opened(d)} style={{ height: headOpen ? 36 : 30 }}><Trans>Open ↗</Trans></Button>}
                     {/* Routed through Button (not hand-drawn) so it reads --btn-shadow/--btn-weight/--btn-primary-bg/-ink
                         and the hover/pressed rules; the style override only restores height/padding/line-height, which track the collapsing header. */}
@@ -1792,16 +1797,6 @@ export default function V2JobFeed() {
               <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: reportCovers ? 'none' : 'flex', flexDirection: 'column' }} className="v2-scroll">
                   {/* reader / live / cached posting — full-bleed iframe */}
                   <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                    {(openLink(d) || dCached) && !__DEMO__ && (
-                      <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 30px', borderBottom: '1px solid var(--line)', background: 'var(--surface-2)' }}>
-                        <span style={{ fontSize: 12, color: postView === 'live' ? 'var(--muted)' : 'var(--accent)' }}>{postView === 'cached' ? t`Cached snapshot · captured when you applied` : postView === 'reader' ? t`Reader view · the posting without the site around it` : t`Live posting`}</span>
-                        <Segmented variant="inset" ariaLabel={t`Posting view`} value={postView}
-                          onChange={setPostView} style={{ marginLeft: 'auto' }}
-                          options={[{ value: 'reader', label: t`Reader` },
-                            ...(openLink(d) ? [{ value: 'live', label: t`Live` }] : []),
-                            ...(dCached ? [{ value: 'cached', label: t`Cached` }] : [])]} />
-                      </div>
-                    )}
                     {postView === 'reader' ? (
                       readerDoc?.id !== d.id ? (
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>

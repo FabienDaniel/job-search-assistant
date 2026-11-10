@@ -549,7 +549,7 @@ export default function Settings() {
         SW(t`Zoom control on postings`, t`The small + / − floater top-right of a posting.`, t`Hidden — postings open at last selected zoom level.`, 'feed_zoom_floater',
           { dflt: true, info: t`Zoom is remembered per browser, not per job: set it once and every posting opens at that size. Both the live page and the cached copy are frames, so zoom scales the frame and the page reflows to the new width.` }),
         { kind: 'readerSources', key: 'feed_reader_sources', label: t`Reader view by default`, help: t`Postings from the highlighted sources open in the reader view. The others open the live page.`,
-          info: t`The reader view shows the posting without the site around it. LinkedIn postings are read from LinkedIn's public job page. Other sources show the description saved when the job was found. The switch above a posting changes the view for that job.` },
+          info: t`The reader view shows the posting without the site around it. LinkedIn postings are read from LinkedIn's public job page. Other sources show the description saved when the job was found. The switch beside a job's Open button changes the view for that job.` },
       ]],
       ['models', t`AI`, t`Models`, '', [
         { kind: 'pair', label: t`Primary provider · model`, help: t`Every AI feature uses this pair unless overridden below.`,
