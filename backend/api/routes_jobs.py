@@ -1534,6 +1534,30 @@ def get_cached_page(job_id: str, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/{job_id}/reader")
+async def get_reader(job_id: str, db: Session = Depends(get_db)):
+    """The posting's reader view: LinkedIn's own description for a LinkedIn posting, else the stored description."""
+    from backend.scraper._shared.reader import description_html, linkedin_posting
+
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    key = job.posting_key or ""
+    if key.startswith("linkedin:"):
+        body = await linkedin_posting(key.split(":", 1)[1])
+        if body:
+            return HTMLResponse(
+                content=_reader_html(body, "LinkedIn posting"), headers=_READER_CSP
+            )
+    body = description_html(job.description)
+    if not body:
+        raise HTTPException(status_code=404, detail="No description captured")
+    return HTMLResponse(
+        content=_reader_html(body, "Description saved when the job was found"),
+        headers=_READER_CSP,
+    )
+
+
 @router.post("/{job_id}/open-check")
 async def open_check(job_id: str, force: bool = False, db: Session = Depends(get_db)):
     """Is the posting still open (scraper/_shared/still_open.py)? Answered from the last check
