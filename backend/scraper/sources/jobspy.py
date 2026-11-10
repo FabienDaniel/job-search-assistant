@@ -289,9 +289,13 @@ def _fill_linkedin_descriptions(jobs_df, existing_ids, loop) -> int:
     if "description" not in jobs_df.columns:
         jobs_df["description"] = None
     jobs_df["description"] = jobs_df["description"].astype(object)
+    jobs_df["description_html"] = None
+    jobs_df["description_html"] = jobs_df["description_html"].astype(object)
     for t in todo:
         if t["description"]:
             jobs_df.at[t["idx"], "description"] = t["description"]
+        if t.get("description_html"):
+            jobs_df.at[t["idx"], "description_html"] = t["description_html"]
     return filled
 
 
@@ -595,6 +599,7 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
                     source=source,
                     search_id=search.id,
                     description=_clean(row.get("description")),
+                    description_html=_clean(row.get("description_html")),
                     location=_clean(row.get("location")),
                     # Set below from the board's own remote tag where it has one
                     # (_structured_arrangement), else from the JD cascade.
@@ -705,6 +710,7 @@ def _run_sync(search, proxy_url: str = None, shared=None) -> dict:
                         source=source,
                         search_id=search.id,
                         description=_clean(row.get("description")),
+                        description_html=_clean(row.get("description_html")),
                         location=_clean(row.get("location")),
                         status="ignored",
                         seen=False,

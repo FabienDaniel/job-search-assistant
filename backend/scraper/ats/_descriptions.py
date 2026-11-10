@@ -130,6 +130,11 @@ async def _fetch_job_description(url: str, job: dict = None) -> str | None:
         # posting, which pushes the requirements past the prompt's JD cap; only
         # the description block is the JD.
         if _host_matches(url, "linkedin.com"):
+            if job is not None:
+                # Lazy: reader imports this module's selector.
+                from backend.scraper._shared.reader import linkedin_html
+
+                job["description_html"] = linkedin_html(resp.text)
             soup = soup.select_one(_LINKEDIN_DESCRIPTION_SELECTOR)
             if soup is None:
                 logger.info(f"No description block on LinkedIn page {url}")
