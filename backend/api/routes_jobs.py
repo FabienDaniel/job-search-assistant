@@ -1485,27 +1485,32 @@ def cache_applied_jobs(
 
 def _reader_html(body_html: str, meta: str) -> str:
     """Wrap cleaned posting HTML in the shared reader shell (used by the cached-page and live-page endpoints)."""
+    from backend.scraper._shared.reader import tighten_breaks
+
+    body_html = tighten_breaks(body_html)
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-         max-width: 800px; margin: 0 auto; padding: 24px 32px; line-height: 1.7; color: #1a1a1a;
-         font-size: 15px; }}
-  h1 {{ font-size: 1.5em; margin-top: 1.5em; margin-bottom: 0.5em; color: #111; }}
-  h2 {{ font-size: 1.3em; margin-top: 1.4em; margin-bottom: 0.4em; color: #222; }}
-  h3, h4, h5, h6 {{ font-size: 1.1em; margin-top: 1.2em; margin-bottom: 0.3em; color: #333; }}
-  p {{ margin: 0.6em 0; }}
-  ul, ol {{ padding-left: 1.5em; margin: 0.5em 0; }}
-  li {{ margin-bottom: 0.4em; }}
+         max-width: 800px; margin: 0 auto; padding: 14px 24px 24px; line-height: 1.5; color: #1a1a1a;
+         font-size: 14px; }}
+  h1 {{ font-size: 1.4em; margin: 1em 0 0.4em; color: #111; }}
+  h2 {{ font-size: 1.25em; margin: 1em 0 0.3em; color: #222; }}
+  h3, h4, h5, h6 {{ font-size: 1.1em; margin: 0.9em 0 0.2em; color: #333; }}
+  p {{ margin: 0.5em 0; }}
+  ul, ol {{ padding-left: 1.4em; margin: 0.3em 0 0.5em; }}
+  li {{ margin-bottom: 0.15em; }}
   a {{ color: #2563eb; text-decoration: none; }}
   a:hover {{ text-decoration: underline; }}
-  table {{ border-collapse: collapse; width: 100%; margin: 1em 0; }}
-  td, th {{ border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 0.8em 0; }}
+  td, th {{ border: 1px solid #e5e7eb; padding: 6px 10px; text-align: left; }}
   th {{ background: #f9fafb; font-weight: 600; }}
-  blockquote {{ border-left: 3px solid #d1d5db; padding-left: 1em; color: #4b5563; margin: 1em 0; }}
+  blockquote {{ border-left: 3px solid #d1d5db; padding-left: 1em; color: #4b5563; margin: 0.8em 0; }}
   pre, code {{ background: #f3f4f6; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }}
-  hr {{ border: none; border-top: 1px solid #e5e7eb; margin: 1.5em 0; }}
-  .cache-meta {{ color: #9ca3af; font-size: 12px; border-bottom: 1px solid #f3f4f6; padding-bottom: 12px; margin-bottom: 16px; }}
+  hr {{ border: none; border-top: 1px solid #e5e7eb; margin: 0.8em 0; }}
+  /* Floated so the posting's first line (LinkedIn's criteria) runs beside it. */
+  .cache-meta {{ float: right; margin: 0.15em 0 0.4em 1.5em; color: #9ca3af; font-size: 12px; }}
+  .cache-meta + * {{ margin-top: 0; }}
 </style></head><body>
 <div class="cache-meta">{meta}</div>
 {body_html}
