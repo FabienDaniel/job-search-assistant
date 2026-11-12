@@ -52,7 +52,7 @@ const srcLabel = (v, boards = []) => apifySourceLabel(boards, v, ' via Apify') |
   direct: t`a company scrape`, manual: t`the Log application form`, jobright: 'Jobright.ai', levels_fyi: 'Levels.fyi',
   linkedin_personal: t`LinkedIn Personal`, linkedin_extension: t`the LinkedIn extension`,
   extension: t`the extension`, freehire: 'freehire.me', caribbeanjobs: 'caribbeanjobs.com', trulyremote: 'trulyremotework.com',
-  behance: 'Behance', hollylist: 'hollylist.com', wanacreate: 'wanacreate.art', himalayas: 'himalayas.app', eluta: 'eluta.ca', dribbble: 'Dribbble', artstation: 'ArtStation', workwithindies: 'workwithindies.com',
+  behance: 'Behance', hollylist: 'hollylist.com', wanacreate: 'wanacreate.art', himalayas: 'himalayas.app', eluta: 'eluta.ca', freework: 'free-work.com', dribbble: 'Dribbble', artstation: 'ArtStation', workwithindies: 'workwithindies.com',
 }[v] || (v ? v.replace(/^jobspy_/, '').replace(/_/g, ' ') : t`the Job Feed`))
 
 // Dots read the shared --stage-* tokens (theme.css), not generic --warn/--good/--bad,

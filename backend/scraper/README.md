@@ -74,6 +74,7 @@ Details that matter:
 | `creative` | `creative` | no | six boards through `_shared/job_boards.py` | term and a board |
 | `himalayas` | `himalayas` | no | JSON API through `_shared/job_boards.py` | term |
 | `eluta` | `eluta` | no | RSS plus job pages through `_shared/job_boards.py`, heavily rate limited | term |
+| `freework` | `freework` | no | free-work.com JSON API through `_shared/job_boards.py`, French locale only | term |
 | `linkedin_extension`, `extension` | none | | jobs arrive by push from the Chrome extension | |
 
 The `SearchMode` flags are documented on the dataclass. `config_error(search)` gives the human reason a search cannot run.

@@ -2548,6 +2548,10 @@ msgstr "Contains unreviewed tailoring changes"
 msgid "Contract"
 msgstr "Contract"
 
+#: src/screens/Searches.jsx
+msgid "Contract = freelance missions. Full-time = CDI and CDD. Part-time = both."
+msgstr "Contract = freelance missions. Full-time = CDI and CDD. Part-time = both."
+
 #: src/ConfirmDialog.jsx
 #: src/screens/Applications.jsx
 msgid "Copied ✓"
@@ -3558,6 +3562,14 @@ msgstr "e.g. golang backend"
 #: src/screens/Searches.jsx
 msgid "e.g. illustrator"
 msgstr "e.g. illustrator"
+
+#: src/screens/Searches.jsx
+msgid "e.g. Paris"
+msgstr "e.g. Paris"
+
+#: src/screens/Searches.jsx
+msgid "e.g. python"
+msgstr "e.g. python"
 
 #: src/screens/Searches.jsx
 msgid "e.g. software engineer, developer"
@@ -6006,6 +6018,10 @@ msgstr "On-site only"
 msgid "One city name. Behance ignores it."
 msgstr "One city name. Behance ignores it."
 
+#: src/screens/Searches.jsx
+msgid "One city name. Empty = all of France. Remote jobs stay."
+msgstr "One city name. Empty = all of France. Remote jobs stay."
+
 #: src/screens/Settings.jsx
 msgid "one company per line · exact match"
 msgstr "one company per line · exact match"
@@ -6781,6 +6797,10 @@ msgstr "Reading the board — nothing is saved"
 #: src/screens/Searches.jsx
 msgid "Reads Canadian jobs from employer career sites through the RSS search of eluta.ca: no login and no key. Location is a city with a 50 km radius; empty means all of Canada. Eluta has no remote filter. It allows 10 RSS checks a day from one address, so give each search a run interval of 1440 minutes. One run reads one feed page and at most 6 job pages; the other new jobs wait for the next run."
 msgstr "Reads Canadian jobs from employer career sites through the RSS search of eluta.ca: no login and no key. Location is a city with a 50 km radius; empty means all of Canada. Eluta has no remote filter. It allows 10 RSS checks a day from one address, so give each search a run interval of 1440 minutes. One run reads one feed page and at most 6 job pages; the other new jobs wait for the next run."
+
+#: src/screens/Searches.jsx
+msgid "Reads French tech and IT jobs from the public API of free-work.com: no login and no key. Job type picks the contracts: Contract reads freelance missions, Full-time reads CDI and CDD, Part-time reads both. Remote keeps fully remote jobs. Location is a city name; remote jobs stay. Salaries and daily rates are in euros, so they stay as text in the description."
+msgstr "Reads French tech and IT jobs from the public API of free-work.com: no login and no key. Job type picks the contracts: Contract reads freelance missions, Full-time reads CDI and CDD, Part-time reads both. Remote keeps fully remote jobs. Location is a city name; remote jobs stay. Salaries and daily rates are in euros, so they stay as text in the description."
 
 #: src/screens/Searches.jsx
 msgid "Reads the job APIs and feeds of Behance, Hollylist, Wana Create, Dribbble, ArtStation and Work With Indies directly: no login and no Apify key. Remote applies on every board: where a board cannot filter it, the jobs that the posting calls on-site or hybrid are dropped. Location (a city name) applies on Hollylist, Wana Create, Dribbble, ArtStation and Work With Indies (remote jobs stay); Behance ignores it. On Remote searches, Country drops the Behance jobs that are not open to that country. Hollylist members-only offers are skipped, and a salary is stored as a number only in US dollars per year. Test reads at most 20 job pages."

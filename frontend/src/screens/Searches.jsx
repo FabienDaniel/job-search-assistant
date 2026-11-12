@@ -108,6 +108,7 @@ const noteFor = (mode) => {
   if (mode === 'creative') return [t`Reads the job APIs and feeds of Behance, Hollylist, Wana Create, Dribbble, ArtStation and Work With Indies directly: no login and no Apify key. Remote applies on every board: where a board cannot filter it, the jobs that the posting calls on-site or hybrid are dropped. Location (a city name) applies on Hollylist, Wana Create, Dribbble, ArtStation and Work With Indies (remote jobs stay); Behance ignores it. On Remote searches, Country drops the Behance jobs that are not open to that country. Hollylist members-only offers are skipped, and a salary is stored as a number only in US dollars per year. Test reads at most 20 job pages.`, 'sm-creative']
   if (mode === 'himalayas') return [t`Reads the public API of himalayas.app: no login and no key. Every job is remote, so there is no Remote or Location. Country keeps the jobs open to that country, worldwide jobs included. A salary is stored as a number only in US dollars per year.`, 'sm-himalayas']
   if (mode === 'eluta') return [t`Reads Canadian jobs from employer career sites through the RSS search of eluta.ca: no login and no key. Location is a city with a 50 km radius; empty means all of Canada. Eluta has no remote filter. It allows 10 RSS checks a day from one address, so give each search a run interval of 1440 minutes. One run reads one feed page and at most 6 job pages; the other new jobs wait for the next run.`, 'sm-eluta']
+  if (mode === 'freework') return [t`Reads French tech and IT jobs from the public API of free-work.com: no login and no key. Job type picks the contracts: Contract reads freelance missions, Full-time reads CDI and CDD, Part-time reads both. Remote keeps fully remote jobs. Location is a city name; remote jobs stay. Salaries and daily rates are in euros, so they stay as text in the description.`, 'sm-freework']
   if (mode === 'extension') return [t`Jobs come from the “Save to Job Feed” button on any website. The filters and auto-score depth below apply to each job as it is saved.`, 'sm-levels']
   if (mode === 'linkedin_extension') return [t`Jobs are captured while you browse linkedin.com/jobs/collections pages. The filters below are applied on import.`, 'sm-levels']
   return null
@@ -166,6 +167,7 @@ const summaryOf = (s, boards = []) => {
   }
   if (m === 'himalayas') return t`“${s.search_term || ''}” · Remote${s.country ? ` · ${s.country}` : ''}${last}`
   if (m === 'eluta') return `“${s.search_term || ''}” · ${s.location || 'Canada'}${last}`
+  if (m === 'freework') return `“${s.search_term || ''}” · ${s.location || (s.is_remote ? t`Remote` : 'France')}${last}`
   return `${short(s.direct_url) || t`no URL`}${last}`
 }
 
@@ -239,6 +241,7 @@ const toPayload = (d) => {
     p.location = d.location || ''
     p.country = d.country || DEFAULT_COUNTRY
   }
+  if (d.search_mode === 'freework') p.location = d.location || ''
   return p
 }
 
@@ -394,6 +397,17 @@ function ConfigForm({ d, set }) {
       <Cell key="loc" label={t`Location`} value={d.location} onChange={(v) => set({ location: v })} placeholder={t`e.g. Vancouver`}
         sub={t`A city, 50 km around it. Empty = all of Canada.`} />,
       <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} sub={t`0 = no age limit`} />,
+    )
+  } else if (m === 'freework') {
+    fields.push(
+      <Cell key="term" label={t`Search term · required`} mono value={d.search_term} onChange={(v) => set({ search_term: v })} placeholder={t`e.g. python`} />,
+      <Cell key="jt" label={t`Job type`} value={d.job_type} options={[['contract', t`Contract`], ['fulltime', t`Full-time`], ['parttime', t`Part-time`]]} onChange={(v) => set({ job_type: v })}
+        sub={t`Contract = freelance missions. Full-time = CDI and CDD. Part-time = both.`} />,
+      <Cell key="loc" label={t`Location`} value={d.location} onChange={(v) => set({ location: v })} placeholder={t`e.g. Paris`}
+        sub={t`One city name. Empty = all of France. Remote jobs stay.`} />,
+      <Cell key="rem" label={t`Remote`} value={d.is_remote} options={[['', t`Any`], ['true', t`Remote only`]]} onChange={(v) => set({ is_remote: v })} />,
+      <Cell key="ho" label={t`Hours old · 0–720`} mono type="number" min={BOUNDS.hours_old[0]} max={BOUNDS.hours_old[1]} value={d.hours_old} onChange={(v) => set({ hours_old: v })} sub={t`0 = no age limit`} />,
+      <Cell key="rw" label={t`Results wanted · 1–500`} mono type="number" min={BOUNDS.results_wanted[0]} max={BOUNDS.results_wanted[1]} value={d.results_wanted} onChange={(v) => set({ results_wanted: v })} />,
     )
   } else if (m === 'trulyremote') {
     // The whole board is read on every run; this caps the new jobs whose pages one run opens.

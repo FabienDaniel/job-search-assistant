@@ -61,6 +61,7 @@ BOARD_HOSTS = (
     "workwithindies.com",
     "himalayas.app",
     "eluta.ca",
+    "free-work.com",
     "welcometothejungle.com",
     "lnkd.in",  # LinkedIn's short link lands on LinkedIn
 )
