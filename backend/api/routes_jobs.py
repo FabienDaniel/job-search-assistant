@@ -1485,6 +1485,9 @@ def cache_applied_jobs(
 
 def _reader_html(body_html: str, meta: str) -> str:
     """Wrap cleaned posting HTML in the shared reader shell (used by the cached-page and live-page endpoints)."""
+    from backend.scraper._shared.reader import tighten_breaks
+
+    body_html = tighten_breaks(body_html)
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>

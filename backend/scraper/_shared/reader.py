@@ -69,6 +69,59 @@ async def linkedin_posting(posting_id: str) -> str | None:
     return linkedin_html(resp.text[:2_000_000])
 
 
+# Tags that start a new line on their own, so a <br> beside one adds a blank line.
+_BLOCKS = {
+    "p", "li", "ul", "ol", "dl", "dt", "dd", "div", "section", "article", "main",
+    "table", "tr", "td", "th", "thead", "tbody", "blockquote", "pre", "hr",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+}  # fmt: skip
+
+
+def _at_block_edge(br, forward: bool) -> bool:
+    """True when only whitespace and other <br>s lie between `br` and a block boundary."""
+    node = br
+    while True:
+        sib = node.next_sibling if forward else node.previous_sibling
+        while sib is not None:
+            if isinstance(sib, str):
+                if sib.strip():
+                    return False
+            elif sib.name in _BLOCKS:
+                return True
+            elif sib.name != "br":
+                return False
+            sib = sib.next_sibling if forward else sib.previous_sibling
+        node = node.parent
+        # Leaving an inline wrapper continues the walk in its parent.
+        if node is None or node.name in _BLOCKS or node.name == "[document]":
+            return True
+
+
+def tighten_breaks(body: str) -> str:
+    """Drop the <br>s that sit beside a block boundary, and the blocks left empty.
+
+    LinkedIn ends every paragraph with <br><br> inside its <p>, which doubles the
+    gap the paragraph margin already gives.
+    """
+    soup = BeautifulSoup(body, "html.parser")
+    # html.parser nests a <br/> inside a preceding bare <br>. Flatten them first.
+    for br in soup.find_all("br"):
+        for child in reversed(list(br.contents)):
+            br.insert_after(child.extract())
+    for br in [
+        b
+        for b in soup.find_all("br")
+        if _at_block_edge(b, True) or _at_block_edge(b, False)
+    ]:
+        br.decompose()
+    for tag in soup.find_all(["p", "div"]):
+        if tag.decomposed:
+            continue
+        if not tag.get_text(strip=True) and not tag.find(["hr", "table", "ul", "ol"]):
+            tag.decompose()
+    return str(soup)
+
+
 def description_html(text: str) -> str | None:
     """The stored description rendered from Markdown, reduced to the reader's allowed tags."""
     import markdown

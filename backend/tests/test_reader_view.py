@@ -150,3 +150,49 @@ def test_a_rate_limited_fetch_saves_nothing(client, test_db, guest):
     assert "stored text" in r.text
     test_db.refresh(job)
     assert job.description_html is None
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        # LinkedIn's own paragraph shape
+        (
+            "<p>Fondé en France.<br/><br/></p><p>Avec 6000.<br/><br/></p>",
+            "<p>Fondé en France.</p><p>Avec 6000.</p>",
+        ),
+        ("<li>Python<br> </li>", "<li>Python </li>"),
+        ("<p><br>Lead</p>", "<p>Lead</p>"),
+        (
+            "<p>Intro<strong>Contexte<br><br></strong></p>",
+            "<p>Intro<strong>Contexte</strong></p>",
+        ),
+        # a break between two runs of text is the posting's own line break
+        ("<p>one<br/>two</p>", "<p>one<br/>two</p>"),
+        ("<p>a</p><p><br/></p><div> <div></div> </div><p>b</p>", "<p>a</p><p>b</p>"),
+        ("<div><hr/></div>", "<div><hr/></div>"),
+        # a bold heading LinkedIn closes with breaks before the next paragraph
+        (
+            "<div><strong>Description<br/><br/></strong><p>Rejoignez</p></div>",
+            "<div><strong>Description</strong><p>Rejoignez</p></div>",
+        ),
+        ("<p>a</p><br><br>text", "<p>a</p>text"),
+        # html.parser nests the <br/> inside the bare <br> before it
+        (
+            "<p> <br><br></p><strong>D<br/><br/></strong><p>R</p>",
+            "<strong>D</strong><p>R</p>",
+        ),
+    ],
+)
+def test_tighten_breaks(raw, expected):
+    from backend.scraper._shared.reader import tighten_breaks
+
+    assert tighten_breaks(raw) == expected
+
+
+def test_reader_drops_linkedin_paragraph_breaks(client, test_db, guest):
+    job = _linkedin_job(
+        test_db,
+        description_html="<div><p>First.<br/><br/></p><p>Second.<br/><br/></p></div>",
+    )
+    r = assert_clean(client.get(f"/api/jobs/{job.id}/reader"), 200)
+    assert "<p>First.</p><p>Second.</p>" in r.text
