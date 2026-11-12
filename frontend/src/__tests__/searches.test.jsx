@@ -198,6 +198,31 @@ describe('Himalayas and Eluta · v2 Searches', () => {
   })
 })
 
+describe('Free-Work · v2 Searches', () => {
+  beforeEach(() => { vi.clearAllMocks(); sessionStorage.clear() })
+
+  const FW = { ...SEARCH, id: 's7', name: 'Python missions', search_mode: 'freework', search_term: 'python', job_type: 'contract', location: 'Paris', is_remote: null, direct_url: '', sources: [] }
+
+  it('has its badge and summary', async () => {
+    mockApi([FW])
+    renderScreen()
+    expect((await screen.findByText('FREE-WORK')).className).toContain('sm-freework')
+    expect(screen.getByText(/“python” · Paris/)).toBeTruthy()
+  })
+
+  it('the editor has Job type, Location and Remote and no Country', async () => {
+    mockApi([FW])
+    renderScreen()
+    fireEvent.click(await screen.findByText('Python missions'))
+    await screen.findByText('Save changes')
+    expect(screen.getByText(/Contract = freelance missions/)).toBeTruthy()
+    expect(screen.getByLabelText('Job type')).toBeTruthy()
+    expect(screen.getByLabelText('Location')).toBeTruthy()
+    expect(screen.getByLabelText('Remote')).toBeTruthy()
+    expect(screen.queryByLabelText('Country')).toBeNull()
+  })
+})
+
 describe('TrulyRemoteWork · v2 Searches', () => {
   beforeEach(() => { vi.clearAllMocks(); sessionStorage.clear() })
 

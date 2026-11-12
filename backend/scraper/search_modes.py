@@ -158,6 +158,9 @@ SEARCH_MODES: dict[str, SearchMode] = {
             "himalayas", "Himalayas", "himalayas", background_test=True, needs_term=True
         ),
         SearchMode("eluta", "Eluta", "eluta", background_test=True, needs_term=True),
+        SearchMode(
+            "freework", "Free-Work", "freework", background_test=True, needs_term=True
+        ),
         SearchMode("linkedin_extension", "LinkedIn Extension", extension=True),
         SearchMode("extension", "Extension", extension=True),
     )
